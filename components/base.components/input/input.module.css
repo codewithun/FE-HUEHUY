@@ -1,0 +1,78 @@
+.input {
+    @apply text-slate-600 bg-white bg-opacity-60 backdrop-blur-sm w-full transition duration-150 ease-in-out focus:outline-none border-[1px] border-slate-200 placeholder:font-normal placeholder:text-slate-400;
+}
+
+.input:focus-visible {
+	@apply border-primary;
+}
+
+.input__error {
+	@apply border-light-danger bg-red-50;
+}
+
+.input:disabled {
+	@apply opacity-60;
+}
+
+.input__icon {
+    @apply absolute top-1/2 -translate-y-1/2;
+}
+
+.input__error__message {
+    @apply block text-left text-danger mt-1 ml-1;
+}
+
+.input__tip {
+    @apply block text-slate-400 mb-1;
+}
+
+.input__suggest__container {
+    @apply absolute left-0 mt-2 w-full bg-slate-50 shadow text-left z-30 overflow-hidden ease-in-out max-h-[200px] overflow-y-auto;
+}
+
+.input__suggest {
+    @apply w-full list-none text-slate-500 font-medium;
+}
+
+.input_values_container {
+    @apply flex gap-2 flex-nowrap w-max;
+}
+
+.input_values_item {
+    @apply flex px-1 pl-2 justify-between bg-slate-200 text-gray-500 items-center rounded-[4px];
+}
+
+.input_values_delete {
+    @apply text-sm cursor-pointer pl-2 pr-1 py-1 hover:text-danger;
+}
+
+.input_scroll::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+	position: fixed;
+	top: 0;
+	left: 0;
+}
+
+.input_scroll:hover::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+.input_scroll::-webkit-scrollbar-track {
+	box-shadow: inset 0 0 3px rgba(0, 0, 0, .2);
+	border-radius: 10px;
+}
+
+.input_scroll::-webkit-scrollbar-thumb {
+	background: rgba(0, 0, 0, .2);
+	border-radius: 10px;
+}
+
+.input_scroll::-webkit-scrollbar-thumb:hover {
+	background: rgba(0, 0, 0, .4);
+}
+
+.input__file {
+	@apply file:-mx-3 file:-my-1 file:cursor-pointer file:overflow-hidden file:rounded-md file:border-0 file:border-solid file:border-inherit file:[margin-inline-end:0.75rem] file:[border-inline-end-width:1px] file:bg-light-primary file:px-3 file:py-1 file:text-slate-500;
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.ac.unpar.unparone.twa",
+      "sha256_cert_fingerprints": [
+        "AD:69:C9:2B:25:09:DD:85:7B:93:87:87:81:F7:F1:78:69:28:05:75:5D:63:33:37:30:07:3C:54:AE:DD:A1:81"
+      ]
+    }
+  }
+]

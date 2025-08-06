@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.huehuy.app.twa",
+      "sha256_cert_fingerprints": [
+        "6C:FB:02:D7:42:8A:66:80:FF:BE:FA:ED:24:DC:FB:41:EF:E6:30:BC:3A:30:E7:48:96:BC:23:27:D6:EE:70:A6"
+      ]
+    }
+  }
+]
