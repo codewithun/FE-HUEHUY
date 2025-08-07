@@ -4,29 +4,29 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
-import React, { useEffect, useState } from 'react';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation, Autoplay } from 'swiper';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronRight,
-  faCubes,
   faGlobe,
   faIcons,
   faLocationDot,
   faMagnifyingGlass,
+  faMessage
 } from '@fortawesome/free-solid-svg-icons';
-import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { Autoplay, Navigation } from 'swiper';
+import { Swiper, SwiperSlide } from 'swiper/react';
 import {
   ButtonComponent,
   FormSupervisionComponent,
 } from '../../components/base.components';
-import Link from 'next/link';
-import { useGet } from '../../helpers';
-import CubeComponent from '../../components/construct.components/CubeComponent';
-import { distanceConvert } from '../../helpers/distanceConvert.helpers';
-import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
+import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
+import FloatingCommunityButton from '../../components/construct.components/FloatingCommunityButton';
 import MenuAdPage from '../../components/construct.components/partial-page/MenuAd.page';
+import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
+import { useGet } from '../../helpers';
+import { distanceConvert } from '../../helpers/distanceConvert.helpers';
 
 export default function Index() {
   const [map, setMap] = useState(null);
@@ -136,15 +136,27 @@ export default function Index() {
 
             <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
               <div className="relative -top-5 px-4">
-                <Link href="/app/cari">
-                  <div className="w-full bg-white border border__primary px-6 py-4 rounded-[20px] flex justify-between items-center">
-                    <p>Mulai mencari promo disini...</p>
-                    <FontAwesomeIcon
-                      icon={faMagnifyingGlass}
-                      className="text__primary"
-                    />
-                  </div>
-                </Link>
+                <div className="flex gap-3 items-center">
+                  <Link href="/app/cari" className="flex-1">
+                    <div className="w-full bg-white border border__primary px-6 py-4 rounded-[20px] flex justify-between items-center">
+                      <p>Mulai mencari promo disini...</p>
+                      <FontAwesomeIcon
+                        icon={faMagnifyingGlass}
+                        className="text__primary"
+                      />
+                    </div>
+                  </Link>
+
+                  {/* Button Pesan */}
+                  <Link href="/app/pesan">
+                    <div className="bg-white border border__primary p-4 rounded-[20px] flex justify-center items-center aspect-square">
+                      <FontAwesomeIcon
+                        icon={faMessage}
+                        className="text__primary text-lg"
+                      />
+                    </div>
+                  </Link>
+                </div>
               </div>
 
               {dataMenu?.data?.map((menu, key) => {
@@ -448,6 +460,7 @@ export default function Index() {
             </div>
 
             <BottomBarComponent active={'home'} />
+            <FloatingCommunityButton />
           </div>
         </div>
       </>
