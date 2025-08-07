@@ -1,4 +1,4 @@
-import { faArrowLeft, faFlashlight, faFlashlightSlash, faQrcode } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faBolt, faCamera, faFlashlight, faFlashlightSlash, faQrcode, faShieldCheck, faStore, faTicket } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -20,18 +20,14 @@ export default function ScanQR() {
     setIsScanning(false);
 
     try {
-      // Analisis QR Code untuk menentukan flow
       const qrData = parseQRCode(result);
       
       if (qrData.type === 'event_booth') {
-        // Flow Voucher Sekolah - Event Curiosity
         router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=event&booth=${qrData.boothId}`);
       } else if (qrData.type === 'tenant_promo') {
-        // Flow Promo Tenant
         router.push(`/app/scanner/register-tenant?qr=${encodeURIComponent(result)}&type=tenant&tenantId=${qrData.tenantId}`);
       } else {
-        // QR tidak dikenali - demo fallback
-        router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=demo&booth=DEMO01`);
+        router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=general&booth=BOOTH01`);
       }
     } catch (error) {
       console.error('Error processing QR:', error);
@@ -40,38 +36,35 @@ export default function ScanQR() {
     }
   };
 
-  const demoEventScan = () => {
-    const demoQR = 'event_booth_DEMO01';
-    handleScanResult(demoQR);
+  const scanEventBooth = () => {
+    const eventQR = 'event_booth_CURIOSITY2024';
+    handleScanResult(eventQR);
   };
 
-  const demoTenantScan = () => {
-    const demoQR = 'tenant_promo_RESTO01';
-    handleScanResult(demoQR);
+  const scanTenantPromo = () => {
+    const tenantQR = 'tenant_promo_FOODCOURT01';
+    handleScanResult(tenantQR);
   };
 
   const parseQRCode = (qrText) => {
     try {
-      // Coba parse sebagai JSON
       const data = JSON.parse(qrText);
       return data;
     } catch {
-      // Demo patterns - untuk testing dengan client
       if (qrText.includes('event') || qrText.includes('booth') || qrText.includes('curiosity')) {
         return {
           type: 'event_booth',
-          boothId: extractBoothId(qrText) || 'DEMO01'
+          boothId: extractBoothId(qrText) || 'CURIOSITY2024'
         };
-      } else if (qrText.includes('tenant') || qrText.includes('promo') || qrText.includes('resto')) {
+      } else if (qrText.includes('tenant') || qrText.includes('promo') || qrText.includes('resto') || qrText.includes('food')) {
         return {
           type: 'tenant_promo',
-          tenantId: extractTenantId(qrText) || 'RESTO01' // Ubah dari TENANT01 ke RESTO01
+          tenantId: extractTenantId(qrText) || 'FOODCOURT01'
         };
       }
-      // Fallback untuk demo - anggap semua QR sebagai event booth
       return { 
         type: 'event_booth', 
-        boothId: 'DEMO01',
+        boothId: 'CURIOSITY2024',
         data: qrText 
       };
     }
@@ -94,144 +87,168 @@ export default function ScanQR() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-primary text-white px-4 py-6">
-        <div className="flex items-center gap-4">
-          <Link href="/app">
-            <FontAwesomeIcon icon={faArrowLeft} className="text-xl" />
+    <div className="min-h-screen bg-gray-100">
+      {/* Header - Sesuai HUEHUY Style */}
+      <div className="bg-white px-4 py-4 shadow-sm border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <Link href="/app" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <FontAwesomeIcon icon={faArrowLeft} className="text-lg text-gray-700" />
           </Link>
-          <div>
-            <h1 className="text-xl font-bold">Scan QR Code</h1>
-            <p className="text-sm opacity-90">
+          <div className="flex-1">
+            <h1 className="text-lg font-semibold text-gray-900">QR Scanner</h1>
+            <p className="text-sm text-gray-600">
               {isScanning ? 'Arahkan kamera ke QR Code' : 'Memproses...'}
             </p>
+          </div>
+          <FontAwesomeIcon icon={faQrcode} className="text-xl text-gray-400" />
+        </div>
+      </div>
+
+      {/* Quick Actions - Style seperti kategori HUEHUY */}
+      <div className="p-4">
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <FontAwesomeIcon icon={faBolt} className="text-blue-600 text-sm" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 text-sm">Quick Scan</h3>
+              <p className="text-xs text-gray-500">Akses cepat untuk jenis QR tertentu</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={scanEventBooth}
+              className="bg-blue-500 text-white py-3 px-3 rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all active:scale-95"
+            >
+              <div className="flex flex-col items-center gap-1">
+                <FontAwesomeIcon icon={faTicket} className="text-base" />
+                <span className="text-xs">Event Booth</span>
+              </div>
+            </button>
+            <button
+              onClick={scanTenantPromo}
+              className="bg-green-500 text-white py-3 px-3 rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all active:scale-95"
+            >
+              <div className="flex flex-col items-center gap-1">
+                <FontAwesomeIcon icon={faStore} className="text-base" />
+                <span className="text-xs">Tenant Promo</span>
+              </div>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Demo Buttons - Untuk Testing Client */}
-      <div className="px-4 py-4 bg-yellow-50 border-b border-yellow-200">
-        <h3 className="font-semibold text-yellow-800 mb-2">🎬 Mode Demo:</h3>
-        <div className="flex gap-2">
-          <button
-            onClick={demoEventScan}
-            className="flex-1 bg-blue-500 text-white py-2 px-3 rounded-lg text-sm"
-          >
-            Demo Event Booth
-          </button>
-          <button
-            onClick={demoTenantScan}
-            className="flex-1 bg-green-500 text-white py-2 px-3 rounded-lg text-sm"
-          >
-            Demo Tenant Promo
-          </button>
-        </div>
-      </div>
-
-      {/* Scanner Area */}
-      <div className="px-4 py-6">
-        <div className="relative">
+      {/* Scanner Area - Style seperti card HUEHUY */}
+      <div className="px-4 pb-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {isScanning ? (
-            <QrScannerComponent onScan={handleScanResult} />
+            <div className="relative">
+              <QrScannerComponent onScan={handleScanResult} />
+              <div className="absolute inset-0 border-2 border-white/30 rounded-xl">
+                <div className="absolute top-3 left-3 w-5 h-5 border-l-3 border-t-3 border-white rounded-tl-lg"></div>
+                <div className="absolute top-3 right-3 w-5 h-5 border-r-3 border-t-3 border-white rounded-tr-lg"></div>
+                <div className="absolute bottom-3 left-3 w-5 h-5 border-l-3 border-b-3 border-white rounded-bl-lg"></div>
+                <div className="absolute bottom-3 right-3 w-5 h-5 border-r-3 border-b-3 border-white rounded-br-lg"></div>
+              </div>
+            </div>
           ) : (
-            <div className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center">
+            <div className="aspect-square flex items-center justify-center p-6">
               {loading ? (
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-gray-600">Memproses QR Code...</p>
+                  <div className="relative">
+                    <div className="animate-spin rounded-full h-16 w-16 border-3 border-gray-200 border-t-blue-500 mx-auto"></div>
+                    <FontAwesomeIcon icon={faQrcode} className="absolute inset-0 m-auto text-xl text-blue-500" />
+                  </div>
+                  <p className="text-gray-700 mt-3 font-medium text-sm">Memproses QR Code...</p>
+                  <p className="text-gray-400 text-xs">Mohon tunggu sebentar</p>
                 </div>
               ) : (
                 <div className="text-center">
-                  <FontAwesomeIcon icon={faQrcode} className="text-6xl text-gray-400 mb-4" />
-                  <p className="text-gray-600">QR Code berhasil dipindai</p>
+                  <div className="bg-green-50 p-4 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                    <FontAwesomeIcon icon={faShieldCheck} className="text-2xl text-green-600" />
+                  </div>
+                  <p className="text-gray-800 font-medium text-sm">QR Code Berhasil Dipindai!</p>
+                  <p className="text-gray-500 text-xs">Sedang mengarahkan...</p>
                 </div>
               )}
             </div>
           )}
         </div>
+      </div>
 
-        {/* Instructions */}
-        <div className="mt-6 bg-white rounded-xl p-4">
-          <h3 className="font-semibold mb-3">Jenis QR Code yang Didukung:</h3>
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-              <div>
-                <p className="font-medium text-blue-600">Event Booth QR</p>
-                <p className="text-sm text-gray-600">
-                  Scan di booth sekolah untuk mendapatkan voucher komunitas
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-              <div>
-                <p className="font-medium text-green-600">Tenant Promo QR</p>
-                <p className="text-sm text-gray-600">
-                  Scan di tenant untuk promo langsung dan bergabung komunitas
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Generate QR untuk Demo */}
-        <div className="mt-6 bg-gray-50 rounded-xl p-4">
-          <h3 className="font-semibold mb-3">📱 QR Code untuk Testing:</h3>
-          <div className="space-y-2 text-sm">
-            <div className="bg-white p-2 rounded border">
-              <strong>Event Booth:</strong> event_booth_DEMO01
-            </div>
-            <div className="bg-white p-2 rounded border">
-              <strong>Tenant Promo:</strong> tenant_promo_RESTO01
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Buat QR code dari text di atas menggunakan generator online
-            </p>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="mt-6 flex gap-4">
+      {/* Controls */}
+      <div className="px-4 pb-4">
+        <div className="flex gap-3">
           <button
             onClick={() => setFlashOn(!flashOn)}
-            className="flex-1 bg-white border border-gray-300 py-3 px-4 rounded-xl flex items-center justify-center gap-2"
+            className={`flex-1 py-3 px-3 rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${
+              flashOn 
+                ? 'bg-yellow-500 text-white' 
+                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
           >
-            <FontAwesomeIcon icon={flashOn ? faFlashlightSlash : faFlashlight} />
-            <span>{flashOn ? 'Matikan' : 'Nyalakan'} Flash</span>
+            <FontAwesomeIcon icon={flashOn ? faFlashlightSlash : faFlashlight} className="text-base" />
+            <span>{flashOn ? 'Matikan Flash' : 'Flash'}</span>
           </button>
           
           {!isScanning && (
             <button
               onClick={resetScanner}
-              className="flex-1 bg-primary text-white py-3 px-4 rounded-xl"
+              className="flex-1 bg-blue-500 text-white py-3 px-3 rounded-lg font-medium text-sm shadow-sm hover:shadow-md transition-all"
             >
+              <FontAwesomeIcon icon={faCamera} className="mr-2" />
               Scan Lagi
             </button>
           )}
         </div>
-
-        {/* Result Display */}
-        {scanResult && (
-          <div className="mt-6 bg-gray-50 rounded-xl p-4">
-            <h3 className="font-semibold mb-2">Hasil Scan:</h3>
-            <p className="text-sm text-gray-600 break-all">{scanResult}</p>
-          </div>
-        )}
       </div>
 
-      {/* Bottom Info */}
-      <div className="px-4 pb-28">
-        <div className="bg-blue-50 rounded-xl p-4">
-          <h3 className="font-semibold text-blue-800 mb-2">💡 Tips Demo:</h3>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Gunakan button demo di atas untuk testing cepat</li>
-            <li>• Buat QR code dari text yang disediakan</li>
-            <li>• QR apapun akan dianggap sebagai Event Booth (fallback)</li>
-            <li>• Scan QR yang mengandung kata "tenant" untuk demo tenant</li>
-          </ul>
+      {/* Information Cards */}
+      <div className="px-4 space-y-3 pb-20">
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <h3 className="font-semibold text-gray-900 mb-3 text-sm flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+            QR Code yang Didukung
+          </h3>
+          <div className="space-y-3">
+            <div className="flex gap-3 p-3 bg-blue-25 rounded-lg border border-blue-100">
+              <div className="bg-blue-500 p-1.5 rounded-lg flex-shrink-0">
+                <FontAwesomeIcon icon={faTicket} className="text-white text-xs" />
+              </div>
+              <div>
+                <p className="font-medium text-blue-800 text-sm">Event Booth</p>
+                <p className="text-xs text-blue-600">
+                  Scan untuk voucher dan bergabung dengan komunitas sekolah
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 p-3 bg-green-25 rounded-lg border border-green-100">
+              <div className="bg-green-500 p-1.5 rounded-lg flex-shrink-0">
+                <FontAwesomeIcon icon={faStore} className="text-white text-xs" />
+              </div>
+              <div>
+                <p className="font-medium text-green-800 text-sm">Tenant & Promo</p>
+                <p className="text-xs text-green-600">
+                  Dapatkan promo menarik dan bergabung dengan komunitas merchant
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {scanResult && (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 border-l-4 border-l-green-500">
+            <h3 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+              <FontAwesomeIcon icon={faShieldCheck} className="text-green-600" />
+              Hasil Scan
+            </h3>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-700 font-mono break-all">{scanResult}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

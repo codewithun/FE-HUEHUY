@@ -1,8 +1,8 @@
-import { faArrowLeft, faStore } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCheckCircle, faPhone, faStore, faUser, faWhatsapp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 export default function RegisterTenant() {
   const router = useRouter();
@@ -13,43 +13,7 @@ export default function RegisterTenant() {
     whatsapp: '',
   });
   const [loading, setLoading] = useState(false);
-  const [tenantInfo, setTenantInfo] = useState(null);
-
-  useEffect(() => {
-    // Set demo data untuk tenant
-    if (tenantId) {
-      setDemoTenantInfo(tenantId);
-    }
-  }, [tenantId]);
-
-  const setDemoTenantInfo = (id) => {
-    // Demo data untuk testing
-    const demoTenants = {
-      'RESTO01': {
-        name: 'Warung Padang Sederhana',
-        category: 'Restoran & Kuliner',
-        promo_description: 'Diskon 20% untuk semua menu + gratis es teh manis!'
-      },
-      'TENANT01': {
-        name: 'Toko Elektronik Modern',
-        category: 'Elektronik & Gadget',
-        promo_description: 'Cashback 15% untuk pembelian minimal Rp 500.000'
-      },
-      'CAFE01': {
-        name: 'Kopi Nusantara Cafe',
-        category: 'Cafe & Minuman',
-        promo_description: 'Beli 2 gratis 1 untuk semua varian kopi'
-      }
-    };
-
-    const tenant = demoTenants[id] || {
-      name: `Demo Tenant ${id}`,
-      category: 'Kategori Demo',
-      promo_description: 'Promo khusus untuk member komunitas!'
-    };
-
-    setTenantInfo(tenant);
-  };
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,17 +22,21 @@ export default function RegisterTenant() {
     setLoading(true);
     
     try {
-      // Simulasi API call untuk demo
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Delay 1.5 detik
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Demo: anggap registrasi berhasil
-      const demoResult = {
-        customerId: `CUST_${Date.now()}`,
+      const registrationData = {
+        promoId: `PROMO_${Date.now()}`,
+        tenantId: tenantId || 'FOODCOURT01',
+        userName: formData.name,
+        userPhone: formData.whatsapp,
         success: true
       };
 
-      // Langsung redirect ke halaman promo tenant
-      router.push(`/app/tenant/${tenantId}?registered=true&customerId=${demoResult.customerId}&demo=true`);
+      setSubmitted(true);
+      
+      setTimeout(() => {
+        router.push(`/app/scanner/tenant-promo?promoId=${registrationData.promoId}&tenant=${tenantId}&name=${encodeURIComponent(formData.name)}&phone=${encodeURIComponent(formData.whatsapp)}`);
+      }, 2000);
       
     } catch (error) {
       console.error('Registration error:', error);
@@ -78,121 +46,120 @@ export default function RegisterTenant() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-primary text-white px-4 py-6">
-        <div className="flex items-center gap-4">
-          <Link href="/app/scanner/scan-qr">
-            <FontAwesomeIcon icon={faArrowLeft} className="text-xl" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold">Daftar Promo Tenant</h1>
-            <p className="text-sm opacity-90">{tenantInfo?.name || `Tenant ${tenantId}`}</p>
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center px-4 max-w-sm mx-auto">
+          <div className="bg-green-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <FontAwesomeIcon icon={faCheckCircle} className="text-4xl text-green-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Registrasi Berhasil!</h2>
+          <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+            Selamat! Anda telah bergabung dengan komunitas merchant.<br/>
+            Promo akan segera dikirim ke WhatsApp Anda.
+          </p>
+          <div className="flex items-center justify-center gap-2 mb-4 bg-white rounded-full px-3 py-2 shadow-sm">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-200 border-t-green-500"></div>
+            <span className="text-xs text-gray-600">Mengalihkan ke halaman promo...</span>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Demo Banner */}
-      <div className="px-4 py-3 bg-green-50 border-b border-green-200">
-        <p className="text-sm text-green-700">
-          🎬 <strong>Mode Demo:</strong> Data tenant simulasi untuk testing
-        </p>
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <div className="bg-white px-4 py-4 shadow-sm border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <Link href="/app/scanner/scan-qr" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <FontAwesomeIcon icon={faArrowLeft} className="text-lg text-gray-700" />
+          </Link>
+          <div className="flex-1">
+            <h1 className="text-lg font-semibold text-gray-900">Daftar Tenant</h1>
+            <p className="text-sm text-gray-600">Tenant Promo - {tenantId}</p>
+          </div>
+          <FontAwesomeIcon icon={faStore} className="text-xl text-gray-400" />
+        </div>
       </div>
 
-      {/* Tenant Info */}
-      <div className="px-4 py-6">
-        {tenantInfo && (
-          <div className="bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-xl p-6 mb-6">
-            <div className="flex items-center gap-4">
-              <FontAwesomeIcon icon={faStore} className="text-3xl" />
-              <div>
-                <h2 className="text-xl font-bold">{tenantInfo.name}</h2>
-                <p className="opacity-90">{tenantInfo.category}</p>
+      {/* Registration Form */}
+      <div className="p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="text-center mb-6">
+            <div className="bg-green-50 p-3 rounded-xl w-14 h-14 mx-auto mb-3 flex items-center justify-center">
+              <FontAwesomeIcon icon={faStore} className="text-xl text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Informasi Pendaftar</h3>
+            <p className="text-sm text-gray-600">Isi data berikut untuk mendapatkan promo</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nama Lengkap *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="w-full px-4 py-3 pl-10 border border-gray-200 rounded-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all bg-gray-50"
+                  placeholder="Masukkan nama lengkap"
+                />
+                <FontAwesomeIcon 
+                  icon={faUser} 
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" 
+                />
               </div>
             </div>
-            <div className="mt-4 bg-white bg-opacity-20 rounded-lg p-3">
-              <p className="text-sm">
-                🎉 {tenantInfo.promo_description}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nomor WhatsApp *
+              </label>
+              <div className="relative">
+                <input
+                  type="tel"
+                  required
+                  value={formData.whatsapp}
+                  onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
+                  className="w-full px-4 py-3 pl-10 pr-10 border border-gray-200 rounded-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all bg-gray-50"
+                  placeholder="08xxxxxxxxxx"
+                />
+                <FontAwesomeIcon 
+                  icon={faPhone} 
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" 
+                />
+                <FontAwesomeIcon 
+                  icon={faWhatsapp} 
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 text-sm" 
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Promo akan dikirim ke nomor WhatsApp ini
               </p>
             </div>
-          </div>
-        )}
 
-        {/* Registration Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Nama Lengkap *</label>
-            <input
-              type="text"
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-primary"
-              placeholder="Masukkan nama lengkap"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Nomor WhatsApp *</label>
-            <input
-              type="tel"
-              required
-              value={formData.whatsapp}
-              onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-primary"
-              placeholder="08xxxxxxxxxx"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !formData.name || !formData.whatsapp}
-            className="w-full bg-primary text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Memproses...
-              </div>
-            ) : (
-              'Daftar & Akses Promo'
-            )}
-          </button>
-        </form>
-
-        {/* Benefits */}
-        <div className="mt-6 bg-white rounded-xl p-4">
-          <h3 className="font-semibold mb-3">Keuntungan Bergabung:</h3>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <p className="text-sm">Akses langsung ke promo tenant</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <p className="text-sm">Otomatis join komunitas</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <p className="text-sm">Voucher dengan kode unik atau QR</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <p className="text-sm">Notifikasi promo eksklusif via WhatsApp</p>
-            </div>
-          </div>
-        </div>
-
-        {/* QR Info */}
-        <div className="mt-4 bg-gray-50 rounded-xl p-4">
-          <h3 className="font-semibold mb-2">Info QR Code:</h3>
-          <p className="text-sm text-gray-600 break-all">
-            <strong>QR:</strong> {qr}
-          </p>
-          <p className="text-sm text-gray-600">
-            <strong>Tenant ID:</strong> {tenantId}
-          </p>
+            <button
+              type="submit"
+              disabled={loading || !formData.name || !formData.whatsapp}
+              className="w-full bg-green-500 text-white py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 mt-6"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Memproses Registrasi...
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <FontAwesomeIcon icon={faStore} />
+                  Daftar & Dapatkan Promo
+                </div>
+              )}
+            </button>
+          </form>
         </div>
       </div>
     </div>
