@@ -48,28 +48,21 @@ const BottomBarComponent = ({ active }) => {
                 </div>
               </Link>
             </>
-            
             {/* Scan QR di tengah */}
             <div className="relative">
               <Link href="/app/scanner/scan-qr">
                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-background w-16 rounded-2xl aspect-square flex justify-center items-center shadow-md">
-                  <FontAwesomeIcon
-                    className="text-3xl"
-                    icon={faQrcode}
-                  />
+                  <FontAwesomeIcon className="text-3xl" icon={faQrcode} />
                 </div>
               </Link>
             </div>
-            
             <>
               {/* Ganti dengan fitur lokasi */}
-              <Link href="/app/lokasi">
+              <Link href="/app/berburu">
                 <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-xl ${
-                      active == 'location'
-                        ? 'text-primary'
-                        : 'text-slate-500'
+                      active == 'location' ? 'text-primary' : 'text-slate-500'
                     }`}
                     icon={faLocationDot}
                   />
