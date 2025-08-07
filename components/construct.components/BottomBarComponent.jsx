@@ -1,14 +1,13 @@
 import {
-  faHome,
   faBookmark,
+  faHome, // ganti dengan icon QR
+  faLocationDot,
+  faQrcode,
   faUser,
-  faLocationCrosshairs,
-  faComments,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 // import { useRouter } from 'next/router';
-import React from 'react';
 import useDetectKeyboardOpen from 'use-detect-keyboard-open';
 
 const BottomBarComponent = ({ active }) => {
@@ -49,44 +48,33 @@ const BottomBarComponent = ({ active }) => {
                 </div>
               </Link>
             </>
+            
+            {/* Scan QR di tengah */}
             <div className="relative">
-              <Link href="/app/berburu">
+              <Link href="/app/scanner/scan-qr">
                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-primary text-background w-16 rounded-2xl aspect-square flex justify-center items-center shadow-md">
                   <FontAwesomeIcon
                     className="text-3xl"
-                    icon={faLocationCrosshairs}
+                    icon={faQrcode}
                   />
                 </div>
               </Link>
             </div>
+            
             <>
-              {/* <Link href="/app/notifikasi">
-                <div className="flex  flex-col justify-center items-center py-2">
+              {/* Ganti dengan fitur lokasi */}
+              <Link href="/app/lokasi">
+                <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-xl ${
-                      active == 'notification'
+                      active == 'location'
                         ? 'text-primary'
                         : 'text-slate-500'
                     }`}
-                    icon={faBell}
+                    icon={faLocationDot}
                   />
-                  {active == 'notification' && (
-                    <p className="text-xs mt-1">Notifikasi</p>
-                  )}
-                </div>
-              </Link> */}
-              <Link href="/app/pesan">
-                <div className="flex  flex-col justify-center items-center py-2">
-                  <FontAwesomeIcon
-                    className={`text-xl ${
-                      active == 'notification'
-                        ? 'text-primary'
-                        : 'text-slate-500'
-                    }`}
-                    icon={faComments}
-                  />
-                  {active == 'notification' && (
-                    <p className="text-xs mt-1">Pesan</p>
+                  {active == 'location' && (
+                    <p className="text-xs mt-1">Lokasi</p>
                   )}
                 </div>
               </Link>
