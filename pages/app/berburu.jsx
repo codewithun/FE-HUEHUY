@@ -18,8 +18,7 @@ import {
   faLock,
   faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons';
-import { withScriptjs, withGoogleMap, GoogleMap } from 'react-google-maps';
-import InfoBox from 'react-google-maps/lib/components/addons/InfoBox';
+import { GoogleMap, InfoBox, useJsApiLoader } from '@react-google-maps/api';
 import { useGet } from '../../helpers';
 import {
   ButtonComponent,
@@ -307,15 +306,6 @@ export default function Berburu() {
                                 )}
                               </div>
                             </div>
-                            {/* <div className="absolute top-5 left-0 bg-white bg-opacity-50 backdrop-blur-md  py-1 pl-2 pr-3 rounded-r-full flex gap-2 items-center">
-                            <CubeComponent
-                              size={8}
-                              color={`${item?.cube?.cube_type?.color}`}
-                            />
-                            <p className="text-xs">
-                              {item?.cube?.cube_type?.code}
-                            </p>
-                          </div> */}
                           </div>
                         </Link>
                       );
@@ -376,15 +366,6 @@ export default function Berburu() {
                                   )}
                                 </div>
                               </div>
-                              {/* <div className="absolute top-36 right-6 bg-white bg-opacity-50 backdrop-blur-md min-h-[20px] py-1.5 px-3 rounded-lg flex gap-3 items-center">
-                          <CubeComponent
-                            size={9}
-                            color={`${item?.cube?.cube_type?.color}`}
-                          />
-                          <p className="text-xs">
-                            {item?.cube?.cube_type?.code}
-                          </p>
-                        </div> */}
                             </div>
                           </Link>
                         );
@@ -473,15 +454,6 @@ export default function Berburu() {
                                       </div>
                                     </div>
                                   </div>
-                                  {/* <div className="absolute bottom-[110px] right-4 bg-white bg-opacity-50 backdrop-blur-md min-h-[20px] py-1.5 px-3 rounded-lg flex gap-2 items-center">
-                                  <CubeComponent
-                                    size={9}
-                                    color={`${ad?.cube?.cube_type?.color}`}
-                                  />
-                                  <p className="text-xs">
-                                    {ad?.cube?.cube_type?.code}
-                                  </p>
-                                </div> */}
                                 </div>
                               </Link>
                             );
@@ -507,351 +479,6 @@ export default function Berburu() {
               }
             }
           })}
-
-          {/* {dataMenu?.data?.find(
-            (menu) => menu.name == 'Kategori Promo' && menu.is_active
-          ) && (
-            <div className="px-2">
-              <div className="grid grid-cols-4 gap-7">
-                {dataPrimaryCategories?.data?.map((category, key) => {
-                  return (
-                    <Link href={`/app/cari?cari=${category?.name}`} key={key}>
-                      <div className="w-full aspect-square bg-slate-400 rounded-[12px] relative overflow-hidden flex justify-center items-center">
-                        <img
-                          src={category?.picture_source}
-                          height={1000}
-                          width={1000}
-                          alt=""
-                          className="h-full aspect-square brightness-90"
-                        />
-                        <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs">
-                          {category?.name}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-                <Link href={`/app/category`}>
-                  <div className="w-full aspect-square bg-primary rounded-[12px] relative overflow-hidden flex justify-center items-center">
-                    <FontAwesomeIcon
-                      icon={faIcons}
-                      className="text-5xl text-teal-100"
-                    />
-                    <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs">
-                      Lainnya
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            </div>
-          )} */}
-
-          {/* {dataMenu?.data?.find(
-            (menu) => menu.name == 'Promo Terdekat' && menu.is_active
-          ) && (
-            <div className="mt-8">
-              <div className="flex justify-between items-center gap-2">
-                <div>
-                  <p className="font-semibold">Promo Terdekat</p>
-                  <p className="text-xs text-slate-500">
-                    Rekomendasi promo terdekat di daerah kamu...
-                  </p>
-                </div>
-                <Link href={`/app/cari?berdasarkan=Terdekat`}>
-                  <div className="text-sm text-primary font-semibold">
-                    Lainnya
-                    <FontAwesomeIcon icon={faChevronRight} className="ml-2" />
-                  </div>
-                </Link>
-              </div>
-
-              <div className="flex flex-col gap-3 mt-4">
-                {dataNear?.data?.map((item, key) => {
-                  return (
-                    <Link href={`/app/${item?.cube?.code}`} key={key}>
-                      <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
-                        <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
-                          <img
-                            src={item?.picture_source}
-                            height={700}
-                            width={700}
-                            alt=""
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <p className="font-semibold">{item?.title}</p>
-                          <p className="text-slate-600 text-xs my-1 limit__line__2">
-                            {item?.cube?.address}
-                          </p>
-                          <div className="flex gap-2 mt-2">
-                            <p className="text-xs text-slate-600 limit__line__1">
-                              <FontAwesomeIcon icon={faLocationDot} />.{' '}
-                              {distanceConvert(item?.distance)}
-                            </p>
-                          </div>
-                        </div> */}
-          {/* <div className="absolute top-5 left-0 bg-white bg-opacity-50 backdrop-blur-md  py-1 pl-2 pr-3 rounded-r-full flex gap-2 items-center">
-                            <CubeComponent
-                              size={8}
-                              color={`${item?.cube?.cube_type?.color}`}
-                            />
-                            <p className="text-xs">
-                              {item?.cube?.cube_type?.code}
-                            </p>
-                          </div> */}
-          {/* </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )} */}
-
-          {/* {dataMenu?.data?.find(
-            (menu) => menu.name == 'Rekomendasi Promo' && menu.is_active
-          ) && (
-            <div className="mt-4">
-              <p className="text-sm font-semibold mt-8 mb-2">
-                Promo Direkomendasikan
-              </p>
-
-              <div className="flex flex-col gap-4 mt-4">
-                {dataAds?.data?.map((ad, ad_key) => {
-                  return (
-                    <Link href={`/app/${ad?.cube?.code}`} key={ad_key}>
-                      <div className="relative">
-                        <div className="aspect-[4/3] bg-slate-400 rounded-[20px] overflow-hidden brightness-90">
-                          <img
-                            src={ad?.picture_source}
-                            height={1200}
-                            width={600}
-                            alt=""
-                          />
-                        </div>
-                        <div className="absolute bottom-4 w-full px-4">
-                          <div className="bg-white bg-opacity-50 backdrop-blur-md min-h-[60px] rounded-[15px]">
-                            <div className="px-6 p-4">
-                              <p className="font-semibold">{ad?.title}</p>
-                              <div className="flex justify-between gap-2">
-                                <p className="text-slate-600 text-sm font-medium my-1 limit__line__1">
-                                  {ad?.cube?.address}
-                                </p>
-                                <p className="text-primary text-sm whitespace-nowrap">
-                                  {parseInt(ad?.distance)} KM
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div> */}
-          {/* <div className="absolute bottom-[95px] right-4 bg-white bg-opacity-50 backdrop-blur-md min-h-[20px] py-1.5 px-3 rounded-lg flex gap-3 items-center">
-                          <CubeComponent
-                            size={9}
-                            color={`${ad?.cube?.cube_type?.color}`}
-                          />
-                          <p className="text-xs">{ad?.cube?.cube_type?.code}</p>
-                        </div> */}
-          {/* </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )} */}
-
-          {/* {dataMenu?.data?.find(
-            (menu) =>
-              menu.name == 'Rekomendasi Kategori Promo' && menu.is_active
-          ) && (
-            <>
-              {dataCategories?.data?.map((category, key) => {
-                return (
-                  <div className="mt-8" key={key}>
-                    <div className="flex justify-between items-center gap-4">
-                      <div className="w-full max-w-[75%]">
-                        <p className="font-semibold">{category?.name}</p>
-                        {category?.child_categories?.at(0) && (
-                          <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2">
-                            <div className="flex flex-nowrap gap-2 w-max">
-                              <ButtonComponent size="xs" label="Semua" />
-                              {category?.child_categories?.map(
-                                (child, child_key) => {
-                                  return (
-                                    <Link
-                                      href={`/app/cari?cari=${child?.name}`}
-                                      key={child_key}
-                                    >
-                                      <ButtonComponent
-                                        size="xs"
-                                        label={child?.name}
-                                        variant="simple"
-                                      />
-                                    </Link>
-                                  );
-                                }
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <Link href={`/app/cari?cari=${category?.name}`}>
-                        <div className="text-sm text-primary font-semibold">
-                          Lainnya
-                          <FontAwesomeIcon
-                            icon={faChevronRight}
-                            className="ml-2"
-                          />
-                        </div>
-                      </Link>
-                    </div>
-
-                    <div className="flex flex-col gap-4 mt-4">
-                      {category?.ads?.map((ad, ad_key) => {
-                        return (
-                          <Link href={`/app/${ad?.cube?.code}`} key={ad_key}>
-                            <div className="relative">
-                              <div className="aspect-[4/3] bg-slate-400 rounded-[20px] overflow-hidden brightness-90">
-                                <img
-                                  src={ad?.picture_source}
-                                  height={1200}
-                                  width={600}
-                                  alt=""
-                                />
-                              </div>
-                              <div className="absolute bottom-4 w-full px-4">
-                                <div className="bg-white bg-opacity-50 backdrop-blur-md min-h-[60px] rounded-[15px]">
-                                  <div className="px-6 p-4">
-                                    <p className="font-semibold limit__line__1">
-                                      {ad?.title}
-                                    </p>
-                                    <div className="flex justify-between gap-4 items-start">
-                                      <p className="text-slate-600 text-sm font-medium my-1 limit__line__2">
-                                        {ad?.cube?.address}
-                                      </p>
-                                      {(ad?.total_remaining ||
-                                        ad?.max_grab) && (
-                                        <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                          Sisa{' '}
-                                          {ad?.total_remaining || ad?.max_grab}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div> */}
-          {/* <div className="absolute bottom-[110px] right-4 bg-white bg-opacity-50 backdrop-blur-md min-h-[20px] py-1.5 px-3 rounded-lg flex gap-2 items-center">
-                                  <CubeComponent
-                                    size={9}
-                                    color={`${ad?.cube?.cube_type?.color}`}
-                                  />
-                                  <p className="text-xs">
-                                    {ad?.cube?.cube_type?.code}
-                                  </p>
-                                </div> */}
-          {/* </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )} */}
-
-          {/* <div className="mt-6 pb-24">
-            <p className="text-sm font-semibold mt-8 mb-2">
-              Temukan Melalui Kategori
-            </p>
-
-            <div className="flex flex-col gap-3">
-              {dataChildCategories?.data?.map((item, key) => {
-                return (
-                  <div className="py-2 border-b border-slate-200" key={key}>
-                    <div className="flex justify-between ">
-                      <Link href={`/app/cari?cari=${item?.name}`}>
-                        <p className="w-2/3 whitespace-nowrap">{item?.name}</p>
-                      </Link>
-                      {item?.childs?.length ? (
-                        <div
-                          className="w-1/3 text-right"
-                          onClick={() => {
-                            if (expands?.find((e) => e == item?.id)) {
-                              setExpands(expands.filter((e) => e != item?.id));
-                            } else {
-                              setExpands([
-                                ...expands.filter((e) => e != item?.id),
-                                item?.id,
-                              ]);
-                            }
-                          }}
-                        >
-                          <FontAwesomeIcon
-                            icon={
-                              expands?.find((e) => e == item?.id)
-                                ? faChevronUp
-                                : faChevronDown
-                            }
-                          />
-                        </div>
-                      ) : (
-                        <></>
-                      )}
-                    </div>
-
-                    {expands?.find((e) => e == item?.id) && (
-                      <div className="flex flex-col gap-3 mt-2 pl-2">
-                        {item?.childs?.map((item, key) => {
-                          return (
-                            <div
-                              className="py-2 border-b border-slate-200"
-                              key={key}
-                            >
-                              <div className="flex justify-between">
-                                <Link href={`/app/cari?cari=${item?.name}`}>
-                                  <p className="w-2/3 whitespace-nowrap">
-                                    {item?.name}
-                                  </p>
-                                </Link>
-                                {item?.childs?.length ? (
-                                  <div
-                                    className="w-1/3 text-right"
-                                    onClick={() => {
-                                      if (expands?.find((e) => e == item?.id)) {
-                                        setExpands(
-                                          expands.filter((e) => e != item?.id)
-                                        );
-                                      } else {
-                                        setExpands([
-                                          ...expands.filter(
-                                            (e) => e != item?.id
-                                          ),
-                                          item?.id,
-                                        ]);
-                                      }
-                                    }}
-                                  >
-                                    <FontAwesomeIcon
-                                      icon={
-                                        expands?.find((e) => e == item?.id)
-                                          ? faChevronUp
-                                          : faChevronDown
-                                      }
-                                    />
-                                  </div>
-                                ) : (
-                                  <></>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div> */}
         </div>
 
         <FloatingPageComponent
@@ -943,54 +570,51 @@ export default function Berburu() {
   );
 }
 
-const MapWithAMarker = withScriptjs(
-  withGoogleMap(({ position, dataAds }) => {
-    return (
-      <>
-        <GoogleMap
-          defaultZoom={9}
-          defaultCenter={
-            position ? position : { lat: -6.905977, lng: 107.613144 }
-          }
-          center={position ? position : { lat: -6.905977, lng: 107.613144 }}
-          options={{
-            streetViewControl: false,
-            fullscreenControl: false,
-            disableDefaultUI: true,
-            keyboardShortcuts: false,
+function MapWithAMarker({ position, dataAds }) {
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: 'AIzaSyD74gvRdtA7NAo4j8ENoOsdy3QGXU6Oklc', // API key baru
+    libraries: ['places'],
+  });
+
+  if (!isLoaded) return <div style={{ height: '250px' }}>Loading...</div>;
+
+  return (
+    <GoogleMap
+      center={position ? position : { lat: -6.905977, lng: 107.613144 }}
+      zoom={9}
+      mapContainerStyle={{ height: '250px', width: '100%' }}
+      options={{
+        streetViewControl: false,
+        fullscreenControl: false,
+        disableDefaultUI: true,
+        keyboardShortcuts: false,
+      }}
+    >
+      {dataAds?.map((ad, key) => (
+        <InfoBox
+          position={{
+            lat: ad?.cube?.map_lat,
+            lng: ad?.cube?.map_lng,
           }}
+          options={{ closeBoxURL: '', enableEventPropagation: true }}
+          key={key}
         >
-          {dataAds?.map((ad, key) => {
-            return (
-              <InfoBox
-                defaultPosition={
-                  new google.maps.LatLng({
-                    lat: ad?.cube?.map_lat,
-                    lng: ad?.cube?.map_lng,
-                  })
-                }
-                options={{ closeBoxURL: ``, enableEventPropagation: true }}
-                key={key}
-              >
-                <Link href={`/app/${ad?.cube?.code}`}>
-                  <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
-                      {ad?.cube?.picture_source ? (
-                        <img src={ad?.cube?.picture_source} className="w-12" />
-                      ) : (
-                        <CubeComponent
-                          size={18}
-                          color={`${ad?.cube?.cube_type?.color}`}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              </InfoBox>
-            );
-          })}
-        </GoogleMap>
-      </>
-    );
-  })
-);
+          <Link href={`/app/${ad?.cube?.code}`}>
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
+                {ad?.cube?.picture_source ? (
+                  <img src={ad?.cube?.picture_source} className="w-12" />
+                ) : (
+                  <CubeComponent
+                    size={18}
+                    color={`${ad?.cube?.cube_type?.color}`}
+                  />
+                )}
+              </div>
+            </div>
+          </Link>
+        </InfoBox>
+      ))}
+    </GoogleMap>
+  );
+}
