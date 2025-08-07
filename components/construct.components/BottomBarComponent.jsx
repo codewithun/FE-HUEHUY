@@ -63,7 +63,7 @@ const BottomBarComponent = ({ active }) => {
             
             <>
               {/* Ganti dengan fitur lokasi */}
-              <Link href="/app/lokasi">
+              <Link href="/app/berburu">
                 <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-xl ${
