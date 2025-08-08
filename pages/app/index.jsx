@@ -11,6 +11,7 @@ import {
   faLocationDot,
   faMagnifyingGlass,
   faMessage,
+  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
@@ -22,6 +23,7 @@ import {
   FormSupervisionComponent,
 } from '../../components/base.components';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
+import FloatingOriginButton from '../../components/construct.components/FloatingOriginButton';
 import MenuAdPage from '../../components/construct.components/partial-page/MenuAd.page';
 import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
 import { useGet } from '../../helpers';
@@ -461,6 +463,11 @@ export default function Index() {
             <BottomBarComponent active={'home'} />
           </div>
         </div>
+        {/* Tambahkan FloatingOriginButton di luar container agar floating */}
+        <FloatingOriginButton
+          origin="Komunitas"
+          icon={<FontAwesomeIcon icon={faUsers} className="text-xl" />}
+        />
       </>
     );
   } else if (!loadingUser) {
