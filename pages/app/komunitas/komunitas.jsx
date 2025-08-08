@@ -13,14 +13,19 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
 
 export default function Komunitas() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('semua'); // semua, komunitasku, belum-gabung
+  const [activeTab, setActiveTab] = useState('semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Demo data dengan informasi yang lebih clean
   const [myCommunitiesData] = useState([
@@ -120,6 +125,12 @@ export default function Komunitas() {
     router.push(`/app/komunitas/promo?communityId=${communityId}`);
   };
 
+  // Format number function with consistent locale
+  const formatNumber = (num) => {
+    if (!isClient) return num.toString();
+    return num.toLocaleString('id-ID');
+  };
+
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
@@ -212,6 +223,7 @@ export default function Komunitas() {
                   community={community} 
                   activeTab={activeTab}
                   onOpenCommunity={handleOpenCommunity}
+                  formatNumber={formatNumber}
                 />
               ))}
             </div>
@@ -246,7 +258,7 @@ export default function Komunitas() {
 }
 
 // Community Card Component - Clean & Professional
-function CommunityCard({ community, activeTab, onOpenCommunity }) {
+function CommunityCard({ community, activeTab, onOpenCommunity, formatNumber }) {
   const [isJoining, setIsJoining] = useState(false);
 
   const handleJoinCommunity = async () => {
@@ -310,7 +322,7 @@ function CommunityCard({ community, activeTab, onOpenCommunity }) {
               <div className="flex items-center gap-4 text-xs text-gray-500">
                 <div className="flex items-center gap-1">
                   <FontAwesomeIcon icon={faUserFriends} />
-                  <span>{community.members.toLocaleString()} member</span>
+                  <span>{formatNumber(community.members)} member</span>
                 </div>
                 <div className="px-2 py-1 bg-gray-100 rounded-full">
                   <span className="text-gray-700 font-medium">{community.category}</span>
