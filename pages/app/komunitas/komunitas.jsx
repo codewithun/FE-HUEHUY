@@ -57,17 +57,17 @@ export default function Komunitas() {
 
   const [allCommunitiesData] = useState([
     ...myCommunitiesData,
-    {
-      id: 3,
-      name: 'Tech Startup Indonesia',
-      description: 'Komunitas startup untuk networking dan berbagi pengalaman bisnis',
-      members: 2456,
-      category: 'Teknologi',
-      isJoined: false,
-      privacy: 'public',
-      activePromos: 6,
-      isVerified: true
-    },
+    // {
+    //   id: 3,
+    //   name: 'Tech Startup Indonesia',
+    //   description: 'Komunitas startup untuk networking dan berbagi pengalaman bisnis',
+    //   members: 2456,
+    //   category: 'Teknologi',
+    //   isJoined: false,
+    //   privacy: 'public',
+    //   activePromos: 6,
+    //   isVerified: true
+    // },
     {
       id: 4,
       name: 'Photography Enthusiast',
