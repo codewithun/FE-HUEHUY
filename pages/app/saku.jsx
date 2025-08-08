@@ -1,22 +1,29 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
-import React, { useState, useEffect } from 'react';
-import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
-import { IconButtonComponent } from '../../components/base.components';
-import { useGet } from '../../helpers';
-import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
-import { QRCodeSVG } from 'qrcode.react';
 import {
+  faArrowLeft,
   faArrowRight,
+  faCheckCircle,
   faChevronRight,
+  faClock,
+  faExclamationTriangle,
+  faGift,
   faRoute,
+  faTag,
+  faTimesCircle,
+  faWallet, // Icon saku/dompet
 } from '@fortawesome/free-solid-svg-icons';
-import CubeComponent from '../../components/construct.components/CubeComponent';
-import Link from 'next/link';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import moment from 'moment';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { QRCodeSVG } from 'qrcode.react';
+import { useEffect, useState } from 'react';
+import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
+import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
 
 export default function Save() {
+  const router = useRouter();
   const [modalValidation, setModalValidation] = useState(false);
   const [selected, setSelected] = useState(null);
   const [data, setData] = useState({ data: [] });
@@ -27,252 +34,360 @@ export default function Save() {
     setData({ data: vouchers });
   }, []);
 
+  // Helper function untuk menghitung waktu kedaluwarsa
+  const getTimeRemaining = (expiredAt) => {
+    if (!expiredAt) return null;
+    
+    const now = moment();
+    const expired = moment(expiredAt);
+    const duration = moment.duration(expired.diff(now));
+    
+    const hours = Math.floor(duration.asHours());
+    const minutes = Math.floor(duration.asMinutes()) % 60;
+    
+    if (hours > 0) {
+      return `${hours} jam ${minutes} menit lagi`;
+    } else if (minutes > 0) {
+      return `${minutes} menit lagi`;
+    } else {
+      return 'Sudah kedaluwarsa';
+    }
+  };
+
+  // Helper function untuk status badge
+  const getStatusBadge = (item) => {
+    if (item?.validation_at) {
+      return (
+        <div className="flex items-center gap-1">
+          <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
+          <span className="font-medium text-success bg-green-50 px-2 py-1 rounded-full text-xs">
+            Sudah divalidasi
+          </span>
+        </div>
+      );
+    } else if (item?.ad?.status !== 'active') {
+      return (
+        <div className="flex items-center gap-1">
+          <FontAwesomeIcon icon={faTimesCircle} className="text-danger text-xs" />
+          <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">
+            Promo Ditutup
+          </span>
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex items-center gap-1">
+          <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
+          <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded-full text-xs">
+            Belum divalidasi
+          </span>
+        </div>
+      );
+    }
+  };
+
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
-        <div className="bg-primary w-full px-4 pt-4 pb-14">
-          <h2 className="text-white font-semibold">Saku Promo Kamu</h2>
-          <p className="text-slate-300 text-sm mt-1">
-            Kumpulan promo yang kamu rebut...
-          </p>
+        {/* Header Section tanpa icon barcode */}
+        <div className="bg-primary w-full px-4 py-4 flex items-center">
+          {/* Arrow Back */}
+          <button
+            onClick={() => router.push('/app')}
+            className="text-white hover:text-white/80 transition-colors mr-4"
+          >
+            <FontAwesomeIcon icon={faArrowLeft} className="text-xl" />
+          </button>
+
+          {/* Title - centered */}
+          <h2 className="text-white font-semibold text-lg flex-1 text-center">Saku Promo</h2>
         </div>
 
-        <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-8 relative z-20 pb-28">
-          <div className="px-4">
-            <div className="flex flex-col gap-3">
-              {data?.data?.length ? (
-                data?.data?.map((item, key) => (
+        {/* Content Section */}
+        <div className="bg-slate-50 min-h-screen w-full pb-32">
+          <div className="px-4 pt-6">
+            {/* Info Card */}
+            <div className="bg-white rounded-xl p-4 mb-6 shadow-sm border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                  <FontAwesomeIcon icon={faWallet} className="text-primary text-xl" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-800">Koleksi Promo Anda</h3>
+                  <p className="text-slate-500 text-sm">
+                    {data?.data?.length || 0} item tersimpan
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {data?.data?.length ? (
+              <div className="space-y-4">
+                {data?.data?.map((item, key) => (
                   <div
-                    className={`grid grid-cols-4 gap-3 p-3 shadow-neuro rounded-[15px] relative cursor-pointer bg-white`}
+                    className="bg-white rounded-2xl p-4 shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                     key={key}
                     onClick={() => {
                       setModalValidation(true);
                       setSelected(item);
                     }}
                   >
-                    <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-100 flex justify-center items-center">
-                      <img
-                        src={item?.ad?.picture_source}
-                        height={700}
-                        width={700}
-                        alt=""
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <p className="font-semibold">{item?.ad?.title}</p>
-                      <p className="text-slate-600 text-xs mb-2">
-                        {item?.ad?.cube?.address}
-                      </p>
-                      {item?.voucher_item ? (
-                        <span className="font-medium text-success bg-green-50 px-2 py-1 rounded">
-                          Voucher
-                        </span>
-                      ) : (
-                        <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded">
-                          Promo
-                        </span>
-                      )}
-                      {/* Status & Expired */}
-                      {item?.validation_at ? (
-                        <span className="font-medium text-success block mt-1">
-                          Sudah divalidasi
-                        </span>
-                      ) : item?.ad?.status != 'active' ? (
-                        <span className="font-medium text-danger block mt-1">
-                          Promo Ditutup
-                        </span>
-                      ) : (
-                        <span className="font-medium text-warning block mt-1">
-                          Belum divalidasi
-                        </span>
-                      )}
-                      {item?.expired_at && (
-                        <p className="text-danger text-xs mb-2">
-                          Batas waktu:{' '}
-                          {ExpiredHour > 1
-                            ? ExpiredHour.toString()?.split('.')[0] +
-                              ' Jam Lagi'
-                            : ExpiredMinutes.toString()?.split('.')[0] +
-                              ' Menit Lagi'}
-                        </p>
-                      )}
+                    <div className="flex gap-4">
+                      {/* Image Section */}
+                      <div className="w-20 h-20 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex justify-center items-center group-hover:scale-105 transition-transform duration-300">
+                        {item?.ad?.picture_source ? (
+                          <img
+                            src={item?.ad?.picture_source}
+                            className="w-full h-full object-cover"
+                            alt={item?.ad?.title || 'Promo'}
+                          />
+                        ) : (
+                          <FontAwesomeIcon icon={faTag} className="text-slate-400 text-2xl" />
+                        )}
+                      </div>
+
+                      {/* Content Section - tanpa arrow icon */}
+                      <div className="flex-1 min-w-0">
+                        <div className="mb-2">
+                          <h3 className="font-semibold text-slate-800 text-base leading-tight">
+                            {item?.ad?.title || 'Promo Tanpa Judul'}
+                          </h3>
+                        </div>
+
+                        {/* Type Badge */}
+                        <div className="flex items-center gap-2 mb-2">
+                          {item?.voucher_item ? (
+                            <span className="inline-flex items-center gap-1 font-medium text-success bg-emerald-50 px-3 py-1 rounded-full text-xs border border-emerald-200">
+                              <FontAwesomeIcon icon={faGift} />
+                              Voucher
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 font-medium text-warning bg-amber-50 px-3 py-1 rounded-full text-xs border border-amber-200">
+                              <FontAwesomeIcon icon={faTag} />
+                              Promo
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Status */}
+                        <div className="mb-2">
+                          {getStatusBadge(item)}
+                        </div>
+
+                        {/* Expiry Information */}
+                        {item?.expired_at && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <FontAwesomeIcon icon={faClock} className="text-red-500" />
+                            <span className="text-red-600 font-medium">
+                              {getTimeRemaining(item.expired_at)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center mt-6 font-medium text-slate-500">
-                  Upss.. belum ada promo atau voucher yang kamu rebut!
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <div className="w-24 h-24 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
+                  <FontAwesomeIcon icon={faWallet} className="text-slate-400 text-3xl" />
                 </div>
-              )}
-            </div>
+                <h3 className="font-semibold text-slate-600 mb-2">Saku Promo Kosong</h3>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto">
+                  Jelajahi kubus dan kumpulkan promo untuk mengisi saku Anda
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
         <BottomBarComponent active={'save'} />
       </div>
 
+      {/* Modal Bottom Sheet */}
       <BottomSheetComponent
-        title={'Validasi Promo'}
+        title={'Detail Promo'}
         show={modalValidation}
         onClose={() => {
           setModalValidation(false);
           setSelected(null);
         }}
-        height={550}
+        height={600}
       >
-        <div className="p-4">
-          <div className="flex justify-between mt-3">
-            <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Promo</p>
-              <h4 className="font-semibold text-xl">{selected?.ad?.title}</h4>
-            </div>
-
-            <Link href={`/app/${selected?.ad?.cube?.code}`}>
-              <div className="text-sm text-primary">
-                Buka Detail Iklan <FontAwesomeIcon icon={faChevronRight} />
+        <div className="p-4 space-y-4">
+          {/* Header Info */}
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h4 className="font-bold text-xl text-slate-800 leading-tight mb-2">
+                  {selected?.ad?.title}
+                </h4>
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faTag} className="text-primary text-sm" />
+                  <span className="text-sm font-medium text-slate-600">
+                    {selected?.voucher_item ? 'Voucher' : 'Promo'}
+                  </span>
+                </div>
               </div>
-            </Link>
+
+              <Link href={`/app/${selected?.ad?.cube?.code}`}>
+                <div className="flex items-center gap-1 text-sm text-primary font-medium bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors">
+                  Detail
+                  <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+                </div>
+              </Link>
+            </div>
           </div>
 
-          {selected?.ad?.cube?.tags?.at(0)?.address && (
-            <div className="flex justify-between items-center gap-3 mt-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500 mt-3 mb-1">
-                  Get Direction (Lokasi Validasi)
-                </p>
-                <p className="col-span-3">
-                  {selected?.ad?.cube?.tags?.at(0)?.address}
-                </p>
+          {/* Contact Information */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <h5 className="font-semibold text-slate-800 mb-3">Informasi Kontak</h5>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600 text-sm">Pemilik</span>
+                <span className="text-slate-800 font-medium text-sm">
+                  {selected?.ad?.cube?.user?.name || selected?.ad?.cube?.corporate?.name || '-'}
+                </span>
               </div>
-              <a
-                href={`http://www.google.com/maps/place/${
-                  selected?.ad?.cube?.tags?.at(0)?.map_lat
-                },${selected?.ad?.cube?.tags?.at(0)?.map_lng}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex flex-col items-center"
-              >
-                <IconButtonComponent
-                  icon={faRoute}
-                  size="xl"
-                  variant="simple"
-                  className="mt-3"
-                />
-                <div className="text-sm -mt-2">Rute</div>
-              </a>
-            </div>
-          )}
-
-          {selected?.ad?.cube?.tags?.at(0)?.link && (
-            <div className="flex justify-between items-center gap-3 mt-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500 mt-3 mb-1">
-                  Link Toko Online
-                </p>
-                <p className="col-span-3">
-                  {selected?.ad?.cube?.tags?.at(0)?.link}
-                </p>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600 text-sm">No. Telepon</span>
+                <span className="text-slate-800 font-medium text-sm">
+                  {selected?.ad?.cube?.user?.phone || selected?.ad?.cube?.corporate?.phone || '-'}
+                </span>
               </div>
-              <a
-                href={selected?.ad?.cube?.tags?.at(0)?.link}
-                target="_blank"
-                rel="noreferrer"
-                className="flex flex-col items-center"
-              >
-                <IconButtonComponent
-                  icon={faArrowRight}
-                  size="xl"
-                  variant="simple"
-                  className="mt-3"
-                />
-                <div className="text-sm -mt-2">Buka</div>
-              </a>
             </div>
-          )}
-
-          <p className="text-sm font-medium text-slate-500 mt-5 mb-1">
-            Informasi Pemilik Kubus
-          </p>
-          <div className="grid grid-cols-4">
-            <p>Nama </p>
-            <p className="col-span-3">
-              :{' '}
-              {selected?.ad?.cube?.user?.name ||
-                selected?.ad?.cube?.corporate?.name}
-            </p>
-            <p>No Hp/WA</p>
-            <p className="col-span-3">
-              :{' '}
-              {selected?.ad?.cube?.user?.phone ||
-                selected?.ad?.cube?.corporate?.phone}
-            </p>
           </div>
+
+          {/* Location or Online Store */}
+          {(selected?.ad?.cube?.tags?.at(0)?.address || selected?.ad?.cube?.tags?.at(0)?.link) && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <h5 className="font-semibold text-slate-800 mb-3">Lokasi/Link</h5>
+              
+              {selected?.ad?.cube?.tags?.at(0)?.address && (
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-600">Alamat:</span>
+                    <p className="text-slate-800 text-sm font-medium">
+                      {selected?.ad?.cube?.tags?.at(0)?.address}
+                    </p>
+                  </div>
+                  <a
+                    href={`http://www.google.com/maps/place/${
+                      selected?.ad?.cube?.tags?.at(0)?.map_lat
+                    },${selected?.ad?.cube?.tags?.at(0)?.map_lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-primary/10 p-2 rounded-lg hover:bg-primary/20 transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faRoute} className="text-primary" />
+                  </a>
+                </div>
+              )}
+
+              {selected?.ad?.cube?.tags?.at(0)?.link && (
+                <div className="flex justify-between items-center">
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-600">Online Store:</span>
+                    <p className="text-slate-800 text-sm font-medium truncate">
+                      {selected?.ad?.cube?.tags?.at(0)?.link}
+                    </p>
+                  </div>
+                  <a
+                    href={selected?.ad?.cube?.tags?.at(0)?.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-primary/10 p-2 rounded-lg hover:bg-primary/20 transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faArrowRight} className="text-primary" />
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {selected?.validation_at ? (
-          <div className="py-8 border border-primary rounded-[15px]">
-            <div className="font-medium text-success text-center text-lg">
-              Promo Sudah Divalidasi
+        {/* QR Code Section */}
+        <div className="px-4 pb-6">
+          {selected?.validation_at ? (
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl py-8">
+              <div className="text-center">
+                <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-4xl mb-3" />
+                <div className="font-bold text-green-700 text-lg">
+                  Promo Telah Digunakan
+                </div>
+                <p className="text-green-600 text-sm mt-1">Terima kasih</p>
+              </div>
             </div>
-          </div>
-        ) : selected?.ad?.status != 'active' ? (
-          <div className="py-8 border border-danger rounded-[15px]">
-            <div className="font-medium text-danger text-center text-lg">
-              Promo Ditutup
+          ) : selected?.ad?.status !== 'active' ? (
+            <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
+              <div className="text-center">
+                <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />
+                <div className="font-bold text-red-700 text-lg">
+                  Promo Tidak Tersedia
+                </div>
+                <p className="text-red-600 text-sm mt-1">Promo sudah berakhir</p>
+              </div>
             </div>
-          </div>
-        ) : selected?.voucher_item?.code ? (
-          <div className="mt-6 py-8 rounded-[20px] bg-white px-6">
-            <div>Voucher Promo</div>
-            <h4 className="text-xl font-semibold">
-              Kode Voucher: {selected?.voucher_item?.code}
-            </h4>
-            {/* Tambahkan QR untuk validasi tenant */}
-            <div className="flex flex-col items-center mt-4">
-              <QRCodeSVG
-                value={selected?.voucher_item?.code}
-                size={160}
-                bgColor="#f8fafc"
-                fgColor="#0f172a"
-                level="H"
-                includeMargin={true}
-                className="rounded-lg"
-              />
-              <button
-                className="mt-4 px-4 py-2 rounded-full bg-primary text-white font-semibold shadow-neuro hover:bg-primary/80 transition"
-                onClick={() => {
-                  // Aksi validasi QR oleh tenant, misal open scanner/modal
-                  alert('QR siap divalidasi oleh tenant!');
-                }}
-              >
-                Validasi QR ke Tenant
-              </button>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="text-center">
+                <div className="mb-4">
+                  <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
+                    {selected?.voucher_item?.code ? 'Kode Voucher' : 'QR Code'}
+                  </span>
+                </div>
+                
+                {selected?.voucher_item?.code ? (
+                  <>
+                    <h4 className="text-2xl font-bold text-slate-800 mb-4">
+                      {selected?.voucher_item?.code}
+                    </h4>
+                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                      <QRCodeSVG
+                        value={selected?.voucher_item?.code}
+                        size={180}
+                        bgColor="#f8fafc"
+                        fgColor="#0f172a"
+                        level="H"
+                        includeMargin={true}
+                        className="mx-auto rounded-lg"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                      <QRCodeSVG
+                        value={selected?.code}
+                        size={180}
+                        bgColor="#f8fafc"
+                        fgColor="#0f172a"
+                        className="mx-auto rounded-lg"
+                      />
+                    </div>
+                    <div className="text-xl font-bold text-slate-600 mb-4">
+                      {selected?.code}
+                    </div>
+                  </>
+                )}
+                
+                <button
+                  className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+                  onClick={() => {
+                    alert('QR Code siap untuk divalidasi');
+                  }}
+                >
+                  <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                  Validasi Promo
+                </button>
+                <p className="text-slate-500 text-xs mt-3">
+                  Tunjukkan kode ini kepada merchant
+                </p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="mt-6 py-8 rounded-t-[20px] bg-white p-4">
-            <div className="flex justify-center">
-              <QRCodeSVG
-                value={selected?.code}
-                width={'40vw'}
-                height={'40vw'}
-              />
-            </div>
-            <strong className="block mt-2 text-xl text-center text-slate-500">
-              {selected?.code}
-            </strong>
-            {/* Tombol validasi QR */}
-            <button
-              className="mt-4 px-4 py-2 rounded-full bg-primary text-white font-semibold shadow-neuro hover:bg-primary/80 transition"
-              onClick={() => {
-                // Aksi validasi QR oleh tenant
-                alert('QR siap divalidasi oleh tenant!');
-              }}
-            >
-              Validasi QR ke Tenant
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </BottomSheetComponent>
     </>
   );

@@ -1,9 +1,9 @@
 import {
-  faBookmark,
   faHome, // ganti dengan icon QR
   faLocationDot,
   faQrcode,
   faUser,
+  faWallet, // ganti faBookmark dengan faWallet untuk saku
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
@@ -42,7 +42,7 @@ const BottomBarComponent = ({ active }) => {
                     className={`text-xl ${
                       active == 'save' ? 'text-primary' : 'text-slate-500'
                     }`}
-                    icon={faBookmark}
+                    icon={faWallet}
                   />
                   {active == 'save' && <p className="text-xs mt-1">Saku</p>}
                 </div>
