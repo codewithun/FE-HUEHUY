@@ -22,7 +22,6 @@ import {
   FormSupervisionComponent,
 } from '../../components/base.components';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
-import FloatingCommunityButton from '../../components/construct.components/FloatingCommunityButton';
 import MenuAdPage from '../../components/construct.components/partial-page/MenuAd.page';
 import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
 import { useGet } from '../../helpers';
@@ -460,7 +459,6 @@ export default function Index() {
             </div>
 
             <BottomBarComponent active={'home'} />
-            <FloatingCommunityButton />
           </div>
         </div>
       </>
