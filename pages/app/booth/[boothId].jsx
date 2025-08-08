@@ -19,7 +19,7 @@ import QrScannerComponent from '../../../components/construct.components/QrScann
 
 export default function EventBoothPromo() {
   const router = useRouter();
-  const { boothId, registered, customerId } = router.query;
+  const { boothId, registered } = router.query;
   
   const [boothData, setBoothData] = useState(null);
   const [activeMethod, setActiveMethod] = useState('code');
@@ -207,7 +207,7 @@ export default function EventBoothPromo() {
       await new Promise(resolve => setTimeout(resolve, 1500));
       setJoinedCommunity(true);
     } catch (error) {
-      console.error('Auto join community error:', error);
+      // Error handling for auto join community (logging removed)
     }
   };
 
@@ -234,7 +234,6 @@ export default function EventBoothPromo() {
       }, 3000);
       
     } catch (error) {
-      console.error('Claim voucher error:', error);
       alert('Terjadi kesalahan sistem. Silakan coba lagi dalam beberapa saat.');
     } finally {
       setLoading(false);
@@ -266,7 +265,6 @@ export default function EventBoothPromo() {
       }, 3000);
       
     } catch (error) {
-      console.error('QR scan error:', error);
       alert('Terjadi kesalahan sistem. Silakan coba lagi dalam beberapa saat.');
       setIsScanning(false);
     } finally {
