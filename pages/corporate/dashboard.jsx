@@ -9,14 +9,63 @@ import {
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { token_cookie_name, useGet } from '../../helpers';
-import { GoogleMap, withGoogleMap, withScriptjs } from 'react-google-maps';
-import { InfoBox } from 'react-google-maps/lib/components/addons/InfoBox';
+import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
 import Image from 'next/image';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { CorporateLayout } from '../../components/construct.components/layout/Corporate.layout';
 import CubeComponent from '../../components/construct.components/CubeComponent';
 import { useUserContext } from '../../context/user.context';
 import Cookies from 'js-cookie';
+
+const mapContainerStyle = {
+  width: '100%',
+  height: '500px',
+};
+
+function MapWithAMarker({ position, dataAds }) {
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: 'AIzaSyD74gvRdtA7NAo4j8ENoOsdy3QGXU6Oklc',
+    libraries: ['places'],
+  });
+
+  if (!isLoaded) return <div style={{ height: '500px' }}>Loading...</div>;
+
+  return (
+    <GoogleMap
+      mapContainerStyle={mapContainerStyle}
+      zoom={10}
+      center={position ? position : { lat: -6.905977, lng: 107.613144 }}
+      options={{
+        streetViewControl: false,
+        fullscreenControl: false,
+        disableDefaultUI: true,
+        keyboardShortcuts: false,
+      }}
+    >
+      {dataAds?.map((ad, key) => (
+        <Marker
+          key={key}
+          position={{ lat: ad?.map_lat, lng: ad?.map_lng }}
+          icon={{
+            url: '/cube-icon.png',
+            scaledSize: { width: 32, height: 32 },
+          }}
+        >
+          <InfoWindow position={{ lat: ad?.map_lat, lng: ad?.map_lng }}>
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
+                <CubeComponent
+                  size={18}
+                  color={`#${ad?.cube?.cube_type?.color}`}
+                />
+              </div>
+            </div>
+          </InfoWindow>
+        </Marker>
+      ))}
+    </GoogleMap>
+  );
+}
 
 export default function Index() {
   const [map, setMap] = useState(null);
@@ -108,14 +157,9 @@ export default function Index() {
 
       <div className="mt-2 relative overflow-hidden rounded-[20px]">
         <MapWithAMarker
-          googleMapURL="https://maps.googleapis.com/maps/api/js?key=AIzaSyBLjp3NfOdkLbKJ85DFBg3CCQuIoKEzVZc&v=3.exp&libraries=geometry,drawing,places"
-          loadingElement={<div style={{ height: `500px` }} />}
-          containerElement={<div style={{ height: `500px` }} />}
-          mapElement={<div style={{ height: `500px` }} />}
           position={map}
           dataAds={dataAds?.data}
         />
-
         <div
           className="absolute top-4 right-4 w-12 h-12 bg-white flex items-center justify-center rounded-lg"
           onClick={() => setRefreshMap(!refreshMap)}
@@ -130,49 +174,3 @@ export default function Index() {
 Index.getLayout = function getLayout(page) {
   return <CorporateLayout>{page}</CorporateLayout>;
 };
-
-const MapWithAMarker = withScriptjs(
-  withGoogleMap(({ position, dataAds }) => {
-    return (
-      <>
-        <GoogleMap
-          defaultZoom={10}
-          defaultCenter={
-            position ? position : { lat: -6.905977, lng: 107.613144 }
-          }
-          center={position ? position : { lat: -6.905977, lng: 107.613144 }}
-          options={{
-            streetViewControl: false,
-            fullscreenControl: false,
-            disableDefaultUI: true,
-            keyboardShortcuts: false,
-          }}
-        >
-          {dataAds?.map((ad, key) => {
-            return (
-              <InfoBox
-                defaultPosition={
-                  new google.maps.LatLng({
-                    lat: ad?.map_lat,
-                    lng: ad?.map_lng,
-                  })
-                }
-                options={{ closeBoxURL: ``, enableEventPropagation: true }}
-                key={key}
-              >
-                <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
-                    <CubeComponent
-                      size={18}
-                      color={`#${ad?.cube?.cube_type?.color}`}
-                    />
-                  </div>
-                </div>
-              </InfoBox>
-            );
-          })}
-        </GoogleMap>
-      </>
-    );
-  })
-);
