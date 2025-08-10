@@ -1,14 +1,6 @@
 import {
   faArrowLeft,
-  faBuilding,
-  faCrown,
-  faGlobe,
-  faLock,
-  faPlus,
-  faSearch,
-  faShield,
-  faUserFriends,
-  faUsers
+  faSearch
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
@@ -27,49 +19,79 @@ export default function Komunitas() {
     setIsClient(true);
   }, []);
 
-  // Demo data dengan informasi yang lebih clean
+  // Demo data dengan lebih banyak komunitas
   const [myCommunitiesData] = useState([
     {
       id: 1,
-      name: 'Event Curiosity 2024',
-      description: 'Komunitas peserta Event Curiosity dengan berbagai benefit eksklusif',
+      name: 'dbotanica Bandung',
+      description: 'Mall perbelanjaan standar dengan beragam toko dan tempat kuliner menarik',
       members: 1234,
-      category: 'Event',
+      category: 'Shopping',
       isOwner: false,
       isAdmin: true,
       privacy: 'public',
       activePromos: 8,
-      isVerified: true
+      isVerified: true,
+      avatar: '/api/placeholder/50/50'
     },
     {
       id: 2,
-      name: 'Foodie Lovers Jakarta',
-      description: 'Komunitas pecinta kuliner dengan pengalaman dan rekomendasi terbaik',
+      name: 'Sunscape Event Organizer',
+      description: 'Sunscape Event Organizer adalah penyelenggara acara profesional',
       members: 856,
-      category: 'Kuliner',
+      category: 'Event',
       isOwner: true,
       isAdmin: true,
       privacy: 'private',
       activePromos: 12,
-      isVerified: false
+      isVerified: false,
+      avatar: '/api/placeholder/50/50'
+    },
+    {
+      id: 3,
+      name: 'Kuliner Bandung Selatan',
+      description: 'Komunitas pecinta kuliner area Bandung Selatan dan sekitarnya',
+      members: 2341,
+      category: 'Kuliner',
+      isOwner: false,
+      isAdmin: false,
+      privacy: 'public',
+      activePromos: 15,
+      isVerified: true,
+      avatar: '/api/placeholder/50/50'
+    },
+    {
+      id: 4,
+      name: 'Otomotif Enthusiast',
+      description: 'Komunitas penggemar otomotif, modifikasi, dan spare part',
+      members: 892,
+      category: 'Otomotif',
+      isOwner: false,
+      isAdmin: true,
+      privacy: 'public',
+      activePromos: 6,
+      isVerified: false,
+      avatar: '/api/placeholder/50/50'
+    },
+    {
+      id: 5,
+      name: 'Fashion & Style Bandung',
+      description: 'Komunitas fashion, style, dan shopping outfit terkini',
+      members: 1567,
+      category: 'Fashion',
+      isOwner: false,
+      isAdmin: false,
+      privacy: 'public',
+      activePromos: 22,
+      isVerified: true,
+      avatar: '/api/placeholder/50/50'
     }
   ]);
 
   const [allCommunitiesData] = useState([
     ...myCommunitiesData,
-    // {
-    //   id: 3,
-    //   name: 'Tech Startup Indonesia',
-    //   description: 'Komunitas startup untuk networking dan berbagi pengalaman bisnis',
-    //   members: 2456,
-    //   category: 'Teknologi',
-    //   isJoined: false,
-    //   privacy: 'public',
-    //   activePromos: 6,
-    //   isVerified: true
-    // },
     {
-      id: 4,
+      id: 6,
       name: 'Photography Enthusiast',
       description: 'Komunitas fotografi untuk sharing tips dan teknik photography',
       members: 1890,
@@ -77,10 +99,11 @@ export default function Komunitas() {
       isJoined: false,
       privacy: 'public',
       activePromos: 4,
-      isVerified: false
+      isVerified: false,
+      avatar: '/api/placeholder/50/50'
     },
     {
-      id: 5,
+      id: 7,
       name: 'Business Network Club',
       description: 'Komunitas eksklusif untuk networking bisnis dan profesional',
       members: 234,
@@ -88,7 +111,44 @@ export default function Komunitas() {
       isJoined: false,
       privacy: 'private',
       activePromos: 15,
-      isVerified: true
+      isVerified: true,
+      avatar: '/api/placeholder/50/50'
+    },
+    {
+      id: 8,
+      name: 'Fitness & Health Community',
+      description: 'Komunitas kesehatan, fitness, dan gaya hidup sehat',
+      members: 987,
+      category: 'Kesehatan',
+      isJoined: false,
+      privacy: 'public',
+      activePromos: 7,
+      isVerified: false,
+      avatar: '/api/placeholder/50/50'
+    },
+    {
+      id: 9,
+      name: 'Tech Startup Bandung',
+      description: 'Komunitas startup teknologi dan digital di Bandung',
+      members: 445,
+      category: 'Teknologi',
+      isJoined: false,
+      privacy: 'private',
+      activePromos: 3,
+      isVerified: true,
+      avatar: '/api/placeholder/50/50'
+    },
+    {
+      id: 10,
+      name: 'Traveling Backpacker',
+      description: 'Komunitas traveler dan backpacker untuk sharing destinasi',
+      members: 1678,
+      category: 'Travel',
+      isJoined: false,
+      privacy: 'public',
+      activePromos: 9,
+      isVerified: false,
+      avatar: '/api/placeholder/50/50'
     }
   ]);
 
@@ -120,9 +180,9 @@ export default function Komunitas() {
     return data;
   };
 
-  // Function untuk handle buka komunitas - redirect ke promo
+  // Function untuk handle buka komunitas - redirect langsung ke dashboard
   const handleOpenCommunity = (communityId) => {
-    router.push(`/app/komunitas/promo?communityId=${communityId}`);
+    router.push(`/app/komunitas/dashboard/${communityId}`);
   };
 
   // Format number function with consistent locale
@@ -135,112 +195,158 @@ export default function Komunitas() {
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="container mx-auto relative z-10 pb-28">
-          {/* Header Banner Clean */}
-          <div className="w-full aspect-[16/7] overflow-hidden bg-gradient-to-br from-primary via-primary to-primary/95 relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-black/20"></div>
-            <div className="absolute inset-0 flex items-center justify-between px-4 text-white">
-              <div className="flex items-center gap-4">
-                <Link href="/app">
-                  <FontAwesomeIcon icon={faArrowLeft} className="text-xl" />
-                </Link>
-                <div>
+          {/* Header Banner dengan ilustrasi 3D style - IMPROVED */}
+          <div className="w-full bg-primary relative overflow-hidden">
+            {/* Background decoration - lebih subtle */}
+            <div className="absolute inset-0">
+              <div className="absolute top-4 right-4 w-16 h-16 bg-cyan-400 rounded-full opacity-15"></div>
+              <div className="absolute bottom-8 left-8 w-12 h-12 bg-teal-300 rounded-full opacity-10"></div>
+              <div className="absolute top-12 left-1/4 w-8 h-8 bg-cyan-300 rounded-full opacity-15"></div>
+            </div>
+            
+            <div className="relative px-4 py-6 text-white">
+              {/* Header dengan back button dan create button */}
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <Link href="/app">
+                    <FontAwesomeIcon icon={faArrowLeft} className="text-xl" />
+                  </Link>
                   <h1 className="text-xl font-bold">Komunitas</h1>
-                  <p className="text-sm opacity-90">Bergabung dengan komunitas profesional</p>
+                </div>
+                
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="bg-white text-primary px-4 py-2 rounded-full font-medium text-sm hover:bg-gray-100 transition-all duration-300 shadow-sm"
+                >
+                  Buat Komunitas
+                </button>
+              </div>
+
+              {/* Ilustrasi area dengan 3D characters - IMPROVED */}
+              <div className="flex items-center justify-center py-6 relative">
+                {/* Central illustration placeholder - 3 characters with speech bubbles */}
+                <div className="flex items-center gap-3">
+                  {/* Character 1 */}
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                      <div className="w-8 h-8 bg-orange-200 rounded-full"></div>
+                    </div>
+                    <div className="absolute -top-6 -left-1 bg-white text-primary px-2 py-1 rounded-lg text-xs shadow-sm">
+                      💬
+                    </div>
+                  </div>
+                  
+                  {/* Character 2 (center with ADS badge) */}
+                  <div className="relative">
+                    <div className="w-18 h-18 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                      <div className="w-12 h-12 bg-blue-200 rounded-full"></div>
+                    </div>
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow-sm">
+                      ADS
+                    </div>
+                    <div className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-primary px-2 py-1 rounded-lg text-xs shadow-sm">
+                      👑
+                    </div>
+                  </div>
+                  
+                  {/* Character 3 */}
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full flex items-center justify-center shadow-lg">
+                      <div className="w-8 h-8 bg-gray-100 rounded-full"></div>
+                    </div>
+                    <div className="absolute -top-6 -right-1 bg-white text-primary px-2 py-1 rounded-lg text-xs shadow-sm">
+                      📋
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Floating elements - lebih kecil dan subtle */}
+                <div className="absolute top-2 left-6 bg-blue-400 text-white p-1.5 rounded-lg text-xs shadow-sm">
+                  👍
+                </div>
+                <div className="absolute bottom-2 right-6 bg-green-400 text-white p-1.5 rounded-lg text-xs shadow-sm">
+                  📢
                 </div>
               </div>
-              
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-white text-primary p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-              >
-                <FontAwesomeIcon icon={faPlus} className="text-lg" />
-              </button>
+
+              {/* Tagline - Clean dan Simple */}
+              <div className="text-center mt-6 mb-4">
+                <p className="text-lg font-semibold text-white drop-shadow-md">
+                  Lebih mudah berbagi promo sesama anggota komunitas
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Content dengan rounded corners */}
+          {/* Content area - matching background gradient */}
           <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
-            {/* Search Bar */}
             <div className="relative -top-5 px-4">
-              <div className="w-full bg-white border border__primary px-6 py-4 rounded-[20px] flex items-center gap-3 shadow-sm">
-                <FontAwesomeIcon icon={faSearch} className="text__primary" />
-                <input
-                  type="text"
-                  placeholder="Cari komunitas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 outline-none bg-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="px-4 mb-6">
-              <div className="flex space-x-1 bg-white bg-opacity-50 backdrop-blur-sm rounded-[20px] p-1 shadow-sm">
-                {[
-                  { key: 'semua', label: 'Semua' },
-                  { key: 'komunitasku', label: 'Komunitas Saya' },
-                  { key: 'belum-gabung', label: 'Jelajahi' }
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex-1 px-4 py-3 rounded-[15px] text-sm font-medium transition-all duration-200 ${
-                      activeTab === tab.key
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'text-gray-600 hover:text-primary'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Stats Grid - Simplified */}
-            <div className="px-4 mb-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white bg-opacity-50 backdrop-blur-sm rounded-[15px] p-4 text-center shadow-sm">
-                  <p className="text-2xl font-bold text-primary">{allCommunitiesData.length}</p>
-                  <p className="text-xs text-gray-600">Total Komunitas</p>
-                </div>
-                <div className="bg-white bg-opacity-50 backdrop-blur-sm rounded-[15px] p-4 text-center shadow-sm">
-                  <p className="text-2xl font-bold text-green-600">{myCommunitiesData.length}</p>
-                  <p className="text-xs text-gray-600">Bergabung</p>
-                </div>
-                <div className="bg-white bg-opacity-50 backdrop-blur-sm rounded-[15px] p-4 text-center shadow-sm">
-                  <p className="text-2xl font-bold text-blue-600">{allCommunitiesData.filter(c => c.isVerified).length}</p>
-                  <p className="text-xs text-gray-600">Terverifikasi</p>
+              {/* Search Bar - matching style from index */}
+              <div className="mb-6">
+                <div className="w-full bg-white border border__primary px-6 py-4 rounded-[20px] flex justify-between items-center shadow-sm">
+                  <input
+                    type="text"
+                    placeholder="Cari komunitas?..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 outline-none bg-transparent"
+                  />
+                  <FontAwesomeIcon 
+                    icon={faSearch} 
+                    className="text__primary" 
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Community List */}
-            <div className="px-4 space-y-4">
-              {filteredCommunities().map((community) => (
-                <CommunityCard 
-                  key={community.id} 
-                  community={community} 
-                  activeTab={activeTab}
-                  onOpenCommunity={handleOpenCommunity}
-                  formatNumber={formatNumber}
-                />
-              ))}
-            </div>
-
-            {filteredCommunities().length === 0 && (
-              <div className="text-center py-16 px-4">
-                <div className="w-20 h-20 bg-white bg-opacity-50 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FontAwesomeIcon icon={faUsers} className="text-3xl text-gray-400" />
+            {/* Content with proper padding */}
+            <div className="px-4 pb-6">
+              {/* Komunitasku section */}
+              <div className="mb-6">
+                <div className="mb-4">
+                  <h2 className="text-slate-900 text-lg font-semibold">Komunitasku</h2>
+                  <p className="text-slate-600 text-sm">
+                    {myCommunitiesData.length} komunitas yang kamu ikuti
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                  {searchQuery ? 'Komunitas tidak ditemukan' : 'Belum ada komunitas'}
-                </h3>
-                <p className="text-gray-500 text-sm">
-                  {searchQuery ? 'Coba kata kunci lain' : 'Mulai dengan membuat komunitas baru'}
-                </p>
+
+                {/* My Communities List */}
+                <div className="space-y-3">
+                  {myCommunitiesData.map((community) => (
+                    <CommunityCard 
+                      key={community.id} 
+                      community={community} 
+                      type="joined"
+                      onOpenCommunity={handleOpenCommunity}
+                      formatNumber={formatNumber}
+                    />
+                  ))}
+                </div>
               </div>
-            )}
+
+              {/* Komunitas Lainnya section */}
+              <div className="mb-6">
+                <div className="mb-4">
+                  <h2 className="text-slate-900 text-lg font-semibold">Komunitas Lainnya</h2>
+                  <p className="text-slate-600 text-sm">
+                    Temukan komunitas baru yang menarik
+                  </p>
+                </div>
+
+                {/* Other Communities List */}
+                <div className="space-y-3">
+                  {notJoinedCommunitiesData.map((community) => (
+                    <CommunityCard 
+                      key={community.id} 
+                      community={community} 
+                      type="notJoined"
+                      onOpenCommunity={handleOpenCommunity}
+                      formatNumber={formatNumber}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -257,100 +363,85 @@ export default function Komunitas() {
   );
 }
 
-// Community Card Component - Clean & Professional
-function CommunityCard({ community, activeTab, onOpenCommunity, formatNumber }) {
+// Community Card Component - IMPROVED dengan type untuk membedakan joined/notJoined
+function CommunityCard({ community, type, onOpenCommunity, formatNumber }) {
   const [isJoining, setIsJoining] = useState(false);
 
-  const handleJoinCommunity = async () => {
+  const handleJoinCommunity = async (e) => {
+    e.stopPropagation(); // Prevent opening community when clicking join button
     setIsJoining(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsJoining(false);
-    onOpenCommunity(community.id);
+    // In real app, this would update the community join status
   };
 
-  const getPrivacyIcon = (privacy) => {
-    switch(privacy) {
-      case 'private': return faLock;
-      case 'public': return faGlobe;
-      default: return faUsers;
-    }
-  };
-
-  const getCategoryIcon = (category) => {
-    switch(category) {
-      case 'Event': return faUsers;
-      case 'Kuliner': return faBuilding;
-      case 'Teknologi': return faShield;
-      case 'Hobi': return faUsers;
-      case 'Bisnis': return faBuilding;
-      default: return faUsers;
-    }
+  const getCategoryColor = (category) => {
+    const colors = {
+      'Shopping': 'bg-purple-100 text-purple-800',
+      'Event': 'bg-blue-100 text-blue-800',
+      'Kuliner': 'bg-orange-100 text-orange-800',
+      'Otomotif': 'bg-gray-100 text-gray-800',
+      'Fashion': 'bg-pink-100 text-pink-800',
+      'Hobi': 'bg-green-100 text-green-800',
+      'Bisnis': 'bg-indigo-100 text-indigo-800',
+      'Kesehatan': 'bg-red-100 text-red-800',
+      'Teknologi': 'bg-cyan-100 text-cyan-800',
+      'Travel': 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[category] || 'bg-gray-100 text-gray-800';
   };
 
   return (
-    <div className="bg-white bg-opacity-60 backdrop-blur-sm rounded-[20px] p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
-      <div className="flex gap-4">
-        {/* Community Avatar - Professional */}
-        <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-[15px] flex items-center justify-center flex-shrink-0">
-          <FontAwesomeIcon icon={getCategoryIcon(community.category)} className="text-white text-xl" />
+    <div 
+      className="bg-white bg-opacity-60 backdrop-blur-sm rounded-[15px] p-4 shadow-sm border border-slate-200 hover:shadow-md transition-all duration-300 cursor-pointer"
+      onClick={() => onOpenCommunity(community.id)}
+    >
+      <div className="flex gap-3">
+        {/* Community Avatar */}
+        <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
+            <span className="text-white text-xs font-bold">
+              {community.name.substring(0, 2).toUpperCase()}
+            </span>
+          </div>
         </div>
 
         {/* Community Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              {/* Header dengan badges */}
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-semibold text-gray-900 truncate text-base">{community.name}</h3>
-                <FontAwesomeIcon 
-                  icon={getPrivacyIcon(community.privacy)} 
-                  className="text-xs text-gray-400" 
-                />
-                {community.isVerified && (
-                  <FontAwesomeIcon icon={faShield} className="text-blue-500 text-xs" />
-                )}
-                {activeTab === 'komunitasku' && community.isOwner && (
-                  <FontAwesomeIcon icon={faCrown} className="text-yellow-500 text-xs" />
-                )}
-              </div>
-              
-              <p className="text-sm text-gray-600 mb-3 limit__line__2 leading-relaxed">
-                {community.description}
-              </p>
-              
-              {/* Stats Row */}
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <FontAwesomeIcon icon={faUserFriends} />
-                  <span>{formatNumber(community.members)} member</span>
-                </div>
-                <div className="px-2 py-1 bg-gray-100 rounded-full">
-                  <span className="text-gray-700 font-medium">{community.category}</span>
-                </div>
-                {community.activePromos > 0 && (
-                  <div className="px-2 py-1 bg-orange-100 rounded-full">
-                    <span className="text-orange-700 font-medium">{community.activePromos} benefit</span>
-                  </div>
-                )}
-              </div>
+          <div className="flex items-start justify-between mb-1">
+            <h3 className="font-semibold text-slate-900 text-sm truncate pr-2">
+              {community.name}
+            </h3>
+            <div className="flex items-center gap-2">
+              {community.isVerified && (
+                <span className="text-blue-500 text-xs">✓</span>
+              )}
+              {community.privacy === 'private' && (
+                <span className="text-gray-400 text-xs">🔒</span>
+              )}
             </div>
-
-            {/* Action Button */}
-            <div className="ml-4 flex-shrink-0">
-              {activeTab === 'komunitasku' ? (
-                <button 
-                  onClick={() => onOpenCommunity(community.id)}
-                  className="bg-primary text-white px-5 py-2 rounded-[15px] text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Lihat Detail
-                </button>
+          </div>
+          
+          <p className="text-slate-600 text-xs leading-relaxed mb-2">
+            {community.description}
+          </p>
+          
+          <div className="flex items-center justify-between">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(community.category)}`}>
+              {community.category}
+            </span>
+            
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span>{formatNumber(community.members)} anggota</span>
+              {type === 'joined' ? (
+                <span className="text-primary font-medium">{community.activePromos} promo</span>
               ) : (
                 <button
                   onClick={handleJoinCommunity}
                   disabled={isJoining}
-                  className="bg-green-500 text-white px-5 py-2 rounded-[15px] text-sm font-medium disabled:opacity-50 hover:bg-green-600 transition-colors"
+                  className="bg-primary text-white px-3 py-1 rounded-full font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
-                  {isJoining ? 'Bergabung...' : 'Bergabung'}
+                  {isJoining ? 'Bergabung...' : 'Gabung'}
                 </button>
               )}
             </div>
@@ -361,7 +452,7 @@ function CommunityCard({ community, activeTab, onOpenCommunity, formatNumber }) 
   );
 }
 
-// Create Community Modal - Clean & Professional
+// Create Community Modal - tetap sama
 function CreateCommunityModal({ onClose }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -423,11 +514,16 @@ function CreateCommunityModal({ onClose }) {
                 className="w-full px-4 py-3 border border__primary rounded-[20px] focus:outline-none focus:border-primary bg-white"
               >
                 <option value="">Pilih kategori</option>
+                <option value="Shopping">Shopping</option>
                 <option value="Event">Event</option>
                 <option value="Kuliner">Kuliner</option>
-                <option value="Teknologi">Teknologi</option>
+                <option value="Otomotif">Otomotif</option>
+                <option value="Fashion">Fashion</option>
                 <option value="Hobi">Hobi</option>
                 <option value="Bisnis">Bisnis</option>
+                <option value="Kesehatan">Kesehatan</option>
+                <option value="Teknologi">Teknologi</option>
+                <option value="Travel">Travel</option>
               </select>
             </div>
 
