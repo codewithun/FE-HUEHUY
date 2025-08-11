@@ -405,9 +405,9 @@ const PromoDetailPage = () => {
   }
 
   return (
-    <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen">
+    <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
-      <div className="bg-primary w-full h-[60px] px-4 relative overflow-hidden">
+      <div className="bg-primary w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl">
         {/* Background decoration */}
         <div className="absolute inset-0">
           <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
@@ -448,7 +448,7 @@ const PromoDetailPage = () => {
       </div>
 
       {/* Content */}
-      <div className="bg-white min-h-screen w-full px-4 pt-4 pb-28">
+      <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
         <div className="lg:mx-auto lg:max-w-md">
           {/* Hero Promo Image Card - Bigger */}
           <div className="mb-4">
@@ -563,25 +563,27 @@ const PromoDetailPage = () => {
       </div>
 
       {/* Bottom Button Bar */}
-      <div className="fixed bottom-0 left-0 right-0 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:max-w-md bg-white border-t border-slate-200 p-4 z-30">
-        <button 
-          onClick={handleClaimPromo}
-          disabled={isClaimedLoading}
-          className={`w-full py-4 rounded-[15px] font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] ${
-            isClaimedLoading 
-              ? 'bg-slate-400 text-white cursor-not-allowed' 
-              : 'bg-green-700 text-white hover:bg-green-800'
-          }`}
-        >
-          {isClaimedLoading ? (
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Merebut Promo...
-            </div>
-          ) : (
-            'Rebut Promo Sekarang'
-          )}
-        </button>
+      <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+        <div className="lg:max-w-sm lg:mx-auto">
+          <button 
+            onClick={handleClaimPromo}
+            disabled={isClaimedLoading}
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${
+              isClaimedLoading 
+                ? 'bg-slate-400 text-white cursor-not-allowed' 
+                : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
+            }`}
+          >
+            {isClaimedLoading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Merebut Promo...
+              </div>
+            ) : (
+              'Rebut Promo Sekarang'
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Success Modal */}
@@ -787,6 +789,18 @@ const PromoDetailPage = () => {
 
         .animate-slide-up {
           animation: slide-up 0.3s ease-out;
+        }
+
+        /* Desktop specific improvements */
+        @media (min-width: 1024px) {
+          .claim-button {
+            max-width: 320px;
+            margin: 0 auto;
+          }
+          
+          .desktop-container {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          }
         }
       `}</style>
     </div>
