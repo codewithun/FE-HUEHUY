@@ -29,8 +29,202 @@ export default function Save() {
   const [data, setData] = useState({ data: [] });
 
   useEffect(() => {
-    // Ambil voucher dari localStorage (demo)
-    const vouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+    // Ambil voucher dari localStorage (demo), jika kosong tambahkan dummy data
+    let vouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+    
+    // Jika localStorage kosong, tambahkan dummy data untuk demo
+    if (vouchers.length === 0) {
+      vouchers = [
+        {
+          id: 'demo-1',
+          code: 'PROMO12345678',
+          claimed_at: new Date().toISOString(),
+          expired_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days from now
+          validation_at: null,
+          voucher_item: null,
+          ad: {
+            id: 'demo-1',
+            title: 'Paket Kenyang Cuma 40 Ribu - Beef Sausage & Chicken di Lalaunch!',
+            picture_source: '/images/promo/beef-sausage-chicken.jpg',
+            status: 'active',
+            cube: {
+              code: 'community-1',
+              user: {
+                name: 'D\'Botanica Admin',
+                phone: '085666666333'
+              },
+              corporate: null,
+              tags: [
+                {
+                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
+                  link: null,
+                  map_lat: '-6.9175',
+                  map_lng: '107.6191'
+                }
+              ]
+            }
+          }
+        },
+        {
+          id: 'demo-2',
+          code: 'PROMO87654321',
+          claimed_at: moment().subtract(2, 'hours').toISOString(),
+          expired_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
+          validation_at: null,
+          voucher_item: {
+            code: 'BOBA2024'
+          },
+          ad: {
+            id: 'demo-2',
+            title: 'Beli 1 Gratis 1! Brown Sugar Coffee di Boba Thai',
+            picture_source: '/images/promo/brown-sugar-coffee.jpg',
+            status: 'active',
+            cube: {
+              code: 'community-1',
+              user: {
+                name: 'Boba Thai Manager',
+                phone: '085777777444'
+              },
+              corporate: null,
+              tags: [
+                {
+                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
+                  link: 'https://bobathai.com',
+                  map_lat: '-6.9175',
+                  map_lng: '107.6191'
+                }
+              ]
+            }
+          }
+        },
+        {
+          id: 'demo-3',
+          code: 'PROMO11223344',
+          claimed_at: moment().subtract(1, 'day').toISOString(),
+          expired_at: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day from now
+          validation_at: moment().subtract(30, 'minutes').toISOString(), // Already used
+          voucher_item: null,
+          ad: {
+            id: 'demo-3',
+            title: 'Makan Bertiga Lebih Hemat - Paket Ayam di Chicken Star Cuma 59 Ribu!',
+            picture_source: '/images/promo/chicken-package.jpg',
+            status: 'active',
+            cube: {
+              code: 'community-1',
+              user: {
+                name: 'Chicken Star Owner',
+                phone: '085888888555'
+              },
+              corporate: null,
+              tags: [
+                {
+                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
+                  link: null,
+                  map_lat: '-6.9175',
+                  map_lng: '107.6191'
+                }
+              ]
+            }
+          }
+        },
+        {
+          id: 'demo-4',
+          code: 'PROMO99887766',
+          claimed_at: moment().subtract(6, 'hours').toISOString(),
+          expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+          validation_at: null,
+          voucher_item: null,
+          ad: {
+            id: 'demo-4',
+            title: 'Diskon 50% Bubble Tea untuk 15 Pelanggan Pertama!',
+            picture_source: '/images/promo/bubble-tea-discount.jpg',
+            status: 'active',
+            cube: {
+              code: 'community-1',
+              user: {
+                name: 'Bubble Tea House Staff',
+                phone: '085999999666'
+              },
+              corporate: null,
+              tags: [
+                {
+                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
+                  link: 'https://bubbletea-house.com',
+                  map_lat: '-6.9175',
+                  map_lng: '107.6191'
+                }
+              ]
+            }
+          }
+        },
+        {
+          id: 'demo-5',
+          code: 'PROMO55443322',
+          claimed_at: moment().subtract(3, 'hours').toISOString(),
+          expired_at: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
+          validation_at: null,
+          voucher_item: {
+            code: 'MCDFLASH2024'
+          },
+          ad: {
+            id: 'demo-5',
+            title: 'Flash Sale - Burger Combo',
+            picture_source: '/images/promo/burger-combo-flash.jpg',
+            status: 'active',
+            cube: {
+              code: 'community-1',
+              corporate: {
+                name: 'McDonald\'s BTC',
+                phone: '085111111222'
+              },
+              user: null,
+              tags: [
+                {
+                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
+                  link: 'https://mcdonalds.co.id',
+                  map_lat: '-6.9175',
+                  map_lng: '107.6191'
+                }
+              ]
+            }
+          }
+        },
+        {
+          id: 'demo-6',
+          code: 'PROMO66778899',
+          claimed_at: moment().subtract(4, 'hours').toISOString(),
+          expired_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // Expired (1 day ago)
+          validation_at: null,
+          voucher_item: null,
+          ad: {
+            id: 'demo-6',
+            title: 'Limited Time - Pizza Medium',
+            picture_source: '/images/promo/pizza-medium-deal.jpg',
+            status: 'inactive', // Promo sudah ditutup
+            cube: {
+              code: 'community-1',
+              corporate: {
+                name: 'Pizza Hut BTC',
+                phone: '085222222333'
+              },
+              user: null,
+              tags: [
+                {
+                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
+                  link: 'https://pizzahut.co.id',
+                  map_lat: '-6.9175',
+                  map_lng: '107.6191'
+                }
+              ]
+            }
+          }
+        }
+      ];
+      
+      // Update localStorage dengan dummy data
+      localStorage.setItem('huehuy_vouchers', JSON.stringify(vouchers));
+    }
+    
     setData({ data: vouchers });
   }, []);
 
@@ -45,13 +239,23 @@ export default function Save() {
     const hours = Math.floor(duration.asHours());
     const minutes = Math.floor(duration.asMinutes()) % 60;
     
-    if (hours > 0) {
+    if (hours < 0 || minutes < 0) {
+      return 'Sudah kedaluwarsa';
+    } else if (hours > 0) {
       return `${hours} jam ${minutes} menit lagi`;
     } else if (minutes > 0) {
       return `${minutes} menit lagi`;
     } else {
       return 'Sudah kedaluwarsa';
     }
+  };
+
+  // Helper function untuk cek apakah promo baru direbut (dalam 1 jam terakhir)
+  const isRecentlyClaimed = (claimedAt) => {
+    if (!claimedAt) return false;
+    const now = moment();
+    const claimed = moment(claimedAt);
+    return now.diff(claimed, 'hours') < 1;
   };
 
   // Helper function untuk status badge
@@ -89,7 +293,7 @@ export default function Save() {
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
-        {/* Header Section tanpa icon barcode */}
+        {/* Header Section */}
         <div className="bg-primary w-full px-4 py-4 flex items-center">
           {/* Arrow Back */}
           <button
@@ -125,28 +329,44 @@ export default function Save() {
               <div className="space-y-4">
                 {data?.data?.map((item, key) => (
                   <div
-                    className="bg-white rounded-2xl p-4 shadow-lg border border-slate-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                    className={`bg-white rounded-2xl p-4 shadow-lg border hover:shadow-xl transition-all duration-300 cursor-pointer group ${
+                      isRecentlyClaimed(item.claimed_at) 
+                        ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white' 
+                        : 'border-slate-100'
+                    }`}
                     key={key}
                     onClick={() => {
                       setModalValidation(true);
                       setSelected(item);
                     }}
                   >
+                    {/* Badge untuk promo baru direbut */}
+                    {isRecentlyClaimed(item.claimed_at) && (
+                      <div className="mb-3">
+                        <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                          ✨ Baru Direbut
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex gap-4">
-                      {/* Image Section */}
+                      {/* Image Section dengan gambar yang sesuai */}
                       <div className="w-20 h-20 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex justify-center items-center group-hover:scale-105 transition-transform duration-300">
                         {item?.ad?.picture_source ? (
                           <img
                             src={item?.ad?.picture_source}
                             className="w-full h-full object-cover"
                             alt={item?.ad?.title || 'Promo'}
+                            onError={(e) => {
+                              e.target.src = '/default-avatar.png';
+                            }}
                           />
                         ) : (
                           <FontAwesomeIcon icon={faTag} className="text-slate-400 text-2xl" />
                         )}
                       </div>
 
-                      {/* Content Section - tanpa arrow icon */}
+                      {/* Content Section */}
                       <div className="flex-1 min-w-0">
                         <div className="mb-2">
                           <h3 className="font-semibold text-slate-800 text-base leading-tight">
@@ -194,9 +414,15 @@ export default function Save() {
                   <FontAwesomeIcon icon={faWallet} className="text-slate-400 text-3xl" />
                 </div>
                 <h3 className="font-semibold text-slate-600 mb-2">Saku Promo Kosong</h3>
-                <p className="text-slate-500 text-sm max-w-xs mx-auto">
-                  Jelajahi kubus dan kumpulkan promo untuk mengisi saku Anda
+                <p className="text-slate-500 text-sm max-w-xs mx-auto mb-4">
+                  Jelajahi komunitas dan kumpulkan promo untuk mengisi saku Anda
                 </p>
+                <button 
+                  onClick={() => router.push('/app/komunitas')}
+                  className="bg-primary text-white px-6 py-3 rounded-[12px] font-semibold hover:bg-opacity-90 transition-all"
+                >
+                  Cari Promo
+                </button>
               </div>
             )}
           </div>
@@ -205,7 +431,7 @@ export default function Save() {
         <BottomBarComponent active={'save'} />
       </div>
 
-      {/* Modal Bottom Sheet */}
+      {/* Modal Bottom Sheet - tidak ada perubahan */}
       <BottomSheetComponent
         title={'Detail Promo'}
         show={modalValidation}
@@ -215,6 +441,7 @@ export default function Save() {
         }}
         height={600}
       >
+        {/* ...existing modal content remains the same... */}
         <div className="p-4 space-y-4">
           {/* Header Info */}
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-4">
