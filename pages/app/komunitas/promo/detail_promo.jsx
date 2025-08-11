@@ -189,6 +189,35 @@ const PromoDetailPage = () => {
           },
           terms: 'TERM & CONDITIONS APPLY',
           timeLeft: '1 jam 15 menit'
+        },
+        // Data khusus untuk promo entry dari QR scan
+        '123': {
+          id: '123',
+          title: 'Promo Spesial QR - Diskon 60% Menu Favorit!',
+          merchant: 'Restoran QR Special',
+          distance: '2 KM',
+          location: 'Jl. Sudirman No. 123, Bandung, West Java, Indonesia',
+          coordinates: '8°15KM 8°30KM 8°30KM',
+          image: '/images/promo/qr-special-promo.jpg',
+          originalPrice: 100000,
+          discountPrice: 40000,
+          discount: '60%',
+          schedule: {
+            day: 'Everyday',
+            details: 'Berlaku Setiap Hari',
+            time: '10:00 - 22:00',
+            timeDetails: 'Jam Berlaku Promo'
+          },
+          status: {
+            type: 'Online',
+            description: 'Tipe Promo: 🌐 Online / 📍 Offline'
+          },
+          description: 'Promo spesial untuk pengguna yang scan QR Code! Nikmati diskon fantastis 60% untuk menu favorit di restoran kami. Promo terbatas untuk user yang datang dari QR scan.',
+          seller: {
+            name: 'QR Restaurant Admin',
+            phone: '081234567890'
+          },
+          terms: 'TERM & CONDITIONS APPLY - Khusus untuk QR Scanner'
         }
       };
 
@@ -201,7 +230,12 @@ const PromoDetailPage = () => {
   }, [promoId, communityId]);
 
   const handleBack = () => {
-    router.push(`/app/komunitas/promo?communityId=${communityId}`);
+    // Jika dari promo-entry, kembali ke halaman utama
+    if (communityId === 'promo-entry') {
+      router.push('/app');
+    } else {
+      router.push(`/app/komunitas/promo?communityId=${communityId}`);
+    }
   };
 
   const handleShare = () => {
