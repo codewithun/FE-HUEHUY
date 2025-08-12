@@ -3,12 +3,11 @@ import {
     faClock
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import CommunityBottomBar from './CommunityBottomBar';
 
 export default function CommunityDashboard({ communityId }) {
-    const router = useRouter();
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -115,13 +114,6 @@ export default function CommunityDashboard({ communityId }) {
             setCommunityData(getCommunityData(communityId));
         }
     }, [communityId]);
-
-    const [userData] = useState({
-        name: 'Ardan Ferdiansah',
-        email: 'ardanferdiansah03@gmail.com',
-        avatar: '/api/placeholder/60/60',
-        promoCount: 0
-    });
 
     // Upcoming Events Data - dynamic based on community
     const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -408,7 +400,7 @@ export default function CommunityDashboard({ communityId }) {
                 <div className="container mx-auto relative z-10 pb-28">
                     {/* Header Banner */}
                                 {/* Header Banner */}
-            <div className={`w-full relative overflow-hidden bg-primary rounded-b-[40px] shadow-neuro`}>
+            <div className={`w-full relative overflow-hidden ${getCommunityGradient(communityData.category)} rounded-b-[40px] shadow-neuro`}>
                         {/* Background decoration */}
                         <div className="absolute inset-0">
                             <div className="absolute top-4 right-4 w-16 h-16 bg-white rounded-full opacity-10"></div>
@@ -501,33 +493,33 @@ export default function CommunityDashboard({ communityId }) {
                                         <div className="grid grid-cols-2 gap-3">
                                             {category.promos.map((promo) => (
                                                 <div key={promo.id} className="bg-white rounded-xl overflow-hidden shadow-neuro-in hover:scale-[1.01] transition-all duration-300">
-                                                    <div className="aspect-[4/3] bg-gray-100">
-                                                        <img 
+                                                        <Image 
                                                             src={promo.image} 
                                                             alt={promo.title}
+                                                            width={150}
+                                                            height={120}
                                                             className="w-full h-full object-cover"
                                                         />
-                                                    </div>
-                                                    <div className="p-3">
-                                                        <h4 className="font-semibold text-sm text-slate-900 mb-2 line-clamp-2">
-                                                            {promo.title}
-                                                        </h4>
-                                                        {promo.description && (
-                                                            <p className="text-xs text-slate-600 mb-2 line-clamp-2">
-                                                                {promo.description}
-                                                            </p>
-                                                        )}
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-xs bg-primary bg-opacity-20 text-primary px-2 py-1 rounded">
-                                                                {promo.label}
-                                                            </span>
-                                                            {promo.discount && (
-                                                                <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">
-                                                                    {promo.discount}
-                                                                </span>
+                                                        <div className="p-3">
+                                                            <h4 className="font-semibold text-sm text-slate-900 mb-2 line-clamp-2">
+                                                                {promo.title}
+                                                            </h4>
+                                                            {promo.description && (
+                                                                <p className="text-xs text-slate-600 mb-2 line-clamp-2">
+                                                                    {promo.description}
+                                                                </p>
                                                             )}
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-xs bg-primary bg-opacity-20 text-primary px-2 py-1 rounded">
+                                                                    {promo.label}
+                                                                </span>
+                                                                {promo.discount && (
+                                                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">
+                                                                        {promo.discount}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
