@@ -1,27 +1,30 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useEffect, useState } from 'react';
+import {
+  faArrowLeftLong,
+  faPaperPlane,
+} from '@fortawesome/free-solid-svg-icons';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 import {
   DateFormatComponent,
   IconButtonComponent,
   InputComponent,
 } from '../../../components/base.components';
-import {
-  faArrowLeftLong,
-  faPaperPlane,
-} from '@fortawesome/free-solid-svg-icons';
-import { useRouter } from 'next/router';
 import { post, useGet } from '../../../helpers';
-import Link from 'next/link';
 
 export default function Pesan() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, communityId, adminName, type } = router.query;
   const [message, setMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  
+  // Check if this is a community admin chat
+  const isCommunityAdminChat = type === 'admin' && id?.toString().startsWith('community-admin-');
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loading, code, dataChat, reset] = useGet({
-    path: id && `chat-rooms/${id}`,
+    path: id && !isCommunityAdminChat && `chat-rooms/${id}`,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -29,14 +32,46 @@ export default function Pesan() {
     path: `account`,
   });
 
+  // Demo data for community admin chat
+  const [adminChatData] = useState({
+    data: {
+      id: id,
+      admin_name: adminName,
+      community_id: communityId,
+      chats: [
+        {
+          id: 1,
+          message: 'Halo! Selamat datang di komunitas kami. Ada yang bisa saya bantu?',
+          is_my_reply: false,
+          created_at: new Date().toISOString(),
+          user_sender: { name: adminName }
+        }
+      ]
+    }
+  });
+
+  // Use admin chat data if it's a community admin chat
+  const currentChatData = isCommunityAdminChat ? adminChatData : dataChat;
+
+  // Handle back navigation
+  const handleBackNavigation = () => {
+    if (isCommunityAdminChat && communityId) {
+      // If it's a community admin chat, go back to admin chat list
+      router.push(`/app/komunitas/admin-chat/${communityId}`);
+    } else {
+      // For regular chats, use default back behavior
+      router.back();
+    }
+  };
+
   useEffect(() => {
     setTimeout(() => {
       document.getElementById('chat-box').scrollTo({
-        top: dataChat?.data?.chats.length * 100,
+        top: currentChatData?.data?.chats.length * 100,
         behavior: 'smooth',
       });
     }, 100);
-  }, [dataChat]);
+  }, [currentChatData]);
 
   return (
     <>
@@ -49,16 +84,18 @@ export default function Pesan() {
                 icon={faArrowLeftLong}
                 variant="simple"
                 size="lg"
-                onClick={() => router.back()}
+                onClick={handleBackNavigation}
               />
             </div>
 
             <div className="font-semibold w-full text-lg">
-              {dataChat?.data?.world
-                ? dataChat?.data?.world?.name
-                : dataChat?.data?.user_merchant_id == dataUser?.data?.id
-                ? dataChat?.data?.user_hunter?.name
-                : dataChat?.data?.user_merchant?.name}
+              {isCommunityAdminChat 
+                ? `Admin ${adminName}`
+                : currentChatData?.data?.world
+                ? currentChatData?.data?.world?.name
+                : currentChatData?.data?.user_merchant_id == dataUser?.data?.id
+                ? currentChatData?.data?.user_hunter?.name
+                : currentChatData?.data?.user_merchant?.name}
             </div>
           </div>
 
@@ -66,7 +103,7 @@ export default function Pesan() {
             className="overflow-y-auto overflow-x-hidden scroll h-[90vh] pb-10"
             id="chat-box"
           >
-            {dataChat?.data?.chats.map((item, key) => {
+            {currentChatData?.data?.chats.map((item, key) => {
               if (item.is_my_reply) {
                 return (
                   <div
@@ -105,7 +142,7 @@ export default function Pesan() {
                     key={key}
                   >
                     <div className="bg-gray-200 w-max max-w-[240px] p-3 rounded-xl rounded-tl-none">
-                      {dataChat?.data?.world && (
+                      {currentChatData?.data?.world && (
                         <p className="font-semibold mb-1">
                           {item?.user_sender?.name}
                         </p>
@@ -158,11 +195,23 @@ export default function Pesan() {
               className=" rounded-lg"
               loading={chatLoading}
               onClick={async () => {
+                if (isCommunityAdminChat) {
+                  // For community admin chat, show a demo response
+                  setChatLoading(true);
+                  // Simulate sending message and getting response
+                  setTimeout(() => {
+                    alert('Pesan terkirim! (Demo: Admin akan merespons dalam aplikasi nyata)');
+                    setMessage('');
+                    setChatLoading(false);
+                  }, 1000);
+                  return;
+                }
+
                 setChatLoading(true);
                 const execute = await post({
                   path: `chats`,
                   body: {
-                    chat_room_id: dataChat?.data?.id,
+                    chat_room_id: currentChatData?.data?.id,
                     message: message,
                   },
                 });
