@@ -4,10 +4,12 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import CommunityBottomBar from './CommunityBottomBar';
 
 export default function CommunityDashboard({ communityId }) {
+    const router = useRouter();
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -143,6 +145,16 @@ export default function CommunityDashboard({ communityId }) {
                             time: '19:00 - 22:00',
                             location: community.name,
                             participants: 120
+                        },
+                        {
+                            id: 3,
+                            title: 'Shopping Festival Weekend',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '25 Agustus 2025',
+                            time: '10:00 - 22:00',
+                            location: community.name,
+                            participants: 500
                         }
                     ],
                     'Event': [
@@ -155,6 +167,26 @@ export default function CommunityDashboard({ communityId }) {
                             time: '16:00 - 21:00',
                             location: 'Venue ' + community.name,
                             participants: 200
+                        },
+                        {
+                            id: 2,
+                            title: 'Music Festival 2025',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '22 Agustus 2025',
+                            time: '18:00 - 24:00',
+                            location: 'Main Stage ' + community.name,
+                            participants: 1000
+                        },
+                        {
+                            id: 3,
+                            title: 'Corporate Networking Event',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '30 Agustus 2025',
+                            time: '19:00 - 22:00',
+                            location: 'Conference Hall',
+                            participants: 150
                         }
                     ],
                     'Kuliner': [
@@ -167,6 +199,26 @@ export default function CommunityDashboard({ communityId }) {
                             time: '17:00 - 23:00',
                             location: community.location,
                             participants: 150
+                        },
+                        {
+                            id: 2,
+                            title: 'Street Food Night Market',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '26 Agustus 2025',
+                            time: '18:00 - 01:00',
+                            location: community.location,
+                            participants: 300
+                        },
+                        {
+                            id: 3,
+                            title: 'Cooking Competition',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '29 Agustus 2025',
+                            time: '14:00 - 18:00',
+                            location: 'Culinary Center',
+                            participants: 80
                         }
                     ],
                     'Otomotif': [
@@ -179,6 +231,16 @@ export default function CommunityDashboard({ communityId }) {
                             time: '08:00 - 12:00',
                             location: 'Parking Area ' + community.location,
                             participants: 80
+                        },
+                        {
+                            id: 2,
+                            title: 'Motorcycle Show & Contest',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '27 Agustus 2025',
+                            time: '09:00 - 15:00',
+                            location: 'Exhibition Center',
+                            participants: 120
                         }
                     ],
                     'Fashion': [
@@ -191,6 +253,26 @@ export default function CommunityDashboard({ communityId }) {
                             time: '19:00 - 22:00',
                             location: community.location,
                             participants: 300
+                        },
+                        {
+                            id: 2,
+                            title: 'Designer Showcase Night',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '31 Agustus 2025',
+                            time: '20:00 - 23:00',
+                            location: 'Fashion Gallery',
+                            participants: 200
+                        },
+                        {
+                            id: 3,
+                            title: 'Style Workshop & Demo',
+                            category: community.name,
+                            image: '/api/placeholder/300/200',
+                            date: '3 September 2025',
+                            time: '15:00 - 18:00',
+                            location: 'Workshop Studio',
+                            participants: 50
                         }
                     ]
                 };
@@ -212,37 +294,55 @@ export default function CommunityDashboard({ communityId }) {
                     'Shopping': [
                         {
                             id: 1,
-                            title: 'Baby & Kids',
-                            subtitle: 'Semua Perlengkapan & Permainan Anak!',
+                            title: 'Fast Food Promo',
+                            subtitle: 'Nikmati Burger & Chicken Terbaik!',
                             promos: [
                                 {
                                     id: 1,
-                                    title: 'IndoKids Baby & Mom - Welcome to Huehuy!',
-                                    image: '/api/placeholder/150/120',
-                                    label: 'Advertising',
-                                    discount: null
+                                    title: 'McDonald\'s - Burger Combo Flash Sale',
+                                    image: '/images/promo/burger-combo-flash.jpg',
+                                    label: 'Flash Sale',
+                                    discount: '30%',
+                                    description: 'Paket burger kombo dengan kentang dan minuman'
                                 },
                                 {
                                     id: 2,
-                                    title: 'WAFFLE JOY - Welcome to Huehuy!',
-                                    image: '/api/placeholder/150/120',
-                                    label: 'Advertising',
-                                    discount: null
+                                    title: 'Chicken Star - Paket Ayam Special',
+                                    image: '/images/promo/chicken-package.jpg',
+                                    label: 'Special Deal',
+                                    discount: '25%',
+                                    description: 'Ayam crispy dengan nasi dan saus pilihan'
+                                },
+                                {
+                                    id: 3,
+                                    title: 'Premium Beef Sausage Package',
+                                    image: '/images/promo/beef-sausage-chicken.jpg',
+                                    label: 'Premium',
+                                    discount: '20%',
+                                    description: 'Sosis beef premium dengan ayam panggang'
                                 }
                             ]
                         },
                         {
                             id: 2,
-                            title: 'Pojok Pelayanan',
-                            subtitle: 'Pelayanan dan Penyewaan Jasa!',
+                            title: 'Pizza & Coffee',
+                            subtitle: 'Promo Pizza dan Minuman Favorit!',
                             promos: [
                                 {
-                                    id: 3,
-                                    title: 'BEDJO HELMET - Welcome to...',
-                                    image: '/api/placeholder/150/120',
-                                    label: 'Advertising',
-                                    discount: null,
-                                    description: 'Jasa penjualan barang dan helm, serta pencucian...'
+                                    id: 4,
+                                    title: 'Pizza Hut - Medium Pizza Deal',
+                                    image: '/images/promo/pizza-medium-deal.jpg',
+                                    label: 'Pizza Deal',
+                                    discount: '35%',
+                                    description: 'Pizza medium dengan topping pilihan dan minuman'
+                                },
+                                {
+                                    id: 5,
+                                    title: 'Brown Sugar Coffee Special',
+                                    image: '/images/promo/brown-sugar-coffee.jpg',
+                                    label: 'Coffee Promo',
+                                    discount: '15%',
+                                    description: 'Kopi brown sugar dengan topping premium'
                                 }
                             ]
                         }
@@ -250,22 +350,32 @@ export default function CommunityDashboard({ communityId }) {
                     'Event': [
                         {
                             id: 1,
-                            title: 'Event Packages',
-                            subtitle: 'Paket Event Menarik untuk Semua!',
+                            title: 'Food & Beverage Packages',
+                            subtitle: 'Paket F&B untuk Event Anda!',
                             promos: [
                                 {
                                     id: 1,
-                                    title: 'Wedding Package Premium',
-                                    image: '/api/placeholder/150/120',
+                                    title: 'Bubble Tea House - Event Package',
+                                    image: '/images/promo/bubble-tea-discount.jpg',
                                     label: 'Event Package',
-                                    discount: '25%'
+                                    discount: '25%',
+                                    description: 'Paket bubble tea untuk acara corporate dan private'
                                 },
                                 {
                                     id: 2,
-                                    title: 'Corporate Event Package',
-                                    image: '/api/placeholder/150/120',
-                                    label: 'Event Package',
-                                    discount: '15%'
+                                    title: 'Corporate Lunch Package',
+                                    image: '/images/promo/burger-combo-flash.jpg',
+                                    label: 'Corporate',
+                                    discount: '20%',
+                                    description: 'Paket makan siang untuk meeting dan seminar'
+                                },
+                                {
+                                    id: 3,
+                                    title: 'Premium Coffee Catering',
+                                    image: '/images/promo/brown-sugar-coffee.jpg',
+                                    label: 'Catering',
+                                    discount: '30%',
+                                    description: 'Layanan kopi premium untuk event khusus'
                                 }
                             ]
                         }
@@ -273,22 +383,40 @@ export default function CommunityDashboard({ communityId }) {
                     'Kuliner': [
                         {
                             id: 1,
-                            title: 'Promo Makanan',
-                            subtitle: 'Diskon Special untuk Member Komunitas!',
+                            title: 'Promo Makanan & Minuman',
+                            subtitle: 'Diskon Special untuk Foodie!',
                             promos: [
                                 {
                                     id: 1,
-                                    title: 'Ayam Geprek Bensu',
-                                    image: '/api/placeholder/150/120',
+                                    title: 'Chicken Star - Ayam Crispy Spesial',
+                                    image: '/images/promo/chicken-package.jpg',
                                     label: 'Food Promo',
-                                    discount: '20%'
+                                    discount: '20%',
+                                    description: 'Ayam crispy dengan bumbu rahasia dan nasi hangat'
                                 },
                                 {
                                     id: 2,
-                                    title: 'Sate Klatak Pak Kumis',
-                                    image: '/api/placeholder/150/120',
-                                    label: 'Food Promo',
-                                    discount: '15%'
+                                    title: 'Bubble Tea House - Minuman Segar',
+                                    image: '/images/promo/bubble-tea-discount.jpg',
+                                    label: 'Drink Promo',
+                                    discount: '15%',
+                                    description: 'Bubble tea dengan berbagai rasa dan topping'
+                                },
+                                {
+                                    id: 3,
+                                    title: 'Pizza Hut - Pizza Family',
+                                    image: '/images/promo/pizza-medium-deal.jpg',
+                                    label: 'Family Deal',
+                                    discount: '30%',
+                                    description: 'Pizza besar dengan topping lengkap untuk keluarga'
+                                },
+                                {
+                                    id: 4,
+                                    title: 'Premium Coffee Experience',
+                                    image: '/images/promo/brown-sugar-coffee.jpg',
+                                    label: 'Premium',
+                                    discount: '10%',
+                                    description: 'Kopi berkualitas tinggi dengan cita rasa otentik'
                                 }
                             ]
                         }
@@ -301,17 +429,19 @@ export default function CommunityDashboard({ communityId }) {
                             promos: [
                                 {
                                     id: 1,
-                                    title: 'Service Motor Complete',
-                                    image: '/api/placeholder/150/120',
+                                    title: 'Service Motor Complete Package',
+                                    image: '/images/promo/chicken-package.jpg',
                                     label: 'Service',
-                                    discount: '30%'
+                                    discount: '30%',
+                                    description: 'Paket service lengkap untuk motor kesayangan'
                                 },
                                 {
                                     id: 2,
-                                    title: 'Oil Change Package',
-                                    image: '/api/placeholder/150/120',
-                                    label: 'Service',
-                                    discount: '20%'
+                                    title: 'Oil Change Premium Package',
+                                    image: '/images/promo/beef-sausage-chicken.jpg',
+                                    label: 'Maintenance',
+                                    discount: '20%',
+                                    description: 'Ganti oli premium dengan filter berkualitas'
                                 }
                             ]
                         }
@@ -325,16 +455,26 @@ export default function CommunityDashboard({ communityId }) {
                                 {
                                     id: 1,
                                     title: 'Summer Collection 2025',
-                                    image: '/api/placeholder/150/120',
+                                    image: '/images/promo/burger-combo-flash.jpg',
                                     label: 'Fashion',
-                                    discount: '40%'
+                                    discount: '40%',
+                                    description: 'Koleksi pakaian musim panas terbaru dan trendy'
                                 },
                                 {
                                     id: 2,
-                                    title: 'Shoes & Accessories',
-                                    image: '/api/placeholder/150/120',
-                                    label: 'Fashion',
-                                    discount: '35%'
+                                    title: 'Shoes & Accessories Sale',
+                                    image: '/images/promo/pizza-medium-deal.jpg',
+                                    label: 'Accessories',
+                                    discount: '35%',
+                                    description: 'Sepatu dan aksesoris dengan kualitas premium'
+                                },
+                                {
+                                    id: 3,
+                                    title: 'Casual Wear Collection',
+                                    image: '/images/promo/brown-sugar-coffee.jpg',
+                                    label: 'Casual',
+                                    discount: '25%',
+                                    description: 'Pakaian kasual untuk gaya hidup aktif'
                                 }
                             ]
                         }
@@ -396,6 +536,15 @@ export default function CommunityDashboard({ communityId }) {
 
     return (
         <>
+            <style jsx>{`
+                .scrollbar-hide {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+                .scrollbar-hide::-webkit-scrollbar {
+                    display: none;
+                }
+            `}</style>
             <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
                 <div className="container mx-auto relative z-10 pb-28">
                     {/* Header Banner */}
@@ -434,50 +583,58 @@ export default function CommunityDashboard({ communityId }) {
                                     </div>
                                 </div>
                                 
-                                <div className="space-y-4">
-                                    {upcomingEvents.map((event) => (
-                                        <div key={event.id} className="relative rounded-2xl overflow-hidden shadow-neuro hover:scale-[1.01] transition-all duration-300">
-                                            <div className="relative h-48 bg-primary">
-                                                {/* Background pattern */}
-                                                <div className="absolute inset-0 bg-black bg-opacity-30"></div>
-                                                <div className="absolute inset-0" style={{
-                                                    backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="7" cy="7" r="7"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
-                                                }}></div>
-                                                
-                                                {/* Event Category Badge */}
-                                                <div className="absolute top-3 left-3">
-                                                    <span className="bg-white bg-opacity-90 text-primary px-3 py-1 rounded-full text-xs font-semibold">
-                                                        {event.category}
-                                                    </span>
-                                                </div>
-                                                
-                                                {/* View More Button */}
-                                                <button className="absolute top-3 right-3 bg-white bg-opacity-20 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-semibold border border-white border-opacity-30 shadow-neuro-in">
-                                                    {event.category.toLowerCase()}
-                                                </button>
-                                                
-                                                {/* Event Info */}
-                                                <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                                                    <h3 className="text-lg font-bold mb-2 tracking-wider drop-shadow-neuro">
-                                                        UPCOMING
-                                                    </h3>
-                                                    <h4 className="text-xl font-bold mb-3 leading-tight drop-shadow-neuro">
-                                                        {event.title}
-                                                    </h4>
-                                                    <div className="flex items-center gap-4 text-sm text-white text-opacity-90">
-                                                        <div className="flex items-center gap-1">
-                                                            <FontAwesomeIcon icon={faCalendar} className="text-xs" />
-                                                            <span className="drop-shadow-neuro">{event.date}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <FontAwesomeIcon icon={faClock} className="text-xs" />
-                                                            <span className="drop-shadow-neuro">{event.time}</span>
+                                {/* Horizontal Scroll Container for Events */}
+                                <div className="overflow-x-auto scrollbar-hide">
+                                    <div className="flex gap-4 pb-2" style={{ width: 'max-content' }}>
+                                        {upcomingEvents.map((event) => (
+                                            <div 
+                                                key={event.id} 
+                                                onClick={() => router.push(`/app/komunitas/event/${event.id}`)}
+                                                className="relative rounded-2xl overflow-hidden shadow-neuro hover:scale-[1.01] transition-all duration-300 flex-shrink-0 cursor-pointer" 
+                                                style={{ width: '280px' }}
+                                            >
+                                                <div className="relative h-48 bg-primary">
+                                                    {/* Background pattern */}
+                                                    <div className="absolute inset-0 bg-black bg-opacity-30"></div>
+                                                    <div className="absolute inset-0" style={{
+                                                        backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="7" cy="7" r="7"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
+                                                    }}></div>
+                                                    
+                                                    {/* Event Category Badge */}
+                                                    <div className="absolute top-3 left-3">
+                                                        <span className="bg-white bg-opacity-90 text-primary px-3 py-1 rounded-full text-xs font-semibold">
+                                                            {event.category}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* View More Button */}
+                                                    <button className="absolute top-3 right-3 bg-white bg-opacity-20 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-semibold border border-white border-opacity-30 shadow-neuro-in">
+                                                        {event.category.toLowerCase()}
+                                                    </button>
+                                                    
+                                                    {/* Event Info */}
+                                                    <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                                                        <h3 className="text-lg font-bold mb-2 tracking-wider drop-shadow-neuro">
+                                                            UPCOMING
+                                                        </h3>
+                                                        <h4 className="text-xl font-bold mb-3 leading-tight drop-shadow-neuro">
+                                                            {event.title}
+                                                        </h4>
+                                                        <div className="flex items-center gap-4 text-sm text-white text-opacity-90">
+                                                            <div className="flex items-center gap-1">
+                                                                <FontAwesomeIcon icon={faCalendar} className="text-xs" />
+                                                                <span className="drop-shadow-neuro">{event.date}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <FontAwesomeIcon icon={faClock} className="text-xs" />
+                                                                <span className="drop-shadow-neuro">{event.time}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
@@ -490,38 +647,48 @@ export default function CommunityDashboard({ communityId }) {
                                     </div>
                                     
                                     <div className="bg-white bg-opacity-60 backdrop-blur-sm rounded-b-2xl p-4 shadow-neuro">
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {category.promos.map((promo) => (
-                                                <div key={promo.id} className="bg-white rounded-xl overflow-hidden shadow-neuro-in hover:scale-[1.01] transition-all duration-300">
-                                                        <Image 
-                                                            src={promo.image} 
-                                                            alt={promo.title}
-                                                            width={150}
-                                                            height={120}
-                                                            className="w-full h-full object-cover"
-                                                        />
+                                        {/* Horizontal Scroll Container */}
+                                        <div className="overflow-x-auto scrollbar-hide">
+                                            <div className="flex gap-4 pb-2" style={{ width: 'max-content' }}>
+                                                {category.promos.map((promo) => (
+                                                    <div 
+                                                        key={promo.id} 
+                                                        onClick={() => router.push(`/app/komunitas/promo/${promo.id}`)}
+                                                        className="bg-white rounded-xl overflow-hidden shadow-neuro-in hover:scale-[1.02] transition-all duration-300 flex-shrink-0 cursor-pointer" 
+                                                        style={{ width: '160px' }}
+                                                    >
+                                                        <div className="relative h-24 overflow-hidden">
+                                                            <Image 
+                                                                src={promo.image} 
+                                                                alt={promo.title}
+                                                                width={160}
+                                                                height={96}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
                                                         <div className="p-3">
-                                                            <h4 className="font-semibold text-sm text-slate-900 mb-2 line-clamp-2">
+                                                            <h4 className="font-semibold text-sm text-slate-900 mb-2 line-clamp-2 min-h-[2.5rem]">
                                                                 {promo.title}
                                                             </h4>
                                                             {promo.description && (
-                                                                <p className="text-xs text-slate-600 mb-2 line-clamp-2">
+                                                                <p className="text-xs text-slate-600 mb-2 line-clamp-2 min-h-[2rem]">
                                                                     {promo.description}
                                                                 </p>
                                                             )}
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-xs bg-primary bg-opacity-20 text-primary px-2 py-1 rounded">
+                                                            <div className="flex flex-col gap-2">
+                                                                <span className="text-xs bg-primary bg-opacity-20 text-primary px-2 py-1 rounded text-center">
                                                                     {promo.label}
                                                                 </span>
                                                                 {promo.discount && (
-                                                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">
+                                                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold text-center">
                                                                         {promo.discount}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </div>
-                                                </div>
-                                            ))}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
