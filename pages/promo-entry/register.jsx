@@ -11,6 +11,7 @@ export default function PromoRegister() {
   const router = useRouter();
   const [promoId, setPromoId] = useState('');
   const [btnLoading, setBtnLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     // Ambil promoId dari URL query parameter atau sessionStorage
@@ -65,7 +66,7 @@ export default function PromoRegister() {
       
       await submit(e);
     } catch (error) {
-      console.error('Registration error:', error);
+      setErrorMessage(`Registration error: ${error.message || 'Unknown error occurred'}`);
     } finally {
       setBtnLoading(false);
     }
@@ -127,7 +128,12 @@ export default function PromoRegister() {
               }}
               tip="Pastikan nomor WhatsApp aktif untuk menerima kode OTP"
             />
-
+            {errorMessage && (
+              <div className="px-6 text-red-500 text-sm font-medium">
+                {errorMessage}
+              </div>
+            )}
+            
             <div className="px-6 mt-4">
               <ButtonComponent
                 type="submit"

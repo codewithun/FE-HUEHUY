@@ -30,7 +30,8 @@ export default function ScanQR() {
         router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=general&booth=BOOTH01`);
       }
     } catch (error) {
-      console.error('Error processing QR:', error);
+      // Handle QR processing error
+      setScanResult(`Error: ${error.message || 'Unknown error processing QR code'}`);
       setLoading(false);
       setIsScanning(true);
     }

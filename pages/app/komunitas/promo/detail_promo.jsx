@@ -2,6 +2,7 @@ import { faArrowLeft, faCheckCircle, faExclamationTriangle, faMapMarkerAlt, faPh
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 const PromoDetailPage = () => {
   const router = useRouter();
@@ -314,7 +315,7 @@ const PromoDetailPage = () => {
       setShowSuccessModal(true);
       
     } catch (error) {
-      console.error('Error claiming promo:', error);
+      // Handle error without using console
       setErrorMessage('Gagal merebut promo. Silakan coba lagi.');
       setShowErrorModal(true);
     } finally {
@@ -454,15 +455,22 @@ const PromoDetailPage = () => {
           <div className="mb-4">
             <div className="bg-white rounded-[20px] shadow-lg overflow-hidden border border-slate-100">
               <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
-                {/* Larger Promo Image */}
-                <img 
-                  src={promoData.image} 
-                  alt={promoData.title}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.src = '/default-avatar.png';
-                  }}
-                />
+                <div className="relative w-full h-full">
+                  <Image 
+                    src={promoData.image} 
+                    alt={promoData.title}
+                    className="object-cover"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 500px"
+                    placeholder="blur"
+                    blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
+                    onError={() => {
+                      // Use default image if error occurs
+                      const img = document.querySelector(`img[alt="${promoData.title}"]`);
+                      if (img) img.src = '/default-avatar.png';
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>

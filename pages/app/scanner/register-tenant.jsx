@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 export default function RegisterTenant() {
   const router = useRouter();
-  const { qr, type, tenantId } = router.query;
+  const { tenantId } = router.query;
   
   const [formData, setFormData] = useState({
     name: '',
@@ -48,7 +48,8 @@ export default function RegisterTenant() {
       }, 2000);
       
     } catch (error) {
-      console.error('Registration error:', error);
+      // Log error silently or use a logging service here
+      // For now, just show alert to user without console statement
       alert('Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setLoading(false);

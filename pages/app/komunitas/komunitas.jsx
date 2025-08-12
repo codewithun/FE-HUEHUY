@@ -301,28 +301,53 @@ export default function Komunitas() {
 
             {/* Content with proper padding */}
             <div className="px-4 pb-6">
-              {/* Komunitasku section */}
-              <div className="mb-6">
-                <div className="mb-4">
-                  <h2 className="text-slate-900 text-lg font-semibold">Komunitasku</h2>
-                  <p className="text-slate-600 text-sm">
-                    {myCommunitiesData.length} komunitas yang kamu ikuti
-                  </p>
-                </div>
-
-                {/* My Communities List */}
-                <div className="space-y-3">
-                  {myCommunitiesData.map((community) => (
-                    <CommunityCard 
-                      key={community.id} 
-                      community={community} 
-                      type="joined"
-                      onOpenCommunity={handleOpenCommunity}
-                      formatNumber={formatNumber}
-                    />
-                  ))}
-                </div>
+              {/* Tab navigation */}
+              <div className="flex mb-4 border-b border-slate-200">
+                <button 
+                  className={`px-4 py-2 ${activeTab === 'semua' ? 'text-primary font-semibold border-b-2 border-primary' : 'text-slate-600'}`}
+                  onClick={() => setActiveTab('semua')}
+                >
+                  Semua
+                </button>
+                <button 
+                  className={`px-4 py-2 ${activeTab === 'komunitasku' ? 'text-primary font-semibold border-b-2 border-primary' : 'text-slate-600'}`}
+                  onClick={() => setActiveTab('komunitasku')}
+                >
+                  Komunitasku
+                </button>
+                <button 
+                  className={`px-4 py-2 ${activeTab === 'belum-gabung' ? 'text-primary font-semibold border-b-2 border-primary' : 'text-slate-600'}`}
+                  onClick={() => setActiveTab('belum-gabung')}
+                >
+                  Belum Gabung
+                </button>
               </div>
+
+              {/* Communities List */}
+              {/* Show recommended communities section only when viewing all or joined communities */}
+              {activeTab !== 'belum-gabung' && (
+                <div className="mb-6">
+                  <div className="mb-4">
+                    <h2 className="text-slate-900 text-lg font-semibold">Komunitas Lainnya</h2>
+                    <p className="text-slate-600 text-sm">
+                      Temukan komunitas baru yang menarik
+                    </p>
+                  </div>
+
+                  {/* Other Communities List */}
+                  <div className="space-y-3">
+                    {notJoinedCommunitiesData.slice(0, 3).map((community) => (
+                      <CommunityCard 
+                        key={community.id} 
+                        community={community} 
+                        type="notJoined"
+                        onOpenCommunity={handleOpenCommunity}
+                        formatNumber={formatNumber}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Komunitas Lainnya section */}
               <div className="mb-6">
@@ -335,7 +360,7 @@ export default function Komunitas() {
 
                 {/* Other Communities List */}
                 <div className="space-y-3">
-                  {notJoinedCommunitiesData.map((community) => (
+                  {filteredCommunities().map((community) => (
                     <CommunityCard 
                       key={community.id} 
                       community={community} 

@@ -421,7 +421,7 @@ export default function CommunityDashboard({ communityId }) {
                             <div className="mb-6">
                                 <h1 className="text-xl font-bold mb-2 drop-shadow-neuro">
                                     Selamat Datang Di Komunitas<br />
-                                    "{communityData.name}"
+                                    {`"${communityData.name}"`}
                                 </h1>
                                 <p className="text-white text-opacity-90 text-sm leading-relaxed drop-shadow-neuro">
                                     {communityData.description}
