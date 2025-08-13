@@ -123,162 +123,88 @@ export default function CommunityDashboard({ communityId }) {
     useEffect(() => {
         if (communityData) {
             // Generate events based on community type
-            const getEventsForCommunity = (community) => {
-                const eventsByCategory = {
-                    'Shopping': [
-                        {
-                            id: 1,
-                            title: `Upcoming Kids Drawing Competition - ${community.name}`,
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '15 Agustus 2025',
-                            time: '10:00 - 17:00',
-                            location: community.name,
-                            participants: 45
-                        },
-                        {
-                            id: 2,
-                            title: 'Fashion Show & Beauty Contest',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '20 Agustus 2025',
-                            time: '19:00 - 22:00',
-                            location: community.name,
-                            participants: 120
-                        },
-                        {
-                            id: 3,
-                            title: 'Shopping Festival Weekend',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '25 Agustus 2025',
-                            time: '10:00 - 22:00',
-                            location: community.name,
-                            participants: 500
-                        }
-                    ],
-                    'Event': [
-                        {
-                            id: 1,
-                            title: `Grand Opening Celebration - ${community.name}`,
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '18 Agustus 2025',
-                            time: '16:00 - 21:00',
-                            location: 'Venue ' + community.name,
-                            participants: 200
-                        },
-                        {
-                            id: 2,
-                            title: 'Music Festival 2025',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '22 Agustus 2025',
-                            time: '18:00 - 24:00',
-                            location: 'Main Stage ' + community.name,
-                            participants: 1000
-                        },
-                        {
-                            id: 3,
-                            title: 'Corporate Networking Event',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '30 Agustus 2025',
-                            time: '19:00 - 22:00',
-                            location: 'Conference Hall',
-                            participants: 150
-                        }
-                    ],
-                    'Kuliner': [
-                        {
-                            id: 1,
-                            title: `Festival Kuliner ${community.location}`,
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '22 Agustus 2025',
-                            time: '17:00 - 23:00',
-                            location: community.location,
-                            participants: 150
-                        },
-                        {
-                            id: 2,
-                            title: 'Street Food Night Market',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '26 Agustus 2025',
-                            time: '18:00 - 01:00',
-                            location: community.location,
-                            participants: 300
-                        },
-                        {
-                            id: 3,
-                            title: 'Cooking Competition',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '29 Agustus 2025',
-                            time: '14:00 - 18:00',
-                            location: 'Culinary Center',
-                            participants: 80
-                        }
-                    ],
-                    'Otomotif': [
-                        {
-                            id: 1,
-                            title: `Car Meet Up ${community.name}`,
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '25 Agustus 2025',
-                            time: '08:00 - 12:00',
-                            location: 'Parking Area ' + community.location,
-                            participants: 80
-                        },
-                        {
-                            id: 2,
-                            title: 'Motorcycle Show & Contest',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '27 Agustus 2025',
-                            time: '09:00 - 15:00',
-                            location: 'Exhibition Center',
-                            participants: 120
-                        }
-                    ],
-                    'Fashion': [
-                        {
-                            id: 1,
-                            title: `Fashion Week ${community.location}`,
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '28 Agustus 2025',
-                            time: '19:00 - 22:00',
-                            location: community.location,
-                            participants: 300
-                        },
-                        {
-                            id: 2,
-                            title: 'Designer Showcase Night',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '31 Agustus 2025',
-                            time: '20:00 - 23:00',
-                            location: 'Fashion Gallery',
-                            participants: 200
-                        },
-                        {
-                            id: 3,
-                            title: 'Style Workshop & Demo',
-                            category: community.name,
-                            image: '/api/placeholder/300/200',
-                            date: '3 September 2025',
-                            time: '15:00 - 18:00',
-                            location: 'Workshop Studio',
-                            participants: 50
-                        }
-                    ]
-                };
-                return eventsByCategory[community.category] || [];
-            };
-
+            const getEventsForCommunity = (community) => [
+                {
+                    id: 1,
+                    title: `Kids Drawing Competition - ${community.name}`,
+                    category: community.name,
+                    image: '/images/event/kids-drawing.jpg',
+                    date: '15 Agustus 2025',
+                    time: '10:00 - 17:00',
+                    location: community.location,
+                    participants: 45
+                },
+                {
+                    id: 2,
+                    title: 'Fashion Show & Beauty Contest',
+                    category: community.name,
+                    image: '/images/event/fashion-show.jpg',
+                    date: '20 Agustus 2025',
+                    time: '19:00 - 22:00',
+                    location: community.location,
+                    participants: 120
+                },
+                {
+                    id: 3,
+                    title: 'Shopping Festival Weekend',
+                    category: community.name,
+                    image: '/images/event/shopping-festival.jpg',
+                    date: '25 Agustus 2025',
+                    time: '10:00 - 22:00',
+                    location: community.location,
+                    participants: 500
+                },
+                {
+                    id: 4,
+                    title: `Grand Opening Celebration - ${community.name}`,
+                    category: community.name,
+                    image: '/images/event/grand-opening.jpg',
+                    date: '18 Agustus 2025',
+                    time: '16:00 - 21:00',
+                    location: community.location,
+                    participants: 200
+                },
+                {
+                    id: 5,
+                    title: 'Music Festival 2025',
+                    category: community.name,
+                    image: '/images/event/music-festival.jpg',
+                    date: '22 Agustus 2025',
+                    time: '18:00 - 24:00',
+                    location: community.location,
+                    participants: 1000
+                },
+                {
+                    id: 6,
+                    title: `Festival Kuliner ${community.location}`,
+                    category: community.name,
+                    image: '/images/event/kuliner-festival.jpg',
+                    date: '22 Agustus 2025',
+                    time: '17:00 - 23:00',
+                    location: community.location,
+                    participants: 150
+                },
+                {
+                    id: 7,
+                    title: `Car Meet Up ${community.name}`,
+                    category: community.name,
+                    image: '/images/event/car-meetup.jpg',
+                    date: '25 Agustus 2025',
+                    time: '08:00 - 12:00',
+                    location: community.location,
+                    participants: 80
+                },
+                {
+                    id: 8,
+                    title: `Fashion Week ${community.location}`,
+                    category: community.name,
+                    image: '/images/event/fashion-week.jpg',
+                    date: '28 Agustus 2025',
+                    time: '19:00 - 22:00',
+                    location: community.location,
+                    participants: 300
+                }
+            ];
             setUpcomingEvents(getEventsForCommunity(communityData));
         }
     }, [communityData]);
@@ -505,7 +431,8 @@ export default function CommunityDashboard({ communityId }) {
     // Function to get gradient based on community category
     const getCommunityGradient = (category) => {
         const gradients = {
-            'Shopping': 'bg-gradient-to-br from-purple-500 to-purple-700',
+            // Hijau tua untuk Shopping
+            'Shopping': 'bg-gradient-to-br from-green-700 to-green-900',
             'Event': 'bg-gradient-to-br from-blue-500 to-blue-700',
             'Kuliner': 'bg-gradient-to-br from-orange-500 to-orange-700',
             'Otomotif': 'bg-gradient-to-br from-gray-600 to-gray-800',
@@ -593,41 +520,46 @@ export default function CommunityDashboard({ communityId }) {
                                                 className="relative rounded-2xl overflow-hidden shadow-neuro hover:scale-[1.01] transition-all duration-300 flex-shrink-0 cursor-pointer" 
                                                 style={{ width: '280px' }}
                                             >
-                                                <div className="relative h-48 bg-primary">
-                                                    {/* Background pattern */}
-                                                    <div className="absolute inset-0 bg-black bg-opacity-30"></div>
-                                                    <div className="absolute inset-0" style={{
-                                                        backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="7" cy="7" r="7"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
-                                                    }}></div>
+                                                <div className="relative h-48">
+                                                    {/* Background Image */}
+                                                    <Image 
+                                                        src={event.image} 
+                                                        alt={event.title}
+                                                        fill
+                                                        className="object-cover"
+                                                    />
                                                     
-                                                    {/* Event Category Badge */}
+                                                    {/* Dark overlay untuk readability */}
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20"></div>
+                                                    
+                                                    {/* Community Name Badge - Kiri Atas */}
                                                     <div className="absolute top-3 left-3">
-                                                        <span className="bg-white bg-opacity-90 text-primary px-3 py-1 rounded-full text-xs font-semibold">
+                                                        <span className="bg-white bg-opacity-90 text-slate-900 px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
                                                             {event.category}
                                                         </span>
                                                     </div>
                                                     
-                                                    {/* View More Button */}
+                                                    {/* View More Button - Kanan Atas */}
                                                     <button className="absolute top-3 right-3 bg-white bg-opacity-20 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-semibold border border-white border-opacity-30 shadow-neuro-in">
-                                                        {event.category.toLowerCase()}
+                                                        view more
                                                     </button>
                                                     
-                                                    {/* Event Info */}
+                                                    {/* Event Info - Bagian Bawah */}
                                                     <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                                                        <h3 className="text-lg font-bold mb-2 tracking-wider drop-shadow-neuro">
+                                                        <h3 className="text-lg font-bold mb-2 tracking-wider drop-shadow-lg">
                                                             UPCOMING
                                                         </h3>
-                                                        <h4 className="text-xl font-bold mb-3 leading-tight drop-shadow-neuro">
+                                                        <h4 className="text-lg font-bold mb-3 leading-tight drop-shadow-lg line-clamp-2">
                                                             {event.title}
                                                         </h4>
                                                         <div className="flex items-center gap-4 text-sm text-white text-opacity-90">
                                                             <div className="flex items-center gap-1">
                                                                 <FontAwesomeIcon icon={faCalendar} className="text-xs" />
-                                                                <span className="drop-shadow-neuro">{event.date}</span>
+                                                                <span className="drop-shadow-lg">{event.date}</span>
                                                             </div>
                                                             <div className="flex items-center gap-1">
                                                                 <FontAwesomeIcon icon={faClock} className="text-xs" />
-                                                                <span className="drop-shadow-neuro">{event.time}</span>
+                                                                <span className="drop-shadow-lg">{event.time}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -655,14 +587,14 @@ export default function CommunityDashboard({ communityId }) {
                                                         key={promo.id} 
                                                         onClick={() => router.push(`/app/komunitas/promo/${promo.id}`)}
                                                         className="bg-white rounded-xl overflow-hidden shadow-neuro-in hover:scale-[1.02] transition-all duration-300 flex-shrink-0 cursor-pointer" 
-                                                        style={{ width: '160px' }}
+                                                        style={{ width: '180px' }} // Lebarkan card promo
                                                     >
-                                                        <div className="relative h-24 overflow-hidden">
+                                                        <div className="relative h-36 overflow-hidden"> {/* Ubah tinggi gambar */}
                                                             <Image 
                                                                 src={promo.image} 
                                                                 alt={promo.title}
-                                                                width={160}
-                                                                height={96}
+                                                                width={180} // Sesuaikan lebar gambar
+                                                                height={130} // Sesuaikan tinggi gambar
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         </div>
