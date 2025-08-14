@@ -2,6 +2,7 @@ import { faGift, faPercent, faSearch, faTag } from '@fortawesome/free-solid-svg-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import CommunityBottomBar from './dashboard/CommunityBottomBar';
 
 const CommunityPromoPage = () => {
@@ -105,14 +106,19 @@ const CommunityPromoPage = () => {
       onClick={() => handlePromoClick(promo.id)}
     >
       <div className="flex p-3">
-        <div className="w-16 h-16 bg-slate-100 rounded-[12px] flex-shrink-0 mr-3 overflow-hidden">
-          <img 
+        <div>
+          <Image 
             src={promo.image} 
             alt={promo.title}
+            width={64}
+            height={64}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.src = '/default-avatar.png';
+            onError={() => {
+              // Image component doesn't support onError directly
+              // Use placeholder for fallbacks instead
             }}
+            placeholder="blur"
+            blurDataURL="/default-avatar.png"
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -144,18 +150,23 @@ const CommunityPromoPage = () => {
 
   const LimitedDealCard = ({ deal }) => (
     <div 
-      className="bg-orange-50 backdrop-blur-sm rounded-[15px] shadow-sm overflow-hidden hover:scale-[1.01] transition-all duration-300 border border-orange-200 border-opacity-30 cursor-pointer"
+      className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[15px] shadow-sm overflow-hidden mb-3 hover:scale-[1.01] transition-all duration-300 cursor-pointer"
       onClick={() => handlePromoClick(deal.id)}
     >
       <div className="flex p-3">
-        <div className="w-14 h-14 bg-orange-100 rounded-[12px] flex-shrink-0 mr-3 overflow-hidden">
-          <img 
+        <div>
+          <Image 
             src={deal.image} 
             alt={deal.title}
+            width={56}
+            height={56}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.src = '/default-avatar.png';
+            onError={() => {
+              // Image component doesn't support onError directly
+              // Use placeholder for fallbacks instead
             }}
+            placeholder="blur"
+            blurDataURL="/default-avatar.png"
           />
         </div>
         <div className="flex-1 min-w-0">

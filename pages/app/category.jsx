@@ -1,33 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable jsx-a11y/alt-text */
 /* eslint-disable @next/next/no-img-element */
-import React, { useEffect, useState } from 'react';
-import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
+import {
+  faChevronDown,
+  faChevronUp
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faArrowRightArrowLeft,
-  faChevronDown,
-  faChevronRight,
-  faChevronUp,
-  faCrosshairs,
-  faEarthAsia,
-  faExpand,
-  faGlobe,
-  faIcons,
-  faLocationDot,
-  faLock,
-} from '@fortawesome/free-solid-svg-icons';
-import { withScriptjs, withGoogleMap, GoogleMap } from 'react-google-maps';
-import InfoBox from 'react-google-maps/lib/components/addons/InfoBox';
-import { useGet } from '../../helpers';
-import {
-  ButtonComponent,
-  FloatingPageComponent,
-} from '../../components/base.components';
+  GoogleMap,
+  InfoBox,
+  useJsApiLoader,
+} from '@react-google-maps/api';
 import Link from 'next/link';
-import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
+import { useEffect, useState } from 'react';
+import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import CubeComponent from '../../components/construct.components/CubeComponent';
-import { distanceConvert } from '../../helpers/distanceConvert.helpers';
+import { useGet } from '../../helpers';
 
 export default function Berburu() {
   const [expands, setExpands] = useState([]);
@@ -101,6 +89,55 @@ export default function Berburu() {
   const [loadingCategories, codeCategories, dataCategories] = useGet({
     path: `ads-category`,
   });
+
+  function MapWithAMarker({ position, dataAds }) {
+    const { isLoaded } = useJsApiLoader({
+      googleMapsApiKey: 'AIzaSyD74gvRdtA7NAo4j8ENoOsdy3QGXU6Oklc',
+      libraries: ['places'],
+    });
+
+    if (!isLoaded) return <div style={{ height: '250px' }}>Loading...</div>;
+
+    return (
+      <GoogleMap
+        center={position ? position : { lat: -6.905977, lng: 107.613144 }}
+        zoom={9}
+        mapContainerStyle={{ height: '250px', width: '100%' }}
+        options={{
+          streetViewControl: false,
+          fullscreenControl: false,
+          disableDefaultUI: true,
+          keyboardShortcuts: false,
+        }}
+      >
+        {dataAds?.map((ad, key) => (
+          <InfoBox
+            position={{
+              lat: ad?.cube?.map_lat,
+              lng: ad?.cube?.map_lng,
+            }}
+            options={{ closeBoxURL: '', enableEventPropagation: true }}
+            key={key}
+          >
+            <Link href={`/app/${ad?.cube?.code}`}>
+              <div className="flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
+                  {ad?.cube?.picture_source ? (
+                    <img src={ad?.cube?.picture_source} className="w-12" />
+                  ) : (
+                    <CubeComponent
+                      size={18}
+                      color={`${ad?.cube?.cube_type?.color}`}
+                    />
+                  )}
+                </div>
+              </div>
+            </Link>
+          </InfoBox>
+        ))}
+      </GoogleMap>
+    );
+  }
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { faArrowLeft, faBolt, faCamera, faFlashlight, faFlashlightSlash, faQrcode, faShieldCheck, faStore, faTicket } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCamera, faFlashlight, faFlashlightSlash, faQrcode, faShieldCheck } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -14,14 +14,12 @@ export default function ScanQR() {
 
   const handleScanResult = async (result) => {
     if (!result || loading) return;
-    
     setLoading(true);
     setScanResult(result);
     setIsScanning(false);
 
     try {
       const qrData = parseQRCode(result);
-      
       if (qrData.type === 'event_booth') {
         router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=event&booth=${qrData.boothId}`);
       } else if (qrData.type === 'tenant_promo') {
@@ -30,20 +28,10 @@ export default function ScanQR() {
         router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=general&booth=BOOTH01`);
       }
     } catch (error) {
-      console.error('Error processing QR:', error);
+      setScanResult(`Error: ${error.message || 'Unknown error processing QR code'}`);
       setLoading(false);
       setIsScanning(true);
     }
-  };
-
-  const scanEventBooth = () => {
-    const eventQR = 'event_booth_CURIOSITY2024';
-    handleScanResult(eventQR);
-  };
-
-  const scanTenantPromo = () => {
-    const tenantQR = 'tenant_promo_FOODCOURT01';
-    handleScanResult(tenantQR);
   };
 
   const parseQRCode = (qrText) => {
@@ -89,7 +77,7 @@ export default function ScanQR() {
   return (
     <div className="lg:mx-auto lg:relative lg:max-w-md">
       <div className="container mx-auto relative z-10 min-h-screen bg-gradient-to-br from-cyan-50">
-        {/* Header - Style hijau seperti HUEHUY */}
+        {/* Header */}
         <div className="bg-primary px-4 py-4 shadow-sm">
           <div className="flex items-center gap-3">
             <Link href="/app" className="p-2 hover:bg-white/20 rounded-full transition-colors">
@@ -105,43 +93,7 @@ export default function ScanQR() {
           </div>
         </div>
 
-        {/* Quick Actions - Style seperti kategori HUEHUY */}
-        <div className="px-4 mt-4">
-          <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] p-4 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="bg-primary p-2 rounded-[12px]">
-                <FontAwesomeIcon icon={faBolt} className="text-white text-sm" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 text-sm">Quick Scan</h3>
-                <p className="text-xs text-gray-500">Akses cepat untuk jenis QR tertentu</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={scanEventBooth}
-                className="bg-primary text-white py-3 px-3 rounded-[15px] text-sm font-medium shadow-sm hover:shadow-md transition-all active:scale-95"
-              >
-                <div className="flex flex-col items-center gap-1">
-                  <FontAwesomeIcon icon={faTicket} className="text-base" />
-                  <span className="text-xs">Event Booth</span>
-                </div>
-              </button>
-              <button
-                onClick={scanTenantPromo}
-                className="bg-primary text-white py-3 px-3 rounded-[15px] text-sm font-medium shadow-sm hover:shadow-md transition-all active:scale-95"
-              >
-                <div className="flex flex-col items-center gap-1">
-                  <FontAwesomeIcon icon={faStore} className="text-base" />
-                  <span className="text-xs">Tenant Promo</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Scanner Area - Style seperti card HUEHUY */}
+        {/* Scanner Area */}
         <div className="px-4 pb-4 mt-4">
           <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm border border-gray-100 overflow-hidden">
             {isScanning ? (
@@ -206,40 +158,9 @@ export default function ScanQR() {
           </div>
         </div>
 
-        {/* Information Cards */}
-        <div className="px-4 space-y-3 pb-20">
-          <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] p-4 shadow-sm border border-gray-100">
-            <h3 className="font-semibold text-gray-900 mb-3 text-sm flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
-              QR Code yang Didukung
-            </h3>
-            <div className="space-y-3">
-              <div className="flex gap-3 p-3 bg-primary/5 rounded-[12px] border border-primary/20">
-                <div className="bg-primary p-1.5 rounded-[8px] flex-shrink-0">
-                  <FontAwesomeIcon icon={faTicket} className="text-white text-xs" />
-                </div>
-                <div>
-                  <p className="font-medium text-primary text-sm">Event Booth</p>
-                  <p className="text-xs text-slate-600">
-                    Scan untuk voucher dan bergabung dengan komunitas sekolah
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3 p-3 bg-primary/5 rounded-[12px] border border-primary/20">
-                <div className="bg-primary p-1.5 rounded-[8px] flex-shrink-0">
-                  <FontAwesomeIcon icon={faStore} className="text-white text-xs" />
-                </div>
-                <div>
-                  <p className="font-medium text-primary text-sm">Tenant & Promo</p>
-                  <p className="text-xs text-slate-600">
-                    Dapatkan promo menarik dan bergabung dengan komunitas merchant
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {scanResult && (
+        {/* Hasil Scan */}
+        {scanResult && (
+          <div className="px-4 pb-20">
             <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] p-4 shadow-sm border border-gray-100 border-l-4 border-l-primary">
               <h3 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
                 <FontAwesomeIcon icon={faShieldCheck} className="text-primary" />
@@ -249,8 +170,8 @@ export default function ScanQR() {
                 <p className="text-xs text-gray-700 font-mono break-all">{scanResult}</p>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
