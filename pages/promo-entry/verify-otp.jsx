@@ -38,7 +38,8 @@ export default function VerifyOTP() {
         // Asumsikan token berisi info user atau phone number
         setUserPhone(decryptedData.phone || '08****');
       } catch (error) {
-        console.error('Error decrypting temp token:', error);
+        // Silent error handling for decryption issues
+        setUserPhone('08****'); // Fallback to default masked number
       }
     }
 
@@ -68,7 +69,7 @@ export default function VerifyOTP() {
 
       return () => clearInterval(timer);
     }
-  }, [router.query]);
+  }, [router.query, countdown]);
 
   const onSuccess = (data) => {
     // Hapus temporary token dan session data menggunakan helper
@@ -144,6 +145,7 @@ export default function VerifyOTP() {
         alert('Kode OTP baru telah dikirim ke WhatsApp Anda!');
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Resend OTP error:', error);
       alert('Gagal mengirim ulang OTP. Silakan coba lagi.');
     } finally {
@@ -171,6 +173,7 @@ export default function VerifyOTP() {
       
       await submit(e);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('OTP verification error:', error);
     }
   };

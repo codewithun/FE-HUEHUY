@@ -11,6 +11,7 @@ export default function PromoRegister() {
   const router = useRouter();
   const [promoId, setPromoId] = useState('');
   const [btnLoading, setBtnLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     // Ambil promoId dari URL query parameter atau sessionStorage
@@ -65,7 +66,7 @@ export default function PromoRegister() {
       
       await submit(e);
     } catch (error) {
-      console.error('Registration error:', error);
+      setErrorMessage(`Registration error: ${error.message || 'Unknown error occurred'}`);
     } finally {
       setBtnLoading(false);
     }
@@ -97,7 +98,7 @@ export default function PromoRegister() {
           )}
 
           <p className="text-sm text-slate-500 mt-4 px-8 text-center font-medium">
-            Daftar dulu yuk biar bisa ambil promo menarik! Cuma butuh nama dan nomor WA aja kok 😊
+            Daftarkan diri Anda untuk mengakses promo eksklusif yang tersedia. Hanya memerlukan nama dan nomor WhatsApp untuk verifikasi.
           </p>
 
           <form
@@ -108,7 +109,7 @@ export default function PromoRegister() {
               name="name"
               label="Nama Lengkap"
               size="lg"
-              placeholder="Contoh: Joko Gunawan"
+              placeholder="Masukkan nama lengkap Anda"
               {...formControl('name')}
               validations={{
                 required: true,
@@ -119,15 +120,20 @@ export default function PromoRegister() {
               name="phone"
               label="Nomor WhatsApp"
               size="lg"
-              placeholder="Contoh: 08123456789"
+              placeholder="Masukkan nomor WhatsApp Anda"
               {...formControl('phone')}
               validations={{
                 required: true,
                 pattern: /^08[0-9]{8,11}$/,
               }}
-              tip="Pastikan nomor WA aktif untuk menerima kode OTP"
+              tip="Pastikan nomor WhatsApp aktif untuk menerima kode OTP"
             />
-
+            {errorMessage && (
+              <div className="px-6 text-red-500 text-sm font-medium">
+                {errorMessage}
+              </div>
+            )}
+            
             <div className="px-6 mt-4">
               <ButtonComponent
                 type="submit"
@@ -139,7 +145,7 @@ export default function PromoRegister() {
             </div>
             
             <div className="text-center mt-2 text-xs text-slate-400">
-              Dengan mendaftar, kamu akan menerima kode OTP via WhatsApp untuk verifikasi akun
+              Dengan mendaftar, Anda akan menerima kode OTP melalui WhatsApp untuk verifikasi akun
             </div>
           </form>
 
