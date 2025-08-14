@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { faEdit, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faPlus, faTrash, faDownload } from '@fortawesome/free-solid-svg-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { destroy, getFilterParams, useGet } from '../../../helpers';
 import { ButtonComponent } from '../button';
@@ -74,14 +74,15 @@ export function TableSupervisionComponent({
   const [loading, code, data, reset] = useGet(
     {
       ...fetchControl,
-      params: {
-        page,
-        paginate,
-        sortBy: sort.column,
-        sortDirection: sort.direction,
-        search: search,
-        filter: mutatefilter.length ? mutatefilter : undefined,
-      },
+      params:
+        {
+          page,
+          paginate,
+          sortBy: sort.column,
+          sortDirection: sort.direction,
+          search: search,
+          filter: mutatefilter.length ? mutatefilter : undefined,
+        },
     },
     setToLoading ||
       (includeFilters && mutatefilter.length < includeFilters?.length)
@@ -130,7 +131,7 @@ export function TableSupervisionComponent({
   useEffect(() => {
     if (!loading) {
       if (code == 200 || code == 204) {
-        const originalData = data.data;
+  const originalData = Array.isArray(data?.data) ? data.data : [];
         let newColumns: tableColumnProps[] = [];
         let newData: object[] = [];
 
@@ -312,6 +313,52 @@ export function TableSupervisionComponent({
                         }}
                       />
                     )}
+
+                  {/* Tombol Unduh QR - khusus untuk halaman QR Code */}
+                  {originalData[key].qr_code && (
+                    <ButtonComponent
+                      icon={faDownload}
+                      label={'Unduh QR'}
+                      variant="outline"
+                      paint="primary"
+                      size={'xs'}
+                      rounded
+                      onClick={async () => {
+                        const item = originalData[key];
+                        // QR selalu berisi link register + voucher (jika ada)
+                        const linkRegister = 'http://192.168.100.157:3000/buat-akun';
+                        const qrData = linkRegister + (item.voucher ? `|${item.voucher}` : '');
+                        if (!qrData.startsWith('http')) {
+                          alert('Data QR bukan link! Pastikan format sudah benar.');
+                          return;
+                        }
+                        try {
+                          const QRCode = await import('qrcode');
+                          const qrDataURL = await QRCode.toDataURL(qrData, {
+                            width: 300,
+                            margin: 2,
+                            color: {
+                              dark: '#000000',
+                              light: '#FFFFFF'
+                            }
+                          });
+                          const response = await fetch(qrDataURL);
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `qr-${item.id || 'event'}.png`;
+                          link.style.display = 'none';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          window.URL.revokeObjectURL(url);
+                        } catch (error) {
+                          alert('Gagal mengunduh QR Code. Silakan coba lagi.');
+                        }
+                      }}
+                    />
+                  )}
 
                   {(!permissionCode ||
                     hasPermissions?.find((p: number) => p == 4)) &&

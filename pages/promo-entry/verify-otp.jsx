@@ -38,7 +38,7 @@ export default function VerifyOTP() {
         // Asumsikan token berisi info user atau phone number
         setUserPhone(decryptedData.phone || '08****');
       } catch (error) {
-        console.error('Error decrypting temp token:', error);
+        
       }
     }
 
@@ -144,7 +144,6 @@ export default function VerifyOTP() {
         alert('Kode OTP baru telah dikirim ke WhatsApp Anda!');
       }
     } catch (error) {
-      console.error('Resend OTP error:', error);
       alert('Gagal mengirim ulang OTP. Silakan coba lagi.');
     } finally {
       setResendLoading(false);
@@ -171,7 +170,7 @@ export default function VerifyOTP() {
       
       await submit(e);
     } catch (error) {
-      console.error('OTP verification error:', error);
+      
     }
   };
 

@@ -362,7 +362,7 @@ export function TableComponent({
                     // =========================>
                   }
                   <div className="flex gap-4 mb-2">
-                    <div className="w-8 px-4 py-2.5 font-bold">#</div>
+                    <div className="w-8 px-4 py-2.5 font-bold">No</div>
                     {columns &&
                       columns
                         .filter((column) =>

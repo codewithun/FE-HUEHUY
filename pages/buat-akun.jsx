@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ButtonComponent, InputComponent } from '../components/base.components';
 import Link from 'next/link';
 import { token_cookie_name, useForm } from '../helpers';
@@ -9,9 +9,20 @@ import { getAuth, signInWithPopup } from 'firebase/auth';
 import { faGoogle } from '@fortawesome/free-brands-svg-icons';
 import { googleProvider } from '../helpers/firebase';
 import axios from 'axios';
+import { useRouter } from 'next/router';
 
 export default function BuatAkun() {
+  const router = useRouter();
   const [btnGoogleLoading, setBtnGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    // Cek status user, misal dari localStorage atau cookie
+    const sudahRegister = localStorage.getItem('sudahRegister');
+    if (sudahRegister) {
+      router.replace('/dashboard'); // redirect jika sudah pernah scan/register
+    }
+    // else tampilkan form register
+  }, []);
 
   const onSuccess = (data) => {
     Cookies.set(

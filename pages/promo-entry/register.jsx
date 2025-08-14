@@ -27,45 +27,38 @@ export default function PromoRegister() {
     }
   }, [router.query]);
 
-  const onSuccess = (data) => {
-    // Simpan token sementara untuk verifikasi OTP
-    Cookies.set(
-      'temp_user_token',
-      Encrypt(data.temp_token || data.user_token),
-      { expires: 1 }, // 1 hari
-      { secure: true }
-    );
-
-    // Redirect ke halaman verifikasi OTP dengan promoId
-    const redirectUrl = promoId 
-      ? `/promo-entry/verify-otp?promoId=${promoId}` 
-      : '/promo-entry/verify-otp';
-    
-    window.location.href = redirectUrl;
-  };
-
-  const [{ formControl, submit, loading }] = useForm(
-    {
-      path: 'auth/promo-register', // Endpoint khusus untuk registrasi promo
-    },
-    false,
-    onSuccess
-  );
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setBtnLoading(true);
-    
+
     try {
-      // Tambahkan promoId ke form data jika ada
       const formData = new FormData(e.target);
-      if (promoId) {
-        formData.append('promo_id', promoId);
+      const payload = {
+        name: formData.get('name'),
+        phone: formData.get('phone'),
+        promo_id: promoId || '',
+      };
+
+      // Kirim ke endpoint OTP (ubah ke endpoint WhatsApp OTP)
+      const res = await fetch('http://localhost:8000/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (data.status === 'OTP Sent') {
+        // Redirect ke halaman verifikasi OTP
+        const redirectUrl = promoId
+          ? `/promo-entry/verify-otp?promoId=${promoId}`
+          : '/promo-entry/verify-otp';
+        window.location.href = redirectUrl;
+      } else {
+        alert('Gagal mengirim OTP. Coba lagi.');
       }
-      
-      await submit(e);
     } catch (error) {
-      console.error('Registration error:', error);
+      alert('Terjadi kesalahan. Coba lagi.');
     } finally {
       setBtnLoading(false);
     }
@@ -109,18 +102,16 @@ export default function PromoRegister() {
               label="Nama Lengkap"
               size="lg"
               placeholder="Contoh: Joko Gunawan"
-              {...formControl('name')}
               validations={{
                 required: true,
               }}
             />
-            
+
             <InputComponent
               name="phone"
               label="Nomor WhatsApp"
               size="lg"
               placeholder="Contoh: 08123456789"
-              {...formControl('phone')}
               validations={{
                 required: true,
                 pattern: /^08[0-9]{8,11}$/,
@@ -134,10 +125,10 @@ export default function PromoRegister() {
                 label="Daftar & Ambil Promo"
                 block
                 size="xl"
-                loading={loading || btnLoading}
+                loading={btnLoading}
               />
             </div>
-            
+
             <div className="text-center mt-2 text-xs text-slate-400">
               Dengan mendaftar, kamu akan menerima kode OTP via WhatsApp untuk verifikasi akun
             </div>
