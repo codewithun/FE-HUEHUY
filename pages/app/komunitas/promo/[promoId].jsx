@@ -18,7 +18,6 @@ export default function PromoDetailUnified() {
   const router = useRouter();
   const { promoId, communityId } = router.query;
 
-  const [rawPromo, setRawPromo] = useState(null);        // data bentuk lama ([promoId].jsx)
   const [promoData, setPromoData] = useState(null);      // data hasil normalisasi (bentuk detail_promo)
   const [loading, setLoading] = useState(true);
 
@@ -205,7 +204,6 @@ export default function PromoDetailUnified() {
   useEffect(() => {
     if (!promoId) return;
     const legacy = getLegacyPromoData(promoId);
-    setRawPromo(legacy);
     setPromoData(normalizeToDetailShape(legacy));
     setLoading(false);
   }, [promoId]);
@@ -600,6 +598,32 @@ export default function PromoDetailUnified() {
               </button>
               <button id="copy-btn" onClick={() => handleShareComplete('copy')} className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all">
                 <span className="text-sm text-slate-700">📋 Salin Link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
+          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900">Laporkan Promo</h3>
+              <button onClick={() => setShowReportModal(false)} className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all">✕</button>
+            </div>
+            <div className="space-y-3">
+              <button onClick={() => submitReport('Iklan tidak sesuai')} className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all">
+                Iklan tidak sesuai
+              </button>
+              <button onClick={() => submitReport('Penipuan / scam')} className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all">
+                Penipuan / scam
+              </button>
+              <button onClick={() => submitReport('Konten tidak pantas')} className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all">
+                Konten tidak pantas
+              </button>
+              <button onClick={() => setShowReportModal(false)} className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all">
+                Batal
               </button>
             </div>
           </div>
