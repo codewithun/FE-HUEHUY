@@ -1,5 +1,3 @@
-import React, { useEffect, useState } from 'react';
-import OutsideClickHandler from 'react-outside-click-handler';
 import {
   faBars,
   // faBell,
@@ -7,12 +5,14 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import OutsideClickHandler from 'react-outside-click-handler';
 
-import { HeadbarProps } from './headbar.props';
-import { token_cookie_name, useGet } from '../../../helpers';
-import { useRouter } from 'next/router';
 import Cookies from 'js-cookie';
+import { useRouter } from 'next/router';
 import { useUserContext } from '../../../context/user.context';
+import { token_cookie_name, useGet } from '../../../helpers';
+import { HeadbarProps } from './headbar.props';
 
 export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
   const router = useRouter();
@@ -38,42 +38,36 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
         <div
           className={` ${
             dataProfile?.data?.profile?.role?.id == 1 ? 'bg-sky-700' : ''
-          } px-3 lg:px-12 py-4 rounded-br-[150px] flex items-center gap-4 w-[320px]`}
+          } px-4 lg:px-12 py-4 rounded-br-[150px] flex items-center gap-4 w-[320px]`}
         >
           <div className="flex lg:hidden justify-center pr-6">
             <div
-              className="w-8 aspect-square flex justify-center items-center hover:text-primary rounded-md"
+              className="w-8 aspect-square flex justify-center items-center hover:text-primary rounded-md transition-colors duration-200"
               onClick={onMenuClick}
             >
               <FontAwesomeIcon icon={faBars} className="text-lg text-white" />
             </div>
           </div>
-          <div className="bg-white p-1 rounded-full">
+          <div className="bg-white p-1 rounded-full shadow-sm">
             <Image src="/logo.png" width={40} height={40} alt="logo HUEHUY" />
           </div>
           <div>
-            <h1 className="text font-bold text-white whitespace-nowrap">
+            <h1 className="text-base font-bold text-white whitespace-nowrap tracking-wide">
               {dataProfile?.data?.profile.role.id == 1
                 ? 'PANEL SUPER ADMIN'
                 : 'PANEL MITRA'}
             </h1>
-            <p className="text-xs whitespace-nowrap text-white ">HUEHUY</p>
+            <p className="text-xs whitespace-nowrap text-white font-medium">HUEHUY</p>
           </div>
-          {/* <p className="text-xs -mt-1 font-semibold text-slate-400">
-            The Starter Template
-          </p> */}
         </div>
       </div>
 
       <div className="flex gap-4 w-max items-center">
-        {/* <div className="p-3">
-          <FontAwesomeIcon icon={faBell} className="text-lg" />
-        </div> */}
         <div
-          className="flex items-center gap-5 px-6 cursor-pointer bg- py-3 mt-2 rounded-r-[15px] "
+          className="flex items-center gap-4 px-6 cursor-pointer py-3 mt-2 rounded-r-[15px] hover:bg-white/10 transition-colors duration-200"
           onClick={() => setProfile(!profile)}
         >
-          <div className="h-10 bg-background rounded-full aspect-square overflow-hidden">
+          <div className="h-10 bg-background rounded-full aspect-square overflow-hidden border border-white/30 shadow-sm">
             {/* <Image
               src={
                 `http://localhost:8000/storage/${dataProfile?.data?.picture_source}` ||
@@ -86,7 +80,7 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
           </div>
 
           <div className="hidden lg:block w-[150px] text-slate-50">
-            <h6 className="font-semibold limit__line__1">
+            <h6 className="font-semibold limit__line__1 text-base">
               {dataProfile?.data?.profile?.name || '-'}
             </h6>
             <h6 className="-mt-1 text-sm font-medium text-slate-200 limit__line__1">
@@ -104,7 +98,7 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
         <div
           className={`absolute right-0 top-[74px] rounded-l-xl shadow-md overflow-hidden bg-background z-30 ${
             profile ? 'scale-x-100 right-0' : 'scale-x-0 -right-60'
-          }`}
+          } transition-all duration-200`}
         >
           <div className="flex items-center gap-6 px-8 py-6 rounded-b-xl shadow-md">
             <div className="h-16 bg-background border-2 border-light-primary rounded-full aspect-square overflow-hidden">
@@ -132,14 +126,8 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
           </div>
 
           <div className="py-5">
-            {/* <div className="px-8 py-4 flex gap-5 hover:bg-light-primary hover:shadow-md cursor-pointer">
-              <FontAwesomeIcon icon={faUserCog} />
-              <label className="cursor-pointer font-semibold">
-                Edit Profile
-              </label>
-            </div> */}
             <div
-              className="px-8 py-4 flex items-center gap-5 hover:bg-red-50 cursor-pointer text-danger"
+              className="px-8 py-4 flex items-center gap-5 hover:bg-red-50 cursor-pointer text-danger transition-colors duration-200"
               onClick={() => {
                 Cookies.remove(token_cookie_name);
                 dataProfile?.data?.profile?.id == 1
