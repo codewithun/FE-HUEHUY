@@ -1,13 +1,14 @@
 import React from 'react';
 import {
-  InputNumberComponent,
-  TableSupervisionComponent,
+    InputNumberComponent,
+    TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 
 const Iklan = () => {
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Iklan</h1>
       <TableSupervisionComponent
         title="Iklan Huehuy"
         fetchControl={{
@@ -101,7 +102,7 @@ const Iklan = () => {
         }}
         actionControl={{ except: 'detail' }}
       />
-    </>
+    </div>
   );
 };
 

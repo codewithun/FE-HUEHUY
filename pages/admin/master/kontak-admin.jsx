@@ -6,7 +6,8 @@ import { AdminLayout } from '../../../components/construct.components/layout/Adm
 export default function ManageContact() {
   // const { accessActive, loading } = useAccessContext();
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Kontak Admin</h1>
       <TableSupervisionComponent
         title="Tipe Kubus"
         fetchControl={{
@@ -91,7 +92,7 @@ export default function ManageContact() {
         }}
         actionControl={{ except: 'detail' }}
       />
-    </>
+    </div>
   );
 }
 

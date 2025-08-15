@@ -1,4 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import {
+  faEdit,
+  faMagnifyingGlass,
+  faPlus,
+  faRefresh,
+  faTrash,
+} from '@fortawesome/free-solid-svg-icons';
 import React, { useEffect, useState } from 'react';
 import {
   ButtonComponent,
@@ -9,17 +16,10 @@ import {
   ModalConfirmComponent,
   SelectComponent,
 } from '../../../components/base.components';
-import PaginateComponent from '../../../components/base.components/table/Paginate.component';
 import InputImageComponent from '../../../components/base.components/input/InputImage.component';
+import PaginateComponent from '../../../components/base.components/table/Paginate.component';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { destroy, useGet } from '../../../helpers';
-import {
-  faEdit,
-  faMagnifyingGlass,
-  faPlus,
-  faRefresh,
-  faTrash,
-} from '@fortawesome/free-solid-svg-icons';
 
 export default function ManageSlider() {
   // const { accessActive, loading } = useAccessContext();

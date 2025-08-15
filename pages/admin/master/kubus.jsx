@@ -14,23 +14,23 @@ import {
   TableSupervisionComponent,
 } from '../../../components/base.components';
 // import InputHexColor from '../../../components/construct.components/input/InputHexColor';
-import InputImageComponent from '../../../components/base.components/input/InputImage.component';
-import ToggleComponent from '../../../components/construct.components/input/TogleComponet';
-import { TextareaComponent } from '../../../components/base.components/input/Textarea.component';
 import {
   faEdit,
   faFilePen,
   faInfinity,
   faTicket,
 } from '@fortawesome/free-solid-svg-icons';
-import InputOpenHours from '../../../components/construct.components/input/InputOpenHours';
-import UpdateCubeStatusModal from '../../../components/construct.components/modal/UpdateCubeStatus.modal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
+import moment from 'moment';
+import InputImageComponent from '../../../components/base.components/input/InputImage.component';
+import { TextareaComponent } from '../../../components/base.components/input/Textarea.component';
+import InputOpenHours from '../../../components/construct.components/input/InputOpenHours';
+import ToggleComponent from '../../../components/construct.components/input/TogleComponet';
+import UpdateCubeStatusModal from '../../../components/construct.components/modal/UpdateCubeStatus.modal';
 import VoucherModal from '../../../components/construct.components/modal/Voucher.modal';
 import GrabListComponent from '../../../components/construct.components/partial-page/GrabList.component';
-import moment from 'moment';
 import { useUserContext } from '../../../context/user.context';
-import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../helpers';
 
 // import { useAccessContext } from '../../../context';
@@ -66,7 +66,8 @@ function Kubus() {
       : null;
 
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Kubus</h1>
       <TableSupervisionComponent
         setToRefresh={refresh}
         title="Kubus"
@@ -1630,7 +1631,7 @@ function Kubus() {
           setVoucherModal(false);
         }}
       />
-    </>
+    </div>
   );
 }
 
