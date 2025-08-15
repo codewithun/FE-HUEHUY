@@ -1,3 +1,5 @@
+import { faHandHoldingHand } from '@fortawesome/free-solid-svg-icons';
+import Cookies from 'js-cookie';
 import React, { useEffect, useState } from 'react';
 import {
   ButtonComponent,
@@ -5,12 +7,10 @@ import {
   TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
-import UserDetailComponent from '../../../components/construct.components/partial-page/UserDetail.component';
-import { faHandHoldingHand } from '@fortawesome/free-solid-svg-icons';
 import GiveCubeModal from '../../../components/construct.components/modal/GiveCube.modal';
-import { token_cookie_name } from '../../../helpers';
+import UserDetailComponent from '../../../components/construct.components/partial-page/UserDetail.component';
 import { useUserContext } from '../../../context/user.context';
-import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../../helpers';
 // import { useAccessContext } from '../../../context';
 export default function ManageUser() {
   // const { accessActive, loading } = useAccessContext();

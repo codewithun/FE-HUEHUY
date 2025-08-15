@@ -1,7 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState } from 'react';
-import { AdminLayout } from '../../components/construct.components/layout/Admin.layout';
-import DashboardCard from '../../components/construct.components/card/Dashboard.card';
 import {
   faCrosshairs,
   faCubes,
@@ -10,13 +7,14 @@ import {
   faNewspaper,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
-import { token_cookie_name, useGet } from '../../helpers';
-import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
-import Image from 'next/image';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import CubeComponent from '../../components/construct.components/CubeComponent';
-import { useUserContext } from '../../context/user.context';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import Cookies from 'js-cookie';
+import React, { useEffect, useState } from 'react';
+import DashboardCard from '../../components/construct.components/card/Dashboard.card';
+import { AdminLayout } from '../../components/construct.components/layout/Admin.layout';
+import { useUserContext } from '../../context/user.context';
+import { token_cookie_name, useGet } from '../../helpers';
 
 const mapContainerStyle = {
   width: '100%',
@@ -110,13 +108,11 @@ export default function Index() {
   }, [codeAds]);
 
   return (
-    <div>
-      <h1 className="text-lg lg:text-xl font-semibold mb-2">Dashboard</h1>
+    <div className="p-2 md:p-6 bg-slate-50 min-h-screen rounded-2xl">
+      <h1 className="text-xl lg:text-2xl font-bold mb-4 tracking-wide text-slate-700">Dashboard</h1>
 
-      <h2 className="font-semibold mt-5 mb-3 border-l-4 rounded-md border-secondary pl-2">
-        Statistik Dasar
-      </h2>
-      <div className="grid grid-cols-5 gap-3">
+      <h2 className="font-semibold mt-5 mb-3 border-l-4 rounded-md border-secondary pl-3 text-slate-600 text-lg tracking-wide">Statistik Dasar</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
         <DashboardCard
           label="Kubus"
           // loading={dashboardLoading}
@@ -154,17 +150,15 @@ export default function Index() {
         />
       </div>
 
-      <h2 className="font-semibold mt-8 mb-3 border-l-4 rounded-md border-secondary pl-2">
-        Peta Persebaran Promo
-      </h2>
+      <h2 className="font-semibold mt-10 mb-3 border-l-4 rounded-md border-secondary pl-3 text-slate-600 text-lg tracking-wide">Peta Persebaran Promo</h2>
 
-      <div className="mt-2 relative overflow-hidden rounded-[20px]">
+      <div className="mt-2 relative overflow-hidden rounded-2xl shadow bg-white">
         <MapWithAMarker
           position={map}
           dataAds={dataAds?.data}
         />
         <div
-          className="absolute top-4 right-4 w-12 h-12 bg-white flex items-center justify-center rounded-lg"
+          className="absolute top-4 right-4 w-12 h-12 bg-white flex items-center justify-center rounded-xl shadow-md hover:shadow-lg hover:bg-slate-100 transition-all duration-150 cursor-pointer"
           onClick={() => setRefreshMap(!refreshMap)}
         >
           <FontAwesomeIcon icon={faCrosshairs} className="text-2xl" />

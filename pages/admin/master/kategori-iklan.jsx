@@ -1,12 +1,12 @@
 import { faEdit, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { useState } from 'react';
 import {
-  ButtonComponent,
-  FloatingPageComponent,
-  FormSupervisionComponent,
-  TableSupervisionComponent,
+    ButtonComponent,
+    FloatingPageComponent,
+    FormSupervisionComponent,
+    TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
-import { useState } from 'react';
 import { useGet } from '../../../helpers';
 // import { useAccessContext } from '../../../context';
 
@@ -20,7 +20,8 @@ export default function ManageAdsCategories() {
   });
 
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Kategori Iklan</h1>
       <TableSupervisionComponent
         title="Kategori Iklan"
         fetchControl={{
@@ -219,7 +220,7 @@ export default function ManageAdsCategories() {
           />
         </div>
       </FloatingPageComponent>
-    </>
+    </div>
   );
 }
 
