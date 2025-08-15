@@ -3,7 +3,7 @@
 }
 
 .input:focus-visible {
-	@apply border-primary;
+	@apply border-primary shadow-md;
 }
 
 .input__error {
@@ -27,7 +27,7 @@
 }
 
 .input__suggest__container {
-    @apply absolute left-0 mt-2 w-full bg-slate-50 shadow text-left z-30 overflow-hidden ease-in-out max-h-[200px] overflow-y-auto;
+    @apply absolute left-0 mt-2 w-full bg-slate-50 shadow-md text-left z-30 overflow-hidden ease-in-out max-h-[200px] overflow-y-auto;
 }
 
 .input__suggest {

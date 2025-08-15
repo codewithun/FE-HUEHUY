@@ -1,28 +1,28 @@
 /* eslint-disable @next/next/no-img-element */
 import {
-  faArrowDownZA,
-  faArrowUpAZ,
-  faChevronLeft,
-  faChevronRight,
-  faEyeLowVision,
-  faMagnifyingGlass,
-  faRefresh,
+    faArrowDownZA,
+    faArrowUpAZ,
+    faChevronLeft,
+    faChevronRight,
+    faEyeLowVision,
+    faMagnifyingGlass,
+    faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useRef, useState } from 'react';
+import OutsideClickHandler from 'react-outside-click-handler';
+import { useLazySearch } from '../../../helpers';
 import { IconButtonComponent } from '../button';
 import {
-  InputCheckboxComponent,
-  InputComponent,
-  SelectComponent,
+    InputCheckboxComponent,
+    InputComponent,
+    SelectComponent,
 } from '../input';
 import { BoxShadowComponent } from './BoxShadow.component';
+import FilterColumnComponent from './FilterColumn.component';
 import PaginateComponent from './Paginate.component';
-import OutsideClickHandler from 'react-outside-click-handler';
 import styles from './table.module.css';
 import { tableProps } from './table.props';
-import { useLazySearch } from '../../../helpers';
-import FilterColumnComponent from './FilterColumn.component';
 
 export function TableComponent({
   columns,
@@ -292,13 +292,13 @@ export function TableComponent({
                   // ## Head Column
                   // =========================>
                 }
-                <div className="flex gap-4 mb-2 px-3 py-2">
-                  <div className="w-16 px-4 py-2.5 font-bold skeleton__loading"></div>
+                <div className="flex gap-4 mb-2 px-4 py-2">
+                  <div className="w-16 px-4 py-2.5 font-bold skeleton__loading rounded-lg"></div>
                   {[1, 2, 3, 4, 5, 6, 7].map((_, key) => {
                     return (
                       <div
                         key={key}
-                        className={`px-6 py-3 font-bold skeleton__loading`}
+                        className={`px-6 py-3 font-bold skeleton__loading rounded-lg`}
                         style={{
                           width: '200px',
                         }}
@@ -319,7 +319,7 @@ export function TableComponent({
                         style={{
                           animationDelay: `${0.25 + key * 0.05}s`,
                         }}
-                        className="flex items-center gap-4 bg-white rounded-lg shadow-sm relative p-2.5 intro__table__column"
+                        className="flex items-center gap-4 bg-white rounded-xl shadow-sm relative p-3 intro__table__column"
                         key={key}
                       >
                         <div className="w-16 px-4 py-2.5 font-medium skeleton__loading"></div>
@@ -361,7 +361,7 @@ export function TableComponent({
                     // ## Head Column
                     // =========================>
                   }
-                  <div className="flex gap-4 mb-2">
+                  <div className="flex gap-4 mb-2 px-2 py-2">
                     <div className="w-8 px-4 py-2.5 font-bold">No</div>
                     {columns &&
                       columns
@@ -372,7 +372,7 @@ export function TableComponent({
                           return (
                             <div
                               key={key}
-                              className={`px-4 py-2.5 font-bold`}
+                              className={`px-4 py-2.5 font-bold rounded-lg`}
                               style={{
                                 width: column.width ? column.width : '200px',
                               }}
@@ -468,7 +468,7 @@ export function TableComponent({
                     // ## Body Column
                     // =========================>
                   }
-                  <div className={`flex flex-col gap-y-2`}>
+                  <div className={`flex flex-col gap-y-3`}>
                     {data &&
                       data.map((item: object, key) => {
                         return (
@@ -477,11 +477,11 @@ export function TableComponent({
                               animationDelay: `${(key + 1) * 0.05}s`,
                             }}
                             className={`
-                              flex items-center gap-4 rounded-lg shadow-sm relative intro__table__column
+                              flex items-center gap-4 rounded-xl shadow-sm relative intro__table__column transition-all duration-150
                               ${key % 2 ? 'bg-slate-100' : 'bg-white'}
                               ${
                                 onRowClick &&
-                                'cursor-pointer hover:bg-slate-200'
+                                'cursor-pointer hover:bg-slate-200/80'
                               }
                               ${styles.table__row}
                             `}
@@ -504,7 +504,7 @@ export function TableComponent({
                                   return (
                                     <div
                                       key={columnKey}
-                                      className="px-4 py-2.5 font-medium"
+                                      className="px-4 py-2.5 font-medium rounded-lg"
                                       style={{
                                         width: column.width || '200px',
                                       }}
@@ -527,7 +527,7 @@ export function TableComponent({
                             {item['action' as keyof object] &&
                               floatingAction && (
                                 <div
-                                  className="sticky hover:-right-2 bg-background -right-5 z-30 cursor-pointer flex items-center shadow rounded-l-lg"
+                                  className="sticky hover:-right-2 bg-background -right-5 z-30 cursor-pointer flex items-center shadow rounded-l-xl transition-all duration-150"
                                   onClick={() =>
                                     floatingActionActive !== false &&
                                     floatingActionActive == key
@@ -548,7 +548,7 @@ export function TableComponent({
                                   </div>
 
                                   <div
-                                    className={`py-1 flex gap-2 ${
+                                    className={`py-1 flex gap-2 transition-all duration-150 ${
                                       floatingActionActive !== false &&
                                       floatingActionActive == key
                                         ? 'w-max pl-2 pr-8'

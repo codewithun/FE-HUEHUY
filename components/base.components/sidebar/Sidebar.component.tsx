@@ -6,8 +6,8 @@ import { useRouter } from 'next/router';
 
 import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { sidebarProps } from './sidebar.props';
 import { useUserContext } from '../../../context/user.context';
+import { sidebarProps } from './sidebar.props';
 
 export function SidebarComponent({
   items,
@@ -104,8 +104,8 @@ export function SidebarComponent({
             }
           `}
         >
-          <div className="flex flex-col h-max w-full bg-white r overflow-hidden shadow-md fixed left-0 top-1/2 -translate-y-1/2 py-2">
-            <div className="px-2 overflow-y-auto h-[calc(100vh-80px)] scroll_control shadow__scrolly select-none intro__fade__down">
+          <div className="flex flex-col h-max w-full bg-white overflow-hidden shadow-md fixed left-0 top-1/2 -translate-y-1/2 py-4 rounded-xl">
+            <div className="px-3 overflow-y-auto h-[calc(100vh-80px)] scroll_control shadow__scrolly select-none intro__fade__down">
               {items?.map((menu_head, menu_head_key) => {
                 let countAvailableMenu = 0;
 
@@ -120,7 +120,7 @@ export function SidebarComponent({
                   return (
                     <React.Fragment key={menu_head_key}>
                       <div
-                        className="px-3 pt-5 pb-3 flex justify-between items-center cursor-pointer"
+                        className="px-4 pt-4 pb-2 flex justify-between items-center cursor-pointer group"
                         onClick={() => {
                           if (menu_head.collapse) {
                             if (!showMenu?.find((sm) => sm == menu_head_key)) {
@@ -133,7 +133,7 @@ export function SidebarComponent({
                           }
                         }}
                       >
-                        <h6 className="text-sm text-slate-500 font-semibold dark:text-slate-300 block md:hidden lg:block uppercase">
+                        <h6 className="text-xs text-slate-500 font-bold dark:text-slate-300 block md:hidden lg:block uppercase tracking-wide group-hover:text-primary transition-colors duration-200">
                           {menu_head.label}
                         </h6>
                         <div className="h-1 hidden md:block lg:hidden"></div>
@@ -191,10 +191,10 @@ export function SidebarComponent({
                                 <a
                                   href={menuPath}
                                   className={`
-                                  flex items-center duration-150 justify-between gap-4 py-3 my-1 cursor-pointer rounded-r-lg mr-3 pl-8 pr-4 overflow-hidden
+                                  flex items-center duration-150 justify-between gap-4 py-3 my-1 cursor-pointer rounded-lg mr-2 pl-7 pr-3 overflow-hidden transition-all
                                   ${
                                     menuActive
-                                      ? 'text-primary border-b-4 border-primary bg-background'
+                                      ? 'text-primary border-b-4 border-primary bg-background shadow-sm'
                                       : 'text-slate-500 dark:text-slate-200 hover:text-primary hover:bg-stone-100'
                                   }
                                 `}
@@ -226,7 +226,7 @@ export function SidebarComponent({
                                     }
                                   }}
                                 >
-                                  <div className="flex items-center justify-start md:justify-center lg:justify-start w-full gap-6">
+                                  <div className="flex items-center justify-start md:justify-center lg:justify-start w-full gap-4">
                                     {menu.icon && (
                                       <div className="w-8 h-8 flex justify-center items-center">
                                         <FontAwesomeIcon
@@ -235,7 +235,7 @@ export function SidebarComponent({
                                         />
                                       </div>
                                     )}
-                                    <h6 className="block md:hidden lg:block w-full font-semibold">
+                                    <h6 className="block md:hidden lg:block w-full font-semibold text-sm tracking-wide">
                                       {menu.label}
                                     </h6>
                                     {menu.right_content && menu.right_content}
@@ -257,7 +257,7 @@ export function SidebarComponent({
                                 {menu.items && menu.items[0] && (
                                   <div
                                     className={`
-                                    shadow-inner mx-3 md:mx-0 lg:mx-3 lg:py-1 px-1 lg:px-2 rounded-lg bg-gray-50 intro__y overflow-hidden
+                                    shadow-inner mx-2 md:mx-0 lg:mx-2 lg:py-1 px-2 lg:px-3 rounded-lg bg-gray-50 intro__y overflow-hidden
                                     ${
                                       showChild?.find(
                                         (sc) =>
@@ -285,7 +285,7 @@ export function SidebarComponent({
                                                 onChange?.();
                                               }}
                                               className={`
-                                              flex items-center gap-3 justify-start px-3 md:px-0 lg:px-4 rounded-lg py-2.5 my-1 lg:my-2 overflow-hidden
+                                              flex items-center gap-3 justify-start px-3 md:px-0 lg:px-4 rounded-lg py-2.5 my-1 lg:my-2 overflow-hidden transition-all
                                               ${
                                                 router.asPath
                                                   ?.split('?')
@@ -301,7 +301,7 @@ export function SidebarComponent({
                                                   className=""
                                                 />
                                               )}
-                                              <h6 className="text-base md:text-xs lg:text-base font-medium">
+                                              <h6 className="text-xs lg:text-sm font-medium tracking-wide">
                                                 {child.label}
                                               </h6>
                                             </div>
