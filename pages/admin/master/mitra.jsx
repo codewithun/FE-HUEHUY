@@ -1,18 +1,18 @@
+import {
+    faCubes,
+    faHandHoldingHand,
+    faUsers,
+} from '@fortawesome/free-solid-svg-icons';
 import React, { useState } from 'react';
 import {
-  ButtonComponent,
-  FloatingPageComponent,
-  TableSupervisionComponent,
+    ButtonComponent,
+    FloatingPageComponent,
+    TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
-import CorporateMemberPage from '../../../components/construct.components/partial-page/CorporateMember.page';
-import {
-  faCubes,
-  faHandHoldingHand,
-  faUsers,
-} from '@fortawesome/free-solid-svg-icons';
-import ManageCubePage from '../../../components/construct.components/partial-page/ManageCube.page';
 import GiveCubeModal from '../../../components/construct.components/modal/GiveCube.modal';
+import CorporateMemberPage from '../../../components/construct.components/partial-page/CorporateMember.page';
+import ManageCubePage from '../../../components/construct.components/partial-page/ManageCube.page';
 // import { useAccessContext } from '../../../context';
 
 export default function ManageCorporate() {
@@ -24,7 +24,8 @@ export default function ManageCorporate() {
   const [modalGive, setModalGive] = useState(false);
 
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Mitra</h1>
       <TableSupervisionComponent
         title="Mitra"
         fetchControl={{
@@ -197,7 +198,7 @@ export default function ManageCorporate() {
         scope={{ corporate_id: selected?.id }}
         giftToCorp={true}
       />
-    </>
+    </div>
   );
 }
 

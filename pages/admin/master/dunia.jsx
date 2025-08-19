@@ -1,22 +1,22 @@
 import {
-  ButtonComponent,
-  FloatingPageComponent,
-  SelectComponent,
-  TableSupervisionComponent,
-} from '../../../components/base.components';
-import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
-import InputHexColor from '../../../components/construct.components/input/InputHexColor';
-import {
-  faCubes,
-  faNetworkWired,
-  faUsers,
+    faCubes,
+    faNetworkWired,
+    faUsers,
 } from '@fortawesome/free-solid-svg-icons';
-import { useEffect, useState } from 'react';
-import WorldMemberPage from '../../../components/construct.components/partial-page/WorldMember.page';
-import ManageCubePage from '../../../components/construct.components/partial-page/ManageCube.page';
-import { token_cookie_name } from '../../../helpers';
 import Cookies from 'js-cookie';
+import { useEffect, useState } from 'react';
+import {
+    ButtonComponent,
+    FloatingPageComponent,
+    SelectComponent,
+    TableSupervisionComponent,
+} from '../../../components/base.components';
+import InputHexColor from '../../../components/construct.components/input/InputHexColor';
+import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
+import ManageCubePage from '../../../components/construct.components/partial-page/ManageCube.page';
+import WorldMemberPage from '../../../components/construct.components/partial-page/WorldMember.page';
 import { useUserContext } from '../../../context/user.context';
+import { token_cookie_name } from '../../../helpers';
 // import { useGet } from '../../../helpers';
 // import { useAccessContext } from '../../../context';
 
@@ -54,7 +54,8 @@ export default function ManageWorld() {
   // }, [dataWorld]);
 
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Dunia</h1>
       <TableSupervisionComponent
         title="Manajemen Dunia"
         fetchControl={{
@@ -363,7 +364,7 @@ export default function ManageWorld() {
           )}
         </div>
       </FloatingPageComponent>
-    </>
+    </div>
   );
 }
 

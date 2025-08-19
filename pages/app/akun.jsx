@@ -15,10 +15,12 @@ import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
 import { ButtonComponent } from '../../components/base.components';
+import QRCode from 'qrcode.react';
 
 export default function Akun() {
   const router = useRouter();
   const [modalConfirm, setModalConfirm] = useState(false);
+  const [showQR, setShowQR] = useState(false); // state popup QR
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loading, codeData, data] = useGet({
@@ -37,32 +39,48 @@ export default function Akun() {
 
   return (
     <>
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50">
-        <div className="bg-primary w-full h-[180px] rounded-b-[40px]">
-          <div className="flex flex-col gap-2 items-center">
-            <div className="w-20 h-20 rounded-full overflow-hidden mt-6 border-2 border-slate-100">
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+        {/* Profile section */}
+        <div className="flex items-center justify-between bg-primary w-full h-[110px] rounded-b-[40px] shadow-neuro px-6 mb-6">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full overflow-hidden shadow-neuro-in flex items-center justify-center bg-white">
               <img
                 src={
                   data?.data?.profile?.picture_source
                     ? data?.data?.profile?.picture_source
                     : '/avatar.jpg'
                 }
-                width={400}
-                height={400}
+                width={80}
+                height={80}
                 alt=""
-                className="h-full"
+                className="h-full w-full object-cover"
               />
             </div>
-            <p className="text-white text-lg font-semibold mt-2">
-              {data?.data?.profile?.name}
-            </p>
+            <div>
+              <p className="text-white text-lg font-semibold drop-shadow-neuro">
+                {data?.data?.profile?.name}
+              </p>
+              <p className="text-white text-xs mt-1 drop-shadow-neuro">
+                {data?.data?.profile?.code}
+              </p>
+            </div>
           </div>
+          <button onClick={() => setShowQR(true)} aria-label="Show QR">
+            <img
+              src="/qr-code.png" // Simpan gambar di public/qr-code.png
+              alt="Barcode Icon"
+              width={28}
+              height={28}
+              style={{ display: 'block' }}
+            />
+          </button>
         </div>
 
-        <div className="px-4 -mt-8 pb-28">
-          <div className="bg-white rounded-lg p-3 grid grid-cols-2 gap-4">
-            <div className="flex gap-3 items-center border-r border-slate-300">
-              <div className="w-12 h-12 flex justify-center items-center">
+        {/* Info Card */}
+        <div className="px-4 pb-4">
+          <div className="bg-white rounded-2xl p-6 grid grid-cols-2 gap-6 shadow-neuro">
+            <div className="flex gap-4 items-center border-r border-slate-200 pr-4">
+              <div className="w-14 h-14 flex justify-center items-center bg-gray-100 rounded-xl shadow-neuro-in">
                 <FontAwesomeIcon
                   icon={faCoins}
                   className="text-2xl text-slate-400"
@@ -70,13 +88,13 @@ export default function Akun() {
               </div>
               <div>
                 <p className="text-xs text-slate-500">Huehuy Poin</p>
-                <p className="font-semibold">
+                <p className="font-semibold text-primary">
                   {data?.data?.profile?.point} Poin
                 </p>
               </div>
             </div>
-            <div className="flex gap-3 items-center">
-              <div className="w-12 h-12 flex justify-center items-center">
+            <div className="flex gap-4 items-center">
+              <div className="w-14 h-14 flex justify-center items-center bg-gray-100 rounded-xl shadow-neuro-in">
                 <FontAwesomeIcon
                   icon={faCubes}
                   className="text-2xl text-slate-400"
@@ -84,132 +102,146 @@ export default function Akun() {
               </div>
               <div>
                 <p className="text-xs text-slate-500">Kubus Kamu</p>
-                <p className="font-semibold">
+                <p className="font-semibold text-primary">
                   {data?.data?.profile?.cubes?.length} Kubus
                 </p>
               </div>
             </div>
           </div>
+        </div>
 
+        <div className="px-4 -mt-8 pb-28">
           <p className="text-sm font-semibold mt-6">Inventory</p>
-          <Link href="/app/kubusku">
-            <div className="py-4 flex justify-between items-center border-b border-b-gray-300">
-              <p className="font-medium">Kubusku</p>
-              <p>
+          <div className="flex flex-col gap-3 mt-2">
+            <Link href="/app/kubusku">
+              <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
+                <p className="font-medium">Kubusku</p>
                 <FontAwesomeIcon icon={faChevronRight} />
-              </p>
-            </div>
-          </Link>
-          <Link href="/app/validasi">
-            <div className="py-4 flex justify-between items-center border-b border-b-gray-300">
-              <p className="font-medium">Validasi</p>
-              <p>
+              </div>
+            </Link>
+            <Link href="/app/validasi">
+              <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
+                <p className="font-medium">Validasi</p>
                 <FontAwesomeIcon icon={faChevronRight} />
-              </p>
-            </div>
-          </Link>
+              </div>
+            </Link>
+          </div>
 
           <p className="text-sm font-semibold mt-6">Akun & Bantuan</p>
-          <Link href="/app/informasi-akun">
-            <div className="py-4 flex justify-between items-center border-b border-b-gray-300">
-              <p className="font-medium">Informasi Akun</p>
-              <p>
+          <div className="flex flex-col gap-3 mt-2">
+            <Link href="/app/informasi-akun">
+              <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
+                <p className="font-medium">Informasi Akun</p>
                 <FontAwesomeIcon icon={faChevronRight} />
-              </p>
-            </div>
-          </Link>
-          <Link href="/app/pusat-bantuan">
-            <div className="py-4 flex justify-between items-center border-b border-b-gray-300">
-              <p className="font-medium">Pusat Bantuan</p>
-              <p>
+              </div>
+            </Link>
+            <Link href="/app/pusat-bantuan">
+              <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
+                <p className="font-medium">Pusat Bantuan</p>
                 <FontAwesomeIcon icon={faChevronRight} />
-              </p>
-            </div>
-          </Link>
-          <Link href="/app/hubungi-kami">
-            <div className="py-4 flex justify-between items-center border-b border-b-gray-300">
-              <p className="font-medium">Hubungi Admin</p>
-              <p>
+              </div>
+            </Link>
+            <Link href="/app/hubungi-kami">
+              <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
+                <p className="font-medium">Hubungi Admin</p>
                 <FontAwesomeIcon icon={faChevronRight} />
-              </p>
-            </div>
-          </Link>
-          <Link href="/app/kebijakan-privasi">
-            <div className="py-4 flex justify-between items-center border-b border-b-gray-300">
-              <p className="font-medium">Kebijakan & Privasi</p>
-              <p>
+              </div>
+            </Link>
+            <Link href="/app/kebijakan-privasi">
+              <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
+                <p className="font-medium">Kebijakan & Privasi</p>
                 <FontAwesomeIcon icon={faChevronRight} />
-              </p>
-            </div>
-          </Link>
+              </div>
+            </Link>
+          </div>
 
           <p className="text-sm font-semibold mt-6">Informasi Kubus</p>
           <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2">
             <div className="flex flex-nowrap gap-4 w-max">
-              {dataCubeType?.data?.map((item, key) => {
-                return (
-                  <div
-                    className="w-[280px] grid grid-cols-5 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm"
-                    key={key}
-                  >
-                    <div className="w-full aspect-square rounded-lg flex items-center justify-center bg-gray-100">
-                      <CubeComponent size={18} color={item?.color} />
-                    </div>
-                    <div className="col-span-4">
-                      <p className="font-semibold">
-                        {item?.name} ({item?.code})
-                      </p>
-
-                      <p className="text-slate-600 text-xs">
-                        {item?.description}
-                      </p>
-                    </div>
+              {dataCubeType?.data?.map((item, key) => (
+                <div
+                  className="w-[280px] grid grid-cols-5 gap-3 p-3 shadow-neuro rounded-2xl relative bg-white bg-opacity-60 backdrop-blur-sm"
+                  key={key}
+                >
+                  <div className="w-full aspect-square rounded-lg flex items-center justify-center bg-gray-100 shadow-neuro-in">
+                    <CubeComponent size={18} color={item?.color} />
                   </div>
-                );
-              })}
+                  <div className="col-span-4">
+                    <p className="font-semibold">
+                      {item?.name} ({item?.code})
+                    </p>
+                    <p className="text-slate-600 text-xs">
+                      {item?.description}⏎····················
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
           <p className="text-sm font-semibold mt-4">Berita Huehuy</p>
           <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2">
             <div className="flex flex-nowrap gap-4 w-max">
-              {dataArticle?.data?.map((item, key) => {
-                return (
-                  <Link href={`/app/berita/${item?.slug}`} key={key}>
-                    <div className="w-[320px] bg-white bg-opacity-40 backdrop-blur-sm grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative">
-                      <div className="w-full aspect-square rounded-lg bg-slate-40 overflow-hidden">
-                        <img
-                          src={item?.picture_source}
-                          height={700}
-                          width={700}
-                          alt=""
-                        />
-                      </div>
-                      <div className="col-span-3">
-                        <p className="font-semibold limit__line__1">
-                          {item?.title}
-                        </p>
-
-                        <p className="text-slate-600 text-xs mt-1 limit__line__2">
-                          {item?.description}
-                        </p>
-                      </div>
+              {dataArticle?.data?.map((item, key) => (
+                <Link href={`/app/berita/${item?.slug}`} key={key}>
+                  <div className="w-[320px] bg-white bg-opacity-60 backdrop-blur-sm grid grid-cols-4 gap-3 p-3 shadow-neuro rounded-2xl relative hover:scale-[1.01] transition">
+                    <div className="w-full aspect-square rounded-lg bg-slate-40 overflow-hidden shadow-neuro-in">
+                      <img
+                        src={item?.picture_source}
+                        height={700}
+                        width={700}
+                        alt=""
+                      />
                     </div>
-                  </Link>
-                );
-              })}
+                    <div className="col-span-3">
+                      <p className="font-semibold limit__line__1">
+                        {item?.title}
+                      </p>
+                      <p className="text-slate-600 text-xs mt-1 limit__line__2">
+                        {item?.description}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
 
+          {/* QR Popup */}
+          {showQR && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+              <div className="bg-white rounded-2xl shadow-neuro-in p-6 flex flex-col items-center relative">
+                <button
+                  className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"
+                  onClick={() => setShowQR(false)}
+                  aria-label="Close QR"
+                >
+                  &times;
+                </button>
+                <p className="text-sm font-semibold mb-2">Barcode Akun Anda</p>
+                <QRCode
+                  value={data?.data?.profile?.code || 'huehuy-user'}
+                  size={160}
+                  bgColor="#f8fafc"
+                  fgColor="#0f172a"
+                  level="H"
+                  includeMargin={true}
+                  className="rounded-lg"
+                />
+                <p className="text-xs text-slate-400 mt-2">
+                  {data?.data?.profile?.code}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div
-            className="bg-red-50 text-red-700 rounded-lg mt-4 p-4 flex gap-4 items-center border-b border-b-gray-300"
+            className="bg-red-50 text-red-700 rounded-xl mt-4 p-4 flex gap-4 items-center border-b border-b-gray-200 shadow-neuro-in cursor-pointer hover:scale-[1.01] transition"
             onClick={() => {
               setModalConfirm(true);
             }}
           >
-            <p>
-              <FontAwesomeIcon icon={faPowerOff} />
-            </p>
+            <FontAwesomeIcon icon={faPowerOff} />
             <p className="font-medium">Keluar</p>
           </div>
         </div>

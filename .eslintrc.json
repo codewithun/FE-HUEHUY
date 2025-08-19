@@ -14,12 +14,7 @@
     "@typescript-eslint/no-unused-vars": 1,
     "@typescript-eslint/no-explicit-any": 0,
     "import/prefer-default-export": 0,
-    "prettier/prettier": [
-      "error",
-      {
-        "endOfLine": "auto"
-      }
-    ],
+    "prettier/prettier": 0,
     "react/no-unstable-nested-components": 0,
     "react/react-in-jsx-scope": 0,
     "react/require-default-props": 0,

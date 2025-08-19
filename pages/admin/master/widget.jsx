@@ -1,19 +1,19 @@
+import {
+    faArrowDown,
+    faArrowUp,
+    faEdit,
+    faTrash,
+} from '@fortawesome/free-solid-svg-icons';
 import { useState } from 'react';
 import {
-  ButtonComponent,
-  IconButtonComponent,
-  ModalConfirmComponent,
-  SelectComponent,
-  TableSupervisionComponent,
+    ButtonComponent,
+    IconButtonComponent,
+    ModalConfirmComponent,
+    SelectComponent,
+    TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { post } from '../../../helpers';
-import {
-  faArrowDown,
-  faArrowUp,
-  faEdit,
-  faTrash,
-} from '@fortawesome/free-solid-svg-icons';
 
 export default function Widget() {
   const [updateStatus, setUpdateStatus] = useState(false);
@@ -24,7 +24,8 @@ export default function Widget() {
   const [worldId, setWorldId] = useState(null);
 
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Widget</h1>
       <TableSupervisionComponent
         title="Widget"
         fetchControl={{
@@ -374,7 +375,7 @@ export default function Widget() {
           loading: loadingUpdateStatus,
         }}
       />
-    </>
+    </div>
   );
 }
 

@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import React from 'react';
 
 export type CardComponentProps = {
   title: string;
@@ -14,18 +13,18 @@ export default function CardComponent({
 }: CardComponentProps) {
   return (
     <>
-      <div className="block rounded-lg bg-white shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] dark:bg-neutral-700">
+      <div className="block rounded-xl bg-white shadow-md dark:bg-neutral-700 transition-all duration-200">
         {image && (
-          <div className="rounded-t-lg aspect-[4/3]">
-            <Image src={image} width={300} height={400} alt="" />
+          <div className="rounded-t-xl aspect-[4/3] overflow-hidden">
+            <Image src={image} width={300} height={400} alt="" className="object-cover w-full h-full" />
           </div>
         )}
 
-        <div className="p-6">
-          <h5 className="mb-2 text-xl font-medium leading-tight text-slate-800 dark:text-slate-50">
+        <div className="p-7">
+          <h5 className="mb-2 text-xl font-bold leading-tight text-slate-800 dark:text-slate-50 tracking-wide">
             {title}
           </h5>
-          <p className="mb-4 text-base text-slate-600 dark:text-slate-200">
+          <p className="mb-2 text-base text-slate-600 dark:text-slate-200">
             {content}
           </p>
         </div>

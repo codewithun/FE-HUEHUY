@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
-  ButtonComponent,
-  DateFormatComponent,
-  ModalConfirmComponent,
-  TableSupervisionComponent,
+    ButtonComponent,
+    DateFormatComponent,
+    ModalConfirmComponent,
+    TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { post } from '../../../helpers';
@@ -15,7 +15,8 @@ export default function ReportContent() {
   const [loadingUpdateStatus, setLoadingUpdateStatus] = useState(false);
 
   return (
-    <>
+    <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
+      <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Laporan Iklan</h1>
       <TableSupervisionComponent
         title="Laporan Iklan"
         fetchControl={{
@@ -144,7 +145,7 @@ export default function ReportContent() {
           loading: loadingUpdateStatus,
         }}
       />
-    </>
+    </div>
   );
 }
 

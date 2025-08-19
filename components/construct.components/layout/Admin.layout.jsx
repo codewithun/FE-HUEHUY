@@ -8,6 +8,9 @@ import {
   faTags,
   faTriangleExclamation,
   faUser,
+  faQrcode, // Tambahkan ini
+  faBullhorn, // Tambahkan icon promo
+  faUsers, // Tambahkan icon komunitas, import dulu di atas
 } from '@fortawesome/free-solid-svg-icons';
 import { useState } from 'react';
 // import { AccessProvider, UserProvider } from '../../../context';
@@ -18,7 +21,6 @@ export function AdminLayout({ children }) {
   const [sidebar, setSidebar] = useState(false);
   const [hasAccess, setHasAccess] = useState([]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const menu = [
     {
       label: 'Dashboard',
@@ -73,16 +75,35 @@ export function AdminLayout({ children }) {
           path: 'master/laporan-iklan',
         },
         {
+          label: 'Generator QR Event',
+          icon: faQrcode,
+          path: 'master/qrcode',
+        },
+        {
           label: 'Manajemen Konten',
           icon: faPhotoFilm,
           items: [
-            // { label: 'Konfigurasi', path: 'master/konfigurasi' },
             { label: 'Widget', path: 'master/widget' },
             { label: 'Berita', path: 'master/berita' },
             { label: 'Banner', path: 'master/banner' },
             { label: 'FAQ', path: 'master/faq' },
             { label: 'Kontak Admin', path: 'master/kontak' },
           ],
+        },
+        {
+          label: 'Manajemen Voucher',
+          icon: faTags,
+          path: 'master/voucher',
+        },
+        {
+          label: 'Manajemen Promo', // Tambahkan menu promo
+          icon: faBullhorn,
+          path: 'master/promo_dashborad',
+        },
+        {
+          label: 'Manajemen Komunitas',
+          icon: faUsers, // Tambahkan icon komunitas, import dulu di atas
+          path: 'master/komunitas_dashboard',
         },
       ],
     },

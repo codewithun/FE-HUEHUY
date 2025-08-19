@@ -3,7 +3,7 @@
 }
 
 .modal {
-    @apply fixed left-1/2 -translate-x-1/2 bg-white z-40 rounded-xl shadow-md border-b-4 border-primary;
+    @apply fixed left-1/2 -translate-x-1/2 bg-white z-40 rounded-xl shadow-lg border-b-4 border-primary transition-all duration-300;
 }
 
 .modal__confirm {
