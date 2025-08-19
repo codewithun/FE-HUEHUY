@@ -7,6 +7,9 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import CommunityBottomBar from './CommunityBottomBar';
+import Cookies from "js-cookie";
+import { token_cookie_name } from "../../../../helpers";
+import { Decrypt } from "../../../../helpers/encryption.helpers";
 
 export default function CommunityDashboard({ communityId }) {
     const router = useRouter();
@@ -211,225 +214,350 @@ export default function CommunityDashboard({ communityId }) {
 
     // Promo Categories Data - dynamic based on community
     const [promoCategories, setPromoCategories] = useState([]);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    const baseUrl = apiUrl.replace(/\/api$/, ''); // remove trailing /api for images
 
-    useEffect(() => {
-        if (communityData) {
-            // Generate promo categories based on community type
-            const getPromosForCommunity = (community) => {
-                const promosByCategory = {
-                    'Shopping': [
+    // Add back generatePromos used as a final fallback
+    const generatePromos = (community) => {
+        const promosByCategory = {
+            'Shopping': [
+                {
+                    id: 1,
+                    title: 'Fast Food Promo',
+                    subtitle: 'Nikmati Burger & Chicken Terbaik!',
+                    promos: [
                         {
                             id: 1,
-                            title: 'Fast Food Promo',
-                            subtitle: 'Nikmati Burger & Chicken Terbaik!',
-                            promos: [
-                                {
-                                    id: 1,
-                                    title: 'McDonald\'s - Burger Combo Flash Sale',
-                                    image: '/images/promo/burger-combo-flash.jpg',
-                                    label: 'Flash Sale',
-                                    discount: '30%',
-                                    description: 'Paket burger kombo dengan kentang dan minuman'
-                                },
-                                {
-                                    id: 2,
-                                    title: 'Chicken Star - Paket Ayam Special',
-                                    image: '/images/promo/chicken-package.jpg',
-                                    label: 'Special Deal',
-                                    discount: '25%',
-                                    description: 'Ayam crispy dengan nasi dan saus pilihan'
-                                },
-                                {
-                                    id: 3,
-                                    title: 'Premium Beef Sausage Package',
-                                    image: '/images/promo/beef-sausage-chicken.jpg',
-                                    label: 'Premium',
-                                    discount: '20%',
-                                    description: 'Sosis beef premium dengan ayam panggang'
-                                }
-                            ]
+                            title: "McDonald's - Burger Combo Flash Sale",
+                            image: '/images/promo/burger-combo-flash.jpg',
+                            label: 'Flash Sale',
+                            discount: '30%',
+                            description: 'Paket burger kombo dengan kentang dan minuman'
                         },
                         {
                             id: 2,
-                            title: 'Pizza & Coffee',
-                            subtitle: 'Promo Pizza dan Minuman Favorit!',
-                            promos: [
-                                {
-                                    id: 4,
-                                    title: 'Pizza Hut - Medium Pizza Deal',
-                                    image: '/images/promo/pizza-medium-deal.jpg',
-                                    label: 'Pizza Deal',
-                                    discount: '35%',
-                                    description: 'Pizza medium dengan topping pilihan dan minuman'
-                                },
-                                {
-                                    id: 5,
-                                    title: 'Brown Sugar Coffee Special',
-                                    image: '/images/promo/brown-sugar-coffee.jpg',
-                                    label: 'Coffee Promo',
-                                    discount: '15%',
-                                    description: 'Kopi brown sugar dengan topping premium'
-                                }
-                            ]
-                        }
-                    ],
-                    'Event': [
+                            title: 'Chicken Star - Paket Ayam Special',
+                            image: '/images/promo/chicken-package.jpg',
+                            label: 'Special Deal',
+                            discount: '25%',
+                            description: 'Ayam crispy dengan nasi dan saus pilihan'
+                        },
                         {
-                            id: 1,
-                            title: 'Food & Beverage Packages',
-                            subtitle: 'Paket F&B untuk Event Anda!',
-                            promos: [
-                                {
-                                    id: 1,
-                                    title: 'Bubble Tea House - Event Package',
-                                    image: '/images/promo/bubble-tea-discount.jpg',
-                                    label: 'Event Package',
-                                    discount: '25%',
-                                    description: 'Paket bubble tea untuk acara corporate dan private'
-                                },
-                                {
-                                    id: 2,
-                                    title: 'Corporate Lunch Package',
-                                    image: '/images/promo/burger-combo-flash.jpg',
-                                    label: 'Corporate',
-                                    discount: '20%',
-                                    description: 'Paket makan siang untuk meeting dan seminar'
-                                },
-                                {
-                                    id: 3,
-                                    title: 'Premium Coffee Catering',
-                                    image: '/images/promo/brown-sugar-coffee.jpg',
-                                    label: 'Catering',
-                                    discount: '30%',
-                                    description: 'Layanan kopi premium untuk event khusus'
-                                }
-                            ]
-                        }
-                    ],
-                    'Kuliner': [
-                        {
-                            id: 1,
-                            title: 'Promo Makanan & Minuman',
-                            subtitle: 'Diskon Special untuk Foodie!',
-                            promos: [
-                                {
-                                    id: 1,
-                                    title: 'Chicken Star - Ayam Crispy Spesial',
-                                    image: '/images/promo/chicken-package.jpg',
-                                    label: 'Food Promo',
-                                    discount: '20%',
-                                    description: 'Ayam crispy dengan bumbu rahasia dan nasi hangat'
-                                },
-                                {
-                                    id: 2,
-                                    title: 'Bubble Tea House - Minuman Segar',
-                                    image: '/images/promo/bubble-tea-discount.jpg',
-                                    label: 'Drink Promo',
-                                    discount: '15%',
-                                    description: 'Bubble tea dengan berbagai rasa dan topping'
-                                },
-                                {
-                                    id: 3,
-                                    title: 'Pizza Hut - Pizza Family',
-                                    image: '/images/promo/pizza-medium-deal.jpg',
-                                    label: 'Family Deal',
-                                    discount: '30%',
-                                    description: 'Pizza besar dengan topping lengkap untuk keluarga'
-                                },
-                                {
-                                    id: 4,
-                                    title: 'Premium Coffee Experience',
-                                    image: '/images/promo/brown-sugar-coffee.jpg',
-                                    label: 'Premium',
-                                    discount: '10%',
-                                    description: 'Kopi berkualitas tinggi dengan cita rasa otentik'
-                                }
-                            ]
-                        }
-                    ],
-                    'Otomotif': [
-                        {
-                            id: 1,
-                            title: 'Spare Part & Service',
-                            subtitle: 'Promo Perawatan Kendaraan!',
-                            promos: [
-                                {
-                                    id: 1,
-                                    title: 'Service Motor Complete Package',
-                                    image: '/images/promo/chicken-package.jpg',
-                                    label: 'Service',
-                                    discount: '30%',
-                                    description: 'Paket service lengkap untuk motor kesayangan'
-                                },
-                                {
-                                    id: 2,
-                                    title: 'Oil Change Premium Package',
-                                    image: '/images/promo/beef-sausage-chicken.jpg',
-                                    label: 'Maintenance',
-                                    discount: '20%',
-                                    description: 'Ganti oli premium dengan filter berkualitas'
-                                }
-                            ]
-                        }
-                    ],
-                    'Fashion': [
-                        {
-                            id: 1,
-                            title: 'Fashion Sale',
-                            subtitle: 'Koleksi Terbaru dengan Harga Terbaik!',
-                            promos: [
-                                {
-                                    id: 1,
-                                    title: 'Summer Collection 2025',
-                                    image: '/images/promo/burger-combo-flash.jpg',
-                                    label: 'Fashion',
-                                    discount: '40%',
-                                    description: 'Koleksi pakaian musim panas terbaru dan trendy'
-                                },
-                                {
-                                    id: 2,
-                                    title: 'Shoes & Accessories Sale',
-                                    image: '/images/promo/pizza-medium-deal.jpg',
-                                    label: 'Accessories',
-                                    discount: '35%',
-                                    description: 'Sepatu dan aksesoris dengan kualitas premium'
-                                },
-                                {
-                                    id: 3,
-                                    title: 'Casual Wear Collection',
-                                    image: '/images/promo/brown-sugar-coffee.jpg',
-                                    label: 'Casual',
-                                    discount: '25%',
-                                    description: 'Pakaian kasual untuk gaya hidup aktif'
-                                }
-                            ]
+                            id: 3,
+                            title: 'Premium Beef Sausage Package',
+                            image: '/images/promo/beef-sausage-chicken.jpg',
+                            label: 'Premium',
+                            discount: '20%',
+                            description: 'Sosis beef premium dengan ayam panggang'
                         }
                     ]
-                };
-                return promosByCategory[community.category] || [
+                },
+                {
+                    id: 2,
+                    title: 'Pizza & Coffee',
+                    subtitle: 'Promo Pizza dan Minuman Favorit!',
+                    promos: [
+                        {
+                            id: 4,
+                            title: 'Pizza Hut - Medium Pizza Deal',
+                            image: '/images/promo/pizza-medium-deal.jpg',
+                            label: 'Pizza Deal',
+                            discount: '35%',
+                            description: 'Pizza medium dengan topping pilihan dan minuman'
+                        },
+                        {
+                            id: 5,
+                            title: 'Brown Sugar Coffee Special',
+                            image: '/images/promo/brown-sugar-coffee.jpg',
+                            label: 'Coffee Promo',
+                            discount: '15%',
+                            description: 'Kopi brown sugar dengan topping premium'
+                        }
+                    ]
+                }
+            ],
+            'Event': [
+                {
+                    id: 1,
+                    title: 'Food & Beverage Packages',
+                    subtitle: 'Paket F&B untuk Event Anda!',
+                    promos: [
+                        {
+                            id: 1,
+                            title: 'Bubble Tea House - Event Package',
+                            image: '/images/promo/bubble-tea-discount.jpg',
+                            label: 'Event Package',
+                            discount: '25%',
+                            description: 'Paket bubble tea untuk acara corporate dan private'
+                        },
+                        {
+                            id: 2,
+                            title: 'Corporate Lunch Package',
+                            image: '/images/promo/burger-combo-flash.jpg',
+                            label: 'Corporate',
+                            discount: '20%',
+                            description: 'Paket makan siang untuk meeting dan seminar'
+                        },
+                        {
+                            id: 3,
+                            title: 'Premium Coffee Catering',
+                            image: '/images/promo/brown-sugar-coffee.jpg',
+                            label: 'Catering',
+                            discount: '30%',
+                            description: 'Layanan kopi premium untuk event khusus'
+                        }
+                    ]
+                }
+            ],
+            'Kuliner': [
+                {
+                    id: 1,
+                    title: 'Promo Makanan & Minuman',
+                    subtitle: 'Diskon Special untuk Foodie!',
+                    promos: [
+                        {
+                            id: 1,
+                            title: 'Chicken Star - Ayam Crispy Spesial',
+                            image: '/images/promo/chicken-package.jpg',
+                            label: 'Food Promo',
+                            discount: '20%',
+                            description: 'Ayam crispy dengan bumbu rahasia dan nasi hangat'
+                        },
+                        {
+                            id: 2,
+                            title: 'Bubble Tea House - Minuman Segar',
+                            image: '/images/promo/bubble-tea-discount.jpg',
+                            label: 'Drink Promo',
+                            discount: '15%',
+                            description: 'Bubble tea dengan berbagai rasa dan topping'
+                        },
+                        {
+                            id: 3,
+                            title: 'Pizza Hut - Pizza Family',
+                            image: '/images/promo/pizza-medium-deal.jpg',
+                            label: 'Family Deal',
+                            discount: '30%',
+                            description: 'Pizza besar dengan topping lengkap untuk keluarga'
+                        },
+                        {
+                            id: 4,
+                            title: 'Premium Coffee Experience',
+                            image: '/images/promo/brown-sugar-coffee.jpg',
+                            label: 'Premium',
+                            discount: '10%',
+                            description: 'Kopi berkualitas tinggi dengan cita rasa otentik'
+                        }
+                    ]
+                }
+            ],
+            'Otomotif': [
+                {
+                    id: 1,
+                    title: 'Spare Part & Service',
+                    subtitle: 'Promo Perawatan Kendaraan!',
+                    promos: [
+                        {
+                            id: 1,
+                            title: 'Service Motor Complete Package',
+                            image: '/images/promo/chicken-package.jpg',
+                            label: 'Service',
+                            discount: '30%',
+                            description: 'Paket service lengkap untuk motor kesayangan'
+                        },
+                        {
+                            id: 2,
+                            title: 'Oil Change Premium Package',
+                            image: '/images/promo/beef-sausage-chicken.jpg',
+                            label: 'Maintenance',
+                            discount: '20%',
+                            description: 'Ganti oli premium dengan filter berkualitas'
+                        }
+                    ]
+                }
+            ],
+            'Fashion': [
+                {
+                    id: 1,
+                    title: 'Fashion Sale',
+                    subtitle: 'Koleksi Terbaru dengan Harga Terbaik!',
+                    promos: [
+                        {
+                            id: 1,
+                            title: 'Summer Collection 2025',
+                            image: '/images/promo/burger-combo-flash.jpg',
+                            label: 'Fashion',
+                            discount: '40%',
+                            description: 'Koleksi pakaian musim panas terbaru dan trendy'
+                        },
+                        {
+                            id: 2,
+                            title: 'Shoes & Accessories Sale',
+                            image: '/images/promo/pizza-medium-deal.jpg',
+                            label: 'Accessories',
+                            discount: '35%',
+                            description: 'Sepatu dan aksesoris dengan kualitas premium'
+                        },
+                        {
+                            id: 3,
+                            title: 'Casual Wear Collection',
+                            image: '/images/promo/brown-sugar-coffee.jpg',
+                            label: 'Casual',
+                            discount: '25%',
+                            description: 'Pakaian kasual untuk gaya hidup aktif'
+                        }
+                    ]
+                }
+            ]
+        };
+        return promosByCategory[community?.category] || [
+            {
+                id: 1,
+                title: 'Promo Komunitas',
+                subtitle: 'Promo Eksklusif untuk Member!',
+                promos: [
                     {
                         id: 1,
-                        title: 'Promo Komunitas',
-                        subtitle: 'Promo Eksklusif untuk Member!',
-                        promos: [
-                            {
-                                id: 1,
-                                title: 'Welcome Bonus',
-                                image: '/api/placeholder/150/120',
-                                label: 'Special',
-                                discount: '10%'
-                            }
-                        ]
+                        title: 'Welcome Bonus',
+                        image: '/api/placeholder/150/120',
+                        label: 'Special',
+                        discount: '10%'
                     }
-                ];
-            };
+                ]
+            }
+        ];
+    };
 
-            setPromoCategories(getPromosForCommunity(communityData));
-        }
-    }, [communityData]);
+    useEffect(() => {
+        if (!communityData) return;
+
+        const normalizePromos = (arr = []) => {
+            return (Array.isArray(arr) ? arr : []).map((p) => {
+                const raw =
+                    p.image_url ||
+                    p.image ||
+                    (p.image_path ? `${baseUrl}/storage/${p.image_path}` : "/api/placeholder/150/120");
+
+                let image = raw;
+                if (typeof image === "string" && image) {
+                    const isAbsolute = /^https?:\/\//i.test(image);
+                    if (!isAbsolute) {
+                        const cleaned = image.replace(/^\/+/, '');
+
+                        if (/^api\/placeholder/i.test(cleaned)) {
+                            image = `/${cleaned}`;
+                        }
+                        else if (/^api\//i.test(cleaned)) {
+                            const withoutApi = cleaned.replace(/^api\/+/i, '');
+                            if (/^(storage|promos|uploads)/i.test(withoutApi)) {
+                                if (withoutApi.startsWith('promos/')) {
+                                    image = `${baseUrl}/storage/${withoutApi}`;
+                                } else {
+                                    image = `${baseUrl}/${withoutApi}`;
+                                }
+                            } else {
+                                image = `/${cleaned}`;
+                            }
+                        }
+                        else if (/^(promos\/|storage\/|uploads\/)/i.test(cleaned)) {
+                            if (cleaned.startsWith('promos/')) {
+                                image = `${baseUrl}/storage/${cleaned}`;
+                            } else {
+                                image = `${baseUrl}/${cleaned}`;
+                            }
+                        }
+                        else {
+                            image = `/${cleaned}`;
+                        }
+                    }
+                }
+
+                return {
+                    id: p.id ?? p.promo_id ?? Math.random(),
+                    title: p.title ?? p.name ?? "Promo",
+                    image,
+                    label: p.label ?? p.tag ?? "Promo",
+                    discount:
+                        typeof p.discount === "number"
+                            ? `${p.discount}%`
+                            : p.discount ?? p.discount_text ?? "",
+                    description: p.description ?? p.subtitle ?? "",
+                };
+            });
+         };
+
+        const convertCategoriesToWidgets = (cats = []) =>
+            cats.map((c) => ({
+                id: c.id ?? Math.random(),
+                title: c.title ?? c.name ?? "Kategori",
+                subtitle: c.description ?? "",
+                promos: normalizePromos(c.promos ?? []),
+            }));
+
+        const getAuthHeaders = () => {
+            try {
+                const encryptedToken = Cookies.get(token_cookie_name);
+                const token = encryptedToken ? Decrypt(encryptedToken) : "";
+                return token
+                    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+                    : { "Content-Type": "application/json" };
+            } catch (e) {
+                return { "Content-Type": "application/json" };
+            }
+        };
+
+        const fetchPromoWidgetsOrCategories = async () => {
+            // 1) Coba categories dulu
+            try {
+                const res = await fetch(`${apiUrl}/communities/${communityData.id}/categories`, {
+                    headers: getAuthHeaders()
+                });
+                if (res.ok) {
+                    const json = await res.json().catch(() => ({}));
+                    const data = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+                    if (Array.isArray(data) && data.length > 0) {
+                        setPromoCategories(convertCategoriesToWidgets(data));
+                        return;
+                    }
+                } else {
+                    //                  console.log('categories status', res.status);
+                }
+            } catch (err) {
+                // ignore and fallback
+            }
+
+            // 2) Jika tidak ada kategori, baru promos
+            try {
+                const res = await fetch(`${apiUrl}/communities/${communityData.id}/promos`, {
+                    headers: getAuthHeaders()
+                });
+                if (res.ok) {
+                    const json = await res.json().catch(() => ({}));
+                    const data = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+                    if (Array.isArray(data) && data.length > 0) {
+                        setPromoCategories([{
+                            id: `assigned-${communityData.id}`,
+                            title: 'Promo Komunitas',
+                            subtitle: `${communityData.name} - Promo Tersedia`,
+                            promos: normalizePromos(data)
+                        }]);
+                        return;
+                    }
+                } else {
+                    // console.log('promos status', res.status);
+                }
+            } catch (err) {
+                // ignore and fallback
+            }
+
+            // 3) Fallback demo
+            setPromoCategories(generatePromos(communityData));
+        };
+
+        fetchPromoWidgetsOrCategories();
+    }, [communityData, apiUrl]);
 
     // Function to get gradient based on community category
-    const getCommunityGradient = (category) => {
+    function getCommunityGradient(category) {
         const gradients = {
             // Hijau tua untuk Shopping
             'Shopping': 'bg-gradient-to-br from-green-700 to-green-900',
@@ -577,51 +705,60 @@ export default function CommunityDashboard({ communityId }) {
                                         <h3 className="text-lg font-bold drop-shadow-neuro">{category.title}</h3>
                                         <p className="text-white text-opacity-90 text-sm drop-shadow-neuro">{category.subtitle}</p>
                                     </div>
-                                    
+
                                     <div className="bg-white bg-opacity-60 backdrop-blur-sm rounded-b-2xl p-4 shadow-neuro">
-                                        {/* Horizontal Scroll Container */}
-                                        <div className="overflow-x-auto scrollbar-hide">
-                                            <div className="flex gap-4 pb-2" style={{ width: 'max-content' }}>
-                                                {category.promos.map((promo) => (
-                                                    <div 
-                                                        key={promo.id} 
-                                                        onClick={() => router.push(`/app/komunitas/promo/${promo.id}`)}
-                                                        className="bg-white rounded-xl overflow-hidden shadow-neuro-in hover:scale-[1.02] transition-all duration-300 flex-shrink-0 cursor-pointer" 
-                                                        style={{ width: '180px' }} // Lebarkan card promo
-                                                    >
-                                                        <div className="relative h-36 overflow-hidden"> {/* Ubah tinggi gambar */}
-                                                            <Image 
-                                                                src={promo.image} 
-                                                                alt={promo.title}
-                                                                width={180} // Sesuaikan lebar gambar
-                                                                height={130} // Sesuaikan tinggi gambar
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </div>
-                                                        <div className="p-3">
-                                                            <h4 className="font-semibold text-sm text-slate-900 mb-2 line-clamp-2 min-h-[2.5rem]">
-                                                                {promo.title}
-                                                            </h4>
-                                                            {promo.description && (
-                                                                <p className="text-xs text-slate-600 mb-2 line-clamp-2 min-h-[2rem]">
-                                                                    {promo.description}
-                                                                </p>
-                                                            )}
-                                                            <div className="flex flex-col gap-2">
-                                                                <span className="text-xs bg-primary bg-opacity-20 text-primary px-2 py-1 rounded text-center">
-                                                                    {promo.label}
-                                                                </span>
-                                                                {promo.discount && (
-                                                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold text-center">
-                                                                        {promo.discount}
-                                                                    </span>
+                                        {Array.isArray(category.promos) && category.promos.length > 0 ? (
+                                            <div className="overflow-x-auto scrollbar-hide">
+                                                <div className="flex gap-4 pb-2" style={{ width: 'max-content' }}>
+                                                    {category.promos.map((promo) => (
+                                                        <div 
+                                                            key={promo.id} 
+                                                            onClick={() =>
+                                                                router.push({        pathname: `/app/komunitas/promo/${promo.id}`,
+                                                                        query: { communityId: communityData.id }
+                                                                    })
+                                                                }
+                                                            className="bg-white rounded-xl overflow-hidden shadow-neuro-in hover:scale-[1.02] transition-all duration-300 flex-shrink-0 cursor-pointer" 
+                                                            style={{ width: '180px' }}
+                                                        >
+                                                            <div className="relative h-36 overflow-hidden">
+                                                                <Image 
+                                                                    src={promo.image || '/api/placeholder/180/130'}
+                                                                    alt={promo.title}
+                                                                    width={180}
+                                                                    height={130}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            </div>
+                                                            <div className="p-3">
+                                                                <h4 className="font-semibold text-sm text-slate-900 mb-2 line-clamp-2 min-h-[2.5rem]">
+                                                                    {promo.title}
+                                                                </h4>
+                                                                {promo.description && (
+                                                                    <p className="text-xs text-slate-600 mb-2 line-clamp-2 min-h-[2rem]">
+                                                                        {promo.description}
+                                                                    </p>
                                                                 )}
+                                                                <div className="flex flex-col gap-2">
+                                                                    <span className="text-xs bg-primary bg-opacity-20 text-primary px-2 py-1 rounded text-center">
+                                                                        {promo.label || 'Promo'}
+                                                                    </span>
+                                                                    {promo.discount && (
+                                                                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold text-center">
+                                                                            {promo.discount}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <div className="text-center text-sm text-slate-600 py-6">
+                                                Belum ada promo pada kategori ini.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

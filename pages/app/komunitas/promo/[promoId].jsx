@@ -13,12 +13,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import Cookies from "js-cookie";
+import { token_cookie_name } from "../../../../helpers";
+import { Decrypt } from "../../../../helpers/encryption.helpers";
 
 export default function PromoDetailUnified() {
   const router = useRouter();
   const { promoId, communityId } = router.query;
-
-  const [promoData, setPromoData] = useState(null);      // data hasil normalisasi (bentuk detail_promo)
+  const [promoData, setPromoData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [isClaimedLoading, setIsClaimedLoading] = useState(false);
@@ -207,6 +209,118 @@ export default function PromoDetailUnified() {
     setPromoData(normalizeToDetailShape(legacy));
     setLoading(false);
   }, [promoId]);
+
+  useEffect(() => {
+    if (!promoId || !communityId) return;
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    const baseUrl = apiUrl.replace(/\/api$/, '');
+
+    const getAuthHeaders = () => {
+      try {
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : "";
+        return token
+          ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+          : { "Content-Type": "application/json" };
+      } catch (e) {
+        return { "Content-Type": "application/json" };
+      }
+    };
+
+    // Normalisasi gambar promo sesuai home.jsx
+    const normalizePromoImage = (data) => {
+      const raw =
+        data.image_url ||
+        data.image ||
+        (data.image_path ? `${baseUrl}/storage/${data.image_path}` : "/api/placeholder/150/120");
+
+      let image = raw;
+      if (typeof image === "string" && image) {
+        const isAbsolute = /^https?:\/\//i.test(image);
+        if (!isAbsolute) {
+          const cleaned = image.replace(/^\/+/, '');
+          if (/^api\/placeholder/i.test(cleaned)) {
+            image = `/${cleaned}`;
+          }
+          else if (/^api\//i.test(cleaned)) {
+            const withoutApi = cleaned.replace(/^api\/+/i, '');
+            if (/^(storage|promos|uploads)/i.test(withoutApi)) {
+              if (withoutApi.startsWith('promos/')) {
+                image = `${baseUrl}/storage/${withoutApi}`;
+              } else {
+                image = `${baseUrl}/${withoutApi}`;
+              }
+            } else {
+              image = `/${cleaned}`;
+            }
+          }
+          else if (/^(promos\/|storage\/|uploads\/)/i.test(cleaned)) {
+            if (cleaned.startsWith('promos/')) {
+              image = `${baseUrl}/storage/${cleaned}`;
+            } else {
+              image = `${baseUrl}/${cleaned}`;
+            }
+          }
+          else {
+            image = `/${cleaned}`;
+          }
+        }
+      }
+      return image;
+    };
+
+    const fetchPromoDetail = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${apiUrl}/communities/${communityId}/promos/${promoId}`, {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const data = json.data;
+
+          setPromoData({
+            id: data.id,
+            title: data.title,
+            merchant: data.owner_name || 'Merchant',
+            image: normalizePromoImage(data),
+            distance: (data.promo_distance ? `${data.promo_distance} KM` : '-'),
+            location: data.location || '',
+            coordinates: '', // Jika ada field koordinat di API, isi di sini
+            originalPrice: null, // Tambahkan jika ada field harga asli
+            discountPrice: null, // Tambahkan jika ada field harga promo
+            discount: null, // Tambahkan jika ada field diskon
+            schedule: {
+              day: data.always_available ? 'Setiap Hari' : '',
+              details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}` : '',
+              time: data.start_date && data.end_date
+                ? `${new Date(data.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(data.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : '',
+              timeDetails: 'Jam Berlaku Promo'
+            },
+            status: {
+              type: data.promo_type === 'online' ? 'Online' : 'Offline',
+              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
+            },
+            description: data.description || '',
+            seller: {
+              name: data.owner_name || 'Admin',
+              phone: data.owner_contact || ''
+            },
+            terms: 'TERM & CONDITIONS APPLY'
+          });
+        } else {
+          setPromoData(null);
+        }
+      } catch (e) {
+        setPromoData(null);
+      }
+      setLoading(false);
+    };
+
+    fetchPromoDetail();
+  }, [promoId, communityId]);
 
   // ====== Handlers ala detail_promo ======
   const handleBack = () => {

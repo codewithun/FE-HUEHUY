@@ -59,7 +59,7 @@ export default function PromoRegister() {
         alert('Gagal mengirim OTP. Coba lagi.');
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      // console.error('Registration error:', error);
     } finally {
       setBtnLoading(false);
     }

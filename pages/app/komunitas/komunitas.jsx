@@ -7,6 +7,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
+import Cookies from "js-cookie";
+import { token_cookie_name } from "../../../helpers";
+import { Decrypt } from "../../../helpers/encryption.helpers";
 
 export default function Komunitas() {
   const router = useRouter();
@@ -14,169 +17,51 @@ export default function Komunitas() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [communities, setCommunities] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Demo data dengan lebih banyak komunitas
-  const [myCommunitiesData] = useState([
-    {
-      id: 1,
-      name: 'dbotanica Bandung',
-      description: 'Mall perbelanjaan standar dengan beragam toko dan tempat kuliner menarik',
-      members: 1234,
-      category: 'Shopping',
-      isOwner: false,
-      isAdmin: true,
-      privacy: 'public',
-      activePromos: 8,
-      isVerified: true,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 2,
-      name: 'Sunscape Event Organizer',
-      description: 'Sunscape Event Organizer adalah penyelenggara acara profesional',
-      members: 856,
-      category: 'Event',
-      isOwner: true,
-      isAdmin: true,
-      privacy: 'private',
-      activePromos: 12,
-      isVerified: false,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 3,
-      name: 'Kuliner Bandung Selatan',
-      description: 'Komunitas pecinta kuliner area Bandung Selatan dan sekitarnya',
-      members: 2341,
-      category: 'Kuliner',
-      isOwner: false,
-      isAdmin: false,
-      privacy: 'public',
-      activePromos: 15,
-      isVerified: true,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 4,
-      name: 'Otomotif Enthusiast',
-      description: 'Komunitas penggemar otomotif, modifikasi, dan spare part',
-      members: 892,
-      category: 'Otomotif',
-      isOwner: false,
-      isAdmin: true,
-      privacy: 'public',
-      activePromos: 6,
-      isVerified: false,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 5,
-      name: 'Fashion & Style Bandung',
-      description: 'Komunitas fashion, style, dan shopping outfit terkini',
-      members: 1567,
-      category: 'Fashion',
-      isOwner: false,
-      isAdmin: false,
-      privacy: 'public',
-      activePromos: 22,
-      isVerified: true,
-      avatar: '/api/placeholder/50/50'
-    }
-  ]);
+  // Ganti data dummy dengan fetch API
+  useEffect(() => {
+    const fetchCommunities = async () => {
+      setLoading(true);
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : "";
+        const res = await fetch(`${apiUrl}/communities`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await res.json();
+        setCommunities(Array.isArray(data) ? data : data.data || []);
+      } catch (err) {
+        setCommunities([]);
+      }
+      setLoading(false);
+    };
+    fetchCommunities();
+  }, []);
 
-  const [allCommunitiesData] = useState([
-    ...myCommunitiesData,
-    {
-      id: 6,
-      name: 'Photography Enthusiast',
-      description: 'Komunitas fotografi untuk sharing tips dan teknik photography',
-      members: 1890,
-      category: 'Hobi',
-      isJoined: false,
-      privacy: 'public',
-      activePromos: 4,
-      isVerified: false,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 7,
-      name: 'Business Network Club',
-      description: 'Komunitas eksklusif untuk networking bisnis dan profesional',
-      members: 234,
-      category: 'Bisnis',
-      isJoined: false,
-      privacy: 'private',
-      activePromos: 15,
-      isVerified: true,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 8,
-      name: 'Fitness & Health Community',
-      description: 'Komunitas kesehatan, fitness, dan gaya hidup sehat',
-      members: 987,
-      category: 'Kesehatan',
-      isJoined: false,
-      privacy: 'public',
-      activePromos: 7,
-      isVerified: false,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 9,
-      name: 'Tech Startup Bandung',
-      description: 'Komunitas startup teknologi dan digital di Bandung',
-      members: 445,
-      category: 'Teknologi',
-      isJoined: false,
-      privacy: 'private',
-      activePromos: 3,
-      isVerified: true,
-      avatar: '/api/placeholder/50/50'
-    },
-    {
-      id: 10,
-      name: 'Traveling Backpacker',
-      description: 'Komunitas traveler dan backpacker untuk sharing destinasi',
-      members: 1678,
-      category: 'Travel',
-      isJoined: false,
-      privacy: 'public',
-      activePromos: 9,
-      isVerified: false,
-      avatar: '/api/placeholder/50/50'
-    }
-  ]);
-
-  const [notJoinedCommunitiesData] = useState(
-    allCommunitiesData.filter(community => !community.isJoined && !myCommunitiesData.find(my => my.id === community.id))
-  );
-
+  // Filter communities sesuai tab dan pencarian
   const filteredCommunities = () => {
-    let data = [];
-    
-    switch(activeTab) {
-      case 'komunitasku':
-        data = myCommunitiesData;
-        break;
-      case 'belum-gabung':
-        data = notJoinedCommunitiesData;
-        break;
-      default:
-        data = allCommunitiesData;
+    let data = communities;
+    if (activeTab === 'komunitasku') {
+      data = data.filter(c => c.isJoined); // sesuaikan dengan field backend
+    } else if (activeTab === 'belum-gabung') {
+      data = data.filter(c => !c.isJoined);
     }
-
     if (searchQuery) {
-      data = data.filter(community => 
+      data = data.filter(community =>
         community.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        community.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (community.category || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-
     return data;
   };
 
@@ -187,9 +72,12 @@ export default function Komunitas() {
 
   // Format number function with consistent locale
   const formatNumber = (num) => {
-    if (!isClient) return num.toString();
+    if (!isClient) return num ? num.toString() : "0";
+    if (typeof num !== "number") return "0";
     return num.toLocaleString('id-ID');
   };
+
+  const notJoinedCommunities = communities.filter(c => !c.isJoined);
 
   return (
     <>
@@ -325,29 +213,7 @@ export default function Komunitas() {
 
               {/* Communities List */}
               {/* Show recommended communities section only when viewing all or joined communities */}
-              {activeTab !== 'belum-gabung' && (
-                <div className="mb-6">
-                  <div className="mb-4">
-                    <h2 className="text-slate-900 text-lg font-semibold">Komunitas Lainnya</h2>
-                    <p className="text-slate-600 text-sm">
-                      Temukan komunitas baru yang menarik
-                    </p>
-                  </div>
-
-                  {/* Other Communities List */}
-                  <div className="space-y-3">
-                    {notJoinedCommunitiesData.slice(0, 3).map((community) => (
-                      <CommunityCard 
-                        key={community.id} 
-                        community={community} 
-                        type="notJoined"
-                        onOpenCommunity={handleOpenCommunity}
-                        formatNumber={formatNumber}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+              
 
               {/* Komunitas Lainnya section */}
               <div className="mb-6">
@@ -360,15 +226,19 @@ export default function Komunitas() {
 
                 {/* Other Communities List */}
                 <div className="space-y-3">
-                  {filteredCommunities().map((community) => (
-                    <CommunityCard 
-                      key={community.id} 
-                      community={community} 
-                      type="notJoined"
-                      onOpenCommunity={handleOpenCommunity}
-                      formatNumber={formatNumber}
-                    />
-                  ))}
+                  {loading ? (
+                    <div>Loading komunitas...</div>
+                  ) : (
+                    filteredCommunities().map((community) => (
+                      <CommunityCard 
+                        key={community.id} 
+                        community={community} 
+                        type={community.isJoined ? 'joined' : 'notJoined'}
+                        onOpenCommunity={handleOpenCommunity}
+                        formatNumber={formatNumber}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
             </div>

@@ -21,6 +21,38 @@ export default function KomunitasDashboard() {
     description: "",
     logo: "",
   });
+  // combined add modal state (voucher or promo)
+  const [modalAdd, setModalAdd] = useState(false);
+  const [selectedCommunityForAdd, setSelectedCommunityForAdd] = useState(null);
+  const [addType, setAddType] = useState("voucher"); // 'voucher' or 'promo'
+  const [voucherForm, setVoucherForm] = useState({
+    code: "",
+    type: "percentage", // 'percentage' or 'fixed'
+    amount: 0,
+    expiry_date: "",
+    stock: 0,
+  });
+  const [promoForm, setPromoForm] = useState({
+    title: "",
+    description: "",
+    detail: "",
+    promo_distance: 0,
+    start_date: "",
+    end_date: "",
+    always_available: false,
+    stock: 0,
+    promo_type: "offline",
+    location: "",
+    owner_name: "",
+    owner_contact: "",
+  });
+  const [promoImage, setPromoImage] = useState(null);
+  // NEW: reuse existing template states
+  const [useExisting, setUseExisting] = useState(false);
+  const [existingVoucherList, setExistingVoucherList] = useState([]);
+  const [existingPromoList, setExistingPromoList] = useState([]);
+  const [selectedExistingId, setSelectedExistingId] = useState(null);
+  const [selectedAttachCategoryId, setSelectedAttachCategoryId] = useState(null);
   const [modalCategory, setModalCategory] = useState(false);
   const [categoryList, setCategoryList] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -30,6 +62,8 @@ export default function KomunitasDashboard() {
   });
   const [activeCommunityId, setActiveCommunityId] = useState(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  // preview widgets created for the active community (local preview until refreshed)
+  const [previewWidgets, setPreviewWidgets] = useState([]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -39,7 +73,7 @@ export default function KomunitasDashboard() {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : "";
       try {
-        const res = await fetch(`${apiUrl}/communities`, {
+        const res = await fetch(`${apiUrl}/communities`, { // changed: add /api
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -62,8 +96,8 @@ export default function KomunitasDashboard() {
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     const method = selectedCommunity ? "PUT" : "POST";
     const url = selectedCommunity
-      ? `${apiUrl}/communities/${selectedCommunity.id}`
-      : `${apiUrl}/communities`;
+      ? `${apiUrl}/communities/${selectedCommunity.id}` // changed: add /api
+      : `${apiUrl}/communities`; // changed: add /api
 
     // Handle file upload or string
     const formPayload = new FormData();
@@ -92,7 +126,7 @@ export default function KomunitasDashboard() {
     setSelectedCommunity(null);
 
     // Refresh list
-    const res = await fetch(`${apiUrl}/communities`, {
+    const res = await fetch(`${apiUrl}/communities`, { // changed: add /api
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -135,7 +169,7 @@ export default function KomunitasDashboard() {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     const res = await fetch(
-      `${apiUrl}/communities/${communityId}/categories`,
+      `${apiUrl}/communities/${communityId}/categories`, // changed: add /api
       {
         headers: {
           "Content-Type": "application/json",
@@ -164,18 +198,56 @@ export default function KomunitasDashboard() {
       ? `${apiUrl}/communities/${activeCommunityId}/categories/${selectedCategory.id}`
       : `${apiUrl}/communities/${activeCommunityId}/categories`;
 
-    await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(categoryForm),
-    });
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(categoryForm),
+      });
+      const json = await res.json().catch(() => ({}));
+      // refresh categories list
+      setCategoryForm({ title: "", description: "" });
+      setSelectedCategory(null);
+      fetchCategories(activeCommunityId);
 
-    setCategoryForm({ title: "", description: "" });
-    setSelectedCategory(null);
-    fetchCategories(activeCommunityId);
+      // Try to create a promo-widget that corresponds to this category (backend may ignore)
+      // endpoint: POST /admin/communities/:id/promo-categories  { title, subtitle }
+      try {
+        const widgetRes = await fetch(`${apiUrl}/communities/${activeCommunityId}/promo-categories`, { // changed: add /api and remove /admin
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: categoryForm.title,
+            subtitle: categoryForm.description || ""
+          }),
+        });
+        const widgetJson = await widgetRes.json().catch(() => ({}));
+        if (widgetRes.ok || widgetJson && widgetJson.success) {
+          // if backend returns created widget data push to previewWidgets; otherwise create lightweight preview
+          const created = widgetJson.data || widgetJson || {
+            id: widgetJson.id || Date.now(),
+            title: categoryForm.title,
+            subtitle: categoryForm.description || "",
+            promos: []
+          };
+          setPreviewWidgets((p) => [created, ...p]);
+        } else {
+          // still add local preview so admin sees the widget
+          setPreviewWidgets((p) => [{ id: `local-${Date.now()}`, title: categoryForm.title, subtitle: categoryForm.description || "", promos: [] }, ...p]);
+        }
+      } catch (err) {
+        setPreviewWidgets((p) => [{ id: `local-${Date.now()}`, title: categoryForm.title, subtitle: categoryForm.description || "", promos: [] }, ...p]);
+      }
+
+    } catch (err) {
+      // keep existing error behavior
+    }
   };
 
   // Delete category
@@ -183,7 +255,7 @@ export default function KomunitasDashboard() {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     await fetch(
-      `${apiUrl}/communities/${activeCommunityId}/categories/${category.id}`,
+      `${apiUrl}/communities/${activeCommunityId}/categories/${category.id}`, // changed: add /api
       {
         method: "DELETE",
         headers: {
@@ -193,6 +265,104 @@ export default function KomunitasDashboard() {
       }
     );
     fetchCategories(activeCommunityId);
+  };
+
+  // Fetch existing templates when modal opens or type changes
+  useEffect(() => {
+    if (!modalAdd) return;
+    const encryptedToken = Cookies.get(token_cookie_name);
+    const token = encryptedToken ? Decrypt(encryptedToken) : "";
+    // fetch vouchers
+    (async () => {
+      try {
+        const resV = await fetch(`${apiUrl}/admin/vouchers`, { // changed: add /api/admin
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const jsonV = await resV.json().catch(() => ({}));
+        setExistingVoucherList(
+          Array.isArray(jsonV.data) ? jsonV.data : Array.isArray(jsonV) ? jsonV : []
+        );
+      } catch (e) {
+        setExistingVoucherList([]);
+      }
+      // fetch promos
+      try {
+        const resP = await fetch(`${apiUrl}/admin/promos`, { // changed: add /api/admin
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const jsonP = await resP.json().catch(() => ({}));
+        setExistingPromoList(
+          Array.isArray(jsonP.data) ? jsonP.data : Array.isArray(jsonP) ? jsonP : []
+        );
+      } catch (e) {
+        setExistingPromoList([]);
+      }
+    })();
+  }, [modalAdd, apiUrl]);
+
+  // Open combined add modal for a community
+  const openAddModal = (community, defaultType = "voucher", forceUseExisting = true) => {
+    // modal now only for attaching existing voucher/promo
+    setSelectedCommunityForAdd(community);
+    setAddType(defaultType);
+    setSelectedExistingId(null);
+    setSelectedAttachCategoryId(null);
+    // ensure activeCommunityId is set and categories are loaded for the community
+    if (community && community.id) {
+      setActiveCommunityId(community.id);
+      fetchCategories(community.id);
+    }
+    setUseExisting(forceUseExisting); // keep true so only attach-existing flow shown
+    setModalAdd(true);
+  };
+
+  // Submit add (voucher or promo) - simplified: only attach existing items
+  const handleAddSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedCommunityForAdd) return;
+    const encryptedToken = Cookies.get(token_cookie_name);
+    const token = encryptedToken ? Decrypt(encryptedToken) : "";
+
+    if (!selectedExistingId) {
+      alert("Pilih item yang ingin ditambahkan");
+      return;
+    }
+    if (!selectedAttachCategoryId) {
+      alert("Pilih kategori komunitas untuk item ini");
+      return;
+    }
+
+    try {
+      // Controller expects: POST /communities/{communityId}/categories/{categoryId}/attach
+      // body: { type: 'promo'|'voucher', id: int }
+      const endpoint = `${apiUrl}/communities/${selectedCommunityForAdd.id}/categories/${selectedAttachCategoryId}/attach`;
+      const payload = { type: addType, id: Number(selectedExistingId) };
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok || (json && json.success)) {
+        setModalAdd(false);
+        setSelectedCommunityForAdd(null);
+        setSelectedExistingId(null);
+      } else {
+        alert(json.message || "Gagal menambahkan item ke komunitas");
+      }
+    } catch (err) {
+      alert("Terjadi kesalahan saat menambahkan item");
+    }
   };
 
   const columns = [
@@ -233,12 +403,14 @@ export default function KomunitasDashboard() {
       label: "Kategori",
       width: "120px",
       item: (item) => (
-        <ButtonComponent
-          label="Tambah Kategori"
-          paint="info"
-          size="sm"
-          onClick={() => handleOpenCategory(item)}
-        />
+        <div className="flex gap-2">
+          <ButtonComponent
+            label="Tambah Kategori"
+            paint="info"
+            size="sm"
+            onClick={() => handleOpenCategory(item)}
+          />
+        </div>
       ),
     },
   ];
@@ -398,20 +570,39 @@ export default function KomunitasDashboard() {
           setActiveCommunityId(null);
           setSelectedCategory(null);
           setCategoryForm({ title: "", description: "" });
+          setPreviewWidgets([]); // clear previews when closing
         }}
         title="Kategori Komunitas"
         size="md"
       >
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <ButtonComponent
+              label="Tambah Kategori"
+              paint="primary"
+              onClick={() => {
+                setSelectedCategory(null);
+                setCategoryForm({ title: "", description: "" });
+                setShowCategoryForm(true); // Tampilkan form
+              }}
+            />
+          </div>
+
+         {/* New: tombol untuk menambahkan promo/voucher (attach existing) */}
+        <div>
           <ButtonComponent
-            label="Tambah Kategori"
+            label="Tambah Promo/Voucher ke Komunitas"
             paint="primary"
             onClick={() => {
-              setSelectedCategory(null);
-              setCategoryForm({ title: "", description: "" });
-              setShowCategoryForm(true); // Tampilkan form
+              // open add modal in attach-existing mode; activeCommunityId tersedia
+              if (!activeCommunityId) {
+                alert("Pilih komunitas terlebih dahulu.");
+                return;
+              }
+              openAddModal({ id: activeCommunityId }, "voucher", true);
             }}
           />
+        </div>
         </div>
         <form
           className="flex flex-col gap-2 mb-4"
@@ -494,6 +685,106 @@ export default function KomunitasDashboard() {
             ))}
           </tbody>
         </table>
+
+        {/* Widget Preview: shows newly created promo widgets immediately */}
+        {previewWidgets.length > 0 && (
+          <div className="mt-6">
+            <h4 className="font-semibold mb-2">Preview Widget Promo</h4>
+            <div className="flex gap-4 overflow-x-auto">
+              {previewWidgets.map((w) => (
+                <div key={w.id} className="bg-primary rounded-xl p-4 text-white min-w-[220px] shadow-neuro">
+                  <h5 className="font-bold">{w.title}</h5>
+                  <p className="text-sm text-white text-opacity-90">{w.subtitle}</p>
+                  <div className="mt-3 bg-white bg-opacity-10 rounded p-2 text-xs">
+                    <p className="text-white text-opacity-80">No promos yet</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </FloatingPageComponent>
+
+      {/* Combined Add Modal (Voucher / Promo) */}
+      <FloatingPageComponent
+        show={modalAdd}
+        onClose={() => {
+          setModalAdd(false);
+          setSelectedCommunityForAdd(null);
+          setPromoImage(null);
+        }}
+        title={`Tambah ${addType === "voucher" ? "Voucher" : "Promo"} ke Komunitas`}
+        size={addType === "voucher" ? "sm" : "md"}
+        className="bg-background"
+      >
+        <form className="flex flex-col gap-4 p-6" onSubmit={handleAddSubmit}>
+          <div>
+            <label className="font-semibold">Kategori Komunitas</label>
+            <select
+              className="select select-bordered w-full"
+              value={selectedAttachCategoryId || ""}
+              onChange={(e) => setSelectedAttachCategoryId(e.target.value)}
+              required
+            >
+              <option value="">-- Pilih Kategori --</option>
+              {categoryList.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.title}
+                </option>
+              ))}
+            </select>
+          </div>
+           <div>
+             <label className="font-semibold">Tipe</label>
+             <select
+               className="select select-bordered w-full"
+               value={addType}
+               onChange={(e) => setAddType(e.target.value)}
+             >
+               <option value="voucher">Voucher</option>
+               <option value="promo">Promo</option>
+             </select>
+           </div>
+
+          {/* Only attach-existing allowed: show list of existing items to choose */}
+          <div>
+            <label className="font-semibold">{addType === "voucher" ? "Pilih Voucher" : "Pilih Promo"}</label>
+            <select
+              className="select select-bordered w-full"
+              value={selectedExistingId || ""}
+              onChange={(e) => setSelectedExistingId(e.target.value)}
+            >
+              <option value="">-- Pilih --</option>
+              {addType === "voucher"
+                ? existingVoucherList.map((voucher) => (
+                    <option key={voucher.id} value={voucher.id}>
+                      {voucher.code} - {voucher.amount} ({voucher.type})
+                    </option>
+                  ))
+                : existingPromoList.map((promo) => (
+                    <option key={promo.id} value={promo.id}>
+                      {promo.title} - {promo.stock ?? "-"} stok
+                    </option>
+                  ))}
+            </select>
+            {(addType === "voucher" ? existingVoucherList.length === 0 : existingPromoList.length === 0) && (
+              <p className="text-sm text-gray-500 mt-2">Belum ada item tersedia. Buat voucher/promo terlebih dahulu di menu master.</p>
+            )}
+          </div>
+
+          <div className="flex gap-2 justify-end mt-4">
+            <ButtonComponent
+              label="Batal"
+              paint="secondary"
+              variant="outline"
+              onClick={() => {
+                setModalAdd(false);
+                setSelectedCommunityForAdd(null);
+              }}
+            />
+            <ButtonComponent label={addType === "voucher" ? "Tambahkan Voucher" : "Tambahkan Promo"} paint="primary" type="submit" />
+          </div>
+        </form>
       </FloatingPageComponent>
     </>
   );

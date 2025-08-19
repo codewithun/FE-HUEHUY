@@ -30,6 +30,8 @@ export default function PromoDashboard() {
     owner_name: "",
     owner_contact: "",
   });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -55,7 +57,7 @@ export default function PromoDashboard() {
     fetchData();
   }, [apiUrl]);
 
-  // Add or update promo
+  // Add or update promo (send as multipart/form-data)
   const handleSubmit = async (e) => {
     e.preventDefault();
     const encryptedToken = Cookies.get(token_cookie_name);
@@ -64,14 +66,34 @@ export default function PromoDashboard() {
     const url = selectedPromo
       ? `${apiUrl}/admin/promos/${selectedPromo.id}`
       : `${apiUrl}/admin/promos`;
+
+    // Build FormData
+    const fd = new FormData();
+    fd.set("title", formData.title);
+    fd.set("description", formData.description);
+    fd.set("detail", formData.detail ?? "");
+    fd.set("promo_distance", String(formData.promo_distance ?? 0));
+    fd.set("start_date", formData.start_date ?? "");
+    fd.set("end_date", formData.end_date ?? "");
+    fd.set("always_available", formData.always_available ? "1" : "0");
+    fd.set("stock", String(formData.stock ?? 0));
+    fd.set("promo_type", formData.promo_type);
+    fd.set("location", formData.location ?? "");
+    fd.set("owner_name", formData.owner_name);
+    fd.set("owner_contact", formData.owner_contact);
+    if (imageFile) {
+      fd.append("image", imageFile);
+    }
+
     await fetch(url, {
       method,
       headers: {
-        "Content-Type": "application/json",
+        // Do NOT set Content-Type when sending FormData
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(formData),
+      body: fd,
     });
+
     setModalForm(false);
     setFormData({
       title: "",
@@ -88,6 +110,9 @@ export default function PromoDashboard() {
       owner_contact: "",
     });
     setSelectedPromo(null);
+    setImageFile(null);
+    setImagePreview(null);
+
     // Refresh list
     const res = await fetch(`${apiUrl}/admin/promos`, {
       method: "GET",
@@ -116,7 +141,7 @@ export default function PromoDashboard() {
     setSelectedPromo(null);
   };
 
-  // Open form for edit
+  // Open form for edit (set preview to current image if any)
   const handleEdit = (promo) => {
     setSelectedPromo(promo);
     setFormData({
@@ -126,13 +151,15 @@ export default function PromoDashboard() {
       promo_distance: promo.promo_distance || 0,
       start_date: promo.start_date || "",
       end_date: promo.end_date || "",
-      always_available: promo.always_available || false,
+      always_available: !!promo.always_available,
       stock: promo.stock || 0,
       promo_type: promo.promo_type || "offline",
       location: promo.location || "",
       owner_name: promo.owner_name || "",
       owner_contact: promo.owner_contact || "",
     });
+    setImageFile(null);
+    setImagePreview(promo.image ? `${apiUrl.replace(/\/+$/,'')}/storage/${promo.image}` : null);
     setModalForm(true);
   };
 
@@ -194,32 +221,7 @@ export default function PromoDashboard() {
       label: "Kontak Pemilik",
       item: ({ owner_contact }) => owner_contact,
     },
-    {
-      selector: "aksi",
-      label: "Aksi",
-      width: "120px",
-      item: (item) => (
-        <div className="flex gap-2">
-          <ButtonComponent
-            icon={faEdit}
-            label="Ubah"
-            paint="warning"
-            size="sm"
-            onClick={() => handleEdit(item)}
-          />
-          <ButtonComponent
-            icon={faTrash}
-            label="Hapus"
-            paint="danger"
-            size="sm"
-            onClick={() => {
-              setSelectedPromo(item);
-              setModalDelete(true);
-            }}
-          />
-        </div>
-      ),
-    },
+  
   ];
 
   const topBarActions = (
@@ -243,6 +245,8 @@ export default function PromoDashboard() {
           owner_name: "",
           owner_contact: "",
         });
+        setImageFile(null);
+        setImagePreview(null);
         setModalForm(true);
       }}
     />
@@ -300,6 +304,8 @@ export default function PromoDashboard() {
             owner_name: "",
             owner_contact: "",
           });
+          setImageFile(null);
+          setImagePreview(null);
         }}
         title={selectedPromo ? "Ubah Promo" : "Tambah Promo"}
         size="md"
@@ -429,6 +435,34 @@ export default function PromoDashboard() {
               required
             />
           </div>
+
+          {/* Image upload */}
+          <div>
+            <label className="font-semibold">Gambar Promo</label>
+            <input
+              type="file"
+              accept="image/*"
+              className="file-input file-input-bordered w-full"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setImageFile(file);
+                setImagePreview(file ? URL.createObjectURL(file) : (selectedPromo?.image ? `${apiUrl.replace(/\/+$/,'')}/storage/${selectedPromo.image}` : null));
+              }}
+            />
+            {imagePreview && (
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="h-24 mt-2 object-cover rounded"
+              />
+            )}
+            {!imagePreview && selectedPromo?.image && (
+              <p className="text-xs text-gray-500 mt-1">
+                Gambar saat ini dipertahankan jika tidak diganti.
+              </p>
+            )}
+          </div>
+
           <div className="flex gap-2 justify-end mt-4">
             <ButtonComponent
               label="Batal"
@@ -451,6 +485,8 @@ export default function PromoDashboard() {
                   owner_name: "",
                   owner_contact: "",
                 });
+                setImageFile(null);
+                setImagePreview(null);
               }}
             />
             <ButtonComponent
