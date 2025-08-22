@@ -325,16 +325,18 @@ export function TableSupervisionComponent({
                       rounded
                       onClick={async () => {
                         const item = originalData[key];
-                        // QR selalu berisi link register + voucher (jika ada)
-                        const linkRegister = 'http://192.168.100.157:3000/buat-akun';
-                        const qrData = linkRegister + (item.voucher ? `|${item.voucher}` : '');
-                        if (!qrData.startsWith('http')) {
-                          alert('Data QR bukan link! Pastikan format sudah benar.');
+                        let qrValue = '';
+                        if (item.promo) {
+                          qrValue = `http://localhost:3000/app/komunitas/promo/${item.promo.id}?communityId=${item.promo.community_id || 'default'}`;
+                        } else if (item.voucher) {
+                          qrValue = `http://localhost:3000/app/komunitas/voucher/${item.voucher.id}?communityId=${item.voucher.community_id || 'default'}`;
+                        } else {
+                          alert('Data promo/voucher tidak ditemukan!');
                           return;
                         }
                         try {
                           const QRCode = await import('qrcode');
-                          const qrDataURL = await QRCode.toDataURL(qrData, {
+                          const qrDataURL = await QRCode.toDataURL(qrValue, {
                             width: 300,
                             margin: 2,
                             color: {

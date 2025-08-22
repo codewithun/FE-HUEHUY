@@ -21,6 +21,10 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
+import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../helpers';
+import { Decrypt } from '../../helpers/encryption.helpers';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function Save() {
   const router = useRouter();
@@ -29,203 +33,99 @@ export default function Save() {
   const [data, setData] = useState({ data: [] });
 
   useEffect(() => {
-    // Ambil voucher dari localStorage (demo), jika kosong tambahkan dummy data
-    let vouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-    
-    // Jika localStorage kosong, tambahkan dummy data untuk demo
-    if (vouchers.length === 0) {
-      vouchers = [
-        {
-          id: 'demo-1',
-          code: 'PROMO12345678',
-          claimed_at: new Date().toISOString(),
-          expired_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days from now
-          validation_at: null,
-          voucher_item: null,
-          ad: {
-            id: 'demo-1',
-            title: 'Paket Kenyang Cuma 40 Ribu - Beef Sausage & Chicken di Lalaunch!',
-            picture_source: '/images/promo/beef-sausage-chicken.jpg',
-            status: 'active',
-            cube: {
-              code: 'community-1',
-              user: {
-                name: 'D\'Botanica Admin',
-                phone: '085666666333'
-              },
-              corporate: null,
-              tags: [
-                {
-                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
-                  link: null,
-                  map_lat: '-6.9175',
-                  map_lng: '107.6191'
-                }
-              ]
-            }
+    // Muat saku dari backend (promo items / voucher) — tidak pakai localStorage untuk data
+    let mounted = true;
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : '';
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+
+  const res = await fetch(`${apiUrl}/admin/promo-items`, { headers, signal: controller.signal });
+
+        // Jika 401 -> arahkan ke login atau kosongkan data
+  if (res.status === 401) {
+          if (mounted) {
+            setData({ data: [] });
+            // router.push('/login'); // opsional: redirect ke login
           }
-        },
-        {
-          id: 'demo-2',
-          code: 'PROMO87654321',
-          claimed_at: moment().subtract(2, 'hours').toISOString(),
-          expired_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
-          validation_at: null,
-          voucher_item: {
-            code: 'BOBA2024'
-          },
-          ad: {
-            id: 'demo-2',
-            title: 'Beli 1 Gratis 1! Brown Sugar Coffee di Boba Thai',
-            picture_source: '/images/promo/brown-sugar-coffee.jpg',
-            status: 'active',
-            cube: {
-              code: 'community-1',
-              user: {
-                name: 'Boba Thai Manager',
-                phone: '085777777444'
-              },
-              corporate: null,
-              tags: [
-                {
-                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
-                  link: 'https://bobathai.com',
-                  map_lat: '-6.9175',
-                  map_lng: '107.6191'
-                }
-              ]
-            }
+          return;
+        }
+        if (!res.ok) {
+          // fallback ke localStorage agar klaim terbaru tetap muncul
+          try {
+            const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+            if (mounted) setData({ data: local });
+          } catch (_) {
+            if (mounted) setData({ data: [] });
           }
-        },
-        {
-          id: 'demo-3',
-          code: 'PROMO11223344',
-          claimed_at: moment().subtract(1, 'day').toISOString(),
-          expired_at: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day from now
-          validation_at: moment().subtract(30, 'minutes').toISOString(), // Already used
-          voucher_item: null,
-          ad: {
-            id: 'demo-3',
-            title: 'Makan Bertiga Lebih Hemat - Paket Ayam di Chicken Star Cuma 59 Ribu!',
-            picture_source: '/images/promo/chicken-package.jpg',
-            status: 'active',
-            cube: {
-              code: 'community-1',
-              user: {
-                name: 'Chicken Star Owner',
-                phone: '085888888555'
-              },
-              corporate: null,
-              tags: [
-                {
-                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
-                  link: null,
-                  map_lat: '-6.9175',
-                  map_lng: '107.6191'
-                }
-              ]
-            }
-          }
-        },
-        {
-          id: 'demo-4',
-          code: 'PROMO99887766',
-          claimed_at: moment().subtract(6, 'hours').toISOString(),
-          expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-          validation_at: null,
-          voucher_item: null,
-          ad: {
-            id: 'demo-4',
-            title: 'Diskon 50% Bubble Tea untuk 15 Pelanggan Pertama!',
-            picture_source: '/images/promo/bubble-tea-discount.jpg',
-            status: 'active',
-            cube: {
-              code: 'community-1',
-              user: {
-                name: 'Bubble Tea House Staff',
-                phone: '085999999666'
-              },
-              corporate: null,
-              tags: [
-                {
-                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
-                  link: 'https://bubbletea-house.com',
-                  map_lat: '-6.9175',
-                  map_lng: '107.6191'
-                }
-              ]
-            }
-          }
-        },
-        {
-          id: 'demo-5',
-          code: 'PROMO55443322',
-          claimed_at: moment().subtract(3, 'hours').toISOString(),
-          expired_at: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
-          validation_at: null,
-          voucher_item: {
-            code: 'MCDFLASH2024'
-          },
-          ad: {
-            id: 'demo-5',
-            title: 'Flash Sale - Burger Combo',
-            picture_source: '/images/promo/burger-combo-flash.jpg',
-            status: 'active',
-            cube: {
-              code: 'community-1',
-              corporate: {
-                name: 'McDonald\'s BTC',
-                phone: '085111111222'
-              },
-              user: null,
-              tags: [
-                {
-                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
-                  link: 'https://mcdonalds.co.id',
-                  map_lat: '-6.9175',
-                  map_lng: '107.6191'
-                }
-              ]
-            }
-          }
-        },
-        {
-          id: 'demo-6',
-          code: 'PROMO66778899',
-          claimed_at: moment().subtract(4, 'hours').toISOString(),
-          expired_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // Expired (1 day ago)
-          validation_at: null,
-          voucher_item: null,
-          ad: {
-            id: 'demo-6',
-            title: 'Limited Time - Pizza Medium',
-            picture_source: '/images/promo/pizza-medium-deal.jpg',
-            status: 'inactive', // Promo sudah ditutup
-            cube: {
-              code: 'community-1',
-              corporate: {
-                name: 'Pizza Hut BTC',
-                phone: '085222222333'
-              },
-              user: null,
-              tags: [
-                {
-                  address: 'Bandung Trade Center (BTC) Dr. Djunjunan Boulevard, Bandung 40163',
-                  link: 'https://pizzahut.co.id',
-                  map_lat: '-6.9175',
-                  map_lng: '107.6191'
-                }
-              ]
-            }
+          return;
+        }
+
+        const json = await res.json();
+  const items = Array.isArray(json) ? json : (json.data || []);
+
+        // Map ke shape komponen (dukungan PromoItem dengan relasi promo atau shape voucher)
+        const mapped = items.map((it) => {
+          const promo = it.promo || (it.promo_id ? it.promo : null);
+          const adFromPromo = promo
+            ? {
+                id: promo.id || it.promo_id || null,
+                title: promo.title || promo.name || it.title || 'Promo',
+                picture_source: promo.image || promo.picture || it.picture_source || null,
+                status: promo.status || it.status || 'active',
+                cube: promo.cube || it.cube || {},
+              }
+            : (it.ad ? {
+                id: it.ad.id || it.promo_id || null,
+                title: it.ad.title || it.title || 'Promo',
+                picture_source: it.ad.picture_source || it.picture_source || null,
+                status: it.ad.status || it.status || 'active',
+                cube: it.ad.cube || it.cube || {}
+              } : {});
+
+          return {
+            id: it.id,
+            code: it.code || it.voucher_code || (it.voucher_item && it.voucher_item.code) || null,
+            claimed_at: it.created_at || it.claimed_at || it.claimedAt || null,
+            expired_at: it.expires_at || it.expired_at || it.expiry || null,
+            validation_at: it.redeemed_at || it.validation_at || null,
+            voucher_item: it.voucher_item || (it.voucher_code ? { code: it.voucher_code } : null),
+            ad: adFromPromo
+          };
+        });
+
+        // gabungkan dengan localStorage (tanpa duplikat berdasarkan code)
+        let combined = mapped;
+        try {
+          const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+          const codes = new Set(mapped.map((x) => x?.code));
+          combined = [...mapped, ...local.filter((x) => !codes.has(x?.code))];
+        } catch (_) {}
+
+        if (mounted) setData({ data: combined });
+      } catch (err) {
+        if (mounted) {
+          // fallback dari localStorage jika request error
+          try {
+            const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+            setData({ data: local });
+          } catch (_) {
+            setData({ data: [] });
           }
         }
-      ];
-      
-      // Update localStorage dengan dummy data
-      localStorage.setItem('huehuy_vouchers', JSON.stringify(vouchers));
-    }
-    
-    setData({ data: vouchers });
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
   }, []);
 
   // Helper function untuk menghitung waktu kedaluwarsa
@@ -260,6 +160,7 @@ export default function Save() {
 
   // Helper function untuk status badge
   const getStatusBadge = (item) => {
+    const isActive = item?.ad?.status === 'active' || item?.ad?.status === 'available';
     if (item?.validation_at) {
       return (
         <div className="flex items-center gap-1">
@@ -269,7 +170,7 @@ export default function Save() {
           </span>
         </div>
       );
-    } else if (item?.ad?.status !== 'active') {
+    } else if (!isActive) {
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faTimesCircle} className="text-danger text-xs" />
@@ -546,7 +447,7 @@ export default function Save() {
                 <p className="text-green-600 text-sm mt-1">Terima kasih</p>
               </div>
             </div>
-          ) : selected?.ad?.status !== 'active' ? (
+          ) : !(selected?.ad?.status === 'active' || selected?.ad?.status === 'available') ? (
             <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
               <div className="text-center">
                 <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />

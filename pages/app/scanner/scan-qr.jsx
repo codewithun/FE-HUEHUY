@@ -19,6 +19,45 @@ export default function ScanQR() {
     setIsScanning(false);
 
     try {
+      // Jika hasil scan adalah URL promo/voucher, langsung redirect
+      if (
+        typeof result === 'string' &&
+        (result.startsWith('http://') || result.startsWith('https://')) &&
+        (result.includes('/app/komunitas/promo/') || result.includes('/app/komunitas/voucher/'))
+      ) {
+        // Redirect ke URL yang ada di QR code
+        window.location.href = result;
+        return;
+      }
+
+      // --- Parsing QR untuk promo/voucher (format lama) ---
+      let promoId = null;
+      let communityId = null;
+
+      // Coba parsing JSON
+      try {
+        const data = JSON.parse(result);
+        if (data.type === 'promo' && data.promoId && data.communityId) {
+          promoId = data.promoId;
+          communityId = data.communityId;
+        }
+      } catch {
+        // Jika bukan JSON, cek format string: promo|<promoId>|<communityId>
+        if (result.startsWith('promo|')) {
+          const parts = result.split('|');
+          if (parts.length >= 3) {
+            promoId = parts[1];
+            communityId = parts[2];
+          }
+        }
+      }
+
+      if (promoId && communityId) {
+        router.push(`/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`);
+        return;
+      }
+
+      // --- fallback lama ---
       const qrData = parseQRCode(result);
       if (qrData.type === 'event_booth') {
         router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=event&booth=${qrData.boothId}`);
