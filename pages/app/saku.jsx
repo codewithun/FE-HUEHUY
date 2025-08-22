@@ -14,6 +14,7 @@ import {
   faWallet, // Icon saku/dompet
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
 import moment from 'moment';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -21,7 +22,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
-import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -73,20 +73,49 @@ export default function Save() {
         // Map ke shape komponen (dukungan PromoItem dengan relasi promo atau shape voucher)
         const mapped = items.map((it) => {
           const promo = it.promo || (it.promo_id ? it.promo : null);
+          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
+          
           const adFromPromo = promo
             ? {
                 id: promo.id || it.promo_id || null,
                 title: promo.title || promo.name || it.title || 'Promo',
-                picture_source: promo.image || promo.picture || it.picture_source || null,
+                // Perbaikan untuk gambar - pastikan menggunakan path yang benar
+                picture_source: promo.image 
+                  ? `${baseUrl}/storage/${promo.image}` 
+                  : (promo.picture_source || '/default-avatar.png'),
                 status: promo.status || it.status || 'active',
-                cube: promo.cube || it.cube || {},
+                owner_name: promo.owner_name || '',
+                owner_contact: promo.owner_contact || '',
+                cube: {
+                  ...promo.cube || it.cube || {},
+                  community_id: promo.community_id || it.community_id || 1, // Tambahkan community_id
+                  code: promo.code || `community-${promo.community_id || 1}`,
+                  user: { 
+                    name: promo.owner_name || 'Admin', 
+                    phone: promo.owner_contact || '' 
+                  },
+                  corporate: null,
+                  tags: [{ 
+                    address: promo.location || '', 
+                    link: null, 
+                    map_lat: null, 
+                    map_lng: null 
+                  }],
+                },
               }
             : (it.ad ? {
                 id: it.ad.id || it.promo_id || null,
                 title: it.ad.title || it.title || 'Promo',
-                picture_source: it.ad.picture_source || it.picture_source || null,
+                picture_source: it.ad.image 
+                  ? `${baseUrl}/storage/${it.ad.image}` 
+                  : (it.ad.picture_source || it.picture_source || '/default-avatar.png'),
                 status: it.ad.status || it.status || 'active',
-                cube: it.ad.cube || it.cube || {}
+                owner_name: it.ad.owner_name || '',
+                owner_contact: it.ad.owner_contact || '',
+                cube: {
+                  ...it.ad.cube || it.cube || {},
+                  community_id: it.ad.community_id || it.community_id || 1,
+                }
               } : {});
 
           return {
@@ -250,6 +279,15 @@ export default function Save() {
                       </div>
                     )}
 
+                    {/* Tambahkan badge untuk promo yang sudah divalidasi */}
+                    {item.validation_at && (
+                      <div className="mb-3">
+                        <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
+                          ✓ Sudah Digunakan
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex gap-4">
                       {/* Image Section dengan gambar yang sesuai */}
                       <div className="w-20 h-20 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex justify-center items-center group-hover:scale-105 transition-transform duration-300">
@@ -359,7 +397,7 @@ export default function Save() {
                 </div>
               </div>
 
-              <Link href={`/app/${selected?.ad?.cube?.code}`}>
+              <Link href={`/app/komunitas/promo/${selected?.ad?.id}?communityId=${selected?.ad?.cube?.community_id || 1}&from=saku`}>
                 <div className="flex items-center gap-1 text-sm text-primary font-medium bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors">
                   Detail
                   <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
@@ -375,13 +413,13 @@ export default function Save() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-600 text-sm">Pemilik</span>
                 <span className="text-slate-800 font-medium text-sm">
-                  {selected?.ad?.cube?.user?.name || selected?.ad?.cube?.corporate?.name || '-'}
+                  {selected?.ad?.owner_name || selected?.ad?.cube?.user?.name || selected?.ad?.cube?.corporate?.name || '-'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-600 text-sm">No. Telepon</span>
                 <span className="text-slate-800 font-medium text-sm">
-                  {selected?.ad?.cube?.user?.phone || selected?.ad?.cube?.corporate?.phone || '-'}
+                  {selected?.ad?.owner_contact || selected?.ad?.cube?.user?.phone || selected?.ad?.cube?.corporate?.phone || '-'}
                 </span>
               </div>
             </div>

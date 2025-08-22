@@ -1,5 +1,6 @@
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
+import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import {
   ButtonComponent,
@@ -25,30 +26,29 @@ export default function KomunitasDashboard() {
   const [modalAdd, setModalAdd] = useState(false);
   const [selectedCommunityForAdd, setSelectedCommunityForAdd] = useState(null);
   const [addType, setAddType] = useState("voucher"); // 'voucher' or 'promo'
-  const [voucherForm, setVoucherForm] = useState({
-    code: "",
-    type: "percentage", // 'percentage' or 'fixed'
-    amount: 0,
-    expiry_date: "",
-    stock: 0,
-  });
-  const [promoForm, setPromoForm] = useState({
-    title: "",
-    description: "",
-    detail: "",
-    promo_distance: 0,
-    start_date: "",
-    end_date: "",
-    always_available: false,
-    stock: 0,
-    promo_type: "offline",
-    location: "",
-    owner_name: "",
-    owner_contact: "",
-  });
-  const [promoImage, setPromoImage] = useState(null);
+  // const [voucherForm, setVoucherForm] = useState({
+  //   code: "",
+  //   type: "percentage", // 'percentage' or 'fixed'
+  //   amount: 0,
+  //   expiry_date: "",
+  //   stock: 0,
+  // });
+  // const [promoForm, setPromoForm] = useState({
+  //   title: "",
+  //   description: "",
+  //   detail: "",
+  //   promo_distance: 0,
+  //   start_date: "",
+  //   end_date: "",
+  //   always_available: false,
+  //   stock: 0,
+  //   promo_type: "offline",
+  //   location: "",
+  //   owner_name: "",
+  //   owner_contact: "",
+  // });
+  // const [promoImage, setPromoImage] = useState(null);
   // NEW: reuse existing template states
-  const [useExisting, setUseExisting] = useState(false);
   const [existingVoucherList, setExistingVoucherList] = useState([]);
   const [existingPromoList, setExistingPromoList] = useState([]);
   const [selectedExistingId, setSelectedExistingId] = useState(null);
@@ -153,17 +153,6 @@ export default function KomunitasDashboard() {
     setSelectedCommunity(null);
   };
 
-  // Open form for edit
-  const handleEdit = (community) => {
-    setSelectedCommunity(community);
-    setFormData({
-      name: community.name || "",
-      description: community.description || "",
-      logo: "",
-    });
-    setModalForm(true);
-  };
-
   // Fetch categories for a community
   const fetchCategories = async (communityId) => {
     const encryptedToken = Cookies.get(token_cookie_name);
@@ -199,7 +188,7 @@ export default function KomunitasDashboard() {
       : `${apiUrl}/communities/${activeCommunityId}/categories`;
 
     try {
-      const res = await fetch(url, {
+      await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -207,7 +196,6 @@ export default function KomunitasDashboard() {
         },
         body: JSON.stringify(categoryForm),
       });
-      const json = await res.json().catch(() => ({}));
       // refresh categories list
       setCategoryForm({ title: "", description: "" });
       setSelectedCategory(null);
@@ -307,7 +295,7 @@ export default function KomunitasDashboard() {
   }, [modalAdd, apiUrl]);
 
   // Open combined add modal for a community
-  const openAddModal = (community, defaultType = "voucher", forceUseExisting = true) => {
+  const openAddModal = (community, defaultType = "voucher") => {
     // modal now only for attaching existing voucher/promo
     setSelectedCommunityForAdd(community);
     setAddType(defaultType);
@@ -318,7 +306,6 @@ export default function KomunitasDashboard() {
       setActiveCommunityId(community.id);
       fetchCategories(community.id);
     }
-    setUseExisting(forceUseExisting); // keep true so only attach-existing flow shown
     setModalAdd(true);
   };
 
@@ -383,7 +370,7 @@ export default function KomunitasDashboard() {
       width: "100px",
       item: ({ logo }) =>
         logo ? (
-          <img
+          <Image
             src={
               logo.startsWith("http")
                 ? logo
@@ -727,7 +714,7 @@ export default function KomunitasDashboard() {
                 alert("Pilih komunitas terlebih dahulu.");
                 return;
               }
-              openAddModal({ id: activeCommunityId }, "voucher", true);
+              openAddModal({ id: activeCommunityId }, "voucher");
             }}
           />
         </div>
@@ -858,7 +845,7 @@ export default function KomunitasDashboard() {
         onClose={() => {
           setModalAdd(false);
           setSelectedCommunityForAdd(null);
-          setPromoImage(null);
+          // setPromoImage(null); // Removed as per edit hint
         }}
         title={`Tambah ${addType === "voucher" ? "Voucher" : "Promo"} ke Komunitas`}
         size={addType === "voucher" ? "sm" : "md"}
