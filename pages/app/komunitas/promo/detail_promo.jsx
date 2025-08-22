@@ -3,6 +3,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../../../helpers';
+import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 const PromoDetailPage = () => {
   const router = useRouter();
@@ -17,6 +20,13 @@ const PromoDetailPage = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
+    // jangan lanjut sebelum router siap
+    if (!router.isReady) return;
+
+    // Reset state setiap kali promoId atau communityId berubah
+    setPromoData(null);
+    setLoading(true);
+
     if (promoId && communityId) {
       // Mock data untuk detail promo berdasarkan ID dengan gambar yang sesuai
       const mockPromoDetails = {
@@ -222,13 +232,25 @@ const PromoDetailPage = () => {
         }
       };
 
-      const selectedPromo = mockPromoDetails[promoId];
-      if (selectedPromo) {
-        setPromoData(selectedPromo);
-      }
+      // Simulasi async fetch (bisa diganti fetch API jika sudah ada backend)
+      setTimeout(() => {
+        // robust lookup: coba string key dulu lalu numeric
+        const keyStr = String(promoId);
+        const keyNum = Number(promoId);
+        const selectedPromo =
+          mockPromoDetails[keyStr] ?? mockPromoDetails[keyNum] ?? null;
+
+        if (selectedPromo) {
+          setPromoData(selectedPromo);
+        } else {
+          setPromoData(null);
+        }
+        setLoading(false);
+      }, 300); // simulasi loading 300ms
+    } else {
       setLoading(false);
     }
-  }, [promoId, communityId]);
+  }, [router.isReady, promoId, communityId]);
 
   const handleBack = () => {
     // Jika dari promo-entry, kembali ke halaman utama
@@ -238,7 +260,7 @@ const PromoDetailPage = () => {
       router.push(`/app/komunitas/promo?communityId=${communityId}`);
     }
   };
-
+  
   const handleShare = () => {
     setShowShareModal(true);
   };
@@ -249,74 +271,126 @@ const PromoDetailPage = () => {
 
   const handleClaimPromo = async () => {
     if (isClaimedLoading) return;
-    
     setIsClaimedLoading(true);
-    
+
     try {
-      // Simulate API call to claim promo
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Get existing vouchers from localStorage
-      const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      
-      // Check if promo already claimed
-      const isAlreadyClaimed = existingVouchers.some(voucher => 
-        voucher.ad.id === promoData.id || voucher.id === promoData.id
-      );
-      
-      if (isAlreadyClaimed) {
-        setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
+      if (!promoData?.id) {
+        setErrorMessage('Promo tidak valid.');
         setShowErrorModal(true);
         return;
       }
 
-      // Generate unique code for claimed promo
-      const generatePromoCode = () => {
-        return 'PROMO' + Date.now().toString().slice(-8);
+      const encryptedToken = Cookies.get(token_cookie_name);
+      console.log('encryptedToken(cookie):', encryptedToken);
+      let token = encryptedToken ? Decrypt(encryptedToken) : null;
+
+      // fallback ke localStorage (untuk debug)
+      if (!token) {
+        token = localStorage.getItem('auth_token') || null;
+        console.log('token(localStorage):', token);
+      }
+
+      if (!token) {
+        setErrorMessage('Sesi berakhir. Silakan login ulang. (token tidak ditemukan)');
+        setShowErrorModal(true);
+        return;
+      }
+
+      const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+      const endpoints = [
+        `${base}/api/admin/promos/${promoData.id}/items`,
+        `${base}/api/admin/promo-items`,
+      ];
+
+      console.log('claim endpoints:', endpoints);
+
+      // Ubah payload: hanya kirim { claim: true }
+      const payload = {
+        claim: true,
       };
-      
-      // Convert promo data to voucher format
-      const claimedVoucher = {
-        id: promoData.id,
-        code: generatePromoCode(),
-        claimed_at: new Date().toISOString(),
-        expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        validation_at: null,
-        voucher_item: null,
-        ad: {
-          id: promoData.id,
-          title: promoData.title,
-          picture_source: promoData.image,
-          status: 'active',
-          cube: {
-            code: `community-${communityId}`,
-            user: {
-              name: promoData.seller.name,
-              phone: promoData.seller.phone
-            },
-            corporate: null,
-            tags: [
-              {
-                address: promoData.location,
-                link: null,
-                map_lat: null,
-                map_lng: null
-              }
-            ]
+
+      const headers = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      };
+
+      let savedItem = null;
+      let lastError = '';
+
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+          });
+
+          const txt = await res.text().catch(() => '');
+          let json = {};
+          try {
+            json = txt ? JSON.parse(txt) : {};
+          } catch (e) {
+            json = { raw: txt };
           }
+
+          console.log('claim response:', url, res.status, json);
+
+          if (res.ok) {
+            savedItem = json?.data ?? json;
+            break;
+          }
+
+          // Tangani error spesifik
+          if (res.status === 401) {
+            setErrorMessage('Sesi berakhir. Silakan login ulang.');
+            setShowErrorModal(true);
+            return;
+          }
+          if (res.status === 422 && json?.errors) {
+            const msg = Object.values(json.errors).flat().join(', ');
+            setErrorMessage(`Validasi gagal: ${msg}`);
+            setShowErrorModal(true);
+            return;
+          }
+
+          lastError = json?.message || json?.error || `HTTP ${res.status}`;
+        } catch (e) {
+          lastError = e?.message || 'Network error';
+          // coba endpoint berikutnya
         }
-      };
-      
-      // Add to existing vouchers
-      existingVouchers.push(claimedVoucher);
-      localStorage.setItem('huehuy_vouchers', JSON.stringify(existingVouchers));
-      
-      // Show success modal
+      }
+
+      if (!savedItem) {
+        setErrorMessage(lastError || 'Gagal menyimpan promo ke server. Coba lagi nanti.');
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Simpan juga ke localStorage agar UI Saku langsung ter-update
+      try {
+        const existing = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        const enriched = {
+          ...savedItem,
+          claimed_at: new Date().toISOString(),
+          ad: {
+            id: promoData?.id,
+            title: promoData?.title,
+            picture_source: promoData?.image,
+            status: 'active',
+            cube: promoData?.cube || null,
+          },
+        };
+        existing.push(enriched);
+        localStorage.setItem('huehuy_vouchers', JSON.stringify(existing));
+      } catch (e) {
+        // abaikan error localStorage
+      }
+
       setShowSuccessModal(true);
-      
-    } catch (error) {
-      // Handle error without using console
-      setErrorMessage('Gagal merebut promo. Silakan coba lagi.');
+      return;
+  } catch (error) {
+      setErrorMessage(error?.message || 'Gagal merebut promo. Silakan coba lagi.');
       setShowErrorModal(true);
     } finally {
       setIsClaimedLoading(false);
@@ -368,7 +442,7 @@ const PromoDetailPage = () => {
     // Save report to localStorage
     const reports = JSON.parse(localStorage.getItem('promoReports') || '[]');
     reports.push({
-      promoId: promoData.id,
+      promoId: promoData.id,  
       reason,
       reportedAt: new Date().toISOString(),
       status: 'pending'
@@ -576,7 +650,7 @@ const PromoDetailPage = () => {
           <button 
             onClick={handleClaimPromo}
             disabled={isClaimedLoading}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${ 
               isClaimedLoading 
                 ? 'bg-slate-400 text-white cursor-not-allowed' 
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'

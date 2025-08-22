@@ -29,6 +29,7 @@ export default function PromoDashboard() {
     location: "",
     owner_name: "",
     owner_contact: "",
+    code: "", // tambahkan ini
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -81,6 +82,7 @@ export default function PromoDashboard() {
     fd.set("location", formData.location ?? "");
     fd.set("owner_name", formData.owner_name);
     fd.set("owner_contact", formData.owner_contact);
+    fd.set("code", formData.code ?? ""); // tambahkan ini
     if (imageFile) {
       fd.append("image", imageFile);
     }
@@ -108,6 +110,7 @@ export default function PromoDashboard() {
       location: "",
       owner_name: "",
       owner_contact: "",
+      code: "", // tambahkan ini di semua reset formData
     });
     setSelectedPromo(null);
     setImageFile(null);
@@ -157,6 +160,7 @@ export default function PromoDashboard() {
       location: promo.location || "",
       owner_name: promo.owner_name || "",
       owner_contact: promo.owner_contact || "",
+      code: promo.code || "", // tambahkan ini
     });
     setImageFile(null);
     setImagePreview(promo.image ? `${apiUrl.replace(/\/+$/,'')}/storage/${promo.image}` : null);
@@ -169,6 +173,11 @@ export default function PromoDashboard() {
       label: "Judul Promo",
       sortable: true,
       item: ({ title }) => <span className="font-semibold">{title}</span>,
+    },
+    {
+      selector: "code",
+      label: "Kode Promo",
+      item: ({ code }) => code || "-",
     },
     {
       selector: "description",
@@ -244,6 +253,7 @@ export default function PromoDashboard() {
           location: "",
           owner_name: "",
           owner_contact: "",
+          code: "", // tambahkan ini
         });
         setImageFile(null);
         setImagePreview(null);
@@ -303,6 +313,7 @@ export default function PromoDashboard() {
             location: "",
             owner_name: "",
             owner_contact: "",
+            code: "", // tambahkan ini
           });
           setImageFile(null);
           setImagePreview(null);
@@ -435,6 +446,16 @@ export default function PromoDashboard() {
               required
             />
           </div>
+          <div>
+            <label className="font-semibold">Kode Promo (Opsional, unik)</label>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              placeholder="Biarkan kosong untuk generate otomatis"
+            />
+          </div>
 
           {/* Image upload */}
           <div>
@@ -484,6 +505,7 @@ export default function PromoDashboard() {
                   location: "",
                   owner_name: "",
                   owner_contact: "",
+                  code: "", // tambahkan ini
                 });
                 setImageFile(null);
                 setImagePreview(null);
