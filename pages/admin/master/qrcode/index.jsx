@@ -336,10 +336,15 @@ export default function QRCodeCrud() {
         size="md"
         className="bg-background"
       >
-        {selectedItem && selectedItem.text ? (
+        {selectedItem && selectedItem.promo ? (
           <div className="flex flex-col items-center gap-4 p-6">
+            {/* QR untuk PROMO */}
             <QRCodeSVG
-              value={selectedItem.text + (selectedItem.voucher ? `|${selectedItem.voucher}` : '')}
+              value={JSON.stringify({
+                type: 'promo',
+                promoId: selectedItem.promo.id,
+                communityId: selectedItem.promo.community_id || 'default'
+              })}
               size={200}
               bgColor="#fff"
               fgColor="#0f172a"
@@ -347,10 +352,61 @@ export default function QRCodeCrud() {
               includeMargin={true}
             />
             <div className="text-center">
-              <div className="font-bold text-primary text-lg">{selectedItem.text}</div>
-              {selectedItem.voucher && (
-                <div className="text-sm text-secondary mt-1">Voucher: {selectedItem.voucher}</div>
-              )}
+              <div className="font-bold text-primary text-lg">
+                Promo: {selectedItem.promo.name || selectedItem.promo.kode || selectedItem.promo.id}
+              </div>
+              <div className="text-sm text-secondary mt-1">
+                Community: {selectedItem.promo.community_id || 'default'}
+              </div>
+            </div>
+            <ButtonComponent
+              label="Download QR"
+              icon={faDownload}
+              paint="primary"
+              onClick={() => {
+                // Download QR as PNG
+                const svg = document.querySelector('svg');
+                const serializer = new XMLSerializer();
+                const svgStr = serializer.serializeToString(svg);
+                const canvas = document.createElement('canvas');
+                const img = new Image();
+                img.onload = function () {
+                  canvas.width = img.width;
+                  canvas.height = img.height;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0);
+                  const pngFile = canvas.toDataURL('image/png');
+                  const link = document.createElement('a');
+                  link.href = pngFile;
+                  link.download = `qr-event-${selectedItem.text}.png`;
+                  link.click();
+                };
+                img.src = 'data:image/svg+xml;base64,' + btoa(svgStr);
+              }}
+            />
+          </div>
+        ) : selectedItem && selectedItem.voucher ? (
+          <div className="flex flex-col items-center gap-4 p-6">
+            {/* QR untuk VOUCHER */}
+            <QRCodeSVG
+              value={JSON.stringify({
+                type: 'voucher',
+                voucherId: selectedItem.voucher.id,
+                communityId: selectedItem.voucher.community_id || 'default'
+              })}
+              size={200}
+              bgColor="#fff"
+              fgColor="#0f172a"
+              level="H"
+              includeMargin={true}
+            />
+            <div className="text-center">
+              <div className="font-bold text-primary text-lg">
+                Voucher: {selectedItem.voucher.name || selectedItem.voucher.kode || selectedItem.voucher.id}
+              </div>
+              <div className="text-sm text-secondary mt-1">
+                Community: {selectedItem.voucher.community_id || 'default'}
+              </div>
             </div>
             <ButtonComponent
               label="Download QR"

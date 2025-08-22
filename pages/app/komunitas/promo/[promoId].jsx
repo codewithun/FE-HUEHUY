@@ -203,124 +203,152 @@ export default function PromoDetailUnified() {
     };
   };
 
+  // HAPUS/UBAH effect legacy: hanya gunakan jika communityId tidak tersedia (fallback mock)
   useEffect(() => {
     if (!promoId) return;
+    // jika ada communityId, kita akan ambil dari API => jangan override dengan mock
+    if (typeof communityId !== 'undefined' && communityId !== null) return;
+
     const legacy = getLegacyPromoData(promoId);
     setPromoData(normalizeToDetailShape(legacy));
     setLoading(false);
-  }, [promoId]);
+  }, [promoId, communityId]);
 
+  // Perkuat effect yang mem-fetch dari API
   useEffect(() => {
+    if (!router.isReady) return;
     if (!promoId || !communityId) return;
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-    const baseUrl = apiUrl.replace(/\/api$/, '');
+    const controller = new AbortController();
+    const signal = controller.signal;
 
-    const getAuthHeaders = () => {
-      try {
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const token = encryptedToken ? Decrypt(encryptedToken) : "";
-        return token
-          ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
-          : { "Content-Type": "application/json" };
-      } catch (e) {
-        return { "Content-Type": "application/json" };
-      }
-    };
+    (async () => {
+      // reset state setiap kali request baru dibuat
+      setPromoData(null);
+      setLoading(true);
 
-    // Normalisasi gambar promo sesuai home.jsx
-    const normalizePromoImage = (data) => {
-      const raw =
-        data.image_url ||
-        data.image ||
-        (data.image_path ? `${baseUrl}/storage/${data.image_path}` : "/api/placeholder/150/120");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const baseUrl = apiUrl.replace(/\/api$/, '');
 
-      let image = raw;
-      if (typeof image === "string" && image) {
-        const isAbsolute = /^https?:\/\//i.test(image);
-        if (!isAbsolute) {
-          const cleaned = image.replace(/^\/+/, '');
-          if (/^api\/placeholder/i.test(cleaned)) {
-            image = `/${cleaned}`;
-          }
-          else if (/^api\//i.test(cleaned)) {
-            const withoutApi = cleaned.replace(/^api\/+/i, '');
-            if (/^(storage|promos|uploads)/i.test(withoutApi)) {
-              if (withoutApi.startsWith('promos/')) {
-                image = `${baseUrl}/storage/${withoutApi}`;
+      const getAuthHeaders = () => {
+        try {
+          const encryptedToken = Cookies.get(token_cookie_name);
+          const token = encryptedToken ? Decrypt(encryptedToken) : "";
+          return token
+            ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+            : { "Content-Type": "application/json" };
+        } catch (e) {
+          return { "Content-Type": "application/json" };
+        }
+      };
+
+      const normalizePromoImage = (data) => {
+        const raw =
+          data.image_url ||
+          data.image ||
+          (data.image_path ? `${baseUrl}/storage/${data.image_path}` : "/api/placeholder/150/120");
+
+        let image = raw;
+        if (typeof image === "string" && image) {
+          const isAbsolute = /^https?:\/\//i.test(image);
+          if (!isAbsolute) {
+            const cleaned = image.replace(/^\/+/, '');
+            if (/^api\/placeholder/i.test(cleaned)) {
+              image = `/${cleaned}`;
+            }
+            else if (/^api\//i.test(cleaned)) {
+              const withoutApi = cleaned.replace(/^api\/+/i, '');
+              if (/^(storage|promos|uploads)/i.test(withoutApi)) {
+                if (withoutApi.startsWith('promos/')) {
+                  image = `${baseUrl}/storage/${withoutApi}`;
+                } else {
+                  image = `${baseUrl}/${withoutApi}`;
+                }
               } else {
-                image = `${baseUrl}/${withoutApi}`;
+                image = `/${cleaned}`;
               }
-            } else {
+            }
+            else if (/^(promos\/|storage\/|uploads\/)/i.test(cleaned)) {
+              if (cleaned.startsWith('promos/')) {
+                image = `${baseUrl}/storage/${cleaned}`;
+              } else {
+                image = `${baseUrl}/${cleaned}`;
+              }
+            }
+            else {
               image = `/${cleaned}`;
             }
           }
-          else if (/^(promos\/|storage\/|uploads\/)/i.test(cleaned)) {
-            if (cleaned.startsWith('promos/')) {
-              image = `${baseUrl}/storage/${cleaned}`;
-            } else {
-              image = `${baseUrl}/${cleaned}`;
-            }
-          }
-          else {
-            image = `/${cleaned}`;
-          }
         }
-      }
-      return image;
-    };
+        return image;
+      };
 
-    const fetchPromoDetail = async () => {
-      setLoading(true);
       try {
         const res = await fetch(`${apiUrl}/communities/${communityId}/promos/${promoId}`, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          signal,
         });
-        if (res.ok) {
-          const json = await res.json();
-          const data = json.data;
 
-          setPromoData({
-            id: data.id,
-            title: data.title,
-            merchant: data.owner_name || 'Merchant',
-            image: normalizePromoImage(data),
-            distance: (data.promo_distance ? `${data.promo_distance} KM` : '-'),
-            location: data.location || '',
-            coordinates: '', // Jika ada field koordinat di API, isi di sini
-            originalPrice: null, // Tambahkan jika ada field harga asli
-            discountPrice: null, // Tambahkan jika ada field harga promo
-            discount: null, // Tambahkan jika ada field diskon
-            schedule: {
-              day: data.always_available ? 'Setiap Hari' : '',
-              details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}` : '',
-              time: data.start_date && data.end_date
-                ? `${new Date(data.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(data.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : '',
-              timeDetails: 'Jam Berlaku Promo'
-            },
-            status: {
-              type: data.promo_type === 'online' ? 'Online' : 'Offline',
-              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
-            },
-            description: data.description || '',
-            seller: {
-              name: data.owner_name || 'Admin',
-              phone: data.owner_contact || ''
-            },
-            terms: 'TERM & CONDITIONS APPLY'
-          });
-        } else {
+        if (!res.ok) {
+          setPromoData(null);
+          setLoading(false);
+          return;
+        }
+
+        const json = await res.json();
+        const data = json.data;
+
+        // guard: pastikan backend mengembalikan promo yang sesuai promoId
+        const respId = data?.id ?? data?.ad?.id ?? null;
+        if (respId == null || String(respId) !== String(promoId)) {
+          setPromoData(null);
+          setLoading(false);
+          setErrorMessage('Data promo tidak sesuai dengan ID yang diminta.');
+          setShowErrorModal(true);
+          return;
+        }
+
+        setPromoData({
+          id: data.id,
+          title: data.title,
+          merchant: data.owner_name || 'Merchant',
+          image: normalizePromoImage(data),
+          distance: (data.promo_distance ? `${data.promo_distance} KM` : '-'),
+          location: data.location || '',
+          coordinates: '',
+          originalPrice: null,
+          discountPrice: null,
+          discount: null,
+          schedule: {
+            day: data.always_available ? 'Setiap Hari' : '',
+            details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}` : '',
+            time: data.start_date && data.end_date
+              ? `${new Date(data.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(data.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+              : '',
+            timeDetails: 'Jam Berlaku Promo'
+          },
+          status: {
+            type: data.promo_type === 'online' ? 'Online' : 'Offline',
+            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
+          },
+          description: data.description || '',
+          seller: {
+            name: data.owner_name || 'Admin',
+            phone: data.owner_contact || ''
+          },
+          terms: 'TERM & CONDITIONS APPLY'
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
           setPromoData(null);
         }
-      } catch (e) {
-        setPromoData(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    };
+    })();
 
-    fetchPromoDetail();
-  }, [promoId, communityId]);
+    return () => controller.abort();
+  }, [router.isReady, promoId, communityId]);
 
   // ====== Handlers ala detail_promo ======
   const handleBack = () => {
@@ -386,27 +414,75 @@ export default function PromoDetailUnified() {
     if (!promoData || isClaimedLoading) return;
     setIsClaimedLoading(true);
     try {
-      await new Promise(r => setTimeout(r, 1200));
+      // Cegah duplikasi berdasarkan ad.id atau code
       const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-
-      const isAlreadyClaimed = existingVouchers.some(v =>
-        v.ad?.id === promoData.id || v.id === promoData.id
-      );
+      const isAlreadyClaimed = existingVouchers.some(v => v.ad?.id === promoData.id || v.id === promoData.id);
       if (isAlreadyClaimed) {
         setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
         setShowErrorModal(true);
         return;
       }
 
-      const generatePromoCode = () => 'PROMO' + Date.now().toString().slice(-8);
+      // Ambil token dari cookie
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : '';
 
-      const claimedVoucher = {
-        id: promoData.id,
-        code: generatePromoCode(),
+      // Siapkan endpoint Laravel sesuai controller
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
+      const endpoints = [
+        `${apiUrl}/promos/${promoData.id}/items`,
+        `${apiUrl}/promo-items`,
+        `${apiUrl}/admin/promos/${promoData.id}/items`,
+        `${apiUrl}/admin/promo-items`,
+      ];
+      const headers = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const payload = {
+        promo_id: promoData.id,
+        status: 'reserved',
+        expires_at: promoData.expires_at || null,
+      };
+
+      let savedItem = null;
+      let lastError = '';
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+          const txt = await res.text().catch(() => '');
+          let json = {};
+          try { json = txt ? JSON.parse(txt) : {}; } catch (_) { json = { raw: txt }; }
+
+          if (res.ok) { savedItem = json?.data ?? json; break; }
+
+          if (res.status === 401) { lastError = 'Sesi berakhir. Silakan login ulang.'; break; }
+          if (res.status === 422 && json?.errors) { lastError = Object.values(json.errors).flat().join(', '); break; }
+          lastError = json?.message || json?.error || `HTTP ${res.status}`;
+        } catch (e) {
+          lastError = e?.message || 'Network error';
+        }
+      }
+
+      if (!savedItem) {
+        // Jika gagal kirim ke server, tetap simpan local agar UX lancar
+        const fallbackCode = 'PROMO' + Date.now().toString().slice(-8);
+        savedItem = {
+          id: promoData.id,
+          code: fallbackCode,
+          expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          error: lastError || undefined,
+        };
+      }
+
+      // Simpan ke localStorage untuk langsung muncul di Saku
+      const enriched = {
+        ...savedItem,
+        code: savedItem.code || savedItem?.voucher_item?.code,
         claimed_at: new Date().toISOString(),
-        expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         validation_at: null,
-        voucher_item: null,
+        voucher_item: savedItem.voucher_item || null,
         ad: {
           id: promoData.id,
           title: promoData.title,
@@ -414,28 +490,18 @@ export default function PromoDetailUnified() {
           status: 'active',
           cube: {
             code: `community-${communityId || 'unknown'}`,
-            user: {
-              name: promoData.seller?.name || 'Admin',
-              phone: promoData.seller?.phone || ''
-            },
+            user: { name: promoData.seller?.name || 'Admin', phone: promoData.seller?.phone || '' },
             corporate: null,
-            tags: [
-              {
-                address: promoData.location,
-                link: null,
-                map_lat: null,
-                map_lng: null
-              }
-            ]
-          }
-        }
+            tags: [{ address: promoData.location, link: null, map_lat: null, map_lng: null }],
+          },
+        },
       };
-
-      existingVouchers.push(claimedVoucher);
+      existingVouchers.push(enriched);
       localStorage.setItem('huehuy_vouchers', JSON.stringify(existingVouchers));
+
       setShowSuccessModal(true);
     } catch (e) {
-      setErrorMessage('Gagal merebut promo. Silakan coba lagi.');
+      setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
       setShowErrorModal(true);
     } finally {
       setIsClaimedLoading(false);
