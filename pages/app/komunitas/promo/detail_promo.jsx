@@ -1,9 +1,9 @@
 import { faArrowLeft, faCheckCircle, faExclamationTriangle, faMapMarkerAlt, faPhone, faShare, faWifi, faWifiSlash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
-import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
@@ -253,8 +253,11 @@ const PromoDetailPage = () => {
   }, [router.isReady, promoId, communityId]);
 
   const handleBack = () => {
-    // Jika dari promo-entry, kembali ke halaman utama
-    if (communityId === 'promo-entry') {
+    const { from } = router.query;
+    
+    if (from === 'saku') {
+      router.push('/app/saku');
+    } else if (communityId === 'promo-entry') {
       router.push('/app');
     } else {
       router.push(`/app/komunitas/promo?communityId=${communityId}`);
@@ -270,10 +273,23 @@ const PromoDetailPage = () => {
   };
 
   const handleClaimPromo = async () => {
-    if (isClaimedLoading) return;
+    if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
     setIsClaimedLoading(true);
 
     try {
+      // Cek lagi untuk memastikan tidak ada duplikasi
+      const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+      const isDuplicate = existingVouchers.some(v => 
+        String(v.ad?.id) === String(promoData.id) || 
+        String(v.id) === String(promoData.id)
+      );
+      
+      if (isDuplicate) {
+        setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
+        setShowErrorModal(true);
+        return;
+      }
+
       if (!promoData?.id) {
         setErrorMessage('Promo tidak valid.');
         setShowErrorModal(true);
@@ -281,13 +297,13 @@ const PromoDetailPage = () => {
       }
 
       const encryptedToken = Cookies.get(token_cookie_name);
-      console.log('encryptedToken(cookie):', encryptedToken);
+      // console.log('encryptedToken(cookie):', encryptedToken);
       let token = encryptedToken ? Decrypt(encryptedToken) : null;
 
       // fallback ke localStorage (untuk debug)
       if (!token) {
         token = localStorage.getItem('auth_token') || null;
-        console.log('token(localStorage):', token);
+        // console.log('token(localStorage):', token);
       }
 
       if (!token) {
@@ -302,7 +318,7 @@ const PromoDetailPage = () => {
         `${base}/api/admin/promo-items`,
       ];
 
-      console.log('claim endpoints:', endpoints);
+      // console.log('claim endpoints:', endpoints);
 
       // Ubah payload: hanya kirim { claim: true }
       const payload = {
@@ -334,7 +350,7 @@ const PromoDetailPage = () => {
             json = { raw: txt };
           }
 
-          console.log('claim response:', url, res.status, json);
+          // console.log('claim response:', url, res.status, json);
 
           if (res.ok) {
             savedItem = json?.data ?? json;
@@ -649,14 +665,21 @@ const PromoDetailPage = () => {
         <div className="lg:max-w-sm lg:mx-auto">
           <button 
             onClick={handleClaimPromo}
-            disabled={isClaimedLoading}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${ 
-              isClaimedLoading 
-                ? 'bg-slate-400 text-white cursor-not-allowed' 
+            disabled={isClaimedLoading || isAlreadyClaimed}
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+              isAlreadyClaimed
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : isClaimedLoading
+                ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
             }`}
           >
-            {isClaimedLoading ? (
+            {isAlreadyClaimed ? (
+              <div className="flex items-center justify-center">
+                <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                Sudah Direbut
+              </div>
+            ) : isClaimedLoading ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                 Merebut Promo...

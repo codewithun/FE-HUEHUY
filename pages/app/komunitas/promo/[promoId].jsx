@@ -10,10 +10,10 @@ import {
     faWifiSlash
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from "js-cookie";
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Cookies from "js-cookie";
 import { token_cookie_name } from "../../../../helpers";
 import { Decrypt } from "../../../../helpers/encryption.helpers";
 
@@ -350,9 +350,30 @@ export default function PromoDetailUnified() {
     return () => controller.abort();
   }, [router.isReady, promoId, communityId]);
 
+  // Tambahkan state untuk cek apakah promo sudah direbut
+  const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
+
+  // Tambahkan useEffect untuk cek promo sudah direbut atau belum
+  useEffect(() => {
+    if (!promoData?.id) return;
+    
+    // Cek di localStorage apakah promo sudah pernah direbut
+    const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+    const alreadyClaimed = existingVouchers.some(v => 
+      String(v.ad?.id) === String(promoData.id) || 
+      String(v.id) === String(promoData.id)
+    );
+    
+    setIsAlreadyClaimed(alreadyClaimed);
+  }, [promoData]);
+
   // ====== Handlers ala detail_promo ======
   const handleBack = () => {
-    if (communityId === 'promo-entry') {
+    const { from } = router.query;
+    
+    if (from === 'saku') {
+      router.push('/app/saku');
+    } else if (communityId === 'promo-entry') {
       router.push('/app');
     } else if (communityId) {
       router.push(`/app/komunitas/promo?communityId=${communityId}`);
@@ -411,13 +432,18 @@ export default function PromoDetailUnified() {
   };
 
   const handleClaimPromo = async () => {
-    if (!promoData || isClaimedLoading) return;
+    if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
+    
     setIsClaimedLoading(true);
     try {
-      // Cegah duplikasi berdasarkan ad.id atau code
+      // Cek lagi untuk memastikan tidak ada duplikasi
       const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const isAlreadyClaimed = existingVouchers.some(v => v.ad?.id === promoData.id || v.id === promoData.id);
-      if (isAlreadyClaimed) {
+      const isDuplicate = existingVouchers.some(v => 
+        String(v.ad?.id) === String(promoData.id) || 
+        String(v.id) === String(promoData.id)
+      );
+      
+      if (isDuplicate) {
         setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
         setShowErrorModal(true);
         return;
@@ -693,14 +719,21 @@ export default function PromoDetailUnified() {
         <div className="lg:max-w-sm lg:mx-auto">
           <button
             onClick={handleClaimPromo}
-            disabled={isClaimedLoading}
+            disabled={isClaimedLoading || isAlreadyClaimed}
             className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-              isClaimedLoading
+              isAlreadyClaimed
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : isClaimedLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
             }`}
           >
-            {isClaimedLoading ? (
+            {isAlreadyClaimed ? (
+              <div className="flex items-center justify-center">
+                <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                Sudah Direbut
+              </div>
+            ) : isClaimedLoading ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                 Merebut Promo...
