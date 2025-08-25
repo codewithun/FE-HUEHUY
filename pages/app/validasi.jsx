@@ -1,3 +1,11 @@
+import {
+  faArrowLeftLong,
+  faCheckCircle,
+  faHistory,
+} from '@fortawesome/free-solid-svg-icons';
+import Cookies from 'js-cookie';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import {
   ButtonComponent,
@@ -5,15 +13,7 @@ import {
   InputComponent,
   ModalConfirmComponent,
 } from '../../components/base.components';
-import {
-  faArrowLeftLong,
-  faCheckCircle,
-  faHistory,
-} from '@fortawesome/free-solid-svg-icons';
-import { useRouter } from 'next/router';
 import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
-import Link from 'next/link';
-import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
@@ -33,9 +33,17 @@ export default function Validasi() {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : null;
 
+      if (!token) {
+        // eslint-disable-next-line no-console
+        console.error('No token found');
+        // Redirect ke login atau tampilkan pesan
+        setModalFailed(true);
+        return;
+      }
+
       const headers = {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'Authorization': `Bearer ${token}`,
       };
 
       const res = await fetch(`${apiUrl}/promos/validate`, {
@@ -49,17 +57,19 @@ export default function Validasi() {
       const result = await res.json().catch(() => null);
 
       if (res.status === 401) {
-        console.error('validate failed', res.status, result);
-        // token tidak valid / perlu login
+        // eslint-disable-next-line no-console
+        console.error('Token expired or invalid');
         setModalFailed(true);
       } else if (res.ok) {
-        setLastPromoId(result?.promo?.id ?? null);
+        setLastPromoId(result?.data?.promo?.id ?? null);
         setModalSuccess(true);
       } else {
+        // eslint-disable-next-line no-console
         console.error('validate failed', res.status, result);
         setModalFailed(true);
       }
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('validate exception:', err);
       setModalFailed(true);
     } finally {
