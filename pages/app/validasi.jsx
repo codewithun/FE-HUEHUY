@@ -12,8 +12,12 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useRouter } from 'next/router';
 import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
-import { post } from '../../helpers';
 import Link from 'next/link';
+import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../helpers';
+import { Decrypt } from '../../helpers/encryption.helpers';
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function Validasi() {
   const router = useRouter();
@@ -21,21 +25,44 @@ export default function Validasi() {
   const [modalSuccess, setModalSuccess] = useState();
   const [modalFailed, setModalFailed] = useState();
   const [loading, setLoading] = useState(false);
+  const [lastPromoId, setLastPromoId] = useState(null);
 
   const submitValidate = async (parsingCode = null) => {
     setLoading(true);
-    const execute = await post({
-      path: 'promos/validate',
-      body: {
-        code: parsingCode || code,
-      },
-    });
+    try {
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : null;
 
-    if (execute.status == 200) {
-      setModalSuccess(true);
-      setLoading(false);
-    } else {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+
+      const res = await fetch(`${apiUrl}/promos/validate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          code: parsingCode || code,
+        }),
+      });
+
+      const result = await res.json().catch(() => null);
+
+      if (res.status === 401) {
+        console.error('validate failed', res.status, result);
+        // token tidak valid / perlu login
+        setModalFailed(true);
+      } else if (res.ok) {
+        setLastPromoId(result?.promo?.id ?? null);
+        setModalSuccess(true);
+      } else {
+        console.error('validate failed', res.status, result);
+        setModalFailed(true);
+      }
+    } catch (err) {
+      console.error('validate exception:', err);
       setModalFailed(true);
+    } finally {
       setLoading(false);
     }
   };
@@ -113,7 +140,12 @@ export default function Validasi() {
         title="Selamat, Berhasil di validasi"
         onSubmit={async () => {
           setModalSuccess(false);
-          router.push('/app/riwayat-validasi');
+          // kirim id ke halaman riwayat (hanya kalau ada)
+          if (lastPromoId) {
+            router.push(`/app/riwayat-validasi?id=${lastPromoId}`);
+          } else {
+            router.push('/app/riwayat-validasi');
+          }
         }}
       />
 
