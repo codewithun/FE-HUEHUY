@@ -71,6 +71,36 @@ export function TableSupervisionComponent({
   const [dataSelected, setDataSelected] = useState<number | null>(null);
 
   const [forms, setForms] = useState<formProps[]>([]);
+
+  // helper: cari communityId dari berbagai kemungkinan lokasi pada item
+  const getCommunityIdFromItem = (item: any) => {
+    if (!item) return 'default';
+    const fromQuery =
+      typeof window !== 'undefined'
+        ? new URL(window.location.href).searchParams.get('communityId')
+        : null;
+    const candidates = [
+      item.community_id,
+      item.communityId,
+      item.community?.id,
+      item.community?.code,
+      item.promo?.community_id,
+      item.promo?.communityId,
+      item.promo?.community?.id,
+      item.promo?.community?.code,
+      item.promo?.cube?.code,
+      item.voucher?.community_id,
+      item.voucher?.communityId,
+      item.voucher?.community?.id,
+      item.voucher?.community?.code,
+      item.voucher?.ad?.cube?.code,
+      item.ad?.cube?.code,
+      fromQuery,
+    ];
+    const found = candidates.find((v) => v !== undefined && v !== null && String(v).trim() !== '');
+    return found || 'default';
+  };
+
   const [loading, code, data, reset] = useGet(
     {
       ...fetchControl,
@@ -325,17 +355,26 @@ export function TableSupervisionComponent({
                       rounded
                       onClick={async () => {
                         const item = originalData[key];
+                        const communityId = getCommunityIdFromItem(item);
                         let qrValue = '';
+                        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
                         if (item.promo) {
-                          qrValue = `http://localhost:3000/app/komunitas/promo/${item.promo.id}?communityId=${item.promo.community_id || 'default'}`;
+                          qrValue = `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${communityId}`;
                         } else if (item.voucher) {
-                          qrValue = `http://localhost:3000/app/komunitas/voucher/${item.voucher.id}?communityId=${item.voucher.community_id || 'default'}`;
+                          const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
+                          if (!id) {
+                            alert('Data voucher tidak memiliki id yang valid!');
+                            return;
+                          }
+                          qrValue = `${origin}/app/voucher/${id}?communityId=${communityId}`;
                         } else {
                           alert('Data promo/voucher tidak ditemukan!');
                           return;
                         }
+
                         try {
                           const QRCode = await import('qrcode');
+                          // Generate QR langsung ke halaman voucher/promo
                           const qrDataURL = await QRCode.toDataURL(qrValue, {
                             width: 300,
                             margin: 2,
