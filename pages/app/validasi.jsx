@@ -25,7 +25,7 @@ export default function Validasi() {
   const submitValidate = async (parsingCode = null) => {
     setLoading(true);
     const execute = await post({
-      path: 'grabs/validate',
+      path: 'promos/validate',
       body: {
         code: parsingCode || code,
       },
