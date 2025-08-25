@@ -13,6 +13,8 @@ import { useGet } from '../../helpers';
 export default function RiwayatValidasi() {
   const router = useRouter();
   const { id } = router.query;
+  const ready = router.isReady;
+
   const [loading, status, res] = useGet({
     path: id ? `promos/${id}/history` : null,
   });
@@ -38,7 +40,10 @@ export default function RiwayatValidasi() {
             </div>
           </div>
 
-          {loading ? (
+          {/* tunggu router ready dulu */}
+          {!ready ? (
+            <div className="p-4 text-center">Memuat...</div>
+          ) : loading ? (
             <div className="p-4 text-center">Memuat...</div>
           ) : items.length ? (
             items.map((v) => (
