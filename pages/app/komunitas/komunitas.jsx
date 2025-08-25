@@ -32,7 +32,8 @@ export default function Komunitas() {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const encryptedToken = Cookies.get(token_cookie_name);
         const token = encryptedToken ? Decrypt(encryptedToken) : "";
-        const res = await fetch(`${apiUrl}/communities`, {
+        // Perbaiki endpoint agar tidak double /api
+        const res = await fetch(`${apiUrl}/admin/communities`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,

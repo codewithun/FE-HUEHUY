@@ -1,29 +1,30 @@
 /* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
+import { useRouter } from 'next/router';
 import {
   DateFormatComponent,
   IconButtonComponent,
 } from '../../components/base.components';
 import { faArrowLeftLong } from '@fortawesome/free-solid-svg-icons';
-import { useGet } from '../../helpers';
-import { useRouter } from 'next/router';
-import Image from 'next/image';
 import CubeComponent from '../../components/construct.components/CubeComponent';
+import { useGet } from '../../helpers';
 
 export default function RiwayatValidasi() {
   const router = useRouter();
-
-  const [loading, code, data] = useGet({
-    path: `grabs/validated-history`,
+  const { id } = router.query;
+  const [loading, status, res] = useGet({
+    path: id ? `promos/${id}/history` : null,
   });
+
+  const items = res?.data ?? [];
 
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="bg-primary h-10"></div>
-        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
-          <div className="flex justify-between items-center gap-2 p-2 sticky top-0 z-30 bg-white bg-opacity-40 backdrop-blur-sm border-b ">
+        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20">
+          <div className="flex items-center gap-2 p-2 sticky top-0 bg-white border-b">
             <div className="px-2">
               <IconButtonComponent
                 icon={faArrowLeftLong}
@@ -32,57 +33,71 @@ export default function RiwayatValidasi() {
                 onClick={() => router.back()}
               />
             </div>
-            <div className="font-semibold w-full text-lg">Riwayat Validasi</div>
+            <div className="font-semibold w-full text-lg">
+              Riwayat Validasi Promo
+            </div>
           </div>
 
-          {data?.data?.length ? (
-            data?.data?.map((item, key) => {
-              return (
-                <div
-                  className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative cursor-pointer"
-                  key={key}
-                >
-                  <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
-                    <img
-                      src={item?.ad?.picture_source}
-                      height={700}
-                      width={700}
-                      alt=""
+          {loading ? (
+            <div className="p-4 text-center">Memuat...</div>
+          ) : items.length ? (
+            items.map((v) => (
+              <div
+                key={v.id}
+                className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative cursor-pointer m-3"
+              >
+                <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
+                  <img
+                    src={
+                      v.promo?.image ??
+                      v.promo?.picture_source ??
+                      '/placeholder.png'
+                    }
+                    alt=""
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>
+
+                <div className="col-span-3">
+                  <p className="font-semibold">{v.promo?.title ?? 'Promo'}</p>
+                  <p className="text-slate-600 text-sm mb-1">
+                    Divalidasi oleh: {v.user?.name ?? 'Guest'}
+                  </p>
+                  <p className="text-slate-600 text-xs mb-1">
+                    Kode: <span className="font-medium">{v.code}</span>
+                  </p>
+                  <p className="text-slate-600 text-xs mb-1">
+                    Divalidasi pada:{' '}
+                    <DateFormatComponent
+                      date={v.validated_at ?? v.created_at}
+                      format="YYYY MMM DD HH:mm:ss"
                     />
-                  </div>
-                  <div className="col-span-3">
-                    <p className="font-semibold">{item?.ad?.title}</p>
-                    <p className="text-slate-600 text-sm mb-1">
-                      Direbut oleh: {item?.user?.name}
+                  </p>
+                  {v.notes ? (
+                    <p className="text-slate-600 text-xs">
+                      Catatan: {v.notes}
                     </p>
-                    <p className="text-slate-600 text-xs mb-1">
-                      Direbut pada:{' '}
-                      <DateFormatComponent
-                        date={item?.created_at}
-                        format="YYYY MMM DD HH:mm:ss"
-                      />
-                    </p>
-                    <p className="text-slate-600 text-xs mb-1">
-                      Divalidasi pada:{' '}
-                      <DateFormatComponent
-                        date={item?.validation_at}
-                        format="YYYY MMM DD HH:mm:ss"
-                      />
-                    </p>
-                  </div>
-                  <div className="absolute top-5 left-0 bg-slate-300 bg-opacity-60 backdrop:blur-md min-h-[20px] py-1 pl-2 pr-3 rounded-r-full flex gap-2 items-center">
+                  ) : null}
+                </div>
+
+                {v.promo?.cube && (
+                  <div className="absolute top-5 left-0 bg-slate-300 bg-opacity-60 py-1 pl-2 pr-3 rounded-r-full flex gap-2 items-center">
                     <CubeComponent
                       size={8}
-                      color={`${item?.ad?.cube?.cube_type?.color}`}
+                      color={v.promo.cube.cube_type?.color}
                     />
-                    <p className="text-xs">{item?.ad?.cube?.cube_type?.code}</p>
+                    <p className="text-xs">{v.promo.cube.cube_type?.code}</p>
                   </div>
-                </div>
-              );
-            })
+                )}
+              </div>
+            ))
           ) : (
             <div className="text-center mt-6 font-medium text-slate-500">
-              Belum ada promo yang divalidasi...
+              Belum ada riwayat validasi untuk promo ini.
             </div>
           )}
         </div>
