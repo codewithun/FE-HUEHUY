@@ -73,7 +73,7 @@ export default function KomunitasDashboard() {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : "";
       try {
-        const res = await fetch(`${apiUrl}/communities`, { // changed: add /api
+        const res = await fetch(`${apiUrl}/admin/communities`, { // ubah endpoint ke /admin/communities
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -81,7 +81,7 @@ export default function KomunitasDashboard() {
           },
         });
         const result = await res.json();
-        setCommunityList(Array.isArray(result) ? result : result.data || []);
+        setCommunityList(Array.isArray(result.data) ? result.data : []);
       } catch (err) {
         setCommunityList([]);
       }
@@ -96,8 +96,8 @@ export default function KomunitasDashboard() {
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     const method = selectedCommunity ? "PUT" : "POST";
     const url = selectedCommunity
-      ? `${apiUrl}/communities/${selectedCommunity.id}` // changed: add /api
-      : `${apiUrl}/communities`; // changed: add /api
+      ? `${apiUrl}/admin/communities/${selectedCommunity.id}` // ubah endpoint ke /admin/communities
+      : `${apiUrl}/admin/communities`; // ubah endpoint ke /admin/communities
 
     // Handle file upload or string
     const formPayload = new FormData();
@@ -126,7 +126,7 @@ export default function KomunitasDashboard() {
     setSelectedCommunity(null);
 
     // Refresh list
-    const res = await fetch(`${apiUrl}/communities`, { // changed: add /api
+    const res = await fetch(`${apiUrl}/admin/communities`, { // ubah endpoint ke /admin/communities
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -134,14 +134,14 @@ export default function KomunitasDashboard() {
       },
     });
     const result = await res.json();
-    setCommunityList(Array.isArray(result) ? result : result.data || []);
+    setCommunityList(Array.isArray(result.data) ? result.data : []);
   };
 
   // Delete community
   const handleDelete = async () => {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    await fetch(`${apiUrl}/communities/${selectedCommunity.id}`, {
+    await fetch(`${apiUrl}/admin/communities/${selectedCommunity.id}`, { // ubah endpoint ke /admin/communities
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -429,7 +429,7 @@ export default function KomunitasDashboard() {
         noControlBar={false}
         searchable={true}
         fetchControl={{
-          path: "communities",
+          path: "admin/communities", // ubah endpoint ke /admin/communities
           method: "GET",
           headers: () => {
             const encryptedToken = Cookies.get(token_cookie_name);
@@ -440,12 +440,6 @@ export default function KomunitasDashboard() {
             };
           },
           mapData: (result) => {
-            if (Array.isArray(result)) {
-              return {
-                data: result,
-                totalRow: result.length,
-              };
-            }
             if (Array.isArray(result.data)) {
               return {
                 data: result.data,

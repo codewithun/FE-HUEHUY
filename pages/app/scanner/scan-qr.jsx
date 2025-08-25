@@ -23,7 +23,11 @@ export default function ScanQR() {
       if (
         typeof result === 'string' &&
         (result.startsWith('http://') || result.startsWith('https://')) &&
-        (result.includes('/app/komunitas/promo/') || result.includes('/app/komunitas/voucher/'))
+        (
+          result.includes('/app/komunitas/promo/') ||
+          result.includes('/app/komunitas/voucher/') ||
+          result.includes('/app/voucher/') // tambahkan ini
+        )
       ) {
         // Redirect ke URL yang ada di QR code
         window.location.href = result;
