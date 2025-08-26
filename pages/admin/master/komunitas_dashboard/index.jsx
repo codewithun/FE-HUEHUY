@@ -374,7 +374,7 @@ export default function KomunitasDashboard() {
             src={
               logo.startsWith("http")
                 ? logo
-                : `${apiUrl}/storage/${logo}`
+                : `${apiUrl.replace('/api', '')}/storage/${logo}`
             }
             alt="Logo Komunitas"
             width={48}
@@ -566,7 +566,7 @@ export default function KomunitasDashboard() {
                   </svg>
                 </div>
                 <textarea
-                  className="w-full pl-12 pr-4 py-4 text-gray-800 bg-white border-2 border-gray-200 rounded-xl focus:border-primary focus:ring-4 focus:ring-primary focus:ring-opacity-20 transition-all duration-200 placeholder-gray-400 shadow-sm hover:shadow-md resize-none"
+                  className="w-full pl-12 pr-4 py-4 text-gray-800 bg-white border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all duration-200 placeholder-gray-400 shadow-sm hover:shadow-md resize-none"
                   placeholder="Masukkan deskripsi komunitas"
                   rows={4}
                   value={formData.description}

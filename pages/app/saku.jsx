@@ -49,7 +49,7 @@ export default function Save() {
         // Fetch both promo items and voucher items
         const [promoRes, voucherRes] = await Promise.allSettled([
           fetch(`${apiUrl}/admin/promo-items`, { headers, signal: controller.signal }),
-          fetch(`${apiUrl}/admin/voucher-items`, { headers, signal: controller.signal })
+          fetch(`${apiUrl}/vouchers/voucher-items`, { headers, signal: controller.signal })
         ]);
 
         let allItems = [];
@@ -124,12 +124,22 @@ export default function Save() {
         // Handle voucher items response
         if (voucherRes.status === 'fulfilled' && voucherRes.value.ok) {
           const voucherJson = await voucherRes.value.json();
+          console.log('Voucher API Response:', voucherJson); // Debug API response
           const voucherItems = Array.isArray(voucherJson) ? voucherJson : (voucherJson.data || []);
+          console.log('Voucher Items:', voucherItems); // Debug voucher items
           
           // Map voucher items to consistent format
           const mappedVoucherItems = voucherItems.map((voucherItem) => {
             const voucher = voucherItem.voucher;
             const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
+            
+            console.log('Processing voucher item:', {
+              voucherItemId: voucherItem.id,
+              voucherData: voucher,
+              voucherImage: voucher?.image,
+              baseUrl: baseUrl,
+              constructedImageUrl: voucher?.image ? `${baseUrl}/storage/${voucher.image}` : null
+            });
             
             return {
               id: voucherItem.id,
@@ -412,18 +422,35 @@ export default function Save() {
                     <div className="flex gap-4">
                       {/* Image Section dengan gambar yang sesuai */}
                       <div className="w-20 h-20 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex justify-center items-center group-hover:scale-105 transition-transform duration-300">
-                        {item?.ad?.picture_source ? (
-                          <img
-                            src={item?.ad?.picture_source}
-                            className="w-full h-full object-cover"
-                            alt={item?.ad?.title || 'Promo'}
-                            onError={(e) => {
-                              e.target.src = '/default-avatar.png';
-                            }}
-                          />
-                        ) : (
-                          <FontAwesomeIcon icon={faTag} className="text-slate-400 text-2xl" />
-                        )}
+                        {(() => {
+                          // For vouchers, try multiple image sources
+                          const isVoucher = item?.voucher_item || item?.type === 'voucher' || item?.voucher;
+                          let imageSource = null;
+                          
+                          if (isVoucher) {
+                            // For vouchers, check voucher image first, then ad picture_source
+                            const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
+                            imageSource = item?.voucher?.image 
+                              ? `${baseUrl}/storage/${item.voucher.image}`
+                              : item?.ad?.picture_source;
+                          } else {
+                            // For promos, use existing logic
+                            imageSource = item?.ad?.picture_source;
+                          }
+                          
+                          return imageSource ? (
+                            <img
+                              src={imageSource}
+                              className="w-full h-full object-cover"
+                              alt={item?.ad?.title || item?.voucher?.name || 'Promo/Voucher'}
+                              onError={(e) => {
+                                e.target.src = '/default-avatar.png';
+                              }}
+                            />
+                          ) : (
+                            <FontAwesomeIcon icon={faTag} className="text-slate-400 text-2xl" />
+                          );
+                        })()}
                       </div>
 
                       {/* Content Section */}

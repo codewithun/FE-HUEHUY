@@ -15,6 +15,25 @@ const DetailVoucherPage = () => {
   const [claimLoading, setClaimLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Helper function to construct proper image URLs
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '/default-avatar.png';
+    
+    // If already absolute URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // If already starts with /, return as is
+    if (imagePath.startsWith('/')) {
+      return imagePath;
+    }
+    
+    // For relative paths from Laravel storage, construct proper URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:9000';
+    return `${apiUrl}/storage/${imagePath}`;
+  };
+
   useEffect(() => {
     if (id) {
       fetchVoucherDetails();
@@ -194,7 +213,7 @@ const DetailVoucherPage = () => {
               <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
                 <div className="relative w-full h-full">
                   <Image 
-                    src={voucher?.image || '/default-avatar.png'} 
+                    src={getImageUrl(voucher?.image)} 
                     alt={voucher?.name || 'Voucher'}
                     className="object-cover"
                     fill
