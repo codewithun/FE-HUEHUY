@@ -124,22 +124,12 @@ export default function Save() {
         // Handle voucher items response
         if (voucherRes.status === 'fulfilled' && voucherRes.value.ok) {
           const voucherJson = await voucherRes.value.json();
-          console.log('Voucher API Response:', voucherJson); // Debug API response
           const voucherItems = Array.isArray(voucherJson) ? voucherJson : (voucherJson.data || []);
-          console.log('Voucher Items:', voucherItems); // Debug voucher items
           
           // Map voucher items to consistent format
           const mappedVoucherItems = voucherItems.map((voucherItem) => {
             const voucher = voucherItem.voucher;
             const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
-            
-            console.log('Processing voucher item:', {
-              voucherItemId: voucherItem.id,
-              voucherData: voucher,
-              voucherImage: voucher?.image,
-              baseUrl: baseUrl,
-              constructedImageUrl: voucher?.image ? `${baseUrl}/storage/${voucher.image}` : null
-            });
             
             return {
               id: voucherItem.id,
