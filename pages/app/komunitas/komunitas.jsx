@@ -3,11 +3,12 @@ import {
   faSearch
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from "js-cookie";
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
-import Cookies from "js-cookie";
 import { token_cookie_name } from "../../../helpers";
 import { Decrypt } from "../../../helpers/encryption.helpers";
 
@@ -40,8 +41,20 @@ export default function Komunitas() {
           },
         });
         const data = await res.json();
-        setCommunities(Array.isArray(data) ? data : data.data || []);
+        
+        // Process communities data to construct proper logo URLs for Next.js Image
+        const processedCommunities = (Array.isArray(data) ? data : data.data || []).map(community => ({
+          ...community,
+          logo: community.logo ? 
+            (community.logo.startsWith('http') ? 
+              community.logo : 
+              `${apiUrl.replace('/api', '')}/storage/${community.logo}`
+            ) : null
+        }));
+        
+        setCommunities(processedCommunities);
       } catch (err) {
+        // console.error('Error fetching communities:', err);
         setCommunities([]);
       }
       setLoading(false);
@@ -295,11 +308,21 @@ function CommunityCard({ community, type, onOpenCommunity, formatNumber }) {
       <div className="flex gap-3">
         {/* Community Avatar */}
         <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-          <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">
-              {community.name.substring(0, 2).toUpperCase()}
-            </span>
-          </div>
+          {community.logo ? (
+            <Image 
+              src={community.logo} 
+              width={48} 
+              height={48} 
+              alt="Community Logo" 
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
+              <span className="text-white text-xs font-bold">
+                {community.name.substring(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Community Info */}

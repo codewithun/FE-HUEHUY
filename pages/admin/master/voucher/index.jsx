@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../../../helpers';
-import { Decrypt } from '../../../../helpers/encryption.helpers';
-import { faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import React, { useEffect, useState } from 'react';
 import {
   ButtonComponent,
-  TableSupervisionComponent,
   FloatingPageComponent,
   ModalConfirmComponent,
+  TableSupervisionComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
+import { token_cookie_name } from '../../../../helpers';
+import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 export default function VoucherCrud() {
   const [voucherList, setVoucherList] = useState([]);
@@ -91,7 +91,9 @@ export default function VoucherCrud() {
     e.preventDefault();
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : '';
-    const method = selectedVoucher ? 'PUT' : 'POST';
+    
+    // Always use POST, add _method for updates
+    const method = 'POST';
     const url = selectedVoucher
       ? `${apiUrl}/admin/vouchers/${selectedVoucher.id}`
       : `${apiUrl}/admin/vouchers`;
@@ -101,8 +103,8 @@ export default function VoucherCrud() {
       'Authorization': `Bearer ${token}`,
     };
 
-    if (imageFile) {
-      // Jika ada file gambar, gunakan FormData
+    // Always use FormData when uploading files or updating
+    if (imageFile || selectedVoucher) {
       body = new FormData();
       body.append('name', formData.name);
       body.append('description', formData.description);
@@ -111,49 +113,69 @@ export default function VoucherCrud() {
       body.append('tenant_location', formData.tenant_location);
       body.append('stock', formData.stock);
       body.append('delivery', formData.delivery);
-      body.append('image', imageFile);
-      // Jika edit, tambahkan code & community_id jika perlu
-      if (formData.code) body.append('code', formData.code);
+      body.append('code', formData.code);
       if (formData.community_id) body.append('community_id', formData.community_id);
-      // Jangan set Content-Type, browser akan otomatis
+      
+      // Method spoofing for updates
+      if (selectedVoucher) {
+        body.append('_method', 'PUT');
+      }
+      
+      if (imageFile) {
+        body.append('image', imageFile);
+      }
     } else {
-      // Jika tidak ada file, fallback ke JSON
+      // JSON for create without image
       body = JSON.stringify(formData);
       headers['Content-Type'] = 'application/json';
     }
 
-    await fetch(url, {
-      method,
-      headers,
-      body,
-    });
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body,
+      });
 
-    setModalForm(false);
-    setFormData({
-      name: '',
-      description: '',
-      image: '',
-      type: '',
-      valid_until: '',
-      tenant_location: '',
-      stock: 0,
-      delivery: 'manual',
-      code: '',
-      community_id: '', // reset community_id
-    });
-    setImageFile(null);
-    setSelectedVoucher(null);
+      if (!response.ok) {
+        const errorData = await response.json();
+        // console.error('Error:', errorData);
+        alert('Gagal menyimpan voucher: ' + errorData.message);
+        return;
+      }
 
-    // Refresh list
-    const res = await fetch(`${apiUrl}/admin/vouchers`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    const result = await res.json();
-    setVoucherList(Array.isArray(result.data) ? result.data : []);
+      const result = await response.json();
+
+      setModalForm(false);
+      setFormData({
+        name: '',
+        description: '',
+        image: '',
+        type: '',
+        valid_until: '',
+        tenant_location: '',
+        stock: 0,
+        delivery: 'manual',
+        code: '',
+        community_id: '', // reset community_id
+      });
+      setImageFile(null);
+      setSelectedVoucher(null);
+
+      // Refresh list
+      const res = await fetch(`${apiUrl}/admin/vouchers`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const refreshResult = await res.json();
+      setVoucherList(Array.isArray(refreshResult.data) ? refreshResult.data : []);
+    } catch (error) {
+      // console.error('Network error:', error);
+      alert('Terjadi kesalahan jaringan');
+    }
   };
 
   // Delete voucher
