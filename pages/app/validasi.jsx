@@ -35,7 +35,7 @@ export default function Validasi() {
       const token = encryptedToken ? Decrypt(encryptedToken) : null;
 
       if (!token) {
-        console.error('No token found');
+        // console.error('No token found');
         setModalFailed(true);
         return;
       }
@@ -74,7 +74,7 @@ export default function Validasi() {
       }
 
       if (res.status === 401) {
-        console.error('Token expired or invalid');
+        // console.error('Token expired or invalid');
         setModalFailed(true);
       } else if (res.ok) {
         // Get the ID from either promo or voucher data
@@ -83,11 +83,11 @@ export default function Validasi() {
         setLastItemType(itemType);
         setModalSuccess(true);
       } else {
-        console.error('validate failed', res.status, result);
+        // console.error('validate failed', res.status, result);
         setModalFailed(true);
       }
     } catch (err) {
-      console.error('validate exception:', err);
+      // console.error('validate exception:', err);
       setModalFailed(true);
     } finally {
       setLoading(false);
