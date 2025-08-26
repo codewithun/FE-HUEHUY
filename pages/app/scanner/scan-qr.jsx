@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import QrScannerComponent from '../../../components/construct.components/QrScannerComponent';
+import { get } from '../../../helpers/api.helpers';
 
 export default function ScanQR() {
   const router = useRouter();
@@ -32,6 +33,70 @@ export default function ScanQR() {
         // Redirect ke URL yang ada di QR code
         window.location.href = result;
         return;
+      }
+
+      // --- Parsing QR untuk voucher code ---
+      let voucherCode = null;
+      let voucherId = null;
+
+      // Coba parsing JSON untuk voucher
+      try {
+        const data = JSON.parse(result);
+        if (data.type === 'voucher' && (data.code || data.id)) {
+          voucherCode = data.code;
+          voucherId = data.id;
+        }
+      } catch {
+        // Jika bukan JSON, cek format string: voucher|<code> atau langsung voucher code
+        if (result.startsWith('voucher|')) {
+          const parts = result.split('|');
+          if (parts.length >= 2) {
+            voucherCode = parts[1];
+          }
+        } else if (result.startsWith('VOUCHER') || result.match(/^[A-Z0-9]{6,}$/)) {
+          // Jika format seperti kode voucher (huruf besar dan angka)
+          voucherCode = result;
+        }
+      }
+
+      // Jika ada voucher code atau ID, cari voucher di database
+      if (voucherCode || voucherId) {
+        try {
+          // Cari voucher berdasarkan code atau ID
+          const searchParam = voucherCode ? `code=${voucherCode}` : '';
+          const voucherResponse = await get({
+            path: voucherId ? `admin/vouchers/${voucherId}` : `admin/vouchers?search=${voucherCode}&paginate=1`
+          });
+
+          if (voucherResponse?.status === 200 && voucherResponse?.data) {
+            let voucher = null;
+            
+            if (voucherId) {
+              voucher = voucherResponse.data.data;
+            } else {
+              // Jika search by code, ambil dari array hasil
+              const vouchers = Array.isArray(voucherResponse.data.data) ? voucherResponse.data.data : [voucherResponse.data.data];
+              voucher = vouchers.find(v => v.code === voucherCode) || vouchers[0];
+            }
+
+            if (voucher) {
+              // Redirect ke halaman detail voucher dengan ID
+              router.push(`/app/voucher/${voucher.id}`);
+              return;
+            }
+          }
+          
+          // Jika voucher tidak ditemukan
+          setScanResult(`Voucher dengan kode "${voucherCode || voucherId}" tidak ditemukan`);
+          setLoading(false);
+          setIsScanning(true);
+          return;
+        } catch (error) {
+          setScanResult(`Error mencari voucher: ${error.message}`);
+          setLoading(false);
+          setIsScanning(true);
+          return;
+        }
       }
 
       // --- Parsing QR untuk promo/voucher (format lama) ---

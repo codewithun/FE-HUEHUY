@@ -1,63 +1,108 @@
-import { faArrowLeft, faCheckCircle, faMapMarkerAlt, faPhone } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCheckCircle, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import { get, post } from '../../../helpers/api.helpers';
 
 const DetailVoucherPage = () => {
   const router = useRouter();
   const { id } = router.query;
   const [voucher, setVoucher] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isClaimed, setIsClaimed] = useState(false);
   const [claimLoading, setClaimLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     if (id) {
-      const vouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const found = vouchers.find(v => v.id == id || v.code == id || (v.ad && v.ad.id == id));
-      setVoucher(found || null);
-      setIsClaimed(!!found);
-      setLoading(false);
+      fetchVoucherDetails();
     }
   }, [id]);
+
+  const fetchVoucherDetails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await get({
+        path: `admin/vouchers/${id}`
+      });
+
+      if (response?.status === 200 && response?.data?.data) {
+        const voucherData = response.data.data;
+        setVoucher(voucherData);
+        
+        // Check if user already has this voucher (check voucher_items)
+        const userVoucherItems = voucherData.voucher_items || [];
+        // In a real app, you'd check against current user ID
+        // For now, we'll check localStorage for claimed vouchers
+        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        const isAlreadyClaimed = claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
+        setIsClaimed(isAlreadyClaimed);
+      } else if (response?.status === 404) {
+        setError('Voucher tidak ditemukan');
+      } else {
+        setError('Gagal memuat data voucher');
+      }
+    } catch (err) {
+      setError('Terjadi kesalahan saat memuat voucher');
+      // console.error('Error fetching voucher:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBack = () => {
     router.push('/app');
   };
 
-  const handleClaim = () => {
-    if (!voucher && id) {
-      setClaimLoading(true);
-      // Simulate claim logic (in real app, fetch promo data by id, here just dummy)
-      const dummyVoucher = {
-        id,
-        code: 'PROMO' + Date.now().toString().slice(-8),
-        claimed_at: new Date().toISOString(),
-        expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        validation_at: null,
-        voucher_item: null,
-        ad: {
-          id,
-          title: 'Voucher Promo',
-          picture_source: '/default-avatar.png',
-          status: 'active',
-          cube: {
-            code: 'community-1',
-            user: { name: 'Admin', phone: '-' },
-            corporate: null,
-            tags: [{ address: '-', link: null, map_lat: null, map_lng: null }]
-          }
+  const handleClaim = async () => {
+    if (!voucher || isClaimed) return;
+    
+    setClaimLoading(true);
+    try {
+      // In a real app, you'd get the current user ID from context/auth
+      // For now, we'll use a dummy user ID or get from localStorage
+      const userData = JSON.parse(localStorage.getItem('huehuy_user') || '{}');
+      const userId = userData.id || 1; // fallback to dummy ID
+
+      const response = await post({
+        path: `admin/vouchers/${voucher.id}/send-to-user`,
+        body: {
+          user_id: userId
         }
-      };
-      const vouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      vouchers.push(dummyVoucher);
-      localStorage.setItem('huehuy_vouchers', JSON.stringify(vouchers));
-      setTimeout(() => {
-        setClaimLoading(false);
+      });
+
+      if (response?.status === 200) {
+        // Save to localStorage for offline access
+        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        const newVoucherItem = {
+          id: response.data.data.id,
+          voucher_id: voucher.id,
+          user_id: userId,
+          code: response.data.data.code,
+          claimed_at: new Date().toISOString(),
+          expired_at: voucher.valid_until,
+          validation_at: null,
+          voucher: voucher
+        };
+        claimedVouchers.push(newVoucherItem);
+        localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+        
+        setIsClaimed(true);
         setShowSuccessModal(true);
-      }, 1000);
+      } else if (response?.status === 400) {
+        setError(response.data.message || 'Stock voucher habis!');
+      } else {
+        setError('Gagal mengklaim voucher');
+      }
+    } catch (err) {
+      setError('Terjadi kesalahan saat mengklaim voucher');
+      // console.error('Error claiming voucher:', err);
+    } finally {
+      setClaimLoading(false);
     }
   };
 
@@ -72,6 +117,42 @@ const DetailVoucherPage = () => {
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-slate-600">Memuat detail voucher...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
+        <div className="text-center p-8">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FontAwesomeIcon icon={faCheckCircle} className="text-red-500 text-2xl" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Oops!</h3>
+          <p className="text-slate-600 mb-4">{error}</p>
+          <button 
+            onClick={handleBack}
+            className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+          >
+            Kembali
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!voucher) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
+        <div className="text-center p-8">
+          <p className="text-slate-600">Voucher tidak ditemukan</p>
+          <button 
+            onClick={handleBack}
+            className="mt-4 bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+          >
+            Kembali
+          </button>
         </div>
       </div>
     );
@@ -96,6 +177,14 @@ const DetailVoucherPage = () => {
           <div className="w-8" />
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
       {/* Content */}
       <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
         <div className="lg:mx-auto lg:max-w-md">
@@ -105,15 +194,15 @@ const DetailVoucherPage = () => {
               <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
                 <div className="relative w-full h-full">
                   <Image 
-                    src={voucher?.ad?.picture_source || '/default-avatar.png'} 
-                    alt={voucher?.ad?.title || 'Voucher'}
+                    src={voucher?.image || '/default-avatar.png'} 
+                    alt={voucher?.name || 'Voucher'}
                     className="object-cover"
                     fill
                     sizes="(max-width: 768px) 100vw, 500px"
                     placeholder="blur"
                     blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
                     onError={() => {
-                      const img = document.querySelector(`img[alt='${voucher?.ad?.title}']`);
+                      const img = document.querySelector(`img[alt='${voucher?.name}']`);
                       if (img) img.src = '/default-avatar.png';
                     }}
                   />
@@ -121,78 +210,87 @@ const DetailVoucherPage = () => {
               </div>
             </div>
           </div>
+
           {/* Voucher Info */}
-          {voucher && (
-            <>
-              <div className="mb-4">
-                <div className="bg-primary rounded-[20px] p-4 shadow-lg">
-                  <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-semibold text-white">Kode Voucher</span>
-                        <div className="text-xs text-white opacity-80">{voucher.code}</div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs text-white opacity-80">Status</span>
-                        <div className="text-xs text-white opacity-70">{voucher.ad?.status || 'active'}</div>
-                      </div>
+          <div className="mb-4">
+            <div className="bg-primary rounded-[20px] p-4 shadow-lg">
+              <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-semibold text-white">Kode Voucher</span>
+                    <div className="text-xs text-white opacity-80">{voucher.code}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-white opacity-80">Stock</span>
+                    <div className="text-xs text-white opacity-70">{voucher.stock || 0}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-semibold text-white">Tipe Delivery</span>
+                    <div className="text-xs text-white opacity-80">{voucher.delivery || 'manual'}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-white opacity-80">Berlaku Hingga</span>
+                    <div className="text-xs text-white opacity-70">
+                      {voucher.valid_until ? new Date(voucher.valid_until).toLocaleDateString() : 'Tidak terbatas'}
                     </div>
                   </div>
-                  <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-semibold text-white">Tanggal Klaim</span>
-                        <div className="text-xs text-white opacity-80">{voucher.claimed_at && new Date(voucher.claimed_at).toLocaleString()}</div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs text-white opacity-80">Kadaluarsa</span>
-                        <div className="text-xs text-white opacity-70">{voucher.expired_at && new Date(voucher.expired_at).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
-              {/* Voucher Title & Description */}
-              <div className="mb-4">
-                <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
-                  <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
-                    {voucher.ad?.title}
-                  </h2>
-                  <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">
-                    {voucher.ad?.description || '-'}
-                  </p>
+            </div>
+          </div>
+
+          {/* Voucher Title & Description */}
+          <div className="mb-4">
+            <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
+              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
+                {voucher.name}
+              </h2>
+              <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">
+                {voucher.description || 'Tidak ada deskripsi'}
+              </p>
+              {voucher.type && (
+                <div className="inline-block bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-medium">
+                  {voucher.type}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Location Info */}
+          {voucher.tenant_location && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Tenant</h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">{voucher.tenant_location}</p>
+                <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
+                  Rute
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Community Info */}
+          {voucher.community && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Komunitas</h4>
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-900 text-xs">Nama: {voucher.community.name || '-'}</p>
+                  <p className="text-xs text-slate-500">Deskripsi: {voucher.community.description || '-'}</p>
                 </div>
               </div>
-              {/* Location Info */}
-              <div className="mb-4">
-                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                  <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
-                  <p className="text-slate-600 text-xs leading-relaxed mb-3">{voucher.ad?.cube?.tags?.[0]?.address || '-'}</p>
-                  <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
-                    <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
-                    Rute
-                  </button>
-                </div>
-              </div>
-              {/* Seller Contact */}
-              <div className="mb-4">
-                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                  <h4 className="font-semibold text-slate-900 mb-3 text-sm">Penjual / Pemilik Iklan</h4>
-                  <div className="space-y-2">
-                    <p className="font-semibold text-slate-900 text-xs">Nama: {voucher.ad?.cube?.user?.name || '-'}</p>
-                    <p className="text-xs text-slate-500">No Hp/WA: {voucher.ad?.cube?.user?.phone || '-'}</p>
-                    <button className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center">
-                      <FontAwesomeIcon icon={faPhone} className="text-sm" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
+            </div>
           )}
         </div>
       </div>
+
       {/* Bottom Button Bar */}
-      {!isClaimed && (
+      {!isClaimed && voucher.stock > 0 && (
         <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
           <div className="lg:max-w-sm lg:mx-auto">
             <button 
@@ -207,15 +305,38 @@ const DetailVoucherPage = () => {
               {claimLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Merebut Voucher...
+                  Mengklaim Voucher...
                 </div>
               ) : (
-                'Rebut Voucher Sekarang'
+                'Klaim Voucher Sekarang'
               )}
             </button>
           </div>
         </div>
       )}
+
+      {/* Already Claimed or Out of Stock */}
+      {(isClaimed || voucher.stock <= 0) && (
+        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+          <div className="lg:max-w-sm lg:mx-auto">
+            <div className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base text-center ${
+              isClaimed 
+                ? 'bg-green-100 text-green-700 border-2 border-green-200' 
+                : 'bg-slate-100 text-slate-500 border-2 border-slate-200'
+            }`}>
+              {isClaimed ? (
+                <div className="flex items-center justify-center">
+                  <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                  Voucher Sudah Diklaim
+                </div>
+              ) : (
+                'Stock Voucher Habis'
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -225,7 +346,7 @@ const DetailVoucherPage = () => {
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
             <p className="text-slate-600 mb-6 leading-relaxed">
-              Voucher berhasil direbut dan masuk ke Saku Promo Anda!
+              Voucher berhasil diklaim dan masuk ke Saku Promo Anda!
             </p>
             <div className="space-y-3">
               <button 
@@ -244,6 +365,7 @@ const DetailVoucherPage = () => {
           </div>
         </div>
       )}
+      
       <style jsx>{`
         @keyframes bounce-in {
           0% { transform: scale(0.3); opacity: 0; }

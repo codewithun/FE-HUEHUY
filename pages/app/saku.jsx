@@ -46,18 +46,153 @@ export default function Save() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
 
-  const res = await fetch(`${apiUrl}/admin/promo-items`, { headers, signal: controller.signal });
+        // Fetch both promo items and voucher items
+        const [promoRes, voucherRes] = await Promise.allSettled([
+          fetch(`${apiUrl}/admin/promo-items`, { headers, signal: controller.signal }),
+          fetch(`${apiUrl}/admin/voucher-items`, { headers, signal: controller.signal })
+        ]);
 
-        // Jika 401 -> arahkan ke login atau kosongkan data
-  if (res.status === 401) {
+        let allItems = [];
+
+        // Handle promo items response
+        if (promoRes.status === 'fulfilled' && promoRes.value.ok) {
+          const promoJson = await promoRes.value.json();
+          const promoItems = Array.isArray(promoJson) ? promoJson : (promoJson.data || []);
+          
+          // Map promo items to consistent format
+          const mappedPromoItems = promoItems.map((it) => {
+            const promo = it.promo || (it.promo_id ? it.promo : null);
+            const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
+            
+            const adFromPromo = promo
+              ? {
+                  id: promo.id || it.promo_id || null,
+                  title: promo.title || promo.name || it.title || 'Promo',
+                  picture_source: promo.image 
+                    ? `${baseUrl}/storage/${promo.image}` 
+                    : (promo.picture_source || '/default-avatar.png'),
+                  status: promo.status || it.status || 'active',
+                  owner_name: promo.owner_name || '',
+                  owner_contact: promo.owner_contact || '',
+                  cube: {
+                    ...promo.cube || it.cube || {},
+                    community_id: promo.community_id || it.community_id || 1,
+                    code: promo.code || `community-${promo.community_id || 1}`,
+                    user: { 
+                      name: promo.owner_name || 'Admin', 
+                      phone: promo.owner_contact || '' 
+                    },
+                    corporate: null,
+                    tags: [{ 
+                      address: promo.location || '', 
+                      link: null, 
+                      map_lat: null, 
+                      map_lng: null 
+                    }],
+                  },
+                }
+              : (it.ad ? {
+                  id: it.ad.id || it.promo_id || null,
+                  title: it.ad.title || it.title || 'Promo',
+                  picture_source: it.ad.image 
+                    ? `${baseUrl}/storage/${it.ad.image}` 
+                    : (it.ad.picture_source || it.picture_source || '/default-avatar.png'),
+                  status: it.ad.status || it.status || 'active',
+                  owner_name: it.ad.owner_name || '',
+                  owner_contact: it.ad.owner_contact || '',
+                  cube: {
+                    ...it.ad.cube || it.cube || {},
+                    community_id: it.ad.community_id || it.community_id || 1,
+                  }
+                } : {});
+
+            return {
+              id: it.id,
+              type: 'promo',
+              code: it.code || it.voucher_code || (it.voucher_item && it.voucher_item.code) || null,
+              claimed_at: it.created_at || it.claimed_at || it.claimedAt || null,
+              expired_at: it.expires_at || it.expired_at || it.expiry || null,
+              validation_at: it.redeemed_at || it.validation_at || null,
+              voucher_item: it.voucher_item || (it.voucher_code ? { code: it.voucher_code } : null),
+              ad: adFromPromo
+            };
+          });
+
+          allItems = [...allItems, ...mappedPromoItems];
+        }
+
+        // Handle voucher items response
+        if (voucherRes.status === 'fulfilled' && voucherRes.value.ok) {
+          const voucherJson = await voucherRes.value.json();
+          const voucherItems = Array.isArray(voucherJson) ? voucherJson : (voucherJson.data || []);
+          
+          // Map voucher items to consistent format
+          const mappedVoucherItems = voucherItems.map((voucherItem) => {
+            const voucher = voucherItem.voucher;
+            const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
+            
+            return {
+              id: voucherItem.id,
+              type: 'voucher',
+              code: voucherItem.code,
+              claimed_at: voucherItem.created_at,
+              expired_at: voucher?.valid_until || null,
+              validation_at: voucherItem.used_at || null,
+              voucher_item: {
+                id: voucherItem.id,
+                code: voucherItem.code,
+                user_id: voucherItem.user_id,
+                voucher_id: voucherItem.voucher_id,
+                used_at: voucherItem.used_at
+              },
+              voucher: voucher,
+              ad: voucher ? {
+                id: voucher.id,
+                title: voucher.name || voucher.title || 'Voucher',
+                picture_source: voucher.image 
+                  ? `${baseUrl}/storage/${voucher.image}` 
+                  : '/default-avatar.png',
+                status: 'active',
+                description: voucher.description,
+                type: voucher.type,
+                tenant_location: voucher.tenant_location,
+                delivery: voucher.delivery,
+                stock: voucher.stock,
+                community: voucher.community,
+                cube: voucher.community ? {
+                  community_id: voucher.community.id,
+                  code: `community-${voucher.community.id}`,
+                  user: { 
+                    name: voucher.community.name || 'Community', 
+                    phone: '' 
+                  },
+                  corporate: null,
+                  tags: [{ 
+                    address: voucher.tenant_location || '', 
+                    link: null, 
+                    map_lat: null, 
+                    map_lng: null 
+                  }],
+                } : {}
+              } : null
+            };
+          });
+
+          allItems = [...allItems, ...mappedVoucherItems];
+        }
+
+        // If both requests failed with 401, redirect or clear data
+        if ((promoRes.status === 'fulfilled' && promoRes.value.status === 401) || 
+            (voucherRes.status === 'fulfilled' && voucherRes.value.status === 401)) {
           if (mounted) {
             setData({ data: [] });
             // router.push('/login'); // opsional: redirect ke login
           }
           return;
         }
-        if (!res.ok) {
-          // fallback ke localStorage agar klaim terbaru tetap muncul
+
+        // If no data from API, fallback to localStorage
+        if (allItems.length === 0) {
           try {
             const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
             if (mounted) setData({ data: local });
@@ -67,75 +202,21 @@ export default function Save() {
           return;
         }
 
-        const json = await res.json();
-  const items = Array.isArray(json) ? json : (json.data || []);
-
-        // Map ke shape komponen (dukungan PromoItem dengan relasi promo atau shape voucher)
-        const mapped = items.map((it) => {
-          const promo = it.promo || (it.promo_id ? it.promo : null);
-          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
-          
-          const adFromPromo = promo
-            ? {
-                id: promo.id || it.promo_id || null,
-                title: promo.title || promo.name || it.title || 'Promo',
-                // Perbaikan untuk gambar - pastikan menggunakan path yang benar
-                picture_source: promo.image 
-                  ? `${baseUrl}/storage/${promo.image}` 
-                  : (promo.picture_source || '/default-avatar.png'),
-                status: promo.status || it.status || 'active',
-                owner_name: promo.owner_name || '',
-                owner_contact: promo.owner_contact || '',
-                cube: {
-                  ...promo.cube || it.cube || {},
-                  community_id: promo.community_id || it.community_id || 1, // Tambahkan community_id
-                  code: promo.code || `community-${promo.community_id || 1}`,
-                  user: { 
-                    name: promo.owner_name || 'Admin', 
-                    phone: promo.owner_contact || '' 
-                  },
-                  corporate: null,
-                  tags: [{ 
-                    address: promo.location || '', 
-                    link: null, 
-                    map_lat: null, 
-                    map_lng: null 
-                  }],
-                },
-              }
-            : (it.ad ? {
-                id: it.ad.id || it.promo_id || null,
-                title: it.ad.title || it.title || 'Promo',
-                picture_source: it.ad.image 
-                  ? `${baseUrl}/storage/${it.ad.image}` 
-                  : (it.ad.picture_source || it.picture_source || '/default-avatar.png'),
-                status: it.ad.status || it.status || 'active',
-                owner_name: it.ad.owner_name || '',
-                owner_contact: it.ad.owner_contact || '',
-                cube: {
-                  ...it.ad.cube || it.cube || {},
-                  community_id: it.ad.community_id || it.community_id || 1,
-                }
-              } : {});
-
-          return {
-            id: it.id,
-            code: it.code || it.voucher_code || (it.voucher_item && it.voucher_item.code) || null,
-            claimed_at: it.created_at || it.claimed_at || it.claimedAt || null,
-            expired_at: it.expires_at || it.expired_at || it.expiry || null,
-            validation_at: it.redeemed_at || it.validation_at || null,
-            voucher_item: it.voucher_item || (it.voucher_code ? { code: it.voucher_code } : null),
-            ad: adFromPromo
-          };
-        });
-
-        // gabungkan dengan localStorage (tanpa duplikat berdasarkan code)
-        let combined = mapped;
+        // Combine with localStorage (without duplicates based on code and type)
+        let combined = allItems;
         try {
           const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-          const codes = new Set(mapped.map((x) => x?.code));
-          combined = [...mapped, ...local.filter((x) => !codes.has(x?.code))];
+          const existingKeys = new Set(allItems.map((x) => `${x?.type || 'promo'}-${x?.code}`));
+          const uniqueLocal = local.filter((x) => !existingKeys.has(`${x?.type || 'promo'}-${x?.code}`));
+          combined = [...allItems, ...uniqueLocal];
         } catch (_) {}
+
+        // Sort by claimed_at (newest first)
+        combined.sort((a, b) => {
+          const dateA = new Date(a.claimed_at || 0);
+          const dateB = new Date(b.claimed_at || 0);
+          return dateB - dateA;
+        });
 
         if (mounted) setData({ data: combined });
       } catch (err) {
@@ -189,7 +270,47 @@ export default function Save() {
 
   // Helper function untuk status badge
   const getStatusBadge = (item) => {
-    const isActive = item?.ad?.status === 'active' || item?.ad?.status === 'available';
+    // For vouchers, check voucher status and stock
+    if (item?.type === 'voucher' || item?.voucher) {
+      const voucher = item?.voucher || item?.ad;
+      const isVoucherActive = voucher?.stock > 0 && 
+        (!voucher?.valid_until || new Date(voucher.valid_until) > new Date());
+      
+      if (item?.validation_at) {
+        return (
+          <div className="flex items-center gap-1">
+            <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
+            <span className="font-medium text-success bg-green-50 px-2 py-1 rounded-full text-xs">
+              Sudah divalidasi
+            </span>
+          </div>
+        );
+      } else if (!isVoucherActive) {
+        return (
+          <div className="flex items-center gap-1">
+            <FontAwesomeIcon icon={faTimesCircle} className="text-danger text-xs" />
+            <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">
+              Voucher Tidak Tersedia
+            </span>
+          </div>
+        );
+      } else {
+        return (
+          <div className="flex items-center gap-1">
+            <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
+            <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded-full text-xs">
+              Belum divalidasi
+            </span>
+          </div>
+        );
+      }
+    }
+    
+    // For promos, use existing logic but with fallback
+    const isActive = item?.ad?.status === 'active' || 
+                     item?.ad?.status === 'available' || 
+                     (!item?.ad?.status && item?.ad?.id); // fallback if status is missing
+    
     if (item?.validation_at) {
       return (
         <div className="flex items-center gap-1">
@@ -309,23 +430,28 @@ export default function Save() {
                       <div className="flex-1 min-w-0">
                         <div className="mb-2">
                           <h3 className="font-semibold text-slate-800 text-base leading-tight">
-                            {item?.ad?.title || 'Promo Tanpa Judul'}
+                            {item?.ad?.title || item?.voucher?.name || item?.name || 'Promo/Voucher Tanpa Judul'}
                           </h3>
                         </div>
 
                         {/* Type Badge */}
                         <div className="flex items-center gap-2 mb-2">
-                          {item?.voucher_item ? (
-                            <span className="inline-flex items-center gap-1 font-medium text-success bg-emerald-50 px-3 py-1 rounded-full text-xs border border-emerald-200">
-                              <FontAwesomeIcon icon={faGift} />
-                              Voucher
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 font-medium text-warning bg-amber-50 px-3 py-1 rounded-full text-xs border border-amber-200">
-                              <FontAwesomeIcon icon={faTag} />
-                              Promo
-                            </span>
-                          )}
+                          {(() => {
+                            const isVoucher = item?.voucher_item || item?.type === 'voucher' || item?.voucher;
+                            // Uncomment for debugging: console.log('Item:', item, 'isVoucher:', isVoucher);
+                            
+                            return isVoucher ? (
+                              <span className="inline-flex items-center gap-1 font-medium text-success bg-emerald-50 px-3 py-1 rounded-full text-xs border border-emerald-200">
+                                <FontAwesomeIcon icon={faGift} />
+                                Voucher
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 font-medium text-warning bg-amber-50 px-3 py-1 rounded-full text-xs border border-amber-200">
+                                <FontAwesomeIcon icon={faTag} />
+                                Promo
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         {/* Status */}
@@ -370,9 +496,9 @@ export default function Save() {
         <BottomBarComponent active={'save'} />
       </div>
 
-      {/* Modal Bottom Sheet - tidak ada perubahan */}
+      {/* Modal Bottom Sheet */}
       <BottomSheetComponent
-        title={'Detail Promo'}
+        title={selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher ? 'Detail Voucher' : 'Detail Promo'}
         show={modalValidation}
         onClose={() => {
           setModalValidation(false);
@@ -392,12 +518,16 @@ export default function Save() {
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon icon={faTag} className="text-primary text-sm" />
                   <span className="text-sm font-medium text-slate-600">
-                    {selected?.voucher_item ? 'Voucher' : 'Promo'}
+                    {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher ? 'Voucher' : 'Promo'}
                   </span>
                 </div>
               </div>
 
-              <Link href={`/app/komunitas/promo/${selected?.ad?.id}?communityId=${selected?.ad?.cube?.community_id || 1}&from=saku`}>
+              <Link href={
+                selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher 
+                  ? `/app/voucher/${selected?.voucher?.id || selected?.ad?.id || selected?.voucher_item?.voucher_id}` 
+                  : `/app/komunitas/promo/${selected?.ad?.id}?communityId=${selected?.ad?.cube?.community_id || 1}&from=saku`
+              }>
                 <div className="flex items-center gap-1 text-sm text-primary font-medium bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors">
                   Detail
                   <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
@@ -413,15 +543,32 @@ export default function Save() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-600 text-sm">Pemilik</span>
                 <span className="text-slate-800 font-medium text-sm">
-                  {selected?.ad?.owner_name || selected?.ad?.cube?.user?.name || selected?.ad?.cube?.corporate?.name || '-'}
+                  {(() => {
+                    if (selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher) {
+                      // For vouchers, try community name or fallback
+                      return selected?.voucher?.community?.name || 
+                             selected?.ad?.community?.name || 
+                             selected?.ad?.cube?.user?.name || 
+                             'Merchant';
+                    } else {
+                      // For promos, use existing logic
+                      return selected?.ad?.owner_name || 
+                             selected?.ad?.cube?.user?.name || 
+                             selected?.ad?.cube?.corporate?.name || 
+                             '-';
+                    }
+                  })()}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-600 text-sm">No. Telepon</span>
-                <span className="text-slate-800 font-medium text-sm">
-                  {selected?.ad?.owner_contact || selected?.ad?.cube?.user?.phone || selected?.ad?.cube?.corporate?.phone || '-'}
-                </span>
-              </div>
+              {/* Only show phone number for promos, not vouchers */}
+              {!(selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher) && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 text-sm">No. Telepon</span>
+                  <span className="text-slate-800 font-medium text-sm">
+                    {selected?.ad?.owner_contact || selected?.ad?.cube?.user?.phone || selected?.ad?.cube?.corporate?.phone || '-'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -480,12 +627,96 @@ export default function Save() {
               <div className="text-center">
                 <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-4xl mb-3" />
                 <div className="font-bold text-green-700 text-lg">
-                  Promo Telah Digunakan
+                  {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher ? 'Voucher Telah Digunakan' : 'Promo Telah Digunakan'}
                 </div>
-                <p className="text-green-600 text-sm mt-1">Terima kasih</p>
+                <p className="text-green-600 text-sm mt-1">
+                  Terima kasih
+                </p>
               </div>
             </div>
-          ) : !(selected?.ad?.status === 'active' || selected?.ad?.status === 'available') ? (
+          ) : (selected?.type === 'voucher' || selected?.voucher) ? (
+            // For vouchers, check stock and expiry instead of status
+            (() => {
+              const voucher = selected?.voucher || selected?.ad;
+              const isVoucherActive = voucher?.stock > 0 && 
+                (!voucher?.valid_until || new Date(voucher.valid_until) > new Date());
+              
+              if (!isVoucherActive) {
+                return (
+                  <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
+                    <div className="text-center">
+                      <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />
+                      <div className="font-bold text-red-700 text-lg">
+                        Voucher Tidak Tersedia
+                      </div>
+                      <p className="text-red-600 text-sm mt-1">
+                        {voucher?.stock <= 0 ? 'Stock habis' : 'Voucher kedaluwarsa'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <div className="text-center">
+                    <div className="mb-4">
+                      <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
+                        {selected?.voucher_item?.code ? 'Kode Voucher' : 'QR Code'}
+                      </span>
+                    </div>
+                    
+                    {selected?.voucher_item?.code ? (
+                      <>
+                        <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                          <QRCodeSVG
+                            value={selected?.voucher_item?.code}
+                            size={180}
+                            bgColor="#f8fafc"
+                            fgColor="#0f172a"
+                            level="H"
+                            includeMargin={true}
+                            className="mx-auto rounded-lg"
+                          />
+                        </div>
+                        <h4 className="text-2xl font-bold text-slate-800 mb-4">
+                          {selected?.voucher_item?.code}
+                        </h4>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                          <QRCodeSVG
+                            value={selected?.code}
+                            size={180}
+                            bgColor="#f8fafc"
+                            fgColor="#0f172a"
+                            className="mx-auto rounded-lg"
+                          />
+                        </div>
+                        <div className="text-xl font-bold text-slate-600 mb-4">
+                          {selected?.code}
+                        </div>
+                      </>
+                    )}
+                    
+                    <button
+                      className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+                      onClick={() => {
+                        alert('QR Code siap untuk divalidasi');
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                      Validasi Voucher
+                    </button>
+                    <p className="text-slate-500 text-xs mt-3">
+                      Tunjukkan kode ini kepada merchant
+                    </p>
+                  </div>
+                </div>
+              );
+            })()
+          ) : !(selected?.ad?.status === 'active' || selected?.ad?.status === 'available' || (!selected?.ad?.status && selected?.ad?.id)) ? (
             <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
               <div className="text-center">
                 <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />
@@ -500,43 +731,22 @@ export default function Save() {
               <div className="text-center">
                 <div className="mb-4">
                   <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
-                    {selected?.voucher_item?.code ? 'Kode Voucher' : 'QR Code'}
+                    QR Code
                   </span>
                 </div>
                 
-                {selected?.voucher_item?.code ? (
-                  <>
-                    <h4 className="text-2xl font-bold text-slate-800 mb-4">
-                      {selected?.voucher_item?.code}
-                    </h4>
-                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                      <QRCodeSVG
-                        value={selected?.voucher_item?.code}
-                        size={180}
-                        bgColor="#f8fafc"
-                        fgColor="#0f172a"
-                        level="H"
-                        includeMargin={true}
-                        className="mx-auto rounded-lg"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                      <QRCodeSVG
-                        value={selected?.code}
-                        size={180}
-                        bgColor="#f8fafc"
-                        fgColor="#0f172a"
-                        className="mx-auto rounded-lg"
-                      />
-                    </div>
-                    <div className="text-xl font-bold text-slate-600 mb-4">
-                      {selected?.code}
-                    </div>
-                  </>
-                )}
+                <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                  <QRCodeSVG
+                    value={selected?.code}
+                    size={180}
+                    bgColor="#f8fafc"
+                    fgColor="#0f172a"
+                    className="mx-auto rounded-lg"
+                  />
+                </div>
+                <div className="text-xl font-bold text-slate-600 mb-4">
+                  {selected?.code}
+                </div>
                 
                 <button
                   className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
