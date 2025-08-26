@@ -1,7 +1,7 @@
 import {
   faArrowLeftLong,
   faCheckCircle,
-  faHistory,
+  faHistory
 } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import Link from 'next/link';
@@ -25,7 +25,8 @@ export default function Validasi() {
   const [modalSuccess, setModalSuccess] = useState();
   const [modalFailed, setModalFailed] = useState();
   const [loading, setLoading] = useState(false);
-  const [lastPromoId, setLastPromoId] = useState(null);
+  const [lastItemId, setLastItemId] = useState(null);
+  const [lastItemType, setLastItemType] = useState(null);
 
   const submitValidate = async (parsingCode = null) => {
     setLoading(true);
@@ -34,9 +35,7 @@ export default function Validasi() {
       const token = encryptedToken ? Decrypt(encryptedToken) : null;
 
       if (!token) {
-        // eslint-disable-next-line no-console
         console.error('No token found');
-        // Redirect ke login atau tampilkan pesan
         setModalFailed(true);
         return;
       }
@@ -46,30 +45,48 @@ export default function Validasi() {
         'Authorization': `Bearer ${token}`,
       };
 
-      const res = await fetch(`${apiUrl}/promos/validate`, {
+      const codeToValidate = parsingCode || code;
+
+      // Try promo validation first
+      let res = await fetch(`${apiUrl}/promos/validate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          code: parsingCode || code,
+          code: codeToValidate,
         }),
       });
 
-      const result = await res.json().catch(() => null);
+      let result = await res.json().catch(() => null);
+      let itemType = 'promo';
+
+      // If promo validation fails, try voucher validation
+      if (!res.ok) {
+        res = await fetch(`${apiUrl}/vouchers/validate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            code: codeToValidate,
+          }),
+        });
+
+        result = await res.json().catch(() => null);
+        itemType = 'voucher';
+      }
 
       if (res.status === 401) {
-        // eslint-disable-next-line no-console
         console.error('Token expired or invalid');
         setModalFailed(true);
       } else if (res.ok) {
-        setLastPromoId(result?.data?.promo?.id ?? null);
+        // Get the ID from either promo or voucher data
+        const itemId = result?.data?.promo?.id || result?.data?.voucher?.id;
+        setLastItemId(itemId);
+        setLastItemType(itemType);
         setModalSuccess(true);
       } else {
-        // eslint-disable-next-line no-console
         console.error('validate failed', res.status, result);
         setModalFailed(true);
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('validate exception:', err);
       setModalFailed(true);
     } finally {
@@ -92,7 +109,7 @@ export default function Validasi() {
               />
             </div>
             <div className="font-semibold w-full text-lg">Validasi</div>
-            <Link href={'/app/riwayat-validasi'}>
+            <Link href="/app/riwayat-validasi">
               <ButtonComponent
                 variant="simple"
                 label="Riwayat"
@@ -122,7 +139,7 @@ export default function Validasi() {
 
             <div className="">
               <InputComponent
-                placeholder="Masukkan kode promo disini..."
+                placeholder="Masukkan kode disini..."
                 value={code}
                 onChange={(e) => setCode(e)}
                 size="lg"
@@ -147,12 +164,12 @@ export default function Validasi() {
         onClose={() => setModalSuccess(false)}
         paint="primary"
         icon={faCheckCircle}
-        title="Selamat, Berhasil di validasi"
+        title={`Selamat, ${lastItemType === 'promo' ? 'Promo' : 'Voucher'} Berhasil di validasi`}
         onSubmit={async () => {
           setModalSuccess(false);
           // kirim id ke halaman riwayat (hanya kalau ada)
-          if (lastPromoId) {
-            router.push(`/app/riwayat-validasi?id=${lastPromoId}`);
+          if (lastItemId) {
+            router.push(`/app/riwayat-validasi?id=${lastItemId}&type=${lastItemType}`);
           } else {
             router.push('/app/riwayat-validasi');
           }
@@ -164,7 +181,7 @@ export default function Validasi() {
         onClose={() => setModalFailed(false)}
         paint="danger"
         icon={faCheckCircle}
-        title="Kode Tidak Valid / Sudah Digunakan"
+        title={`Kode Tidak Valid / Sudah Digunakan`}
         onSubmit={async () => {
           setModalFailed(false);
         }}
