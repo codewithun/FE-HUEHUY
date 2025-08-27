@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element tt */
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
