@@ -16,8 +16,7 @@ module.exports = withPWA({
       {
         source: '/(.*)',
         headers: [
-          // NOTE: X-Frame-Options tidak menerima "*" (opsional: gunakan "SAMEORIGIN" atau hapus)
-          // { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
         ],
       },
     ];
