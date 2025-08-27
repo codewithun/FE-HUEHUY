@@ -23,25 +23,27 @@ module.exports = withPWA({
   },
   reactStrictMode: false,
   images: {
-    // Tambahkan host backend kamu di sini
     domains: [
       'localhost',
       '127.0.0.1',
       'api-unparone.unpar.ac.id',
       'assets.huehuy.com',
-      'api-159-223-48-146.nip.io',          // <<-- penting
+      'api-159-223-48-146.nip.io',
     ],
-    // Dan tambahkan remotePatterns HTTPS untuk path /storage/**
     remotePatterns: [
       // local dev
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/promos/**' },
       { protocol: 'http', hostname: 'localhost', port: '8000', pathname: '/promos/**' },
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/**' },
       { protocol: 'http', hostname: 'localhost', port: '8000', pathname: '/storage/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/api/storage/**' },
+      { protocol: 'http', hostname: 'localhost', port: '8000', pathname: '/api/storage/**' },
 
       // production backend
-      { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/storage/**' }, // <<--
+      { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/storage/**' },
+      { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/api/storage/**' },
     ],
-    // sementara debug (opsional): unoptimized: true,
+    // Untuk debugging, bisa uncomment ini sementara
+    // unoptimized: true,
   },
 });
