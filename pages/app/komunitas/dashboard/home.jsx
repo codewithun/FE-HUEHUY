@@ -438,37 +438,49 @@ export default function CommunityDashboard({ communityId }) {
                     (p.image_path ? `${baseUrl}/storage/${p.image_path}` : "/api/placeholder/150/120");
 
                 let image = raw;
+                
+                // Validasi dan normalisasi URL
                 if (typeof image === "string" && image) {
-                    const isAbsolute = /^https?:\/\//i.test(image);
-                    if (!isAbsolute) {
+                    // Cek apakah sudah absolute URL yang valid
+                    const isValidAbsolute = /^https?:\/\/.+/i.test(image);
+                    
+                    if (isValidAbsolute) {
+                        // Jika sudah absolute dan valid, gunakan as-is
+                        image = image;
+                    } else if (image.startsWith('/api/placeholder')) {
+                        // Placeholder images
+                        image = image;
+                    } else {
+                        // Handle relative paths
                         const cleaned = image.replace(/^\/+/, '');
-
-                        if (/^api\/placeholder/i.test(cleaned)) {
-                            image = `/${cleaned}`;
-                        }
-                        else if (/^api\//i.test(cleaned)) {
-                            const withoutApi = cleaned.replace(/^api\/+/i, '');
-                            if (/^(storage|promos|uploads)/i.test(withoutApi)) {
-                                if (withoutApi.startsWith('promos/')) {
-                                    image = `${baseUrl}/storage/${withoutApi}`;
-                                } else {
-                                    image = `${baseUrl}/${withoutApi}`;
-                                }
+                        
+                        if (/^(storage\/|api\/storage\/)/i.test(cleaned)) {
+                            // Pastikan baseUrl tidak kosong dan valid
+                            if (baseUrl && baseUrl !== 'undefined') {
+                                // Normalize path - remove api/ prefix if exists
+                                const normalizedPath = cleaned.replace(/^api\//, '');
+                                image = `${baseUrl}/${normalizedPath}`;
                             } else {
-                                image = `/${cleaned}`;
+                                image = "/api/placeholder/150/120";
                             }
-                        }
-                        else if (/^(promos\/|storage\/|uploads\/)/i.test(cleaned)) {
-                            if (cleaned.startsWith('promos/')) {
+                        } else if (/^(promos\/)/i.test(cleaned)) {
+                            if (baseUrl && baseUrl !== 'undefined') {
                                 image = `${baseUrl}/storage/${cleaned}`;
                             } else {
-                                image = `${baseUrl}/${cleaned}`;
+                                image = "/api/placeholder/150/120";
                             }
-                        }
-                        else {
-                            image = `/${cleaned}`;
+                        } else {
+                            // Default fallback
+                            image = "/api/placeholder/150/120";
                         }
                     }
+                } else {
+                    image = "/api/placeholder/150/120";
+                }
+
+                // Final validation - pastikan URL tidak rusak
+                if (typeof image === "string" && image.includes("https:/") && !image.includes("https://")) {
+                    image = image.replace("https:/", "https://");
                 }
 
                 return {
@@ -554,7 +566,7 @@ export default function CommunityDashboard({ communityId }) {
         };
 
         fetchPromoWidgetsOrCategories();
-    }, [communityData, apiUrl]);
+    }, [communityData, apiUrl, baseUrl]);
 
     // Function to get gradient based on community category
     function getCommunityGradient(category) {
