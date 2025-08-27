@@ -441,6 +441,19 @@ export default function CommunityDashboard({ communityId }) {
                 
                 // Validasi dan normalisasi URL
                 if (typeof image === "string" && image) {
+                    // Fix malformed URLs - specifically handle the case where "api" is missing
+                    // Convert "https:/-159-223" to "https://api-159-223"
+                    if (image.match(/https?:\/?-\d+/)) {
+                        image = image.replace(/^https?:\/?(-\d+.*)/, 'https://api$1');
+                    }
+                    // Handle other malformed https URLs
+                    else if (image.includes("https:/") && !image.includes("https://")) {
+                        image = image.replace(/^https?:\/*/, "https://");
+                    }
+                    
+                    // Remove any double slashes after domain (except after protocol)
+                    image = image.replace(/([^:]\/)\/+/g, '$1');
+                    
                     // Cek apakah sudah absolute URL yang valid
                     const isValidAbsolute = /^https?:\/\/.+/i.test(image);
                     
@@ -456,7 +469,7 @@ export default function CommunityDashboard({ communityId }) {
                         
                         if (/^(storage\/|api\/storage\/)/i.test(cleaned)) {
                             // Pastikan baseUrl tidak kosong dan valid
-                            if (baseUrl && baseUrl !== 'undefined') {
+                            if (baseUrl && baseUrl !== 'undefined' && baseUrl.trim() !== '') {
                                 // Normalize path - remove api/ prefix if exists
                                 const normalizedPath = cleaned.replace(/^api\//, '');
                                 image = `${baseUrl}/${normalizedPath}`;
@@ -464,7 +477,7 @@ export default function CommunityDashboard({ communityId }) {
                                 image = "/api/placeholder/150/120";
                             }
                         } else if (/^(promos\/)/i.test(cleaned)) {
-                            if (baseUrl && baseUrl !== 'undefined') {
+                            if (baseUrl && baseUrl !== 'undefined' && baseUrl.trim() !== '') {
                                 image = `${baseUrl}/storage/${cleaned}`;
                             } else {
                                 image = "/api/placeholder/150/120";
@@ -478,9 +491,12 @@ export default function CommunityDashboard({ communityId }) {
                     image = "/api/placeholder/150/120";
                 }
 
-                // Final validation - pastikan URL tidak rusak
-                if (typeof image === "string" && image.includes("https:/") && !image.includes("https://")) {
-                    image = image.replace("https:/", "https://");
+                // Final validation - ensure URL is properly formed
+                if (typeof image === "string") {
+                    // Validate that we have a proper URL structure
+                    if (!image.startsWith('/api/placeholder') && !image.match(/^https?:\/\/[^\/\s]+/i)) {
+                        image = "/api/placeholder/150/120";
+                    }
                 }
 
                 return {
