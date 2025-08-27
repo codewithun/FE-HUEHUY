@@ -1,3 +1,4 @@
+// api.helper.ts
 import { useEffect, useState } from 'react';
 import axios, { AxiosProgressEvent } from 'axios';
 import Cookies from 'js-cookie';
@@ -6,6 +7,39 @@ import { token_cookie_name, loginPath, basePath } from './middleware.helpers';
 import fileDownload from 'js-file-download';
 import { Decrypt } from './encryption.helpers';
 import { standIn } from './standIn.helpers';
+
+// =========================>
+// ## Utils
+// =========================>
+const buildBaseUrl = (base?: string, path?: string) => {
+  const b = (base || '').replace(/\/+$/, ''); // trim trailing /
+  const p = (path || '').replace(/^\/+/, ''); // trim leading  /
+  return [b, p].filter(Boolean).join('/');
+};
+
+const getAuthHeader = () => {
+  try {
+    const enc = Cookies.get(token_cookie_name);
+    if (!enc) return {};
+    const token = Decrypt(enc); // bisa throw kalau cookie korup
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
+  } catch {
+    // Jangan kirim header kalau decrypt gagal
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[api] token decrypt failed => no Authorization header');
+    }
+    return {};
+  }
+};
+
+const mergeHeaders = (includeHeaders?: Record<string, any>) => {
+  const base: Record<string, any> = {
+    Accept: 'application/json',
+    ...getAuthHeader(),
+  };
+  return { ...base, ...(includeHeaders || {}) };
+};
 
 // =========================>
 // ## type of filter params
@@ -43,7 +77,7 @@ export type getProps = {
 // =========================>
 // ## filter type value
 // =========================>
-export const getFilterTypeValue = {
+export const getFilterTypeValue: Record<NonNullable<getFilterParams['type']>, string> = {
   equal: 'eq',
   notEqual: 'ne',
   in: 'in',
@@ -62,51 +96,40 @@ export const get = async ({
   includeHeaders,
   bearer,
 }: getProps) => {
-  const fetchUrl = url
-    ? url
-    : `${process.env.NEXT_PUBLIC_API_URL}/${path || ''}`;
-  const fetchHeaders: any = includeHeaders || {};
+  const fetchUrl = url || buildBaseUrl(process.env.NEXT_PUBLIC_API_URL, path);
+  const fetchHeaders: any = mergeHeaders(includeHeaders as any);
 
-  if (!fetchHeaders.Authorization) {
-    if (bearer) {
-      fetchHeaders.Authorization = `Bearer ${bearer}`;
-    } else if (Cookies.get(token_cookie_name)) {
-      fetchHeaders.Authorization = `Bearer ${Decrypt(
-        Cookies.get(token_cookie_name)
-      )}`;
-    }
+  if (bearer) {
+    fetchHeaders.Authorization = `Bearer ${bearer}`;
   }
 
   const filter: Record<string, any> = {};
   if (params?.filter) {
-    params?.filter?.map((val) => {
-      filter[val.column as keyof object] = `${
-        getFilterTypeValue[val.type as keyof object]
-      }:${Array.isArray(val.value) ? val.value.join(',') : val.value}`;
+    params.filter.forEach((val) => {
+      if (!val?.column || !val?.type) return;
+      const code = getFilterTypeValue[val.type];
+      filter[val.column as keyof object] =
+        `${code}:${Array.isArray(val.value) ? val.value.join(',') : (val.value ?? '')}`;
     });
   }
 
-  // await axios.get(process.env.NEXT_PUBLIC_CSRF_URL || '');
-  const fetch = await axios
-    .get(fetchUrl, {
+  try {
+    const res = await axios.get(fetchUrl, {
       headers: fetchHeaders,
       params: {
         ...params,
         ...includeParams,
         filter: params?.filter ? JSON.stringify(filter) : '',
       },
-    })
-    .then((res) => res)
-    .catch((err) => err.response);
-
-  if (fetch?.status == 401) {
-    Cookies.remove(token_cookie_name);
-    Router.push(loginPath);
-    return fetch;
-  } else if (fetch?.status == 403) {
-    // Router.push(basePath);
-  } else {
-    return fetch;
+    });
+    return res;
+  } catch (err: any) {
+    const resp = err?.response;
+    if (resp?.status === 401) {
+      Cookies.remove(token_cookie_name);
+      Router.push(loginPath);
+    }
+    return resp;
   }
 };
 
@@ -149,6 +172,10 @@ export const useGet = (
               expired: props.expired,
             });
           }
+        } else {
+          setLoading(false);
+          setCode(null);
+          setData(null);
         }
       }
     };
@@ -156,7 +183,6 @@ export const useGet = (
     if (!sleep && (props.path || props.url)) {
       fetch();
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     props.path,
@@ -168,7 +194,6 @@ export const useGet = (
     props.params?.sortDirection,
     props.params?.filter,
     props.includeParams,
-    // props.includeHeaders,
     props.bearer,
     refresh,
     sleep,
@@ -176,7 +201,7 @@ export const useGet = (
 
   const reset = () => setRefresh(!refresh);
 
-  return [loading, code, data, reset];
+  return [loading, code, data, reset] as const;
 };
 
 // =========================>
@@ -186,7 +211,7 @@ export type postProps = {
   path?: string;
   url?: string;
   params?: object;
-  body?: object;
+  body?: any;
   includeHeaders?: object;
   bearer?: string;
   contentType?: 'application/json' | 'multipart/form-data';
@@ -204,44 +229,30 @@ export const post = async ({
   bearer,
   contentType,
 }: postProps) => {
-  const fetchUrl = url
-    ? url
-    : `${process.env.NEXT_PUBLIC_API_URL}/${path || ''}`;
-  const fetchHeaders: any = includeHeaders || {};
+  const fetchUrl = url || buildBaseUrl(process.env.NEXT_PUBLIC_API_URL, path);
+  const fetchHeaders: any = mergeHeaders(includeHeaders as any);
 
-  if (!fetchHeaders.Authorization) {
-    if (bearer) {
-      fetchHeaders.Authorization = `Bearer ${bearer}`;
-    } else if (Cookies.get(token_cookie_name)) {
-      fetchHeaders.Authorization = `Bearer ${Decrypt(
-        Cookies.get(token_cookie_name)
-      )}`;
-    }
-  }
+  if (bearer) fetchHeaders.Authorization = `Bearer ${bearer}`;
 
-  if (!fetchHeaders['Content-Type']) {
-    fetchHeaders['Content-Type'] = contentType
-      ? contentType
-      : 'application/json';
-  }
-
-  // await axios.get(process.env.NEXT_PUBLIC_CSRF_URL || '');
-  const fetch = await axios
-    .post(fetchUrl, body, {
-      headers: fetchHeaders,
-      params: {
-        ...params,
-      },
-    })
-    .then((res) => res)
-    .catch((err) => err.response);
-
-  if (fetch?.status == 401) {
-    Router.push(loginPath);
-  } else if (fetch?.status == 403) {
-    // Router.push('');
+  // Biarkan axios set boundary kalau FormData
+  if (contentType && contentType !== 'multipart/form-data') {
+    fetchHeaders['Content-Type'] = contentType; // json, dll.
   } else {
-    return fetch;
+    delete fetchHeaders['Content-Type'];
+  }
+
+  try {
+    const res = await axios.post(fetchUrl, body, {
+      headers: fetchHeaders,
+      params: { ...params },
+    });
+    return res;
+  } catch (err: any) {
+    const resp = err?.response;
+    if (resp?.status === 401) {
+      Router.push(loginPath);
+    }
+    return resp;
   }
 };
 
@@ -252,7 +263,7 @@ export type patchProps = {
   path?: string;
   url?: string;
   params?: object;
-  body?: object;
+  body?: any;
   includeHeaders?: object;
   bearer?: string;
   contentType?: 'application/json' | 'multipart/form-data';
@@ -270,41 +281,31 @@ export const patch = async ({
   bearer,
   contentType,
 }: patchProps) => {
-  const fetchUrl = url
-    ? url
-    : `${process.env.NEXT_PUBLIC_API_URL}/${path || ''}`;
-  const fetchHeaders: any = includeHeaders || {};
+  const fetchUrl = url || buildBaseUrl(process.env.NEXT_PUBLIC_API_URL, path);
+  const fetchHeaders: any = mergeHeaders(includeHeaders as any);
 
-  if (!fetchHeaders.Authorization) {
-    if (bearer) {
-      fetchHeaders.Authorization = `Bearer ${bearer}`;
-    } else if (Cookies.get(token_cookie_name)) {
-      fetchHeaders.Authorization = `Bearer ${Decrypt(
-        Cookies.get(token_cookie_name)
-      )}`;
-    }
-  }
+  if (bearer) fetchHeaders.Authorization = `Bearer ${bearer}`;
 
-  if (!fetchHeaders['Content-Type']) {
-    fetchHeaders['Content-Type'] = contentType
-      ? contentType
-      : 'application/json';
-  }
-
-  // await axios.get(process.env.NEXT_PUBLIC_CSRF_URL || '');
-  const fetch = await axios.patch(fetchUrl, body, {
-    headers: fetchHeaders,
-    params: {
-      ...params,
-    },
-  });
-
-  if (fetch.status == 401) {
-    Router.push(loginPath);
-  } else if (fetch.status == 403) {
-    Router.push(basePath);
+  if (contentType && contentType !== 'multipart/form-data') {
+    fetchHeaders['Content-Type'] = contentType;
   } else {
-    return fetch;
+    delete fetchHeaders['Content-Type'];
+  }
+
+  try {
+    const res = await axios.patch(fetchUrl, body, {
+      headers: fetchHeaders,
+      params: { ...params },
+    });
+    return res;
+  } catch (err: any) {
+    const resp = err?.response;
+    if (resp?.status === 401) {
+      Router.push(loginPath);
+    } else if (resp?.status === 403) {
+      Router.push(basePath);
+    }
+    return resp;
   }
 };
 
@@ -329,34 +330,25 @@ export const destroy = async ({
   includeHeaders,
   bearer,
 }: destroyProps) => {
-  const fetchUrl = url
-    ? url
-    : `${process.env.NEXT_PUBLIC_API_URL}/${path || ''}`;
-  const fetchHeaders: any = includeHeaders || {};
+  const fetchUrl = url || buildBaseUrl(process.env.NEXT_PUBLIC_API_URL, path);
+  const fetchHeaders: any = mergeHeaders(includeHeaders as any);
 
-  if (!fetchHeaders.Authorization) {
-    if (bearer) {
-      fetchHeaders.Authorization = `Bearer ${bearer}`;
-    } else if (Cookies.get(token_cookie_name)) {
-      fetchHeaders.Authorization = `Bearer ${Decrypt(
-        Cookies.get(token_cookie_name)
-      )}`;
+  if (bearer) fetchHeaders.Authorization = `Bearer ${bearer}`;
+
+  try {
+    const res = await axios.delete(fetchUrl, {
+      headers: fetchHeaders,
+      params: { ...params },
+    });
+    return res;
+  } catch (err: any) {
+    const resp = err?.response;
+    if (resp?.status === 401) {
+      Router.push(loginPath);
+    } else if (resp?.status === 403) {
+      Router.push(basePath);
     }
-  }
-
-  const fetch = await axios.delete(fetchUrl, {
-    headers: fetchHeaders,
-    params: {
-      ...params,
-    },
-  });
-
-  if (fetch.status == 401) {
-    Router.push(loginPath);
-  } else if (fetch.status == 403) {
-    Router.push(basePath);
-  } else {
-    return fetch;
+    return resp;
   }
 };
 
@@ -385,39 +377,37 @@ export const download = async ({
   fileName,
   onDownloadProgress,
 }: downloadProps) => {
-  const fetchUrl = url
-    ? url
-    : `${process.env.NEXT_PUBLIC_API_URL}/${path || ''}`;
-  const fetchHeaders: any = includeHeaders || {};
+  const fetchUrl = url || buildBaseUrl(process.env.NEXT_PUBLIC_API_URL, path);
+  const fetchHeaders: any = mergeHeaders(includeHeaders as any);
 
-  if (!fetchHeaders.Authorization) {
-    if (bearer) {
-      fetchHeaders.Authorization = `Bearer ${bearer}`;
-    } else if (Cookies.get(token_cookie_name)) {
-      fetchHeaders.Authorization = `Bearer ${Decrypt(
-        Cookies.get(token_cookie_name)
-      )}`;
+  if (bearer) fetchHeaders.Authorization = `Bearer ${bearer}`;
+
+  try {
+    const res = await axios.get(fetchUrl, {
+      headers: fetchHeaders,
+      params: { ...params },
+      responseType: 'blob',
+      onDownloadProgress,
+    });
+
+    if (res.status === 401) {
+      Router.push(loginPath);
+      return;
     }
-  }
+    if (res.status === 403) {
+      Router.push(basePath);
+      return;
+    }
 
-  if (!fetchHeaders.responseType) {
-    fetchHeaders.responseType = 'blob';
-  }
-
-  const fetch = await axios.get(fetchUrl, {
-    headers: fetchHeaders,
-    params: {
-      ...params,
-    },
-    onDownloadProgress: onDownloadProgress,
-  });
-
-  if (fetch.status == 401) {
-    Router.push(loginPath);
-  } else if (fetch.status == 403) {
-    Router.push(basePath);
-  } else {
-    fileDownload(fetch.data, fileName);
-    return fetch.data;
+    fileDownload(res.data, fileName);
+    return res.data;
+  } catch (err: any) {
+    const resp = err?.response;
+    if (resp?.status === 401) {
+      Router.push(loginPath);
+    } else if (resp?.status === 403) {
+      Router.push(basePath);
+    }
+    return resp;
   }
 };
