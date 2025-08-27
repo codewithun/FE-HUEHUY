@@ -261,7 +261,7 @@ export default function CommunityDashboard({ communityId }) {
     // VALIDASI AKHIR
     if (!(isAbsoluteUrl(url) || isPlaceholder(url))) {
       // kalau masih aneh (mis. "https:/-159..."), fallback
-      console.warn('[image-url] invalid final url, fallback:', url);
+      // console.warn('[image-url] invalid final url, fallback:', url);
       return fallback;
     }
     return url;
