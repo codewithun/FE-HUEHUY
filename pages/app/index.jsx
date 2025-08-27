@@ -29,8 +29,13 @@ import MenuCubePage from '../../components/construct.components/partial-page/Men
 import { useGet } from '../../helpers';
 import { distanceConvert } from '../../helpers/distanceConvert.helpers';
 
+// >>> TAMBAHAN: ambil token dari cookie dan decrypt
+import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../helpers';
+import { Decrypt } from '../../helpers/encryption.helpers';
+
 export default function Index() {
-  const [map, setMap] = useState(null);
+  const [map, setMap] = useState<any>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingBanner, codeBanner, dataBanner] = useGet({
@@ -97,6 +102,12 @@ export default function Index() {
     path: `account`,
   });
 
+  // >>> TAMBAHAN: siapkan bearer token untuk submit form edit-profile
+  const authToken =
+    typeof window !== 'undefined' && Cookies.get(token_cookie_name)
+      ? Decrypt(Cookies.get(token_cookie_name) as string)
+      : undefined;
+
   if (dataUser?.data?.profile?.phone) {
     return (
       <>
@@ -116,7 +127,7 @@ export default function Index() {
                   }}
                   className="w-full"
                 >
-                  {dataBanner?.data?.map((item, key) => {
+                  {dataBanner?.data?.map((item: any, key: number) => {
                     return (
                       <SwiperSlide key={key} className="overflow-hidden">
                         <div className="w-full aspect-[16/8] overflow-hidden bg-primary">
@@ -160,32 +171,34 @@ export default function Index() {
                 </div>
               </div>
 
-              {dataMenu?.data?.map((menu, key) => {
+              {dataMenu?.data?.map((menu: any, key: number) => {
                 if (menu.content_type == 'category' && menu.is_active) {
                   return (
                     <div className="px-4" key={key}>
                       <div className="grid grid-cols-4 gap-7">
-                        {dataPrimaryCategories?.data?.map((category, key) => {
-                          return (
-                            <Link
-                              href={`/app/cari?cari=${category?.name}`}
-                              key={key}
-                            >
-                              <div className="w-full aspect-square bg-slate-400 rounded-[12px] relative overflow-hidden flex justify-center items-center">
-                                <img
-                                  src={category?.picture_source}
-                                  height={1000}
-                                  width={1000}
-                                  alt=""
-                                  className="h-full aspect-square brightness-90"
-                                />
-                                <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs">
-                                  {category?.name}
+                        {dataPrimaryCategories?.data?.map(
+                          (category: any, key2: number) => {
+                            return (
+                              <Link
+                                href={`/app/cari?cari=${category?.name}`}
+                                key={key2}
+                              >
+                                <div className="w-full aspect-square bg-slate-400 rounded-[12px] relative overflow-hidden flex justify-center items-center">
+                                  <img
+                                    src={category?.picture_source}
+                                    height={1000}
+                                    width={1000}
+                                    alt=""
+                                    className="h-full aspect-square brightness-90"
+                                  />
+                                  <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs">
+                                    {category?.name}
+                                  </div>
                                 </div>
-                              </div>
-                            </Link>
-                          );
-                        })}
+                              </Link>
+                            );
+                          }
+                        )}
                         <Link href={`/app/category`}>
                           <div className="w-full aspect-square bg-primary rounded-[12px] relative overflow-hidden flex justify-center items-center">
                             {dataPrimaryCategories?.other_category_icon
@@ -237,9 +250,9 @@ export default function Index() {
                       </div>
 
                       <div className="flex flex-col gap-3 mt-4">
-                        {dataNear?.data?.map((item, key) => {
+                        {dataNear?.data?.map((item: any, key3: number) => {
                           return (
-                            <Link href={`/app/${item?.cube?.code}`} key={key}>
+                            <Link href={`/app/${item?.cube?.code}`} key={key3}>
                               <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
                                 <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                                   <img
@@ -256,12 +269,12 @@ export default function Index() {
                                   </p>
                                   <div className="flex gap-2 mt-2 items-center">
                                     <p className="text-xs text-slate-600 limit__line__1">
-                                      <FontAwesomeIcon icon={faLocationDot} />.{' '}
+                                      <FontAwesomeIcon icon={faLocationDot} />{' '}
                                       {distanceConvert(item?.distance)}
                                     </p>
                                     <p className="text-xs"> | </p>
                                     <p className="text-xs text-slate-600 font-semibold limit__line__1 p-1">
-                                      <FontAwesomeIcon icon={faGlobe} />.{' '}
+                                      <FontAwesomeIcon icon={faGlobe} />{' '}
                                       {item?.cube?.world?.name || 'General'}
                                     </p>
                                     {item?.cube?.world_affiliate_id && (
@@ -299,46 +312,51 @@ export default function Index() {
                       </div>
                       <div className="w-full px-4 pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2">
                         <div className="flex flex-nowrap gap-4 w-max">
-                          {dataRecommendation?.data?.map((item, key) => {
-                            return (
-                              <Link href={`/app/${item?.cube?.code}`} key={key}>
-                                <div className="relative snap-center w-[330px] shadow-sm bg-white bg-opacity-40 backdrop-blur-sm rounded-[14px] overflow-hidden p-3">
-                                  <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90">
-                                    <img
-                                      src={item?.picture_source}
-                                      height={1200}
-                                      width={600}
-                                      alt=""
-                                    />
-                                  </div>
-                                  <div className="px-1">
-                                    <p className="font-semibold mt-2 limit__line__1">
-                                      {item?.title}
-                                    </p>
-                                    <div className="flex justify-between items-start gap-4">
-                                      <p className="text-slate-600 text-xs my-1 limit__line__2">
-                                        {item?.cube?.address}
-                                        {item?.cube?.is_information && (
-                                          <p className="text-primary bg-green-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                            Informasi
-                                          </p>
-                                        )}
+                          {dataRecommendation?.data?.map(
+                            (item: any, key4: number) => {
+                              return (
+                                <Link
+                                  href={`/app/${item?.cube?.code}`}
+                                  key={key4}
+                                >
+                                  <div className="relative snap-center w-[330px] shadow-sm bg-white bg-opacity-40 backdrop-blur-sm rounded-[14px] overflow-hidden p-3">
+                                    <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90">
+                                      <img
+                                        src={item?.picture_source}
+                                        height={1200}
+                                        width={600}
+                                        alt=""
+                                      />
+                                    </div>
+                                    <div className="px-1">
+                                      <p className="font-semibold mt-2 limit__line__1">
+                                        {item?.title}
                                       </p>
+                                      <div className="flex justify-between items-start gap-4">
+                                        <p className="text-slate-600 text-xs my-1 limit__line__2">
+                                          {item?.cube?.address}
+                                          {item?.cube?.is_information && (
+                                            <p className="text-primary bg-green-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                              Informasi
+                                            </p>
+                                          )}
+                                        </p>
 
-                                      {(item?.total_remaining ||
-                                        item?.max_grab) && (
+                                        {(item?.total_remaining ||
+                                          item?.max_grab) && (
                                           <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
                                             Sisa{' '}
                                             {item?.total_remaining ||
                                               item?.max_grab}
                                           </p>
                                         )}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </Link>
-                            );
-                          })}
+                                </Link>
+                              );
+                            }
+                          )}
                         </div>
                       </div>
                     </>
@@ -349,9 +367,9 @@ export default function Index() {
                 ) {
                   return (
                     <>
-                      {dataCategories?.data?.map((category, key) => {
+                      {dataCategories?.data?.map((category: any, key5: number) => {
                         return (
-                          <div className="px-4 mt-8" key={key}>
+                          <div className="px-4 mt-8" key={key5}>
                             <div className="flex justify-between items-center gap-4">
                               <div className="w-full max-w-[75%]">
                                 <p className="font-semibold">
@@ -365,7 +383,7 @@ export default function Index() {
                                         label="Semua"
                                       />
                                       {category?.child_categories?.map(
-                                        (child, child_key) => {
+                                        (child: any, child_key: number) => {
                                           return (
                                             <Link
                                               href={`/app/cari?cari=${child?.name}`}
@@ -396,7 +414,7 @@ export default function Index() {
                             </div>
 
                             <div className="flex flex-col gap-4 mt-4">
-                              {category?.ads?.map((ad, ad_key) => {
+                              {category?.ads?.map((ad: any, ad_key: number) => {
                                 return (
                                   <Link
                                     href={`/app/${ad?.cube?.code}`}
@@ -423,12 +441,12 @@ export default function Index() {
                                               </p>
                                               {(ad?.total_remaining ||
                                                 ad?.max_grab) && (
-                                                  <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                                    Sisa{' '}
-                                                    {ad?.total_remaining ||
-                                                      ad?.max_grab}
-                                                  </p>
-                                                )}
+                                                <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                                  Sisa{' '}
+                                                  {ad?.total_remaining ||
+                                                    ad?.max_grab}
+                                                </p>
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -482,15 +500,19 @@ export default function Index() {
             <FormSupervisionComponent
               submitControl={{
                 path: 'auth/edit-profile',
-                // pastikan kirim JSON, bukan FormData (multipart)
+                // kirim JSON
                 contentType: 'application/json',
-                // pastikan header Accept json
+                // header json
                 includeHeaders: { Accept: 'application/json' },
+                // >>> PENTING: kirim Bearer token supaya backend kenal user
+                bearer: authToken,
               }}
               defaultValue={{
-                phone: dataUser?.data?.profile?.phone || '', // fallback biar tidak undefined
+                phone: dataUser?.data?.profile?.phone || '',
               }}
-              onSuccess={() => window.location.reload()}
+              onSuccess={() => {
+                window.location.reload();
+              }}
               forms={[
                 {
                   construction: {
