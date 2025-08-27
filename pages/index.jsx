@@ -36,9 +36,7 @@ export default function Login() {
       );
       window.location.href = '/app';
     } else {
-      console.error('No token found in response:', data);
-      // Log struktur response untuk debugging
-      console.log('Full response structure:', JSON.stringify(data, null, 2));
+      // No token found in response
     }
   };
 
@@ -74,7 +72,6 @@ export default function Login() {
       });
 
       // DEBUG: Log response structure
-      console.log('Firebase login response:', JSON.stringify(response, null, 2));
 
       if (response?.status === 200 || response?.status === 201) {
         // Sama seperti onSuccess, coba berbagai path token
@@ -87,14 +84,13 @@ export default function Login() {
             { expires: 365, secure: true }
           );
         } else {
-          console.error('No token found in Firebase login response:', response);
-          console.log('Firebase response structure:', JSON.stringify(response, null, 2));
+          // No token found in Firebase login response
         }
       }
 
       return response;
     } catch (error) {
-      console.error('Firebase login error:', error);
+      // Firebase login error
       return null;
     }
   };
@@ -105,7 +101,6 @@ export default function Login() {
 
     try {
       const result = await signInWithPopup(auth, provider);
-      console.log('Firebase auth result:', result.user);
 
       const response = await loginFirebase(result.user.accessToken, true);
 
@@ -114,22 +109,18 @@ export default function Login() {
       } else if (response?.status === 202) {
         // Handle specific case for status 202
         setBtnGoogleLoading(false);
-        console.log('Login status 202 - need additional handling');
       } else {
         // Handle other error cases
         setBtnGoogleLoading(false);
-        console.error('Login failed with status:', response?.status);
-        console.log('Full error response:', response);
       }
     } catch (error) {
       setBtnGoogleLoading(false);
-      console.error('Firebase authentication failed:', error);
+      // Firebase authentication failed
     }
   };
 
   useEffect(() => {
     const existingToken = Cookies.get(token_cookie_name);
-    console.log('Existing token check:', existingToken ? 'Token exists' : 'No token found');
 
     if (existingToken) {
       router.push('/app');
