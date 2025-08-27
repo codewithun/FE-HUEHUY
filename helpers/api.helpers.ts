@@ -20,15 +20,21 @@ const buildBaseUrl = (base?: string, path?: string) => {
 const getAuthHeader = () => {
   try {
     const enc = Cookies.get(token_cookie_name);
-    if (!enc) return {};
-    const token = Decrypt(enc); // bisa throw kalau cookie korup
-    if (!token) return {};
-    return { Authorization: `Bearer ${token}` };
-  } catch {
-    // Jangan kirim header kalau decrypt gagal
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[api] token decrypt failed => no Authorization header');
+    if (!enc) {
+      return {};
     }
+    
+    const token = Decrypt(enc);
+    if (!token || token.trim() === '') {
+      // Clear corrupted cookie
+      Cookies.remove(token_cookie_name);
+      return {};
+    }
+    
+    return { Authorization: `Bearer ${token}` };
+  } catch (error) {
+    // Clear corrupted cookie
+    Cookies.remove(token_cookie_name);
     return {};
   }
 };
