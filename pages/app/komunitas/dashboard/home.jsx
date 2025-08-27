@@ -431,72 +431,28 @@ export default function CommunityDashboard({ communityId }) {
         if (!communityData) return;
 
         const normalizePromos = (arr = []) => {
+            const base = (baseUrl || '').replace(/\/$/, ''); // pastikan tanpa trailing slash
             return (Array.isArray(arr) ? arr : []).map((p) => {
                 const raw =
                     p.image_url ||
                     p.image ||
-                    (p.image_path ? `${baseUrl}/storage/${p.image_path}` : "/api/placeholder/150/120");
+                    (p.image_path ? `${base}/storage/${p.image_path}` : "/api/placeholder/150/120");
 
-                let image = raw;
-                
-                // Validasi dan normalisasi URL
-                if (typeof image === "string" && image) {
-                    // Fix malformed URLs - specifically handle the case where "api" is missing
-                    // Convert "https:/-159-223" to "https://api-159-223"
-                    if (image.match(/https?:\/?-\d+/)) {
-                        image = image.replace(/^https?:\/?(-\d+.*)/, 'https://api$1');
-                    }
-                    // Handle other malformed https URLs
-                    else if (image.includes("https:/") && !image.includes("https://")) {
-                        image = image.replace(/^https?:\/*/, "https://");
-                    }
-                    
-                    // Remove any double slashes after domain (except after protocol)
-                    image = image.replace(/([^:]\/)\/+/g, '$1');
-                    
-                    // Cek apakah sudah absolute URL yang valid
-                    const isValidAbsolute = /^https?:\/\/.+/i.test(image);
-                    
-                    if (isValidAbsolute) {
-                        // Jika sudah absolute dan valid, gunakan as-is
-                        image = image;
-                    } else if (image.startsWith('/api/placeholder')) {
-                        // Placeholder images
-                        image = image;
-                    } else {
-                        // Handle relative paths
-                        const cleaned = image.replace(/^\/+/, '');
-                        
-                        if (/^(storage\/|api\/storage\/)/i.test(cleaned)) {
-                            // Pastikan baseUrl tidak kosong dan valid
-                            if (baseUrl && baseUrl !== 'undefined' && baseUrl.trim() !== '') {
-                                // Normalize path - remove api/ prefix if exists
-                                const normalizedPath = cleaned.replace(/^api\//, '');
-                                image = `${baseUrl}/${normalizedPath}`;
-                            } else {
-                                image = "/api/placeholder/150/120";
-                            }
-                        } else if (/^(promos\/)/i.test(cleaned)) {
-                            if (baseUrl && baseUrl !== 'undefined' && baseUrl.trim() !== '') {
-                                image = `${baseUrl}/storage/${cleaned}`;
-                            } else {
-                                image = "/api/placeholder/150/120";
-                            }
-                        } else {
-                            // Default fallback
-                            image = "/api/placeholder/150/120";
-                        }
-                    }
+                let image = typeof raw === 'string' && raw ? raw.trim() : "/api/placeholder/150/120";
+
+                // jika sudah absolute URL pakai langsung
+                if (image.startsWith('http://') || image.startsWith('https://')) {
+                    // gunakan image apa adanya
+                } else if (image.startsWith('/api/placeholder')) {
+                    // placeholder tetap
                 } else {
-                    image = "/api/placeholder/150/120";
+                    // treat as relative path -> gabungkan dengan baseUrl
+                    image = `${base}/${image.replace(/^\//, '')}`;
                 }
 
-                // Final validation - ensure URL is properly formed
-                if (typeof image === "string") {
-                    // Validate that we have a proper URL structure
-                    if (!image.startsWith('/api/placeholder') && !image.match(/^https?:\/\/[^\/\s]+/i)) {
-                        image = "/api/placeholder/150/120";
-                    }
+                // final validation: kalau tetap bukan http(s) atau placeholder, fallback
+                if (!(image.startsWith('http://') || image.startsWith('https://') || image.startsWith('/api/placeholder'))) {
+                    image = "/api/placeholder/150/120";
                 }
 
                 return {
