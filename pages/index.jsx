@@ -9,12 +9,11 @@ import Link from 'next/link';
 
 import Cookies from 'js-cookie';
 import { ButtonComponent, InputComponent } from '../components/base.components';
-import { get, token_cookie_name, useForm } from '../helpers';
+import { get, post, token_cookie_name, useForm } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
 import { getAuth, signInWithPopup } from 'firebase/auth';
 import { faGoogle } from '@fortawesome/free-brands-svg-icons';
 import { googleProvider } from '../helpers/firebase';
-import axios from 'axios';
 import { useRouter } from 'next/router';
 import { faArrowRightLong } from '@fortawesome/free-solid-svg-icons';
 
@@ -23,15 +22,24 @@ export default function Login() {
   const [btnGoogleLoading, setBtnGoogleLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Perbaiki onSuccess function
   const onSuccess = (data) => {
-    Cookies.set(
-      token_cookie_name,
-      Encrypt(data.data?.token),
-      { expires: 365 },
-      { secure: true }
-    );
+    // Laravel API biasanya mengembalikan { data: { token: "...", user: {...} } }
+    // Coba berbagai kemungkinan path token
+    const token = data?.data?.token || data?.token || data?.data?.data?.token;
 
-    window.location.href = '/app';
+    if (token) {
+      Cookies.set(
+        token_cookie_name,
+        Encrypt(token),
+        { expires: 365, secure: true }
+      );
+      window.location.href = '/app';
+    } else {
+      console.error('No token found in response:', data);
+      // Log struktur response untuk debugging
+      console.log('Full response structure:', JSON.stringify(data, null, 2));
+    }
   };
 
   const [{ formControl, submit, submitLoading, setDefaultValues }] = useForm(
@@ -49,50 +57,81 @@ export default function Login() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Perbaiki loginFirebase function juga
   const loginFirebase = async (
     idToken,
     remember,
-    url_path = '/auth/login-firebase'
+    url_path = 'auth/login-firebase'
   ) => {
     try {
       const formData = new FormData();
       formData.append('idToken', idToken);
 
-      // confirm backend
-      return axios
-        .post(`${process.env.NEXT_PUBLIC_API_URL + url_path}`, formData)
-        .then((res) => {
-          Cookies.set(token_cookie_name, Encrypt(res.data.token), {
-            secure: true,
-          });
+      const response = await post({
+        path: url_path,
+        body: formData,
+        contentType: 'multipart/form-data'
+      });
 
-          return res;
-        });
+      // DEBUG: Log response structure
+      console.log('Firebase login response:', JSON.stringify(response, null, 2));
+
+      if (response?.status === 200 || response?.status === 201) {
+        // Sama seperti onSuccess, coba berbagai path token
+        const token = response?.data?.token || response?.token || response?.data?.data?.token;
+
+        if (token) {
+          Cookies.set(
+            token_cookie_name,
+            Encrypt(token),
+            { expires: 365, secure: true }
+          );
+        } else {
+          console.error('No token found in Firebase login response:', response);
+          console.log('Firebase response structure:', JSON.stringify(response, null, 2));
+        }
+      }
+
+      return response;
     } catch (error) {
-      return error;
+      console.error('Firebase login error:', error);
+      return null;
     }
   };
 
   const submitLoginFirebase = async (provider) => {
     setBtnGoogleLoading(true);
     const auth = getAuth();
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        loginFirebase(result.user.accessToken, true).then((response) => {
-          if (response.status == 200) {
-            window.location.href = '/app';
-          } else if (response.status == 202) {
-            setBtnGoogleLoading(false);
-          }
-        });
-      })
-      .catch(() => {
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      console.log('Firebase auth result:', result.user);
+
+      const response = await loginFirebase(result.user.accessToken, true);
+
+      if (response?.status === 200) {
+        window.location.href = '/app';
+      } else if (response?.status === 202) {
+        // Handle specific case for status 202
         setBtnGoogleLoading(false);
-      });
+        console.log('Login status 202 - need additional handling');
+      } else {
+        // Handle other error cases
+        setBtnGoogleLoading(false);
+        console.error('Login failed with status:', response?.status);
+        console.log('Full error response:', response);
+      }
+    } catch (error) {
+      setBtnGoogleLoading(false);
+      console.error('Firebase authentication failed:', error);
+    }
   };
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name)) {
+    const existingToken = Cookies.get(token_cookie_name);
+    console.log('Existing token check:', existingToken ? 'Token exists' : 'No token found');
+
+    if (existingToken) {
       router.push('/app');
     } else {
       setLoading(false);
