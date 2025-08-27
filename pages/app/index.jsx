@@ -327,12 +327,12 @@ export default function Index() {
 
                                       {(item?.total_remaining ||
                                         item?.max_grab) && (
-                                        <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                          Sisa{' '}
-                                          {item?.total_remaining ||
-                                            item?.max_grab}
-                                        </p>
-                                      )}
+                                          <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                            Sisa{' '}
+                                            {item?.total_remaining ||
+                                              item?.max_grab}
+                                          </p>
+                                        )}
                                     </div>
                                   </div>
                                 </div>
@@ -423,12 +423,12 @@ export default function Index() {
                                               </p>
                                               {(ad?.total_remaining ||
                                                 ad?.max_grab) && (
-                                                <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                                  Sisa{' '}
-                                                  {ad?.total_remaining ||
-                                                    ad?.max_grab}
-                                                </p>
-                                              )}
+                                                  <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                                    Sisa{' '}
+                                                    {ad?.total_remaining ||
+                                                      ad?.max_grab}
+                                                  </p>
+                                                )}
                                             </div>
                                           </div>
                                         </div>
@@ -482,13 +482,15 @@ export default function Index() {
             <FormSupervisionComponent
               submitControl={{
                 path: 'auth/edit-profile',
+                // pastikan kirim JSON, bukan FormData (multipart)
+                contentType: 'application/json',
+                // pastikan header Accept json
+                includeHeaders: { Accept: 'application/json' },
               }}
               defaultValue={{
-                phone: dataUser?.data?.profile?.phone,
+                phone: dataUser?.data?.profile?.phone || '', // fallback biar tidak undefined
               }}
-              onSuccess={() => {
-                window.location.reload();
-              }}
+              onSuccess={() => window.location.reload()}
               forms={[
                 {
                   construction: {
