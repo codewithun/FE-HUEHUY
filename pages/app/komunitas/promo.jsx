@@ -1,8 +1,11 @@
-import { faGift, faPercent, faSearch, faTag } from '@fortawesome/free-solid-svg-icons';
+import { faGift, faSearch, faTag } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import { token_cookie_name } from '../../../helpers';
+import { Decrypt } from '../../../helpers/encryption.helpers';
 import CommunityBottomBar from './dashboard/CommunityBottomBar';
 
 const CommunityPromoPage = () => {
@@ -10,91 +13,154 @@ const CommunityPromoPage = () => {
   const { communityId } = router.query;
   const [communityData, setCommunityData] = useState(null);
   const [promoData, setPromoData] = useState([]);
-  const [limitedDeals, setLimitedDeals] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  
+  // baseUrl = apiUrl tanpa trailing `/api`, tanpa trailing slash
+  const baseUrl = (apiUrl || '')
+    .replace(/\/api\/?$/, '')
+    .replace(/\/+$/, '');
+
+  // ---- URL helpers ----
+  const isAbsoluteUrl = (u) =>
+    typeof u === 'string' && /^https?:\/\//i.test(u);
+
+  const isPlaceholder = (u) =>
+    typeof u === 'string' && u.startsWith('/api/placeholder');
+
+  /**
+   * Build final image URL (robust):
+   * - absolute: pakai apa adanya
+   * - placeholder: pakai apa adanya
+   * - relatif: normalisasi dulu → mapping ke "storage/..." bila perlu → gabungkan ke baseUrl (apiUrl tanpa /api)
+   */
+  const buildImageUrl = (raw) => {
+    const fallback = '/api/placeholder/150/120';
+    if (typeof raw !== 'string') return fallback;
+
+    let url = raw.trim();
+    if (!url) return fallback;
+
+    // 1) Sudah absolute? langsung pakai
+    if (isAbsoluteUrl(url)) return url;
+
+    // 2) Placeholder? biarkan
+    if (isPlaceholder(url)) return url;
+
+    // 3) Normalisasi path relatif dari backend
+    //    - backend sering kirim "promos/xxx.webp" → seharusnya "storage/promos/xxx.webp"
+    //    - kalau backend kirim "api/storage/xxx" → jadikan "storage/xxx"
+    let path = url.replace(/^\/+/, '');                   // buang leading slash
+    path = path.replace(/^api\/storage\//, 'storage/');   // api/storage → storage
+
+    // Jika bukan diawali "storage/", tetapi diawali folder konten seperti "promos/", "uploads/", arahkan ke storage
+    if (/^(promos|uploads|images|files)\//i.test(path)) {
+      path = `storage/${path}`;
+    }
+
+    // 4) Gabungkan dengan baseUrl (tanpa /api, tanpa trailing slash)
+    const finalUrl = `${baseUrl}/${path}`;
+
+    // 5) Validasi akhir
+    return /^https?:\/\//i.test(finalUrl) ? finalUrl : fallback;
+  };
+
+  const getAuthHeaders = () => {
+    try {
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : '';
+      return token
+        ? {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+        : { 'Content-Type': 'application/json' };
+    } catch (e) {
+      return { 'Content-Type': 'application/json' };
+    }
+  };
+
+  const normalizePromos = (arr = []) => {
+    return (Array.isArray(arr) ? arr : []).map((p) => {
+      const raw =
+        p.image_url ??
+        p.image ??
+        p.image_path ??
+        '/api/placeholder/150/120';
+
+      const image = buildImageUrl(raw);
+
+      return {
+        id: p.id ?? p.promo_id ?? Math.random(),
+        title: p.title ?? p.name ?? 'Promo',
+        merchant: p.merchant ?? p.community?.name ?? 'Merchant',
+        distance: p.distance ?? '0 KM',
+        location: p.location ?? p.community?.location ?? 'Location',
+        image
+      };
+    });
+  };
 
   useEffect(() => {
     if (communityId) {
-      // Mock data untuk komunitas
+      fetchCommunityData();
+      fetchPromoData();
+    }
+  }, [communityId]);
+
+  const fetchCommunityData = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/communities/${communityId}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (res.ok) {
+        const json = await res.json();
+        const community = json.data || json;
+        setCommunityData({
+          id: community.id,
+          name: community.name || 'Komunitas',
+          location: community.location || 'Location'
+        });
+      } else {
+        // Fallback to dummy data if API fails
+        setCommunityData({
+          id: communityId,
+          name: 'dbotanica Bandung',
+          location: 'Bandung'
+        });
+      }
+    } catch (error) {
+      // Fallback to dummy data
       setCommunityData({
         id: communityId,
         name: 'dbotanica Bandung',
         location: 'Bandung'
       });
-
-      // Mock data untuk promo terdekat dengan gambar yang sesuai
-      setPromoData([
-        {
-          id: 1,
-          title: 'Paket Kenyang Cuma 40 Ribu - Beef Sausage & Chicken di Lalaunch!',
-          merchant: 'Bandung Trade Center (BTC) Dr. Djunjunan...',
-          distance: '320 KM',
-          location: 'dbotanica Bandung',
-          image: '/images/promo/beef-sausage-chicken.jpg',
-          originalPrice: 80000,
-          discountPrice: 40000,
-          discount: '50%'
-        },
-        {
-          id: 2,
-          title: 'Beli 1 Gratis 1! Brown Sugar Coffee di Boba Thai',
-          merchant: 'Bandung Trade Center (BTC) Dr. Djunjunan...',
-          distance: '320 KM',
-          location: 'dbotanica Bandung',
-          image: '/images/promo/brown-sugar-coffee.jpg',
-          originalPrice: 25000,
-          discountPrice: 12500,
-          discount: 'BELI 1 GRATIS 1'
-        },
-        {
-          id: 3,
-          title: 'Makan Bertiga Lebih Hemat - Paket Ayam di Chicken Star Cuma 59 Ribu!',
-          merchant: 'Bandung Trade Center (BTC) Dr. Djunjunan...',
-          distance: '320 KM',
-          location: 'dbotanica Bandung',
-          image: '/images/promo/chicken-package.jpg',
-          originalPrice: 89000,
-          discountPrice: 59000,
-          discount: '34%'
-        },
-        {
-          id: 4,
-          title: 'Diskon 50% Bubble Tea untuk 15 Pelanggan Pertama!',
-          merchant: 'Bandung Trade Center (BTC) Dr. Djunjunan...',
-          distance: '320 KM',
-          location: 'dbotanica Bandung',
-          image: '/images/promo/bubble-tea-discount.jpg',
-          originalPrice: 30000,
-          discountPrice: 15000,
-          discount: '50% DISKON'
-        }
-      ]);
-
-      // Mock data untuk limited deals dengan gambar yang sesuai
-      setLimitedDeals([
-        {
-          id: 'limited-1',
-          title: 'Flash Sale - Burger Combo',
-          merchant: 'McDonald\'s BTC',
-          originalPrice: 45000,
-          discountPrice: 25000,
-          discount: '44%',
-          timeLeft: '2 jam 30 menit',
-          image: '/images/promo/burger-combo-flash.jpg'
-        },
-        {
-          id: 'limited-2',
-          title: 'Limited Time - Pizza Medium',
-          merchant: 'Pizza Hut BTC',
-          originalPrice: 75000,
-          discountPrice: 50000,
-          discount: '33%',
-          timeLeft: '1 jam 15 menit',
-          image: '/images/promo/pizza-medium-deal.jpg'
-        }
-      ]);
     }
-  }, [communityId]);
+  };
+
+  const fetchPromoData = async () => {
+    setLoading(true);
+    try {
+      // Fetch regular promos
+      const promoRes = await fetch(`${apiUrl}/communities/${communityId}/promos`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (promoRes.ok) {
+        const promoJson = await promoRes.json();
+        const promoData = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
+        setPromoData(normalizePromos(promoData));
+      }
+    } catch (error) {
+      // Keep empty arrays if API fails
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePromoClick = (promoId) => {
     router.push(`/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`);
@@ -102,94 +168,27 @@ const CommunityPromoPage = () => {
 
   const PromoCard = ({ promo }) => (
     <div 
-      className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[15px] shadow-sm overflow-hidden mb-3 hover:scale-[1.01] transition-all duration-300 cursor-pointer"
+      className="bg-white rounded-[16px] shadow-sm overflow-hidden mb-4 hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50"
       onClick={() => handlePromoClick(promo.id)}
     >
-      <div className="flex p-3">
-        <div>
+      <div className="flex p-5">
+        <div className="w-20 h-20 rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100">
           <Image 
             src={promo.image} 
             alt={promo.title}
-            width={64}
-            height={64}
+            width={80}
+            height={80}
             className="w-full h-full object-cover"
-            onError={() => {
-              // Image component doesn't support onError directly
-              // Use placeholder for fallbacks instead
-            }}
             placeholder="blur"
             blurDataURL="/default-avatar.png"
           />
         </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-slate-900 text-sm leading-tight line-clamp-2 mb-1">
+        <div className="flex-1 ml-4 min-w-0 flex flex-col justify-center">
+          <h3 className="font-semibold text-gray-900 text-base leading-tight line-clamp-2 mb-1">
             {promo.title}
           </h3>
-          
-          <p className="text-xs text-slate-600 mb-2">{promo.merchant}</p>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1">
-              <span className="text-base font-bold text-slate-900">
-                Rp {promo.discountPrice?.toLocaleString('id-ID')}
-              </span>
-              {promo.originalPrice && (
-                <span className="text-xs text-slate-500 line-through">
-                  Rp {promo.originalPrice.toLocaleString('id-ID')}
-                </span>
-              )}
-            </div>
-            <span className="bg-red-500 text-white px-2 py-1 rounded-[8px] text-xs font-medium">
-              {promo.discount}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const LimitedDealCard = ({ deal }) => (
-    <div 
-      className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[15px] shadow-sm overflow-hidden mb-3 hover:scale-[1.01] transition-all duration-300 cursor-pointer"
-      onClick={() => handlePromoClick(deal.id)}
-    >
-      <div className="flex p-3">
-        <div>
-          <Image 
-            src={deal.image} 
-            alt={deal.title}
-            width={56}
-            height={56}
-            className="w-full h-full object-cover"
-            onError={() => {
-              // Image component doesn't support onError directly
-              // Use placeholder for fallbacks instead
-            }}
-            placeholder="blur"
-            blurDataURL="/default-avatar.png"
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-slate-900 text-sm leading-tight line-clamp-1 mb-1">
-            {deal.title}
-          </h4>
-          
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center space-x-1">
-              <span className="text-sm font-bold text-slate-900">
-                Rp {deal.discountPrice?.toLocaleString('id-ID')}
-              </span>
-              <span className="text-xs text-slate-500 line-through">
-                Rp {deal.originalPrice?.toLocaleString('id-ID')}
-              </span>
-            </div>
-            <span className="bg-orange-500 text-white px-2 py-1 rounded-[8px] text-xs font-medium">
-              {deal.discount}
-            </span>
-          </div>
-          
-          <p className="text-xs text-orange-600 font-medium">
-            {deal.timeLeft}
+          <p className="text-sm text-gray-500 line-clamp-1">
+            {promo.merchant}
           </p>
         </div>
       </div>
@@ -210,44 +209,31 @@ const CommunityPromoPage = () => {
   return (
     <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
       {/* Header */}
-      <div className="bg-primary w-full h-[120px] rounded-b-[40px] shadow-neuro px-6 mb-6 relative overflow-hidden">
-        {/* Background decoration */}
-        <div className="absolute inset-0">
-          <div className="absolute top-4 right-4 w-12 h-12 bg-white rounded-full opacity-10"></div>
-          <div className="absolute bottom-6 left-6 w-8 h-8 bg-white rounded-full opacity-10"></div>
-          <div className="absolute top-8 left-1/3 w-6 h-6 bg-white rounded-full opacity-10"></div>
-        </div>
-        
-        <div className="flex items-center justify-center h-full relative z-10">
+      <div className="bg-primary w-full h-[100px] rounded-b-[30px] shadow-sm px-6 mb-4 relative">
+        <div className="flex items-center justify-center h-full">
           {/* Search Bar */}
-          <div className="w-full bg-white border border__primary px-6 py-4 rounded-[25px] flex items-center shadow-neuro-in backdrop-blur-sm">
-            <FontAwesomeIcon icon={faSearch} className="text__primary mr-3 text-lg" />
+          <div className="w-full bg-white px-4 py-3 rounded-[20px] flex items-center shadow-sm">
+            <FontAwesomeIcon icon={faSearch} className="text-gray-400 mr-3" />
             <input
               type="text"
-              placeholder="Cari promo makanan, minuman, atau merchant..."
+              placeholder="Cari promo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 text-gray-700 placeholder-gray-500 bg-transparent outline-none font-medium"
+              className="flex-1 text-gray-700 placeholder-gray-400 bg-transparent outline-none"
             />
-            <FontAwesomeIcon icon={faTag} className="text-primary ml-2 opacity-50" />
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="bg-gradient-to-br from-cyan-50 min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20 px-4 pt-6 pb-24">
+      <div className="px-4 pb-24">
         <div className="lg:mx-auto lg:max-w-md">
           {/* Promo Terdekat Section */}
           <div className="mb-6">
-            <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[15px] p-3 shadow-sm mb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Promo Terdekat</h2>
-                  <p className="text-xs text-slate-600">Rekomendasi terbaik</p>
-                </div>
-                <div className="bg-primary bg-opacity-20 p-2 rounded-[12px]">
-                  <FontAwesomeIcon icon={faTag} className="text-primary text-lg" />
-                </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Promo Terkini</h2>
+              <div className="bg-blue-50 p-2 rounded-lg">
+                <FontAwesomeIcon icon={faTag} className="text-blue-500 text-sm" />
               </div>
             </div>
 
@@ -263,47 +249,11 @@ const CommunityPromoPage = () => {
                   <PromoCard key={promo.id} promo={promo} />
                 ))
             ) : (
-              <div className="text-center py-8 bg-white bg-opacity-40 backdrop-blur-sm rounded-[15px] shadow-sm">
-                <div className="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FontAwesomeIcon icon={faGift} className="text-slate-400 text-lg" />
+              <div className="text-center py-12 bg-gray-50 rounded-[12px]">
+                <div className="bg-gray-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <FontAwesomeIcon icon={faGift} className="text-gray-400" />
                 </div>
-                <p className="text-slate-600 font-medium text-sm">Belum ada promo tersedia</p>
-              </div>
-            )}
-          </div>
-
-          {/* Limited Deals Section */}
-          <div className="mb-6">
-            <div className="bg-orange-50 backdrop-blur-sm rounded-[15px] p-3 shadow-sm mb-3 border border-orange-200 border-opacity-30">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Limited Deals</h2>
-                  <p className="text-xs text-orange-600 font-medium">Penawaran terbatas</p>
-                </div>
-                <div className="bg-gradient-to-r from-orange-400 to-red-400 p-2 rounded-[12px] shadow-sm">
-                  <FontAwesomeIcon icon={faPercent} className="text-white text-lg" />
-                </div>
-              </div>
-            </div>
-            
-            {limitedDeals.length > 0 ? (
-              <div className="space-y-3">
-                {limitedDeals
-                  .filter(deal => 
-                    searchQuery === '' || 
-                    deal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    deal.merchant.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((deal) => (
-                    <LimitedDealCard key={deal.id} deal={deal} />
-                  ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-orange-50 backdrop-blur-sm rounded-[15px] shadow-sm">
-                <div className="bg-orange-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FontAwesomeIcon icon={faPercent} className="text-orange-500 text-lg" />
-                </div>
-                <p className="text-slate-600 font-medium text-sm">Belum ada limited deals</p>
+                <p className="text-gray-500 text-sm">Belum ada promo tersedia</p>
               </div>
             )}
           </div>
