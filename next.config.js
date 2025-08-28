@@ -1,6 +1,5 @@
 // next.config.js
 const runtimeCaching = require('next-pwa/cache');
-
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -15,35 +14,36 @@ module.exports = withPWA({
     return [
       {
         source: '/(.*)',
-        headers: [
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-        ],
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
     ];
   },
   reactStrictMode: false,
   images: {
-    domains: [
-      'localhost',
-      '127.0.0.1',
-      'api-unparone.unpar.ac.id',
-      'assets.huehuy.com',
-      'api-159-223-48-146.nip.io',
-    ],
+    // Hapus "domains", fokus ke remotePatterns (lebih strict & disarankan)
     remotePatterns: [
-      // local dev
+      // ====== LOCAL DEV ======
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/promos/**' },
-      { protocol: 'http', hostname: 'localhost', port: '8000', pathname: '/promos/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/promos/**' },
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/**' },
-      { protocol: 'http', hostname: 'localhost', port: '8000', pathname: '/storage/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/storage/**' },
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/api/storage/**' },
-      { protocol: 'http', hostname: 'localhost', port: '8000', pathname: '/api/storage/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/api/storage/**' },
 
-      // production backend
+      // ====== PRODUCTION BACKEND (nip.io) ======
+      { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/promos/**' },
       { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/storage/**' },
       { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/api/storage/**' },
+
+      // ====== ANTISIPASI REDIRECT KE IP LANGSUNG ======
+      { protocol: 'https', hostname: '159.223.48.146', pathname: '/promos/**' },
+      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/promos/**' },
+      { protocol: 'https', hostname: '159.223.48.146', pathname: '/storage/**' },
+      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/storage/**' },
+      { protocol: 'https', hostname: '159.223.48.146', pathname: '/api/storage/**' },
+      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/api/storage/**' },
     ],
-    // Untuk debugging, bisa uncomment ini sementara
+    // Kalau mau debugging: uncomment sementara
     // unoptimized: true,
   },
 });
