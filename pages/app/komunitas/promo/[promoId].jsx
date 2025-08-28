@@ -1,13 +1,13 @@
 /* pages/.../[promoId].jsx */
 import {
-    faArrowLeft,
-    faCheckCircle,
-    faExclamationTriangle,
-    faMapMarkerAlt,
-    faPhone,
-    faShare,
-    faWifi,
-    faWifiSlash
+  faArrowLeft,
+  faCheckCircle,
+  faExclamationTriangle,
+  faMapMarkerAlt,
+  faPhone,
+  faShare,
+  faWifi,
+  faWifiSlash
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from "js-cookie";
@@ -376,9 +376,11 @@ export default function PromoDetailUnified() {
     } else if (communityId === 'promo-entry') {
       router.push('/app');
     } else if (communityId) {
-      router.push(`/app/komunitas/promo?communityId=${communityId}`);
+      // When coming from QR scan or any promo detail, go back to community home
+      router.push(`/app/komunitas/dashboard/${communityId}`);
     } else {
-      router.back();
+      // Fallback to main app if no communityId
+      router.push('/app');
     }
   };
 

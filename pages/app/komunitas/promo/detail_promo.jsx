@@ -259,8 +259,12 @@ const PromoDetailPage = () => {
       router.push('/app/saku');
     } else if (communityId === 'promo-entry') {
       router.push('/app');
+    } else if (communityId) {
+      // When coming from QR scan or any promo detail, go back to community home
+      router.push(`/app/komunitas/dashboard/${communityId}`);
     } else {
-      router.push(`/app/komunitas/promo?communityId=${communityId}`);
+      // Fallback to main app if no communityId
+      router.push('/app');
     }
   };
   
