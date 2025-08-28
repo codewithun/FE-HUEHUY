@@ -48,7 +48,6 @@ export default function Komunitas() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('semua');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -137,7 +136,7 @@ export default function Komunitas() {
             </div>
 
             <div className="relative px-4 py-6 text-white">
-              {/* Header dengan back button dan create button */}
+              {/* Header dengan back button */}
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
                   <Link href="/app">
@@ -145,13 +144,6 @@ export default function Komunitas() {
                   </Link>
                   <h1 className="text-xl font-bold">Komunitas</h1>
                 </div>
-
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="bg-white text-primary px-4 py-2 rounded-full font-medium text-sm hover:bg-gray-100 transition-all duration-300 shadow-sm"
-                >
-                  Buat Komunitas
-                </button>
               </div>
 
               {/* Ilustrasi area dengan 3D characters - IMPROVED */}
@@ -289,13 +281,6 @@ export default function Komunitas() {
           </div>
         </div>
 
-        {/* Create Community Modal */}
-        {showCreateModal && (
-          <CreateCommunityModal
-            onClose={() => setShowCreateModal(false)}
-          />
-        )}
-
         <BottomBarComponent active={'community'} />
       </div>
     </>
@@ -395,138 +380,6 @@ function CommunityCard({ community, type, onOpenCommunity, formatNumber }) {
               )}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Create Community Modal - tetap sama
-function CreateCommunityModal({ onClose }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    category: '',
-    privacy: 'public'
-  });
-  const [isCreating, setIsCreating] = useState(false);
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    setIsCreating(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsCreating(false);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white bg-opacity-95 backdrop-blur-lg rounded-[25px] w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Buat Komunitas</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2">
-              <FontAwesomeIcon icon={faArrowLeft} />
-            </button>
-          </div>
-
-          <form onSubmit={handleCreate} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Nama Komunitas</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 border border__primary rounded-[20px] focus:outline-none focus:border-primary bg-white"
-                placeholder="Masukkan nama komunitas"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Deskripsi</label>
-              <textarea
-                required
-                rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 border border__primary rounded-[20px] focus:outline-none focus:border-primary bg-white resize-none"
-                placeholder="Deskripsikan tujuan komunitas Anda"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Kategori</label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-3 border border__primary rounded-[20px] focus:outline-none focus:border-primary bg-white"
-              >
-                <option value="">Pilih kategori</option>
-                <option value="Shopping">Shopping</option>
-                <option value="Event">Event</option>
-                <option value="Kuliner">Kuliner</option>
-                <option value="Otomotif">Otomotif</option>
-                <option value="Fashion">Fashion</option>
-                <option value="Hobi">Hobi</option>
-                <option value="Bisnis">Bisnis</option>
-                <option value="Kesehatan">Kesehatan</option>
-                <option value="Teknologi">Teknologi</option>
-                <option value="Travel">Travel</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-3 text-gray-700">Privasi</label>
-              <div className="space-y-3">
-                <label className="flex items-center p-4 bg-gray-50 rounded-[15px] cursor-pointer hover:bg-gray-100 transition-colors">
-                  <input
-                    type="radio"
-                    name="privacy"
-                    value="public"
-                    checked={formData.privacy === 'public'}
-                    onChange={(e) => setFormData({ ...formData, privacy: e.target.value })}
-                    className="mr-3"
-                  />
-                  <div>
-                    <div className="font-medium text-gray-900">Publik</div>
-                    <div className="text-sm text-gray-600">Siapa saja dapat bergabung</div>
-                  </div>
-                </label>
-                <label className="flex items-center p-4 bg-gray-50 rounded-[15px] cursor-pointer hover:bg-gray-100 transition-colors">
-                  <input
-                    type="radio"
-                    name="privacy"
-                    value="private"
-                    checked={formData.privacy === 'private'}
-                    onChange={(e) => setFormData({ ...formData, privacy: e.target.value })}
-                    className="mr-3"
-                  />
-                  <div>
-                    <div className="font-medium text-gray-900">Privat</div>
-                    <div className="text-sm text-gray-600">Memerlukan persetujuan admin</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-3 border border__primary rounded-[20px] text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={isCreating || !formData.name || !formData.description}
-                className="flex-1 px-4 py-3 bg-primary text-white rounded-[20px] font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors"
-              >
-                {isCreating ? 'Membuat...' : 'Buat Komunitas'}
-              </button>
-            </div>
-          </form>
         </div>
       </div>
     </div>
