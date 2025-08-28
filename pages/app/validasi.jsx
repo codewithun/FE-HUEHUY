@@ -122,7 +122,7 @@ export default function Validasi() {
             <div className="flex justify-center items-center gap-4 my-6">
               <div className="w-1/5 h-0.5 bg-gray-300"></div>
               <p className="text-slate-400 font-medium text-center">
-                Atau Masukkan Kode
+                Masukkan Kode
               </p>
               <div className="w-1/5 h-0.5 bg-gray-300"></div>
             </div>

@@ -15,6 +15,9 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import CommunityBottomBar from '../dashboard/CommunityBottomBar';
+import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../../../helpers';
+import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 export default function CommunityProfile() {
     const router = useRouter();
@@ -30,7 +33,7 @@ export default function CommunityProfile() {
         setIsClient(true);
     }, []);
 
-    // Demo data - in real app this would come from API based on community ID
+    // Demo community data (keep as-is)
     const [communityData] = useState({
         id: 1,
         name: 'dbotanica Bandung',
@@ -48,12 +51,60 @@ export default function CommunityProfile() {
         avatar: '/api/placeholder/80/80'
     });
 
-    const [userData] = useState({
-        name: 'Ardan Ferdiansah',
-        email: 'ardanferdiansah03@gmail.com',
+    // -------------------------
+    // User profile from backend
+    // -------------------------
+    const [userData, setUserData] = useState({
+        name: '',
+        email: '',
         avatar: '/api/placeholder/80/80',
         promoCount: 0
     });
+    const [loadingProfile, setLoadingProfile] = useState(false);
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
+    useEffect(() => {
+        if (!isClient) return;
+
+        const fetchProfile = async () => {
+            setLoadingProfile(true);
+            try {
+                const encryptedToken = Cookies.get(token_cookie_name);
+                const token = encryptedToken ? Decrypt(encryptedToken) : null;
+
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers.Authorization = `Bearer ${token}`;
+
+                const res = await fetch(`${apiUrl.replace(/\/$/, '')}/account`, {
+                    method: 'GET',
+                    headers
+                });
+
+                if (res.ok) {
+                    const json = await res.json().catch(() => null);
+                    // adjust according to your backend response shape
+                    const profile = json?.data?.profile || json?.data || json?.profile || json || {};
+                    setUserData({
+                        name: profile?.name || profile?.full_name || userData.name,
+                        email: profile?.email || profile?.contact_email || userData.email,
+                        avatar: profile?.picture_source || profile?.avatar || userData.avatar,
+                        promoCount: profile?.promoCount ?? userData.promoCount
+                    });
+                } else {
+                    // leave defaults on failure
+                    // console.warn('fetch profile failed', res.status);
+                }
+            } catch (e) {
+                // console.warn('fetch profile error', e);
+            } finally {
+                setLoadingProfile(false);
+            }
+        };
+
+        fetchProfile();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isClient]);
 
     const menuItems = [
         {
