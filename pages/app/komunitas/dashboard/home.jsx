@@ -230,41 +230,46 @@ export default function CommunityDashboard({ communityId }) {
 
   // ---- URL helpers (fix utama di sini) ----
   const isAbsoluteUrl = (u) =>
-    typeof u === 'string' &&
-    (u.startsWith('http://') || u.startsWith('https://'));
+    typeof u === 'string' && /^https?:\/\//i.test(u);
 
   const isPlaceholder = (u) =>
     typeof u === 'string' && u.startsWith('/api/placeholder');
 
   /**
-   * Build final image URL:
-   * - absolute URL -> pakai apa adanya (tidak diubah)
-   * - placeholder -> pakai apa adanya
-   * - relatif -> gabungkan ke baseUrl
-   * - validasi akhir: kalau bukan http/https/placeholder -> fallback placeholder
+   * Build final image URL (robust):
+   * - absolute: pakai apa adanya
+   * - placeholder: pakai apa adanya
+   * - relatif: normalisasi dulu → mapping ke "storage/..." bila perlu → gabungkan ke baseUrl (apiUrl tanpa /api)
    */
   const buildImageUrl = (raw) => {
     const fallback = '/api/placeholder/150/120';
-    if (typeof raw !== 'string' || !raw.trim()) return fallback;
-    let url = raw.trim();
+    if (typeof raw !== 'string') return fallback;
 
-    // ABSOLUTE: jangan diapa-apain
+    let url = raw.trim();
+    if (!url) return fallback;
+
+    // 1) Sudah absolute? langsung pakai
     if (isAbsoluteUrl(url)) return url;
 
-    // PLACEHOLDER: biarkan
+    // 2) Placeholder? biarkan
     if (isPlaceholder(url)) return url;
 
-    // RELATIF: gabung dengan base
-    // buang leading slash agar tidak jadi double
-    url = `${baseUrl}/${url.replace(/^\//, '')}`;
+    // 3) Normalisasi path relatif dari backend
+    //    - backend sering kirim "promos/xxx.webp" → seharusnya "storage/promos/xxx.webp"
+    //    - kalau backend kirim "api/storage/xxx" → jadikan "storage/xxx"
+    let path = url.replace(/^\/+/, '');                   // buang leading slash
+    path = path.replace(/^api\/storage\//, 'storage/');   // api/storage → storage
 
-    // VALIDASI AKHIR
-    if (!(isAbsoluteUrl(url) || isPlaceholder(url))) {
-      // kalau masih aneh (mis. "https:/-159..."), fallback
-      // console.warn('[image-url] invalid final url, fallback:', url);
-      return fallback;
+    // Jika bukan diawali "storage/", tetapi diawali folder konten seperti "promos/", "uploads/", arahkan ke storage
+    if (/^(promos|uploads|images|files)\//i.test(path)) {
+      path = `storage/${path}`;
     }
-    return url;
+
+    // 4) Gabungkan dengan baseUrl (tanpa /api, tanpa trailing slash)
+    const finalUrl = `${baseUrl}/${path}`;
+
+    // 5) Validasi akhir
+    return /^https?:\/\//i.test(finalUrl) ? finalUrl : fallback;
   };
 
   // Add back generatePromos used as a final fallback
@@ -498,9 +503,10 @@ export default function CommunityDashboard({ communityId }) {
     const normalizePromos = (arr = []) => {
       return (Array.isArray(arr) ? arr : []).map((p) => {
         const raw =
-          p.image_url ||
-          p.image ||
-          (p.image_path ? `/storage/${p.image_path}` : '/api/placeholder/150/120');
+          p.image_url ??
+          p.image ??
+          p.image_path ?? // biarkan apa adanya (bisa "promos/xxx.webp" atau "storage/xxx.webp"), helper yang akan normalkan
+          '/api/placeholder/150/120';
 
         const image = buildImageUrl(raw);
 
@@ -532,9 +538,9 @@ export default function CommunityDashboard({ communityId }) {
         const token = encryptedToken ? Decrypt(encryptedToken) : '';
         return token
           ? {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            }
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          }
           : { 'Content-Type': 'application/json' };
       } catch (e) {
         return { 'Content-Type': 'application/json' };
@@ -555,8 +561,8 @@ export default function CommunityDashboard({ communityId }) {
           const data = Array.isArray(json?.data)
             ? json.data
             : Array.isArray(json)
-            ? json
-            : [];
+              ? json
+              : [];
           if (Array.isArray(data) && data.length > 0) {
             setPromoCategories(convertCategoriesToWidgets(data));
             return;
@@ -579,8 +585,8 @@ export default function CommunityDashboard({ communityId }) {
           const data = Array.isArray(json?.data)
             ? json.data
             : Array.isArray(json)
-            ? json
-            : [];
+              ? json
+              : [];
           if (Array.isArray(data) && data.length > 0) {
             setPromoCategories([
               {
@@ -784,7 +790,7 @@ export default function CommunityDashboard({ communityId }) {
 
                   <div className="bg-white bg-opacity-60 backdrop-blur-sm rounded-b-2xl p-4 shadow-neuro">
                     {Array.isArray(category.promos) &&
-                    category.promos.length > 0 ? (
+                      category.promos.length > 0 ? (
                       <div className="overflow-x-auto scrollbar-hide">
                         <div
                           className="flex gap-4 pb-2"
