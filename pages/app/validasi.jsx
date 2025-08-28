@@ -13,7 +13,6 @@ import {
   InputComponent,
   ModalConfirmComponent,
 } from '../../components/base.components';
-import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
 import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
@@ -118,15 +117,6 @@ export default function Validasi() {
               />
             </Link>
           </div>
-
-          <QrScannerComponent
-            onScan={(e) => {
-              if (!modalSuccess && !modalFailed && !loading) {
-                setLoading(true);
-                submitValidate(e);
-              }
-            }}
-          />
 
           <div className="bg-background bg-gradient-to-br -mt-4 rounded-t-[15px] pt-2 from-cyan-50 relative z-50 px-4">
             <div className="flex justify-center items-center gap-4 my-6">
