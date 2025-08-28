@@ -1,6 +1,5 @@
 import { faArrowLeft, faComments, faShieldAlt, faUserCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
@@ -27,36 +26,24 @@ export default function CommunityAdminChat() {
             id: 'admin1',
             name: 'Evita dbotanica',
             role: 'Super Admin',
-            avatar: '/api/placeholder/60/60',
-            isOnline: true,
-            lastSeen: null,
             description: 'Founder & CEO'
         },
         {
             id: 'admin2',
             name: 'Ellen Sastraesmana',
             role: 'Admin',
-            avatar: '/api/placeholder/60/60',
-            isOnline: false,
-            lastSeen: '2 jam lalu',
             description: 'Community Manager'
         },
         {
             id: 'admin3',
             name: 'dbotanica',
             role: 'Admin',
-            avatar: '/api/placeholder/60/60',
-            isOnline: true,
-            lastSeen: null,
             description: 'Moderator'
         },
         {
             id: 'admin4',
             name: 'Kartika Dbotanica',
             role: 'Admin',
-            avatar: '/api/placeholder/60/60',
-            isOnline: false,
-            lastSeen: '1 hari lalu',
             description: 'Event Coordinator'
         }
     ]);
@@ -116,7 +103,7 @@ export default function CommunityAdminChat() {
                                         Pilih Admin untuk Memulai Chat
                                     </h3>
                                     <p className="text-white text-opacity-70 text-xs drop-shadow-neuro">
-                                        {adminList.filter(admin => admin.isOnline).length} admin online
+                                        Admin siap membantu Anda
                                     </p>
                                 </div>
                             </div>
@@ -137,23 +124,6 @@ export default function CommunityAdminChat() {
                                 >
                                     <div className="bg-white rounded-xl p-4 shadow-neuro hover:scale-[1.01] transition-all duration-300">
                                         <div className="flex items-center gap-4">
-                                            {/* Avatar with online indicator */}
-                                            <div className="relative">
-                                                <div className="w-14 h-14 bg-gray-100 rounded-2xl overflow-hidden shadow-neuro-in">
-                                                    <Image 
-                                                        src={admin.avatar} 
-                                                        alt={admin.name}
-                                                        width={56}
-                                                        height={56}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-                                                {/* Online indicator */}
-                                                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                                                    admin.isOnline ? 'bg-green-500' : 'bg-gray-400'
-                                                }`}></div>
-                                            </div>
-
                                             {/* Admin info */}
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-1">
@@ -171,21 +141,9 @@ export default function CommunityAdminChat() {
                                                     </div>
                                                 </div>
                                                 
-                                                <p className="text-slate-600 text-sm mb-1">
+                                                <p className="text-slate-600 text-sm">
                                                     {admin.description}
                                                 </p>
-                                                
-                                                <div className="flex items-center gap-2">
-                                                    {admin.isOnline ? (
-                                                        <span className="text-green-600 text-xs font-medium">
-                                                            Online
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-gray-500 text-xs">
-                                                            Terakhir dilihat {admin.lastSeen}
-                                                        </span>
-                                                    )}
-                                                </div>
                                             </div>
 
                                             {/* Chat indicator */}
