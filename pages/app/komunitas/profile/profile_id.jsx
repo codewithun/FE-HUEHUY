@@ -11,13 +11,12 @@ import {
     faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Image from 'next/image';
+import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import CommunityBottomBar from '../dashboard/CommunityBottomBar';
-import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
+import CommunityBottomBar from '../dashboard/CommunityBottomBar';
 
 export default function CommunityProfile() {
     const router = useRouter();
@@ -205,11 +204,15 @@ export default function CommunityProfile() {
                             <div className="bg-black bg-opacity-20 backdrop-blur-sm rounded-2xl p-6 mb-4 shadow-neuro">
                                 <div className="flex items-center gap-4">
                                     <div className="w-16 h-16 bg-white rounded-2xl overflow-hidden flex-shrink-0 shadow-neuro-in">
-                                        <Image 
-                                            src={userData.avatar} 
-                                            alt={userData.name}
+                                        <img 
+                                            src={
+                                                userData.avatar && userData.avatar !== '/api/placeholder/80/80'
+                                                    ? userData.avatar
+                                                    : '/avatar.jpg'
+                                            }
                                             width={64}
                                             height={64}
+                                            alt={userData.name}
                                             className="w-full h-full object-cover"
                                         />
                                     </div>
