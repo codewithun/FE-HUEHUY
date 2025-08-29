@@ -12,6 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { token_cookie_name } from '../../../../helpers';
@@ -203,26 +204,41 @@ export default function CommunityProfile() {
                             {/* User Profile Card */}
                             <div className="bg-black bg-opacity-20 backdrop-blur-sm rounded-2xl p-6 mb-4 shadow-neuro">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 bg-white rounded-2xl overflow-hidden flex-shrink-0 shadow-neuro-in">
-                                        <img 
-                                            src={
-                                                userData.avatar && userData.avatar !== '/api/placeholder/80/80'
-                                                    ? userData.avatar
-                                                    : '/avatar.jpg'
-                                            }
-                                            width={64}
-                                            height={64}
-                                            alt={userData.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
+                                    {loadingProfile ? (
+                                        <div className="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center">
+                                            <FontAwesomeIcon icon={faSpinner} className="animate-spin text-gray-400" />
+                                        </div>
+                                    ) : (
+                                        <div className="w-16 h-16 bg-white rounded-2xl overflow-hidden flex-shrink-0 shadow-neuro-in">
+                                            <Image 
+                                                src={
+                                                    userData.avatar && userData.avatar !== '/api/placeholder/80/80'
+                                                        ? userData.avatar
+                                                        : '/avatar.jpg'
+                                                }
+                                                width={64}
+                                                height={64}
+                                                alt={userData.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                    )}
                                     <div className="flex-1">
-                                        <h2 className="font-bold text-white text-lg mb-1 drop-shadow-neuro">
-                                            {userData.name}
-                                        </h2>
-                                        <p className="text-white text-opacity-80 text-sm mb-2 drop-shadow-neuro">
-                                            {userData.email}
-                                        </p>
+                                        {loadingProfile ? (
+                                            <div>
+                                                <div className="h-6 bg-gray-200 rounded mb-2 animate-pulse"></div>
+                                                <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <h2 className="font-bold text-white text-lg mb-1 drop-shadow-neuro">
+                                                    {userData.name}
+                                                </h2>
+                                                <p className="text-white text-opacity-80 text-sm mb-2 drop-shadow-neuro">
+                                                    {userData.email}
+                                                </p>
+                                            </>
+                                        )}
                                         <div className="flex items-center gap-2">
                                             <span className="text-white text-opacity-90 text-sm font-medium drop-shadow-neuro">
                                                 Iklan/Promo: {userData.promoCount}
