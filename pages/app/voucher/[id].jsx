@@ -1,9 +1,12 @@
 import { faArrowLeft, faCheckCircle, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Image from 'next/image';
+import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { get, post } from '../../../helpers/api.helpers';
+import { token_cookie_name } from '../../../helpers';
+import { Decrypt } from '../../../helpers/encryption.helpers';
 
 const DetailVoucherPage = () => {
   const router = useRouter();
@@ -129,6 +132,21 @@ const DetailVoucherPage = () => {
     setShowSuccessModal(false);
     router.push('/app/saku');
   };
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const encrypted = Cookies.get(token_cookie_name);
+    const token = encrypted ? Decrypt(encrypted) : null;
+    const next = router.asPath || `/app/voucher/${router.query.id || ''}`;
+    if (!token) {
+      router.replace(`/buat-akun?next=${encodeURIComponent(next)}`);
+      return;
+    }
+    // else: fetch voucher data as usual
+    if (id) {
+      fetchVoucherDetails();
+    }
+  }, [router.isReady, router.query]);
 
   if (loading) {
     return (
