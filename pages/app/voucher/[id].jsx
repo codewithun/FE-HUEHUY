@@ -21,22 +21,24 @@ const DetailVoucherPage = () => {
   // Helper function to construct proper image URLs
   const getImageUrl = (imagePath) => {
     if (!imagePath) return '/default-avatar.png';
-    
-    // If already absolute URL, return as is
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    
-    // If already starts with /, return as is
-    if (imagePath.startsWith('/')) {
-      return imagePath;
-    }
-    
-    // For relative paths from Laravel storage, construct proper URL
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:9000';
-    return `${apiUrl}/storage/${imagePath}`;
-  };
 
+    // Sudah absolut? langsung balikin
+    if (/^https?:\/\//i.test(imagePath)) return imagePath;
+
+    // Sudah root-relative? langsung pakai (opsional: prefix-kan base jika perlu)
+    if (imagePath.startsWith('/')) return imagePath;
+
+    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
+    const u = new URL(raw);                // aman untuk hostname & protokol
+    const origin = u.origin;               // contoh: https://api-159-223-48-146.nip.io
+
+    // Hapus path "/api" di akhir (hanya path, bukan subdomain)
+    // Misal: https://.../api → tetap origin yang sama, kita build path sendiri
+    const cleaned = `${origin}/storage/${String(imagePath).replace(/^storage\//, '')}`;
+
+    return cleaned;
+  };
+  
   useEffect(() => {
     if (id) {
       fetchVoucherDetails();
