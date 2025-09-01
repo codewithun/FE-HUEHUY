@@ -14,7 +14,18 @@ export default function Verification() {
   const [waitingMail, setWaitingMail] = useState(60);
   const [modalSendMailSuccess, setModalSendMailSuccess] = useState(false);
 
+  // after successful verification, redirect to original target if provided
   const onSuccess = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      if (next) {
+        window.location.href = decodeURIComponent(next);
+        return;
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
     window.location.href = '/app';
   };
 
@@ -23,7 +34,7 @@ export default function Verification() {
       path: 'auth/verify-mail',
     },
     false,
-    onSuccess
+  onSuccess
   );
 
   const resendMail = async (e) => {

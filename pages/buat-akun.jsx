@@ -22,7 +22,7 @@ export default function BuatAkun() {
       router.replace('/dashboard'); // redirect jika sudah pernah scan/register
     }
     // else tampilkan form register
-  }, []);
+  }, [router]);
 
   const onSuccess = (data) => {
     Cookies.set(
@@ -32,7 +32,11 @@ export default function BuatAkun() {
       { secure: true }
     );
 
-    window.location.href = '/verifikasi';
+  // preserve next param so after verification user returns to original target
+  const rawNext = router?.query?.next;
+  const next = rawNext ? String(rawNext) : null;
+  const target = next ? `/verifikasi?next=${encodeURIComponent(next)}` : '/verifikasi';
+  window.location.href = target;
   };
 
   const [{ formControl, submit, loading }] = useForm(
@@ -74,7 +78,10 @@ export default function BuatAkun() {
       .then((result) => {
         loginFirebase(result.user.accessToken, true).then((response) => {
           if (response.status == 200) {
-            window.location.href = '/app';
+            // if a next param exists, go there after successful login
+            const rawNext = router?.query?.next;
+            const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
+            window.location.href = next || '/app';
           } else if (response.status == 202) {
             setBtnGoogleLoading(false);
           }
