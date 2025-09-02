@@ -1,11 +1,12 @@
-import '@fortawesome/fontawesome-svg-core/styles.css';
-import '../styles/general.css';
-import type { AppProps } from 'next/app';
 import { config } from '@fortawesome/fontawesome-svg-core';
-import { ReactElement, ReactNode } from 'react';
-import { NextPage } from 'next';
-import { Roboto } from "next/font/google";
+import '@fortawesome/fontawesome-svg-core/styles.css';
 import Cookies from 'js-cookie';
+import { NextPage } from 'next';
+import type { AppProps } from 'next/app';
+import { Roboto } from "next/font/google";
+import { ReactElement, ReactNode } from 'react';
+import { UserProvider } from '../context/user.context';
+import '../styles/general.css';
 config.autoAddCss = false;
 
 const font = Roboto({
@@ -28,11 +29,15 @@ export default function App({ Component, pageProps }: AppPropsWithLayout) {
     secure: true,
   });
 
-  return getLayout(
-    <>
-      <main className={font.className}>
-        <Component {...pageProps} />
-      </main>
-    </>
+  return (
+    <UserProvider>
+      {getLayout(
+        <>
+          <main className={font.className}>
+            <Component {...pageProps} />
+          </main>
+        </>
+      )}
+    </UserProvider>
   );
 }

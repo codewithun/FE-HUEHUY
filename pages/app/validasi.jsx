@@ -6,13 +6,15 @@ import {
 import Cookies from 'js-cookie';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ButtonComponent,
   IconButtonComponent,
   InputComponent,
   ModalConfirmComponent,
 } from '../../components/base.components';
+import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
+import { useUserContext } from '../../context/user.context';
 import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
@@ -20,21 +22,38 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function Validasi() {
   const router = useRouter();
+  const { profile, loading, error, fetchProfile } = useUserContext();
+  
   const [code, setCode] = useState('');
-  const [modalSuccess, setModalSuccess] = useState();
-  const [modalFailed, setModalFailed] = useState();
-  const [loading, setLoading] = useState(false);
+  const [modalSuccess, setModalSuccess] = useState(false);
+  const [modalFailed, setModalFailed] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [lastItemId, setLastItemId] = useState(null);
   const [lastItemType, setLastItemType] = useState(null);
 
+  useEffect(() => {
+    const token = Cookies.get(token_cookie_name);
+    
+    if (token && !profile && !loading) {
+      fetchProfile();
+    }
+  }, [profile, loading, fetchProfile]);
+
+  const isManagerTenant = profile?.role_id === 6;
+
+  const handleScanResult = async (result) => {
+    if (!result || submitLoading) return;
+    setCode(result);
+    await submitValidate(result);
+  };
+
   const submitValidate = async (parsingCode = null) => {
-    setLoading(true);
+    setSubmitLoading(true);
     try {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : null;
 
       if (!token) {
-        // console.error('No token found');
         setModalFailed(true);
         return;
       }
@@ -46,7 +65,6 @@ export default function Validasi() {
 
       const codeToValidate = parsingCode || code;
 
-      // Try promo validation first
       let res = await fetch(`${apiUrl}/promos/validate`, {
         method: 'POST',
         headers,
@@ -58,7 +76,6 @@ export default function Validasi() {
       let result = await res.json().catch(() => null);
       let itemType = 'promo';
 
-      // If promo validation fails, try voucher validation
       if (!res.ok) {
         res = await fetch(`${apiUrl}/vouchers/validate`, {
           method: 'POST',
@@ -73,23 +90,19 @@ export default function Validasi() {
       }
 
       if (res.status === 401) {
-        // console.error('Token expired or invalid');
         setModalFailed(true);
       } else if (res.ok) {
-        // Get the ID from either promo or voucher data
         const itemId = result?.data?.promo?.id || result?.data?.voucher?.id;
         setLastItemId(itemId);
         setLastItemType(itemType);
         setModalSuccess(true);
       } else {
-        // console.error('validate failed', res.status, result);
         setModalFailed(true);
       }
     } catch (err) {
-      // console.error('validate exception:', err);
       setModalFailed(true);
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
@@ -98,7 +111,7 @@ export default function Validasi() {
       <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="bg-primary h-10"></div>
         <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
-          <div className="flex justify-between items-center gap-2 p-2 sticky top-0 z-30 bg-white bg-opacity-40 backdrop-blur-sm border-b ">
+          <div className="flex justify-between items-center gap-2 p-2 sticky top-0 z-30 bg-white bg-opacity-40 backdrop-blur-sm border-b">
             <div className="px-2">
               <IconButtonComponent
                 icon={faArrowLeftLong}
@@ -107,7 +120,9 @@ export default function Validasi() {
                 onClick={() => router.back()}
               />
             </div>
-            <div className="font-semibold w-full text-lg">Validasi</div>
+            <div className="font-semibold w-full text-lg">
+              Validasi
+            </div>
             <Link href="/app/riwayat-validasi">
               <ButtonComponent
                 variant="simple"
@@ -128,6 +143,13 @@ export default function Validasi() {
             </div>
 
             <div className="">
+              {isManagerTenant && (
+                <div className="mb-6">
+                  <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm border border-gray-100 overflow-hidden">
+                    <QrScannerComponent onScan={handleScanResult} />
+                  </div>
+                </div>
+              )}
               <InputComponent
                 placeholder="Masukkan kode disini..."
                 value={code}
@@ -135,13 +157,13 @@ export default function Validasi() {
                 size="lg"
               />
 
-              <div className="mt-6 px-8">
+              <div className="mt-6 px-8 flex flex-col gap-3">
                 <ButtonComponent
                   label="Validasi"
                   block
                   size="lg"
                   onClick={() => submitValidate()}
-                  loading={loading}
+                  loading={submitLoading}
                 />
               </div>
             </div>
@@ -157,7 +179,6 @@ export default function Validasi() {
         title={`Selamat, ${lastItemType === 'promo' ? 'Promo' : 'Voucher'} Berhasil di validasi`}
         onSubmit={async () => {
           setModalSuccess(false);
-          // kirim id ke halaman riwayat (hanya kalau ada)
           if (lastItemId) {
             router.push(`/app/riwayat-validasi?id=${lastItemId}&type=${lastItemType}`);
           } else {

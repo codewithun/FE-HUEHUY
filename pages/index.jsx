@@ -3,19 +3,19 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
 import Image from 'next/image';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import Link from 'next/link';
 
+import { faGoogle } from '@fortawesome/free-brands-svg-icons';
+import { faArrowRightLong } from '@fortawesome/free-solid-svg-icons';
+import { getAuth, signInWithPopup } from 'firebase/auth';
 import Cookies from 'js-cookie';
+import { useRouter } from 'next/router';
 import { ButtonComponent, InputComponent } from '../components/base.components';
 import { get, post, token_cookie_name, useForm } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
-import { getAuth, signInWithPopup } from 'firebase/auth';
-import { faGoogle } from '@fortawesome/free-brands-svg-icons';
 import { googleProvider } from '../helpers/firebase';
-import { useRouter } from 'next/router';
-import { faArrowRightLong } from '@fortawesome/free-solid-svg-icons';
 
 export default function Login() {
   const router = useRouter();
@@ -50,7 +50,7 @@ export default function Login() {
 
   useEffect(() => {
     setDefaultValues({
-      scope: 'user',
+      scope: 'user', // Gunakan scope 'user' untuk semua user app
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
