@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
-  faCrosshairs,
-  faCubes,
-  faGlobe,
-  faHandshake,
-  faNewspaper,
-  faUsers,
+    faCalendarAlt,
+    faCrosshairs,
+    faCubes,
+    faGlobe,
+    faHandshake,
+    faNewspaper,
+    faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
@@ -112,7 +113,7 @@ export default function Index() {
       <h1 className="text-xl lg:text-2xl font-bold mb-4 tracking-wide text-slate-700">Dashboard</h1>
 
       <h2 className="font-semibold mt-5 mb-3 border-l-4 rounded-md border-secondary pl-3 text-slate-600 text-lg tracking-wide">Statistik Dasar</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
         <DashboardCard
           label="Kubus"
           // loading={dashboardLoading}
@@ -140,6 +141,13 @@ export default function Index() {
           value={data?.data?.worlds}
           icon={faGlobe}
           linkPath="/admin/master/dunia"
+        />
+        <DashboardCard
+          label="Event"
+          // loading={dashboardLoading}
+          value={data?.data?.events}
+          icon={faCalendarAlt}
+          linkPath="/admin/master/event"
         />
         <DashboardCard
           label="Iklan"

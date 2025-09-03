@@ -1,21 +1,22 @@
 import {
+  faBullhorn, // Tambahkan icon komunitas, import dulu di atas
+  faCalendarAlt,
   faChartSimple,
   faCubes,
   faGlobe,
   faHandshake,
   faImage,
   faPhotoFilm,
+  faQrcode,
   faTags,
   faTriangleExclamation,
-  faUser,
-  faQrcode, // Tambahkan ini
-  faBullhorn, // Tambahkan icon promo
+  faUser, // Tambahkan icon promo
   faUsers, // Tambahkan icon komunitas, import dulu di atas
 } from '@fortawesome/free-solid-svg-icons';
 import { useState } from 'react';
 // import { AccessProvider, UserProvider } from '../../../context';
-import { HeadbarComponent, SidebarComponent } from '../../base.components';
 import { UserProvider } from '../../../context/user.context';
+import { HeadbarComponent, SidebarComponent } from '../../base.components';
 
 export function AdminLayout({ children }) {
   const [sidebar, setSidebar] = useState(false);
@@ -104,6 +105,11 @@ export function AdminLayout({ children }) {
           label: 'Manajemen Komunitas',
           icon: faUsers, // Tambahkan icon komunitas, import dulu di atas
           path: 'master/komunitas_dashboard',
+        },
+        {
+          label: 'Event',
+          icon: faCalendarAlt,
+          path: 'master/event',
         },
       ],
     },
