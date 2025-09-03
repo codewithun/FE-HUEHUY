@@ -7,167 +7,117 @@ import {
     faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import { token_cookie_name } from '../../../../helpers';
+import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 export default function EventDetail() {
     const router = useRouter();
     const { eventId } = router.query;
     const [eventData, setEventData] = useState(null);
     const [isClient, setIsClient] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
     useEffect(() => {
         setIsClient(true);
     }, []);
 
     useEffect(() => {
-        if (eventId) {
-            // Simulate API call to get event data
-            const getEventData = (id) => {
-                const allEvents = {
-                    1: {
-                        id: 1,
-                        title: "Upcoming Kids Drawing Competition - dbotanica Bandung",
-                        subtitle: "Kompetisi menggambar untuk anak-anak dengan hadiah menarik",
-                        image: '/api/placeholder/400/300',
-                        organizer: {
-                            name: "dbotanica Bandung",
-                            logo: '/api/placeholder/80/80',
-                            type: "Shopping Mall"
-                        },
-                        date: "15 Agustus 2025",
-                        time: "10:00 - 17:00",
-                        location: "dbotanica Bandung, Lantai 2 - Area Central Court",
-                        address: "Jl. Pasteur No. 28, Bandung",
-                        category: "Kids & Family",
-                        participants: 45,
-                        maxParticipants: 100,
-                        price: "Gratis",
-                        description: "Acara kompetisi menggambar khusus untuk anak-anak usia 5-12 tahun. Peserta akan diberikan tema khusus dan alat gambar. Pemenang akan mendapatkan hadiah menarik berupa voucher belanja dan alat gambar premium.",
-                        requirements: [
-                            "Anak usia 5-12 tahun",
-                            "Pendaftaran on-site mulai pukul 09:30",
-                            "Membawa KTP orang tua",
-                            "Alat gambar disediakan panitia",
-                            "Peserta wajib didampingi orang tua"
-                        ],
-                        schedule: [
-                            { time: "09:30 - 10:00", activity: "Registrasi peserta" },
-                            { time: "10:00 - 10:15", activity: "Pembukaan & penjelasan aturan" },
-                            { time: "10:15 - 15:00", activity: "Sesi menggambar" },
-                            { time: "15:00 - 16:00", activity: "Penilaian juri" },
-                            { time: "16:00 - 17:00", activity: "Pengumuman pemenang & penutupan" }
-                        ],
-                        prizes: [
-                            "Juara 1: Voucher belanja Rp 500.000 + Set alat gambar",
-                            "Juara 2: Voucher belanja Rp 300.000 + Set alat gambar", 
-                            "Juara 3: Voucher belanja Rp 200.000 + Set alat gambar",
-                            "Semua peserta mendapat goodie bag & sertifikat"
-                        ],
-                        contact: {
-                            phone: "+62 22 1234567",
-                            email: "event@dbotanica.com"
-                        },
-                        tags: ["Kids", "Drawing", "Competition", "Family", "Free"]
-                    },
-                    2: {
-                        id: 2,
-                        title: "Fashion Show & Beauty Contest",
-                        subtitle: "Kompetisi fashion dan kecantikan dengan hadiah jutaan rupiah",
-                        image: '/api/placeholder/400/300',
-                        organizer: {
-                            name: "dbotanica Bandung",
-                            logo: '/api/placeholder/80/80',
-                            type: "Shopping Mall"
-                        },
-                        date: "20 Agustus 2025",
-                        time: "19:00 - 22:00",
-                        location: "dbotanica Bandung, Main Stage",
-                        address: "Jl. Pasteur No. 28, Bandung",
-                        category: "Fashion & Beauty",
-                        participants: 120,
-                        maxParticipants: 150,
-                        price: "Rp 50.000 (untuk kontestan)",
-                        description: "Acara fashion show dan beauty contest terbesar di Bandung! Terbuka untuk umur 17-30 tahun. Peserta akan berjalan di atas panggung profesional dengan lighting dan sound system terbaik.",
-                        requirements: [
-                            "Usia 17-30 tahun",
-                            "Tinggi minimal 160cm (wanita), 170cm (pria)",
-                            "Foto portfolio terbaru",
-                            "Pendaftaran online sebelum 18 Agustus",
-                            "Medical check-up"
-                        ],
-                        schedule: [
-                            { time: "17:00 - 18:00", activity: "Registrasi ulang & persiapan" },
-                            { time: "18:00 - 19:00", activity: "Hair & makeup" },
-                            { time: "19:00 - 19:30", activity: "Opening ceremony" },
-                            { time: "19:30 - 21:00", activity: "Fashion show competition" },
-                            { time: "21:00 - 22:00", activity: "Penilaian & pengumuman pemenang" }
-                        ],
-                        prizes: [
-                            "Best Model: Rp 5.000.000 + Kontrak modeling",
-                            "Best Fashion: Rp 3.000.000 + Trophy",
-                            "People's Choice: Rp 2.000.000 + Trophy",
-                            "10 Finalis terbaik mendapat sertifikat & goodie bag"
-                        ],
-                        contact: {
-                            phone: "+62 22 1234567",
-                            email: "fashion@dbotanica.com"
-                        },
-                        tags: ["Fashion", "Beauty", "Contest", "Modeling", "Prize"]
-                    },
-                    3: {
-                        id: 3,
-                        title: "Grand Opening Celebration - Sunscape Event Organizer",
-                        subtitle: "Perayaan grand opening dengan live music dan doorprize",
-                        image: '/api/placeholder/400/300',
-                        organizer: {
-                            name: "Sunscape Event Organizer",
-                            logo: '/api/placeholder/80/80',
-                            type: "Event Organizer"
-                        },
-                        date: "18 Agustus 2025",
-                        time: "16:00 - 21:00",
-                        location: "Sunscape Event Hall",
-                        address: "Jl. Dago No. 45, Bandung",
-                        category: "Grand Opening",
-                        participants: 200,
-                        maxParticipants: 300,
-                        price: "Gratis",
-                        description: "Rayakan grand opening kantor baru Sunscape Event Organizer! Acara akan dimeriahkan dengan live music, food festival, dan doorprize menarik. Terbuka untuk umum dan gratis!",
-                        requirements: [
-                            "Terbuka untuk umum",
-                            "Registrasi di tempat",
-                            "Membawa identitas diri",
-                            "Doorprize terbatas untuk 100 orang pertama"
-                        ],
-                        schedule: [
-                            { time: "16:00 - 16:30", activity: "Welcome drink & registrasi" },
-                            { time: "16:30 - 17:00", activity: "Opening speech & company profile" },
-                            { time: "17:00 - 19:00", activity: "Live music performance" },
-                            { time: "19:00 - 20:00", activity: "Food festival & networking" },
-                            { time: "20:00 - 21:00", activity: "Doorprize & closing" }
-                        ],
-                        prizes: [
-                            "Grand Prize: iPhone 15 Pro",
-                            "2nd Prize: Samsung Galaxy Watch",
-                            "3rd Prize: Wireless earbuds",
-                            "Door prizes: Voucher makan, merchandise, dll"
-                        ],
-                        contact: {
-                            phone: "+62 22 9876543",
-                            email: "info@sunscape.co.id"
-                        },
-                        tags: ["Grand Opening", "Music", "Food", "Networking", "Free"]
-                    }
-                };
-                
-                return allEvents[parseInt(id)] || allEvents[1];
+        if (eventId && isClient) {
+            fetchEventData();
+        }
+    }, [eventId, isClient]);
+
+    const fetchEventData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            
+            const encryptedToken = Cookies.get(token_cookie_name);
+            const token = encryptedToken ? Decrypt(encryptedToken) : '';
+            
+            const response = await fetch(`${apiUrl}/events/${eventId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : '',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Event tidak ditemukan');
+            }
+
+            const result = await response.json();
+            
+            // Transform backend data to match frontend structure
+            const transformedData = {
+                id: result.data.id,
+                title: result.data.title,
+                subtitle: result.data.subtitle,
+                image: result.data.image ? (
+                    result.data.image.startsWith('http') 
+                        ? result.data.image 
+                        : `${apiUrl}/storage/${result.data.image}`
+                ) : '/api/placeholder/400/300',
+                organizer: {
+                    name: result.data.organizer_name,
+                    logo: result.data.organizer_logo ? (
+                        result.data.organizer_logo.startsWith('http')
+                            ? result.data.organizer_logo
+                            : `${apiUrl}/storage/${result.data.organizer_logo}`
+                    ) : '/api/placeholder/80/80',
+                    type: result.data.organizer_type
+                },
+                date: result.data.date,
+                time: result.data.time,
+                location: result.data.location,
+                address: result.data.address,
+                category: result.data.category,
+                participants: result.data.participants || 0,
+                maxParticipants: result.data.max_participants || 100,
+                price: result.data.price || 'Gratis',
+                description: result.data.description,
+                requirements: result.data.requirements ? result.data.requirements.split('\n').filter(r => r.trim()) : [],
+                schedule: result.data.schedule ? parseSchedule(result.data.schedule) : [],
+                prizes: result.data.prizes ? result.data.prizes.split('\n').filter(p => p.trim()) : [],
+                contact: {
+                    phone: result.data.contact_phone,
+                    email: result.data.contact_email
+                },
+                tags: result.data.tags ? result.data.tags.split(',').map(t => t.trim()) : []
             };
 
-            setEventData(getEventData(eventId));
+            setEventData(transformedData);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
-    }, [eventId]);
+    };
+
+    // Parse schedule string to array of objects
+    const parseSchedule = (scheduleString) => {
+        return scheduleString.split('\n').filter(s => s.trim()).map(item => {
+            const parts = item.split('|');
+            if (parts.length >= 2) {
+                return {
+                    time: parts[0].trim(),
+                    activity: parts[1].trim()
+                };
+            }
+            return {
+                time: '',
+                activity: item.trim()
+            };
+        });
+    };
 
     const handleShare = () => {
         if (navigator.share) {
@@ -182,11 +132,43 @@ export default function EventDetail() {
         }
     };
 
-    const handleRegister = () => {
-        alert('Pendaftaran berhasil! Tim kami akan menghubungi Anda segera.');
+    const handleRegister = async () => {
+        try {
+            const encryptedToken = Cookies.get(token_cookie_name);
+            const token = encryptedToken ? Decrypt(encryptedToken) : '';
+            
+            if (!token) {
+                alert('Silakan login terlebih dahulu untuk mendaftar event');
+                router.push('/');
+                return;
+            }
+
+            const response = await fetch(`${apiUrl}/events/${eventId}/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                alert('Pendaftaran berhasil! Tim kami akan menghubungi Anda segera.');
+                // Refresh event data to update participant count
+                fetchEventData();
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Gagal mendaftar event');
+            }
+        } catch (error) {
+            alert('Terjadi kesalahan saat mendaftar event');
+        }
     };
 
-    if (!isClient || !eventData) {
+    if (!isClient) {
+        return null;
+    }
+
+    if (loading) {
         return (
             <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
                 <div className="container mx-auto relative z-10">
@@ -194,6 +176,47 @@ export default function EventDetail() {
                         <div className="text-white text-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
                             <p className="mt-2 text-sm drop-shadow-neuro">Loading event...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+                <div className="container mx-auto relative z-10">
+                    <div className="w-full bg-red-500 h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
+                        <div className="text-white text-center">
+                            <p className="text-lg font-bold">Error</p>
+                            <p className="mt-2 text-sm">{error}</p>
+                            <button 
+                                onClick={() => router.back()}
+                                className="mt-4 bg-white text-red-500 px-4 py-2 rounded-lg font-semibold"
+                            >
+                                Kembali
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!eventData) {
+        return (
+            <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+                <div className="container mx-auto relative z-10">
+                    <div className="w-full bg-gray-500 h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
+                        <div className="text-white text-center">
+                            <p className="text-lg font-bold">Event tidak ditemukan</p>
+                            <button 
+                                onClick={() => router.back()}
+                                className="mt-4 bg-white text-gray-500 px-4 py-2 rounded-lg font-semibold"
+                            >
+                                Kembali
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -234,11 +257,13 @@ export default function EventDetail() {
                         </button>
 
                         {/* Category Badge */}
-                        <div className="absolute bottom-4 left-4">
-                            <span className="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold shadow-neuro">
-                                {eventData.category}
-                            </span>
-                        </div>
+                        {eventData.category && (
+                            <div className="absolute bottom-4 left-4">
+                                <span className="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold shadow-neuro">
+                                    {eventData.category}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -251,9 +276,11 @@ export default function EventDetail() {
                             <h1 className="text-2xl font-bold text-slate-900 mb-2">
                                 {eventData.title}
                             </h1>
-                            <p className="text-slate-600 mb-4">
-                                {eventData.subtitle}
-                            </p>
+                            {eventData.subtitle && (
+                                <p className="text-slate-600 mb-4">
+                                    {eventData.subtitle}
+                                </p>
+                            )}
                             
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div className="flex items-center gap-2">
@@ -263,13 +290,15 @@ export default function EventDetail() {
                                         <div className="font-semibold">{eventData.date}</div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <FontAwesomeIcon icon={faClock} className="text-primary" />
-                                    <div>
-                                        <div className="text-sm text-slate-600">Waktu</div>
-                                        <div className="font-semibold">{eventData.time}</div>
+                                {eventData.time && (
+                                    <div className="flex items-center gap-2">
+                                        <FontAwesomeIcon icon={faClock} className="text-primary" />
+                                        <div>
+                                            <div className="text-sm text-slate-600">Waktu</div>
+                                            <div className="font-semibold">{eventData.time}</div>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div className="flex items-center gap-2">
                                     <FontAwesomeIcon icon={faLocationDot} className="text-primary" />
                                     <div>
@@ -292,102 +321,126 @@ export default function EventDetail() {
                         </div>
 
                         {/* Organizer Info */}
-                        <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center">
-                                    <Image 
-                                        src={eventData.organizer.logo} 
-                                        alt={eventData.organizer.name}
-                                        width={64}
-                                        height={64}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-lg text-slate-900">{eventData.organizer.name}</h3>
-                                    <p className="text-sm text-slate-600">{eventData.organizer.type}</p>
-                                    <p className="text-sm text-slate-600">{eventData.address}</p>
+                        {eventData.organizer.name && (
+                            <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center">
+                                        <Image 
+                                            src={eventData.organizer.logo} 
+                                            alt={eventData.organizer.name}
+                                            width={64}
+                                            height={64}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-lg text-slate-900">{eventData.organizer.name}</h3>
+                                        {eventData.organizer.type && (
+                                            <p className="text-sm text-slate-600">{eventData.organizer.type}</p>
+                                        )}
+                                        {eventData.address && (
+                                            <p className="text-sm text-slate-600">{eventData.address}</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Description */}
-                        <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
-                            <h3 className="font-bold text-lg text-slate-900 mb-3">Deskripsi Event</h3>
-                            <p className="text-slate-600 leading-relaxed">
-                                {eventData.description}
-                            </p>
-                        </div>
+                        {eventData.description && (
+                            <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
+                                <h3 className="font-bold text-lg text-slate-900 mb-3">Deskripsi Event</h3>
+                                <p className="text-slate-600 leading-relaxed">
+                                    {eventData.description}
+                                </p>
+                            </div>
+                        )}
 
                         {/* Requirements */}
-                        <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
-                            <h3 className="font-bold text-lg text-slate-900 mb-3">Syarat & Ketentuan</h3>
-                            <ul className="space-y-2">
-                                {eventData.requirements.map((req, index) => (
-                                    <li key={index} className="flex items-start gap-2 text-sm text-slate-600">
-                                        <span className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></span>
-                                        <span>{req}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                        {eventData.requirements.length > 0 && (
+                            <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
+                                <h3 className="font-bold text-lg text-slate-900 mb-3">Syarat & Ketentuan</h3>
+                                <ul className="space-y-2">
+                                    {eventData.requirements.map((req, index) => (
+                                        <li key={index} className="flex items-start gap-2 text-sm text-slate-600">
+                                            <span className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></span>
+                                            <span>{req}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
 
                         {/* Schedule */}
-                        <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
-                            <h3 className="font-bold text-lg text-slate-900 mb-3">Jadwal Acara</h3>
-                            <div className="space-y-3">
-                                {eventData.schedule.map((item, index) => (
-                                    <div key={index} className="flex gap-4 p-3 bg-slate-50 rounded-lg">
-                                        <div className="font-semibold text-primary min-w-[80px]">
-                                            {item.time}
+                        {eventData.schedule.length > 0 && (
+                            <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
+                                <h3 className="font-bold text-lg text-slate-900 mb-3">Jadwal Acara</h3>
+                                <div className="space-y-3">
+                                    {eventData.schedule.map((item, index) => (
+                                        <div key={index} className="flex gap-4 p-3 bg-slate-50 rounded-lg">
+                                            {item.time && (
+                                                <div className="font-semibold text-primary min-w-[80px]">
+                                                    {item.time}
+                                                </div>
+                                            )}
+                                            <div className="text-slate-700">
+                                                {item.activity}
+                                            </div>
                                         </div>
-                                        <div className="text-slate-700">
-                                            {item.activity}
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Prizes */}
-                        <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
-                            <h3 className="font-bold text-lg text-slate-900 mb-3">Hadiah & Rewards</h3>
-                            <ul className="space-y-2">
-                                {eventData.prizes.map((prize, index) => (
-                                    <li key={index} className="flex items-start gap-2 text-sm text-slate-600">
-                                        <span className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></span>
-                                        <span>{prize}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                        {eventData.prizes.length > 0 && (
+                            <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
+                                <h3 className="font-bold text-lg text-slate-900 mb-3">Hadiah & Rewards</h3>
+                                <ul className="space-y-2">
+                                    {eventData.prizes.map((prize, index) => (
+                                        <li key={index} className="flex items-start gap-2 text-sm text-slate-600">
+                                            <span className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></span>
+                                            <span>{prize}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
 
                         {/* Tags */}
-                        <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
-                            <h3 className="font-bold text-lg text-slate-900 mb-3">Tags</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {eventData.tags.map((tag, index) => (
-                                    <span key={index} className="bg-primary bg-opacity-20 text-primary px-3 py-1 rounded-full text-sm">
-                                        {tag}
-                                    </span>
-                                ))}
+                        {eventData.tags.length > 0 && (
+                            <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
+                                <h3 className="font-bold text-lg text-slate-900 mb-3">Tags</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {eventData.tags.map((tag, index) => (
+                                        <span key={index} className="bg-primary bg-opacity-20 text-primary px-3 py-1 rounded-full text-sm">
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Contact */}
-                        <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
-                            <h3 className="font-bold text-lg text-slate-900 mb-3">Kontak</h3>
-                            <div className="space-y-2">
-                                <div className="text-sm">
-                                    <span className="font-semibold">Telepon: </span>
-                                    <span className="text-slate-600">{eventData.contact.phone}</span>
-                                </div>
-                                <div className="text-sm">
-                                    <span className="font-semibold">Email: </span>
-                                    <span className="text-slate-600">{eventData.contact.email}</span>
+                        {(eventData.contact.phone || eventData.contact.email) && (
+                            <div className="bg-white rounded-2xl p-4 shadow-neuro mb-6">
+                                <h3 className="font-bold text-lg text-slate-900 mb-3">Kontak</h3>
+                                <div className="space-y-2">
+                                    {eventData.contact.phone && (
+                                        <div className="text-sm">
+                                            <span className="font-semibold">Telepon: </span>
+                                            <span className="text-slate-600">{eventData.contact.phone}</span>
+                                        </div>
+                                    )}
+                                    {eventData.contact.email && (
+                                        <div className="text-sm">
+                                            <span className="font-semibold">Email: </span>
+                                            <span className="text-slate-600">{eventData.contact.email}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Fixed Bottom CTA */}
@@ -402,8 +455,9 @@ export default function EventDetail() {
                             <button 
                                 onClick={handleRegister}
                                 className="bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-neuro hover:scale-105 transition-all duration-300"
+                                disabled={eventData.participants >= eventData.maxParticipants}
                             >
-                                Daftar Sekarang
+                                {eventData.participants >= eventData.maxParticipants ? 'Penuh' : 'Daftar Sekarang'}
                             </button>
                         </div>
                     </div>

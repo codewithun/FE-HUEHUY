@@ -1,15 +1,17 @@
 import {
   faCalendar,
-  faClock
+  faClock,
+  faMapMarkerAlt,
+  faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import CommunityBottomBar from './CommunityBottomBar';
-import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
+import CommunityBottomBar from './CommunityBottomBar';
 
 export default function CommunityDashboard({ communityId }) {
   const router = useRouter();
@@ -127,95 +129,223 @@ export default function CommunityDashboard({ communityId }) {
 
   // Upcoming Events Data - dynamic based on community
   const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
   useEffect(() => {
     if (communityData) {
-      // Generate events based on community type
-      const getEventsForCommunity = (community) => [
-        {
-          id: 1,
-          title: `Kids Drawing Competition - ${community.name}`,
-          category: community.name,
-          image: '/images/event/kids-drawing.jpg',
-          date: '15 Agustus 2025',
-          time: '10:00 - 17:00',
-          location: community.location,
-          participants: 45
-        },
-        {
-          id: 2,
-          title: 'Fashion Show & Beauty Contest',
-          category: community.name,
-          image: '/images/event/fashion-show.jpg',
-          date: '20 Agustus 2025',
-          time: '19:00 - 22:00',
-          location: community.location,
-          participants: 120
-        },
-        {
-          id: 3,
-          title: 'Shopping Festival Weekend',
-          category: community.name,
-          image: '/images/event/shopping-festival.jpg',
-          date: '25 Agustus 2025',
-          time: '10:00 - 22:00',
-          location: community.location,
-          participants: 500
-        },
-        {
-          id: 4,
-          title: `Grand Opening Celebration - ${community.name}`,
-          category: community.name,
-          image: '/images/event/grand-opening.jpg',
-          date: '18 Agustus 2025',
-          time: '16:00 - 21:00',
-          location: community.location,
-          participants: 200
-        },
-        {
-          id: 5,
-          title: 'Music Festival 2025',
-          category: community.name,
-          image: '/images/event/music-festival.jpg',
-          date: '22 Agustus 2025',
-          time: '18:00 - 24:00',
-          location: community.location,
-          participants: 1000
-        },
-        {
-          id: 6,
-          title: `Festival Kuliner ${community.location}`,
-          category: community.name,
-          image: '/images/event/kuliner-festival.jpg',
-          date: '22 Agustus 2025',
-          time: '17:00 - 23:00',
-          location: community.location,
-          participants: 150
-        },
-        {
-          id: 7,
-          title: `Car Meet Up ${community.name}`,
-          category: community.name,
-          image: '/images/event/car-meetup.jpg',
-          date: '25 Agustus 2025',
-          time: '08:00 - 12:00',
-          location: community.location,
-          participants: 80
-        },
-        {
-          id: 8,
-          title: `Fashion Week ${community.location}`,
-          category: community.name,
-          image: '/images/event/fashion-week.jpg',
-          date: '28 Agustus 2025',
-          time: '19:00 - 22:00',
-          location: community.location,
-          participants: 300
-        }
-      ];
-      setUpcomingEvents(getEventsForCommunity(communityData));
+      fetchCommunityEvents();
     }
   }, [communityData]);
+
+  // Format date to be more readable
+  const formatEventDate = (dateString) => {
+    if (!dateString) return '';
+    
+    try {
+      // Handle various date formats
+      let date;
+      
+      // If it's already a valid date string like "4 Sep 2025"
+      if (dateString.includes(' ') && !dateString.includes('T')) {
+        return dateString;
+      }
+      
+      // Try parsing as ISO date or other formats
+      date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        // Try alternative parsing for formats like "2025-09-04"
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+          date = new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+      }
+      
+      // If still invalid, return original string cleaned up
+      if (isNaN(date.getTime())) {
+        return dateString.replace(/T.*/, '').replace(/-/g, '/');
+      }
+      
+      const options = { 
+        day: 'numeric', 
+        month: 'short',
+        year: 'numeric'
+      };
+      return date.toLocaleDateString('id-ID', options);
+    } catch (error) {
+      // If date parsing fails, try to clean up the original string
+      return dateString.replace(/T.*/, '').replace(/-/g, '/');
+    }
+  };
+
+  // Format time to be cleaner
+  const formatEventTime = (timeString) => {
+    if (!timeString) return '';
+    
+    // If it's already in HH:MM format, return as is
+    if (timeString.match(/^\d{2}:\d{2}$/)) {
+      return timeString;
+    }
+    
+    // If it's a range like "10:00 - 17:00", return as is
+    if (timeString.includes(' - ')) {
+      return timeString;
+    }
+    
+    // If it contains "Invalid", return empty string
+    if (timeString.toLowerCase().includes('invalid')) {
+      return '';
+    }
+    
+    try {
+      // Try parsing time with various formats
+      if (timeString.includes(':')) {
+        const timeParts = timeString.split(':');
+        if (timeParts.length >= 2) {
+          const hours = parseInt(timeParts[0]);
+          const minutes = parseInt(timeParts[1]);
+          if (!isNaN(hours) && !isNaN(minutes)) {
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          }
+        }
+      }
+      
+      const time = new Date(`2000-01-01T${timeString}`);
+      if (!isNaN(time.getTime())) {
+        return time.toLocaleTimeString('id-ID', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        });
+      }
+      
+      return timeString;
+    } catch (error) {
+      return timeString;
+    }
+  };
+
+  const fetchCommunityEvents = async () => {
+    try {
+      setLoadingEvents(true);
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : '';
+      
+      // Try multiple possible endpoints
+      const possibleEndpoints = [
+        `${apiUrl}/events?community_id=${communityData.id}`,
+        `${apiUrl}/admin/events?community_id=${communityData.id}`,
+        `${apiUrl}/communities/${communityData.id}/events`,
+        `${apiUrl}/events/community/${communityData.id}`
+      ];
+      
+      let response = null;
+      let usedEndpoint = '';
+      
+      // Try each endpoint until one works
+      for (const endpoint of possibleEndpoints) {
+        try {
+          response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : '',
+            },
+          });
+          
+          if (response.ok) {
+            usedEndpoint = endpoint;
+            break;
+          }
+        } catch (err) {
+          continue;
+        }
+      }
+
+      if (!response || !response.ok) {
+        setUpcomingEvents([]);
+        return;
+      }
+
+      const result = await response.json();
+      
+      let events = [];
+      
+      // Handle different response structures
+      if (Array.isArray(result)) {
+        events = result;
+      } else if (Array.isArray(result.data)) {
+        events = result.data;
+      } else if (result.events && Array.isArray(result.events)) {
+        events = result.events;
+      }
+      
+      // Filter events by community_id if endpoint returns all events
+      if (usedEndpoint.includes('?community_id=') === false) {
+        events = events.filter(event => 
+          event.community_id && event.community_id.toString() === communityData.id.toString()
+        );
+      }
+      
+      // Transform backend data to match frontend structure
+      const transformedEvents = events.map(event => ({
+        id: event.id,
+        title: event.title,
+        category: event.category || communityData.name,
+        image: event.image ? (
+          event.image.startsWith('http') 
+            ? event.image 
+            : `${apiUrl.replace('/api', '')}/storage/${event.image}`
+        ) : '/images/event/default-event.jpg',
+        date: formatEventDate(event.date),
+        time: formatEventTime(event.time),
+        location: event.location,
+        participants: event.participants || 0
+      }));
+
+      setUpcomingEvents(transformedEvents);
+      
+    } catch (error) {
+      setUpcomingEvents([]);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  // Generate demo events as fallback
+  const generateDemoEvents = (community) => [
+    {
+      id: 1,
+      title: `Kids Drawing Competition - ${community.name}`,
+      category: community.name,
+      image: '/images/event/kids-drawing.jpg',
+      date: '15 Agustus 2025',
+      time: '10:00 - 17:00',
+      location: community.location,
+      participants: 45
+    },
+    {
+      id: 2,
+      title: 'Fashion Show & Beauty Contest',
+      category: community.name,
+      image: '/images/event/fashion-show.jpg',
+      date: '20 Agustus 2025',
+      time: '19:00 - 22:00',
+      location: community.location,
+      participants: 120
+    },
+    {
+      id: 3,
+      title: 'Shopping Festival Weekend',
+      category: community.name,
+      image: '/images/event/shopping-festival.jpg',
+      date: '25 Agustus 2025',
+      time: '10:00 - 22:00',
+      location: community.location,
+      participants: 500
+    }
+  ];
 
   // Promo Categories Data - dynamic based on community
   const [promoCategories, setPromoCategories] = useState([]);
@@ -275,59 +405,48 @@ export default function CommunityDashboard({ communityId }) {
   // Add back generatePromos used as a final fallback
   const generatePromos = (community) => {
     const promosByCategory = {
+      // Hijau tua untuk Shopping
       Shopping: [
         {
           id: 1,
-          title: 'Fast Food Promo',
-          subtitle: 'Nikmati Burger & Chicken Terbaik!',
+          title: 'Promo Makanan & Minuman',
+          subtitle: 'Diskon Special untuk Foodie!',
           promos: [
             {
               id: 1,
-              title: "McDonald's - Burger Combo Flash Sale",
-              image: '/images/promo/burger-combo-flash.jpg',
-              label: 'Flash Sale',
-              discount: '30%',
-              description: 'Paket burger kombo dengan kentang dan minuman'
+              title: 'Chicken Star - Ayam Crispy Spesial',
+              image: '/images/promo/chicken-package.jpg',
+              label: 'Food Promo',
+              discount: '20%',
+              description:
+                'Ayam crispy dengan bumbu rahasia dan nasi hangat'
             },
             {
               id: 2,
-              title: 'Chicken Star - Paket Ayam Special',
-              image: '/images/promo/chicken-package.jpg',
-              label: 'Special Deal',
-              discount: '25%',
-              description: 'Ayam crispy dengan nasi dan saus pilihan'
+              title: 'Bubble Tea House - Minuman Segar',
+              image: '/images/promo/bubble-tea-discount.jpg',
+              label: 'Drink Promo',
+              discount: '15%',
+              description:
+                'Bubble tea dengan berbagai rasa dan topping'
             },
             {
               id: 3,
-              title: 'Premium Beef Sausage Package',
-              image: '/images/promo/beef-sausage-chicken.jpg',
-              label: 'Premium',
-              discount: '20%',
-              description: 'Sosis beef premium dengan ayam panggang'
-            }
-          ]
-        },
-        {
-          id: 2,
-          title: 'Pizza & Coffee',
-          subtitle: 'Promo Pizza dan Minuman Favorit!',
-          promos: [
-            {
-              id: 4,
-              title: 'Pizza Hut - Medium Pizza Deal',
+              title: 'Pizza Hut - Pizza Family',
               image: '/images/promo/pizza-medium-deal.jpg',
-              label: 'Pizza Deal',
-              discount: '35%',
+              label: 'Family Deal',
+              discount: '30%',
               description:
-                'Pizza medium dengan topping pilihan dan minuman'
+                'Pizza besar dengan topping lengkap untuk keluarga'
             },
             {
-              id: 5,
-              title: 'Brown Sugar Coffee Special',
+              id: 4,
+              title: 'Premium Coffee Experience',
               image: '/images/promo/brown-sugar-coffee.jpg',
-              label: 'Coffee Promo',
-              discount: '15%',
-              description: 'Kopi brown sugar dengan topping premium'
+              label: 'Premium',
+              discount: '10%',
+              description:
+                'Kopi berkualitas tinggi dengan cita rasa otentik'
             }
           ]
         }
@@ -482,7 +601,7 @@ export default function CommunityDashboard({ communityId }) {
         {
           id: 1,
           title: 'Promo Komunitas',
-          subtitle: 'Promo Eksklusif untuk Member!',
+          subtitle: `${community.name} - Promo Tersedia`,
           promos: [
             {
               id: 1,
@@ -697,83 +816,119 @@ export default function CommunityDashboard({ communityId }) {
                     <h2 className="text-lg font-bold text-slate-900">
                       Upcoming Event
                     </h2>
-                    <p className="text-sm text-slate-600">Upcoming Event</p>
+                    <p className="text-sm text-slate-600">Event komunitas terbaru</p>
                   </div>
+                  <button
+                    onClick={() => router.push(`/app/komunitas/event/community/${communityData.id}`)}
+                    className="text-primary text-sm font-semibold hover:underline"
+                  >
+                    Lihat Semua
+                  </button>
                 </div>
 
-                {/* Horizontal Scroll Container for Events */}
-                <div className="overflow-x-auto scrollbar-hide">
-                  <div
-                    className="flex gap-4 pb-2"
-                    style={{ width: 'max-content' }}
-                  >
-                    {upcomingEvents.map((event) => (
+                {/* Loading State */}
+                {loadingEvents ? (
+                  <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                    {[1, 2, 3].map((i) => (
                       <div
-                        key={event.id}
-                        onClick={() =>
-                          router.push(`/app/komunitas/event/${event.id}`)
-                        }
-                        className="relative rounded-2xl overflow-hidden shadow-neuro hover:scale-[1.01] transition-all duration-300 flex-shrink-0 cursor-pointer"
-                        style={{ width: '280px' }}
-                      >
-                        <div className="relative h-48">
-                          {/* Background Image */}
-                          <Image
-                            src={event.image}
-                            alt={event.title}
-                            fill
-                            className="object-cover"
-                          />
+                        key={i}
+                        className="flex-shrink-0 bg-gray-200 animate-pulse rounded-2xl"
+                        style={{ width: '320px', height: '240px' }}
+                      />
+                    ))}
+                  </div>
+                ) : upcomingEvents.length > 0 ? (
+                  /* Horizontal Scroll Container for Events */
+                  <div className="overflow-x-auto scrollbar-hide">
+                    <div
+                      className="flex gap-4 pb-2"
+                      style={{ width: 'max-content' }}
+                    >
+                      {upcomingEvents.slice(0, 5).map((event) => (
+                        <div
+                          key={event.id}
+                          className="relative rounded-2xl overflow-hidden shadow-neuro hover:scale-[1.01] transition-all duration-300 flex-shrink-0"
+                          style={{ width: '320px' }}
+                        >
+                          <div className="relative h-48">
+                            {/* Background Image */}
+                            <Image
+                              src={event.image}
+                              alt={event.title}
+                              fill
+                              className="object-cover"
+                            />
 
-                          {/* Dark overlay untuk readability */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20"></div>
+                            {/* Dark overlay untuk readability */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20"></div>
 
-                          {/* Community Name Badge - Kiri Atas */}
-                          <div className="absolute top-3 left-3">
-                            <span className="bg-white bg-opacity-90 text-slate-900 px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
-                              {event.category}
-                            </span>
-                          </div>
+                            {/* Community Name Badge - Kiri Atas */}
+                            <div className="absolute top-3 left-3">
+                              <span className="bg-white bg-opacity-90 text-slate-900 px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
+                                {event.category}
+                              </span>
+                            </div>
 
-                          {/* View More Button - Kanan Atas */}
-                          <button className="absolute top-3 right-3 bg-white bg-opacity-20 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-semibold border border-white border-opacity-30 shadow-neuro-in">
-                            view more
-                          </button>
+                            {/* Event Status Badge - Kanan Atas */}
+                            <div className="absolute top-3 right-3">
+                              <span className="bg-green-500 bg-opacity-90 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
+                                UPCOMING
+                              </span>
+                            </div>
 
-                          {/* Event Info - Bagian Bawah */}
-                          <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                            <h3 className="text-lg font-bold mb-2 tracking-wider drop-shadow-lg">
-                              UPCOMING
-                            </h3>
-                            <h4 className="text-lg font-bold mb-3 leading-tight drop-shadow-lg line-clamp-2">
-                              {event.title}
-                            </h4>
-                            <div className="flex items-center gap-4 text-sm text-white text-opacity-90">
-                              <div className="flex items-center gap-1">
-                                <FontAwesomeIcon
-                                  icon={faCalendar}
-                                  className="text-xs"
-                                />
-                                <span className="drop-shadow-lg">
-                                  {event.date}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <FontAwesomeIcon
-                                  icon={faClock}
-                                  className="text-xs"
-                                />
-                                <span className="drop-shadow-lg">
-                                  {event.time}
-                                </span>
+                            {/* Event Info - Bagian Bawah */}
+                            <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                              <h4 className="text-lg font-bold mb-2 leading-tight drop-shadow-lg line-clamp-2">
+                                {event.title}
+                              </h4>
+                              <div className="space-y-1 text-sm text-white text-opacity-90">
+                                <div className="flex items-center gap-2">
+                                  <FontAwesomeIcon
+                                    icon={faCalendar}
+                                    className="text-xs"
+                                  />
+                                  <span className="drop-shadow-lg">
+                                    {event.date}
+                                  </span>
+                                  <FontAwesomeIcon
+                                    icon={faClock}
+                                    className="text-xs ml-2"
+                                  />
+                                  <span className="drop-shadow-lg">
+                                    {event.time}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <FontAwesomeIcon
+                                    icon={faMapMarkerAlt}
+                                    className="text-xs"
+                                  />
+                                  <span className="drop-shadow-lg line-clamp-1">
+                                    {event.location}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <FontAwesomeIcon
+                                    icon={faUsers}
+                                    className="text-xs"
+                                  />
+                                  <span className="drop-shadow-lg">
+                                    {event.participants} peserta
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Empty State */
+                  <div className="text-center text-sm text-slate-600 py-6">
+                    Belum ada event di komunitas ini.
+                  </div>
+                )}
               </div>
 
               {/* Promo Categories */}
