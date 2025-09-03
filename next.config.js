@@ -30,11 +30,12 @@ module.exports = withPWA({
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/api/storage/**' },
       { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/api/storage/**' },
 
-      // ====== PRODUCTION BACKEND (nip.io) ======
-      { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/promos/**' },
-      { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/storage/**' },
-      { protocol: 'https', hostname: 'api-159-223-48-146.nip.io', pathname: '/api/storage/**' },
+      // ====== PRODUCTION BACKEND (api.huehuy.com) ======
+      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/promos/**' },
+      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/storage/**' },
+      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/api/storage/**' },
 
+      // (opsional) tetap pertahankan IP entries jika perlu fallback
       // ====== ANTISIPASI REDIRECT KE IP LANGSUNG ======
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/promos/**' },
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/promos/**' },
