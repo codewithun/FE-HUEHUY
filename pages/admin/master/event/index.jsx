@@ -705,10 +705,13 @@ export default function EventCrud() {
               <label className="font-semibold">Gambar Event</label>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,.jpeg,.jpg,.png,.gif,.svg,.webp,.bmp,.tiff,.ico,.heic,.heif"
                 className="input input-bordered w-full"
                 onChange={handleImageChange}
               />
+              <div className="text-xs text-gray-500 mt-1">
+                Format yang didukung: JPEG, JPG, PNG, GIF, SVG, WEBP, BMP, TIFF, ICO, HEIC, HEIF (Max: 5MB)
+              </div>
               {formData.image && !imageFile && (
                 <div className="mt-2">
                   <img
@@ -720,7 +723,7 @@ export default function EventCrud() {
                     alt="Event"
                     width={80}
                     height={80}
-                    className="rounded"
+                    className="rounded object-cover"
                   />
                 </div>
               )}
@@ -731,7 +734,7 @@ export default function EventCrud() {
                     alt="Preview"
                     width={80}
                     height={80}
-                    className="rounded"
+                    className="rounded object-cover"
                   />
                 </div>
               )}
@@ -740,10 +743,13 @@ export default function EventCrud() {
               <label className="font-semibold">Logo Penyelenggara</label>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,.jpeg,.jpg,.png,.gif,.svg,.webp,.bmp,.tiff,.ico,.heic,.heif"
                 className="input input-bordered w-full"
                 onChange={handleOrganizerLogoChange}
               />
+              <div className="text-xs text-gray-500 mt-1">
+                Format yang didukung: JPEG, JPG, PNG, GIF, SVG, WEBP, BMP, TIFF, ICO, HEIC, HEIF (Max: 5MB)
+              </div>
               {formData.organizer_logo && !organizerLogoFile && (
                 <div className="mt-2">
                   <img
@@ -755,7 +761,7 @@ export default function EventCrud() {
                     alt="Organizer Logo"
                     width={80}
                     height={80}
-                    className="rounded"
+                    className="rounded object-cover"
                   />
                 </div>
               )}
@@ -766,7 +772,7 @@ export default function EventCrud() {
                     alt="Preview"
                     width={80}
                     height={80}
-                    className="rounded"
+                    className="rounded object-cover"
                   />
                 </div>
               )}
