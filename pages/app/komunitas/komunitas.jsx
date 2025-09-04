@@ -1,6 +1,9 @@
 import {
   faArrowLeft,
-  faSearch
+  faCheckCircle,
+  faSearch,
+  faTimes,
+  faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from "js-cookie";
@@ -42,7 +45,84 @@ const buildLogoUrl = (apiUrl, logo) => {
     return null;
   }
 };
-// --- /ADD ---
+
+// --- ADD: API helper functions ---
+const getAuthHeaders = () => {
+  const encryptedToken = Cookies.get(token_cookie_name);
+  const token = encryptedToken ? Decrypt(encryptedToken) : "";
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+};
+
+const joinCommunityAPI = async (communityId) => {
+  // Handle API URL properly - remove /api if it exists, then add it back
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiUrl = baseUrl.replace(/\/api\/?$/, "");
+  
+  const response = await fetch(`${apiUrl}/api/communities/${communityId}/join`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Gagal bergabung dengan komunitas');
+  }
+  
+  return response.json();
+};
+
+const fetchCommunitiesWithMembership = async () => {
+  // Handle API URL properly - remove /api if it exists, then add it back
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiUrl = baseUrl.replace(/\/api\/?$/, "");
+  
+  try {
+    // Try the with-membership endpoint first
+    const response = await fetch(`${apiUrl}/api/communities/with-membership`, {
+      headers: getAuthHeaders(),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    } else {
+    }
+  } catch (error) {
+  }
+  
+  // Fallback: Get all communities and user's communities separately
+  try {
+    const [communitiesResponse, userCommunitiesResponse] = await Promise.all([
+      fetch(`${apiUrl}/api/admin/communities`, { headers: getAuthHeaders() }),
+      fetch(`${apiUrl}/api/communities/user-communities`, { headers: getAuthHeaders() }).catch(() => null)
+    ]);
+    
+    const allCommunities = await communitiesResponse.json();
+    let userCommunities = [];
+    
+    // If user-communities endpoint works, get user's joined communities
+    if (userCommunitiesResponse && userCommunitiesResponse.ok) {
+      const userCommunitiesData = await userCommunitiesResponse.json();
+      userCommunities = userCommunitiesData.data || userCommunitiesData || [];
+    }
+    
+    // Mark communities as joined based on user communities
+    const userCommunityIds = userCommunities.map(uc => uc.id);
+    const communitiesWithMembership = (allCommunities.data || allCommunities || []).map(community => ({
+      ...community,
+      isJoined: userCommunityIds.includes(community.id),
+      members: community.members || 0
+    }));
+    
+    return communitiesWithMembership;
+  } catch (fallbackError) {
+    // Return empty array if all fails
+    return [];
+  }
+};
 
 export default function Komunitas() {
   const router = useRouter();
@@ -51,43 +131,36 @@ export default function Komunitas() {
   const [isClient, setIsClient] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showJoinPopup, setShowJoinPopup] = useState(false);
+  const [selectedCommunity, setSelectedCommunity] = useState(null);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Ganti data dummy dengan fetch API
+  // Updated: Fetch communities with membership status
+  const fetchCommunities = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchCommunitiesWithMembership();
+
+      // Process communities data to construct proper logo URLs for Next.js Image
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      const processedCommunities = list.map((community) => ({
+        ...community,
+        logo: buildLogoUrl((process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, ""), community.logo),
+        // Ensure isJoined field exists (backend should provide this)
+        isJoined: community.isJoined || community.is_joined || false,
+      }));
+      setCommunities(processedCommunities);
+
+    } catch (err) {
+      setCommunities([]);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchCommunities = async () => {
-      setLoading(true);
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const token = encryptedToken ? Decrypt(encryptedToken) : "";
-        // Perbaiki endpoint agar tidak double /api
-        const res = await fetch(`${apiUrl}/admin/communities`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const data = await res.json();
-
-        // Process communities data to construct proper logo URLs for Next.js Image
-        // Process communities data → bangun URL logo yang valid untuk Next/Image
-        const list = Array.isArray(data) ? data : (data?.data || []);
-        const processedCommunities = list.map((community) => ({
-          ...community,
-          logo: buildLogoUrl(apiUrl, community.logo),
-        }));
-        setCommunities(processedCommunities);
-
-      } catch (err) {
-        // console.error('Error fetching communities:', err);
-        setCommunities([]);
-      }
-      setLoading(false);
-    };
     fetchCommunities();
   }, []);
 
@@ -272,6 +345,12 @@ export default function Komunitas() {
                         type={community.isJoined ? 'joined' : 'notJoined'}
                         onOpenCommunity={handleOpenCommunity}
                         formatNumber={formatNumber}
+                        refreshCommunities={fetchCommunities}
+                        setActiveTab={setActiveTab}
+                        onShowJoinPopup={(community) => {
+                          setSelectedCommunity(community);
+                          setShowJoinPopup(true);
+                        }}
                       />
                     ))
                   )}
@@ -281,22 +360,164 @@ export default function Komunitas() {
           </div>
         </div>
 
+        {/* Join Confirmation Popup */}
+        {showJoinPopup && selectedCommunity && (
+          <JoinConfirmationPopup
+            community={selectedCommunity}
+            onConfirm={async () => {
+              try {
+                await joinCommunityAPI(selectedCommunity.id);
+                setShowJoinPopup(false);
+                setSelectedCommunity(null);
+                
+                // Update the specific community as joined
+                setCommunities(prev => prev.map(community => 
+                  community.id === selectedCommunity.id 
+                    ? { ...community, isJoined: true }
+                    : community
+                ));
+                
+                setActiveTab('komunitasku');
+              } catch (error) {
+                // Silent error handling - just close popup and don't update state
+                setShowJoinPopup(false);
+                setSelectedCommunity(null);
+              }
+            }}
+            onCancel={() => {
+              setShowJoinPopup(false);
+              setSelectedCommunity(null);
+            }}
+          />
+        )}
+
         <BottomBarComponent active={'community'} />
       </div>
     </>
   );
 }
 
-// Community Card Component - IMPROVED dengan type untuk membedakan joined/notJoined
-function CommunityCard({ community, type, onOpenCommunity, formatNumber }) {
+// Join Confirmation Popup Component
+function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
   const [isJoining, setIsJoining] = useState(false);
 
-  const handleJoinCommunity = async (e) => {
-    e.stopPropagation(); // Prevent opening community when clicking join button
+  const handleConfirm = async () => {
     setIsJoining(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsJoining(false);
-    // In real app, this would update the community join status
+    try {
+      await onConfirm();
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-auto shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-slate-800">Bergabung Komunitas</h3>
+          <button
+            onClick={onCancel}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <FontAwesomeIcon icon={faTimes} className="text-gray-500" />
+          </button>
+        </div>
+
+        {/* Community Info */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {community.logo && /^https?:\/\/[^ "]+$/.test(community.logo) ? (
+              <Image
+                src={community.logo}
+                width={48}
+                height={48}
+                alt="Community Logo"
+                className="object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
+                <span className="text-white text-xs font-bold">
+                  {community.name.substring(0, 2).toUpperCase()}
+                </span>
+              </div>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-slate-900">{community.name}</h4>
+            <p className="text-sm text-slate-600">{community.members || 0} anggota</p>
+          </div>
+        </div>
+
+        {/* Confirmation Message */}
+        <div className="mb-6">
+          <p className="text-slate-700 text-center leading-relaxed">
+            Apakah Anda yakin ingin bergabung dengan komunitas <span className="font-semibold">{community.name}</span>?
+          </p>
+          <div className="mt-4 bg-blue-50 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-sm text-blue-800">
+              <FontAwesomeIcon icon={faCheckCircle} className="text-blue-600" />
+              <span>Anda akan mendapatkan akses ke promo eksklusif komunitas</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 px-4 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={isJoining}
+            className="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isJoining ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Bergabung...
+              </>
+            ) : (
+              <>
+                <FontAwesomeIcon icon={faUsers} />
+                Bergabung
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Community Card Component - IMPROVED dengan type untuk membedakan joined/notJoined
+function CommunityCard({ community, type, onOpenCommunity, formatNumber, refreshCommunities, setActiveTab, onShowJoinPopup }) {
+  const [joinError, setJoinError] = useState('');
+  const [isJoined, setIsJoined] = useState(community.isJoined);
+  const [justJoined, setJustJoined] = useState(false);
+
+  // Update isJoined when community prop changes
+  useEffect(() => {
+    setIsJoined(community.isJoined);
+    if (community.isJoined && !isJoined) {
+      setJustJoined(true);
+      setTimeout(() => setJustJoined(false), 2000);
+    }
+  }, [community.isJoined]);
+
+  const handleJoinCommunity = (e) => {
+    e.stopPropagation(); // Prevent opening community when clicking join button
+    
+    // Check if already joined
+    if (isJoined || community.isJoined) {
+      return;
+    }
+    
+    // Show join popup
+    onShowJoinPopup(community);
   };
 
   const getCategoryColor = (category) => {
@@ -317,7 +538,13 @@ function CommunityCard({ community, type, onOpenCommunity, formatNumber }) {
 
   return (
     <div
-      className="bg-white bg-opacity-60 backdrop-blur-sm rounded-[15px] p-4 shadow-sm border border-slate-200 hover:shadow-md transition-all duration-300 cursor-pointer"
+      className={`bg-white bg-opacity-60 backdrop-blur-sm rounded-[15px] p-4 shadow-sm border transition-all duration-300 cursor-pointer ${
+        justJoined 
+          ? 'border-green-300 bg-green-50 shadow-md' 
+          : isJoined 
+            ? 'border-primary bg-primary/5' 
+            : 'border-slate-200 hover:shadow-md'
+      }`}
       onClick={() => onOpenCommunity(community.id)}
     >
       <div className="flex gap-3">
@@ -345,6 +572,9 @@ function CommunityCard({ community, type, onOpenCommunity, formatNumber }) {
           <div className="flex items-start justify-between mb-1">
             <h3 className="font-semibold text-slate-900 text-sm truncate pr-2">
               {community.name}
+              {justJoined && (
+                <span className="ml-2 text-xs text-green-600 font-medium">✓ Bergabung!</span>
+              )}
             </h3>
             <div className="flex items-center gap-2">
               {community.isVerified && (
@@ -367,15 +597,21 @@ function CommunityCard({ community, type, onOpenCommunity, formatNumber }) {
 
             <div className="flex items-center gap-3 text-xs text-slate-500">
               <span>{formatNumber(community.members)} anggota</span>
-              {type === 'joined' ? (
-                <span className="text-primary font-medium">{community.activePromos} promo</span>
+              {type === 'joined' || isJoined ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-primary font-medium">
+                    {community.activePromos || 0} promo
+                  </span>
+                  {isJoined && (
+                    <span className="text-green-600 text-sm">✓</span>
+                  )}
+                </div>
               ) : (
                 <button
                   onClick={handleJoinCommunity}
-                  disabled={isJoining}
-                  className="bg-primary text-white px-3 py-1 rounded-full font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  className="bg-primary text-white px-3 py-1 rounded-full font-medium hover:bg-primary/90 transition-colors"
                 >
-                  {isJoining ? 'Bergabung...' : 'Gabung'}
+                  Gabung
                 </button>
               )}
             </div>
