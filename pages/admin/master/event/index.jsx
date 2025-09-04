@@ -1,6 +1,6 @@
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ButtonComponent,
   FloatingPageComponent,
@@ -116,73 +116,82 @@ export default function EventCrud() {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : '';
     
-    const method = 'POST';
     const url = selectedEvent
       ? `${apiUrl}/admin/events/${selectedEvent.id}`
       : `${apiUrl}/admin/events`;
 
-    let body;
-    let headers = {
-      'Authorization': `Bearer ${token}`,
-    };
-
-    // Always use FormData when uploading files or updating
-    if (imageFile || organizerLogoFile || selectedEvent) {
-      body = new FormData();
-      Object.keys(formData).forEach(key => {
-        if (formData[key] !== '') {
-          body.append(key, formData[key]);
-        }
-      });
-      
-      // Method spoofing for updates
-      if (selectedEvent) {
-        body.append('_method', 'PUT');
+    // Selalu gunakan FormData untuk konsistensi
+    const formDataToSend = new FormData();
+    
+    // Append semua field
+    Object.keys(formData).forEach(key => {
+      if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
+        formDataToSend.append(key, formData[key]);
       }
-      
-      if (imageFile) {
-        body.append('image', imageFile);
-      }
-      if (organizerLogoFile) {
-        body.append('organizer_logo', organizerLogoFile);
-      }
-    } else {
-      // JSON for create without image
-      body = JSON.stringify(formData);
-      headers['Content-Type'] = 'application/json';
+    });
+    
+    // Method spoofing untuk update
+    if (selectedEvent) {
+      formDataToSend.append('_method', 'PUT');
+    }
+    
+    // Append files jika ada
+    if (imageFile) {
+      formDataToSend.append('image', imageFile);
+    }
+    if (organizerLogoFile) {
+      formDataToSend.append('organizer_logo', organizerLogoFile);
     }
 
     try {
       const response = await fetch(url, {
-        method,
-        headers,
-        body,
+        method: 'POST', // Selalu POST, karena menggunakan method spoofing
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Jangan set Content-Type untuk FormData, biarkan browser yang set
+        },
+        body: formDataToSend,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        alert('Gagal menyimpan event: ' + (errorData.message || 'Terjadi kesalahan'));
+        
+        // Format error message lebih baik
+        let errorMessage = 'Gagal menyimpan event';
+        if (errorData.errors) {
+          const errorMessages = Object.values(errorData.errors).flat();
+          errorMessage += ':\n' + errorMessages.join('\n');
+        } else if (errorData.message) {
+          errorMessage += ': ' + errorData.message;
+        }
+        
+        alert(errorMessage);
         return;
       }
 
       const result = await response.json();
-
+      
+      // Reset dan refresh
       setModalForm(false);
       resetForm();
       setSelectedEvent(null);
 
       // Refresh list
-      const res = await fetch(`${apiUrl}/admin/events`, {
+      const refreshRes = await fetch(`${apiUrl}/admin/events`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
       });
-      const refreshResult = await res.json();
+      const refreshResult = await refreshRes.json();
       setEventList(Array.isArray(refreshResult.data) ? refreshResult.data : []);
+      
+      // Show success message
+      alert(selectedEvent ? 'Event berhasil diperbarui!' : 'Event berhasil ditambahkan!');
+      
     } catch (error) {
-      alert('Terjadi kesalahan jaringan');
+      alert('Terjadi kesalahan jaringan: ' + error.message);
     }
   };
 
