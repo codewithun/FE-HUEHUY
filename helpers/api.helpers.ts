@@ -240,11 +240,13 @@ export const post = async ({
 
   if (bearer) fetchHeaders.Authorization = `Bearer ${bearer}`;
 
-  // Biarkan axios set boundary kalau FormData
-  if (contentType && contentType !== 'multipart/form-data') {
-    fetchHeaders['Content-Type'] = contentType; // json, dll.
-  } else {
+  // Fix: Selalu set Content-Type ke application/json untuk login
+  if (contentType === 'multipart/form-data') {
+    // Untuk FormData, biarkan axios set boundary otomatis
     delete fetchHeaders['Content-Type'];
+  } else {
+    // Default ke application/json
+    fetchHeaders['Content-Type'] = contentType || 'application/json';
   }
 
   try {
