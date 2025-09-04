@@ -19,6 +19,9 @@ const PromoDetailPage = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Tambahkan state untuk cek apakah promo sudah direbut
+  const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
+
   useEffect(() => {
     // jangan lanjut sebelum router siap
     if (!router.isReady) return;
@@ -252,6 +255,20 @@ const PromoDetailPage = () => {
     }
   }, [router.isReady, promoId, communityId]);
 
+  // Tambahkan useEffect untuk cek promo sudah direbut atau belum
+  useEffect(() => {
+    if (!promoData?.id) return;
+    
+    // Cek di localStorage apakah promo sudah pernah direbut
+    const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+    const alreadyClaimed = existingVouchers.some(v => 
+      String(v.ad?.id) === String(promoData.id) || 
+      String(v.id) === String(promoData.id)
+    );
+    
+    setIsAlreadyClaimed(alreadyClaimed);
+  }, [promoData]);
+
   const handleBack = () => {
     const { from } = router.query;
     
@@ -324,9 +341,9 @@ const PromoDetailPage = () => {
 
       // console.log('claim endpoints:', endpoints);
 
-      // Ubah payload: hanya kirim { claim: true }
+      // UBAH PAYLOAD: kirim { promo_id: x } bukan { claim: true }
       const payload = {
-        claim: true,
+        promo_id: promoData.id,
       };
 
       const headers = {
@@ -367,6 +384,11 @@ const PromoDetailPage = () => {
             setShowErrorModal(true);
             return;
           }
+          if (res.status === 409) {
+            setErrorMessage(json?.message || 'Promo sudah pernah diclaim sebelumnya.');
+            setShowErrorModal(true);
+            return;
+          }
           if (res.status === 422 && json?.errors) {
             const msg = Object.values(json.errors).flat().join(', ');
             setErrorMessage(`Validasi gagal: ${msg}`);
@@ -392,7 +414,7 @@ const PromoDetailPage = () => {
         const existing = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
         const enriched = {
           ...savedItem,
-          claimed_at: new Date().toISOString(),
+          claimed_at: savedItem.claimed_at || new Date().toISOString(),
           ad: {
             id: promoData?.id,
             title: promoData?.title,
@@ -407,6 +429,8 @@ const PromoDetailPage = () => {
         // abaikan error localStorage
       }
 
+      // Update state
+      setIsAlreadyClaimed(true);
       setShowSuccessModal(true);
       return;
   } catch (error) {
