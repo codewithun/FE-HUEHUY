@@ -359,14 +359,14 @@ export function TableSupervisionComponent({
                         let qrValue = '';
                         const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
                         if (item.promo) {
-                          qrValue = `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${communityId}`;
+                          qrValue = `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${communityId}&autoRegister=1`;
                         } else if (item.voucher) {
                           const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
                           if (!id) {
                             alert('Data voucher tidak memiliki id yang valid!');
                             return;
                           }
-                          qrValue = `${origin}/app/voucher/${id}?communityId=${communityId}`;
+                          qrValue = `${origin}/app/voucher/${id}?communityId=${communityId}&autoRegister=1`;
                         } else {
                           alert('Data promo/voucher tidak ditemukan!');
                           return;
