@@ -45,6 +45,7 @@ const DetailVoucherPage = () => {
     }
   }, [id]);
 
+  // --- MODIFIED: fetchVoucherDetails now returns fetched data (or null) ---
   const fetchVoucherDetails = async () => {
     try {
       setLoading(true);
@@ -60,19 +61,22 @@ const DetailVoucherPage = () => {
         
         // Check if user already has this voucher (check voucher_items)
         const userVoucherItems = voucherData.voucher_items || [];
-        // In a real app, you'd check against current user ID
-        // For now, we'll check localStorage for claimed vouchers
         const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-        const isAlreadyClaimed = claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
+        const isAlreadyClaimed = claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id)
+          || userVoucherItems.length > 0; // server-side info if available
         setIsClaimed(isAlreadyClaimed);
+
+        return voucherData;
       } else if (response?.status === 404) {
         setError('Voucher tidak ditemukan');
+        return null;
       } else {
         setError('Gagal memuat data voucher');
+        return null;
       }
     } catch (err) {
       setError('Terjadi kesalahan saat memuat voucher');
-      // console.error('Error fetching voucher:', err);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -135,20 +139,65 @@ const DetailVoucherPage = () => {
     router.push('/app/saku');
   };
 
+  // --- MODIFIED: handle autoRegister / source param and login check ---
   useEffect(() => {
     if (!router.isReady) return;
     const encrypted = Cookies.get(token_cookie_name);
     const token = encrypted ? Decrypt(encrypted) : null;
     const next = router.asPath || `/app/voucher/${router.query.id || ''}`;
+
+    // accept both `autoRegister` or `source=qr`
+    const autoRegister = router.query.autoRegister || router.query.source;
+
+    // If QR includes autoRegister/source flag
+    if (autoRegister) {
+      // If user is not logged in -> redirect to create account (preserve current behavior)
+      if (!token) {
+        router.replace(`/buat-akun?next=${encodeURIComponent(next)}`);
+        return;
+      }
+
+      // user is logged in -> try to fetch voucher details and register only if not already claimed
+      (async () => {
+        const voucherData = await fetchVoucherDetails();
+        if (!voucherData) return;
+
+        // determine claimed status from returned data + localStorage check
+        const serverHasItems = (voucherData.voucher_items || []).length > 0;
+        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        const locallyClaimed = claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
+        const alreadyClaimed = serverHasItems || locallyClaimed || isClaimed;
+
+        if (!alreadyClaimed) {
+          try {
+            // adjust endpoint path if backend expects different route
+            await post({
+              path: `admin/vouchers/${id}/register-scan`,
+              body: { source: 'qr' }
+            });
+            // refresh data after register
+            await fetchVoucherDetails();
+          } catch (e) {
+            // ignore failure, user still sees page
+          }
+        }
+      })();
+
+      return;
+    }
+
+    // No autoRegister: keep original behavior (redirect to buat-akun if not logged in)
     if (!token) {
       router.replace(`/buat-akun?next=${encodeURIComponent(next)}`);
       return;
     }
-    // else: fetch voucher data as usual
+
+    // logged in and normal flow
     if (id) {
       fetchVoucherDetails();
     }
-  }, [router.isReady, router.query]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query, id]);
 
   if (loading) {
     return (

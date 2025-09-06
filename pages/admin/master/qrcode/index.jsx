@@ -222,11 +222,11 @@ export default function QRCodeCrud() {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     if (!item) return '';
     if (item.promo) {
-      return `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${item.promo.community_id || 'default'}`;
+      return `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${item.promo.community_id || 'default'}&autoRegister=1`;
     }
     if (item.voucher) {
       const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-      return `${origin}/app/voucher/${id}?communityId=${item.voucher.community_id || 'default'}`;
+      return `${origin}/app/voucher/${id}?communityId=${item.voucher.community_id || 'default'}&autoRegister=1`;
     }
     return '';
   };
