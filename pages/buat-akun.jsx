@@ -7,9 +7,17 @@ import { Encrypt } from '../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 
+// tambahan import
+import axios from 'axios';
+import { faGoogle } from '@fortawesome/free-brands-svg-icons';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+
 export default function BuatAkun() {
   const router = useRouter();
   const [btnGoogleLoading, setBtnGoogleLoading] = useState(false);
+
+  // buat provider firebase (jika pakai firebase)
+  const googleProvider = new GoogleAuthProvider();
 
   useEffect(() => {
     // Cek status user, misal dari localStorage atau cookie
@@ -21,20 +29,20 @@ export default function BuatAkun() {
   }, [router]);
 
   const onSuccess = (data) => {
+    // perbaiki opsi Cookies.set -> gabungkan ke satu object
     Cookies.set(
       token_cookie_name,
       Encrypt(data.user_token),
-      { expires: 365 },
-      { secure: true }
+      { expires: 365, secure: true }
     );
 
-  // preserve next param so after verification user returns to original target
-  const rawNext = router?.query?.next;
-  const next = rawNext ? String(rawNext) : null;
-  const target = next ? `/verifikasi?next=${encodeURIComponent(next)}` : '/verifikasi';
-  window.location.href = target;
+    // preserve next param so after verification user returns to original target
+    const rawNext = router?.query?.next;
+    const next = rawNext ? String(rawNext) : null;
+    const target = next ? `/verifikasi?next=${encodeURIComponent(next)}` : '/verifikasi';
+    window.location.href = target;
   };
-
+  
   const [{ formControl, submit, loading }] = useForm(
     {
       path: 'auth/register',
@@ -74,7 +82,6 @@ export default function BuatAkun() {
       .then((result) => {
         loginFirebase(result.user.accessToken, true).then((response) => {
           if (response.status == 200) {
-            // if a next param exists, go there after successful login
             const rawNext = router?.query?.next;
             const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
             window.location.href = next || '/app';
