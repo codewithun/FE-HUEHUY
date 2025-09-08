@@ -5,10 +5,6 @@ import Link from 'next/link';
 import { token_cookie_name, useForm } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
-import { getAuth, signInWithPopup } from 'firebase/auth';
-import { faGoogle } from '@fortawesome/free-brands-svg-icons';
-import { googleProvider } from '../helpers/firebase';
-import axios from 'axios';
 import { useRouter } from 'next/router';
 
 export default function BuatAkun() {
@@ -91,6 +87,20 @@ export default function BuatAkun() {
         setBtnGoogleLoading(false);
       });
   };
+
+  // setelah registrasi/login sukses:
+  async function onRegisterSuccess(response) {
+    // sesuaikan sesuai response backend
+    const token = response?.data?.token || response?.token || response?.access_token;
+    if (token) {
+      // set cookie agar halaman lain (voucher/promo) dapat baca via Cookies.get(token_cookie_name)
+      Cookies.set(token_cookie_name, token, { path: '/', sameSite: 'Lax' });
+    }
+
+    // redirect ke next jika ada
+    const next = router.query.next ? decodeURIComponent(String(router.query.next)) : '/';
+    router.replace(next);
+  }
 
   return (
     <>
