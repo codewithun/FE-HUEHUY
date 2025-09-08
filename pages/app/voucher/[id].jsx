@@ -199,7 +199,6 @@ const DetailVoucherPage = () => {
       }
     } catch (err) {
       // Jika error checking verification, asumsikan sudah terverifikasi
-      console.error('Error checking verification status:', err);
     }
   };
 
