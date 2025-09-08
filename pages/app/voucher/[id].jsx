@@ -144,60 +144,32 @@ const DetailVoucherPage = () => {
     if (!router.isReady) return;
     const encrypted = Cookies.get(token_cookie_name);
     const token = encrypted ? Decrypt(encrypted) : null;
-    const next = router.asPath || `/app/voucher/${router.query.id || ''}`;
 
     // accept both `autoRegister` or `source=qr`
     const autoRegister = router.query.autoRegister || router.query.source;
 
-    // If QR includes autoRegister/source flag
     if (autoRegister) {
-      // If user is not logged in -> redirect to create account (preserve current behavior)
+      // If user is not logged in -> redirect to create account (preserve absolute current URL)
       if (!token) {
+        // gunakan absolute URL supaya next mengandung host + query
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
         router.replace(`/buat-akun?next=${encodeURIComponent(next)}`);
         return;
       }
 
-      // user is logged in -> try to fetch voucher details and register only if not already claimed
-      (async () => {
-        const voucherData = await fetchVoucherDetails();
-        if (!voucherData) return;
-
-        // determine claimed status from returned data + localStorage check
-        const serverHasItems = (voucherData.voucher_items || []).length > 0;
-        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-        const locallyClaimed = claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
-        const alreadyClaimed = serverHasItems || locallyClaimed || isClaimed;
-
-        if (!alreadyClaimed) {
-          try {
-            // adjust endpoint path if backend expects different route
-            await post({
-              path: `admin/vouchers/${id}/register-scan`,
-              body: { source: 'qr' }
-            });
-            // refresh data after register
-            await fetchVoucherDetails();
-          } catch (e) {
-            // ignore failure, user still sees page
-          }
-        }
-      })();
-
-      return;
+      // logged-in flow...
     }
 
-    // No autoRegister: keep original behavior (redirect to buat-akun if not logged in)
-    if (!token) {
-      router.replace(`/buat-akun?next=${encodeURIComponent(next)}`);
-      return;
-    }
-
-    // logged in and normal flow
-    if (id) {
-      fetchVoucherDetails();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // rest of effect...
   }, [router.isReady, router.query, id]);
+
+  const getToken = () => {
+    const encrypted = Cookies.get(token_cookie_name);
+    if (encrypted) return Decrypt(encrypted);
+    // fallback: coba localStorage (beberapa flow menyimpan di sana)
+    const ls = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    return ls || null;
+  };
 
   if (loading) {
     return (
