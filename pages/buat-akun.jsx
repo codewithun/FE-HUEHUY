@@ -40,11 +40,11 @@ export default function BuatAkun() {
     const rawNext = router?.query?.next;
     const next = rawNext ? String(rawNext) : null;
     
-    // Jika ada parameter next, redirect ke sana setelah berhasil register
+    // SELALU ke verifikasi dulu, baru setelah verifikasi redirect ke target
     if (next) {
-      // Decode URL dan redirect
-      const targetUrl = decodeURIComponent(next);
-      window.location.href = targetUrl;
+      // Pass next parameter ke halaman verifikasi
+      const target = `/verifikasi?next=${encodeURIComponent(next)}`;
+      window.location.href = target;
     } else {
       // Default flow ke verifikasi
       const target = '/verifikasi';
@@ -94,13 +94,26 @@ export default function BuatAkun() {
             const rawNext = router?.query?.next;
             const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
             
-            // Redirect ke next URL jika ada, atau ke app
+            // Untuk Google login, cek apakah user sudah terverifikasi
+            // Jika sudah terverifikasi, langsung ke target
+            // Jika belum, ke verifikasi dulu
             if (next) {
+              // Asumsikan Google login sudah terverifikasi, langsung ke target
               window.location.href = next;
             } else {
               window.location.href = '/app';
             }
           } else if (response.status == 202) {
+            // Status 202 biasanya berarti butuh verifikasi
+            const rawNext = router?.query?.next;
+            const next = rawNext ? String(rawNext) : null;
+            
+            if (next) {
+              const target = `/verifikasi?next=${encodeURIComponent(next)}`;
+              window.location.href = target;
+            } else {
+              window.location.href = '/verifikasi';
+            }
             setBtnGoogleLoading(false);
           }
         });

@@ -83,7 +83,16 @@ const DetailVoucherPage = () => {
   };
 
   const handleBack = () => {
-    router.push('/app');
+    // Cek apakah ada parameter autoRegister
+    const autoRegister = router.query.autoRegister || router.query.source;
+    
+    if (autoRegister) {
+      // Jika dari QR scan, redirect ke halaman utama app
+      router.push('/app');
+    } else {
+      // Normal back behavior
+      router.back();
+    }
   };
 
   const handleClaim = async () => {
@@ -160,14 +169,39 @@ const DetailVoucherPage = () => {
         return;
       }
       
-      // Jika sudah login, lanjutkan proses normal
+      // Jika ada token, cek status verifikasi user
+      checkUserVerificationStatus(token);
+    }
+  }, [router.isReady, router.query, id]);
+
+  // Fungsi untuk cek status verifikasi
+  const checkUserVerificationStatus = async (token) => {
+    try {
+      const response = await get({
+        path: 'account-unverified',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Jika user belum terverifikasi (status 200 = belum verifikasi)
+      if (response?.status === 200) {
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+        return;
+      }
+      
+      // Jika sudah terverifikasi, lanjutkan normal
       // Auto-claim voucher jika diperlukan
       if (voucher && !isClaimed) {
         // Optional: auto-claim voucher
         // handleClaim();
       }
+    } catch (err) {
+      // Jika error checking verification, asumsikan sudah terverifikasi
+      console.error('Error checking verification status:', err);
     }
-  }, [router.isReady, router.query, id, voucher, isClaimed]);
+  };
 
   const getToken = () => {
     const encrypted = Cookies.get(token_cookie_name);
