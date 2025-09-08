@@ -38,12 +38,6 @@ const DetailVoucherPage = () => {
 
     return cleaned;
   };
-  
-  useEffect(() => {
-    if (id) {
-      fetchVoucherDetails();
-    }
-  }, [id]);
 
   // --- MODIFIED: fetchVoucherDetails now returns fetched data (or null) ---
   const fetchVoucherDetails = useCallback(async () => {
@@ -81,6 +75,12 @@ const DetailVoucherPage = () => {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchVoucherDetails();
+    }
+  }, [id, fetchVoucherDetails]);
 
   const handleBack = () => {
     // Cek apakah ada parameter autoRegister
@@ -148,7 +148,56 @@ const DetailVoucherPage = () => {
     router.push('/app/saku');
   };
 
-  // Fungsi untuk cek status verifikasi - DIPERBAIKI
+  // Fungsi untuk handle auto register setelah QR scan - DIPINDAH KE ATAS
+  const handleAutoRegister = useCallback(async (token) => {
+    try {
+      const voucherData = await fetchVoucherDetails();
+      if (!voucherData) return;
+
+      // Cek apakah user sudah punya voucher ini
+      const userVoucherItems = voucherData.voucher_items || [];
+      const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+      const alreadyClaimed = userVoucherItems.length > 0 || 
+                            claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
+
+      if (!alreadyClaimed) {
+        // Lakukan auto claim voucher
+        try {
+          const response = await post({
+            path: `admin/vouchers/${voucherData.id}/send-to-user`,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: { source: 'qr_scan' }
+          });
+
+          if (response?.status === 200) {
+            // Simpan ke localStorage
+            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+            const newVoucherItem = {
+              id: response.data.data.id,
+              voucher_id: voucherData.id,
+              code: response.data.data.code,
+              claimed_at: new Date().toISOString(),
+              expired_at: voucherData.valid_until,
+              voucher: voucherData
+            };
+            claimedVouchers.push(newVoucherItem);
+            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+            
+            setIsClaimed(true);
+            setShowSuccessModal(true);
+          }
+        } catch (error) {
+          // Silent error - user bisa manual claim
+        }
+      }
+    } catch (error) {
+      // Silent error
+    }
+  }, [fetchVoucherDetails]);
+
+  // Fungsi untuk cek status verifikasi - DEPENDENCY DIPERBAIKI
   const checkUserVerificationStatus = useCallback(async (token) => {
     try {
       // eslint-disable-next-line no-console
@@ -228,55 +277,6 @@ const DetailVoucherPage = () => {
       window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
     }
   }, [id, handleAutoRegister]);
-
-  // Fungsi untuk handle auto register setelah QR scan
-  const handleAutoRegister = useCallback(async (token) => {
-    try {
-      const voucherData = await fetchVoucherDetails();
-      if (!voucherData) return;
-
-      // Cek apakah user sudah punya voucher ini
-      const userVoucherItems = voucherData.voucher_items || [];
-      const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const alreadyClaimed = userVoucherItems.length > 0 || 
-                            claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
-
-      if (!alreadyClaimed) {
-        // Lakukan auto claim voucher
-        try {
-          const response = await post({
-            path: `admin/vouchers/${voucherData.id}/send-to-user`,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            body: { source: 'qr_scan' }
-          });
-
-          if (response?.status === 200) {
-            // Simpan ke localStorage
-            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-            const newVoucherItem = {
-              id: response.data.data.id,
-              voucher_id: voucherData.id,
-              code: response.data.data.code,
-              claimed_at: new Date().toISOString(),
-              expired_at: voucherData.valid_until,
-              voucher: voucherData
-            };
-            claimedVouchers.push(newVoucherItem);
-            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
-            
-            setIsClaimed(true);
-            setShowSuccessModal(true);
-          }
-        } catch (error) {
-          // Silent error - user bisa manual claim
-        }
-      }
-    } catch (error) {
-      // Silent error
-    }
-  }, [fetchVoucherDetails]);
 
   // --- MODIFIED: handle autoRegister / source param and login check ---
   useEffect(() => {
