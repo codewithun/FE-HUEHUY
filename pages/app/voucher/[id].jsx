@@ -38,12 +38,6 @@ const DetailVoucherPage = () => {
 
     return cleaned;
   };
-  
-  useEffect(() => {
-    if (id) {
-      fetchVoucherDetails();
-    }
-  }, [id]);
 
   // --- MODIFIED: fetchVoucherDetails now returns fetched data (or null) ---
   const fetchVoucherDetails = useCallback(async () => {
@@ -81,6 +75,12 @@ const DetailVoucherPage = () => {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchVoucherDetails();
+    }
+  }, [id, fetchVoucherDetails]);
 
   const handleBack = () => {
     // Cek apakah ada parameter autoRegister
@@ -148,60 +148,7 @@ const DetailVoucherPage = () => {
     router.push('/app/saku');
   };
 
-  // --- MODIFIED: handle autoRegister / source param and login check ---
-  useEffect(() => {
-    if (!router.isReady) return;
-    
-    // accept both `autoRegister` or `source=qr`
-    const autoRegister = router.query.autoRegister || router.query.source;
-
-    if (autoRegister) {
-      // Coba ambil token dengan berbagai cara
-      let token = null;
-      
-      // 1. Coba dari cookie dengan decrypt
-      const encrypted = Cookies.get(token_cookie_name);
-      if (encrypted) {
-        try {
-          token = Decrypt(encrypted);
-          // eslint-disable-next-line no-console
-          console.log('Token from cookie:', token?.substring(0, 20) + '...');
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error('Failed to decrypt token:', e);
-          // Cookie corrupt, hapus
-          Cookies.remove(token_cookie_name);
-        }
-      }
-      
-      // 2. Fallback ke localStorage
-      if (!token) {
-        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-        if (token) {
-          // eslint-disable-next-line no-console
-          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
-        }
-      }
-      
-      // If user is not logged in -> redirect to create account
-      if (!token) {
-        // eslint-disable-next-line no-console
-        console.log('No token found, redirecting to register');
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-        if (typeof window !== 'undefined') {
-          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-        }
-        return;
-      }
-      
-      // Token ada, cek status verifikasi user
-      // eslint-disable-next-line no-console
-      console.log('Token found, checking verification status...');
-      checkUserVerificationStatus(token);
-    }
-  }, [router.isReady, router.query, id, checkUserVerificationStatus]);
-
-  // Fungsi untuk handle auto register setelah QR scan
+  // Fungsi untuk handle auto register setelah QR scan - DIPINDAH KE ATAS
   const handleAutoRegister = useCallback(async (token) => {
     try {
       const voucherData = await fetchVoucherDetails();
@@ -250,7 +197,7 @@ const DetailVoucherPage = () => {
     }
   }, [fetchVoucherDetails]);
 
-  // Fungsi untuk cek status verifikasi - DIPERBAIKI
+  // Fungsi untuk cek status verifikasi - DEPENDENCY DIPERBAIKI
   const checkUserVerificationStatus = useCallback(async (token) => {
     try {
       // eslint-disable-next-line no-console
@@ -330,6 +277,59 @@ const DetailVoucherPage = () => {
       window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
     }
   }, [id, handleAutoRegister]);
+
+  // --- MODIFIED: handle autoRegister / source param and login check ---
+  useEffect(() => {
+    if (!router.isReady) return;
+    
+    // accept both `autoRegister` or `source=qr`
+    const autoRegister = router.query.autoRegister || router.query.source;
+
+    if (autoRegister) {
+      // Coba ambil token dengan berbagai cara
+      let token = null;
+      
+      // 1. Coba dari cookie dengan decrypt
+      const encrypted = Cookies.get(token_cookie_name);
+      if (encrypted) {
+        try {
+          token = Decrypt(encrypted);
+          // eslint-disable-next-line no-console
+          console.log('Token from cookie:', token?.substring(0, 20) + '...');
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to decrypt token:', e);
+          // Cookie corrupt, hapus
+          Cookies.remove(token_cookie_name);
+        }
+      }
+      
+      // 2. Fallback ke localStorage
+      if (!token) {
+        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        if (token) {
+          // eslint-disable-next-line no-console
+          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
+        }
+      }
+      
+      // If user is not logged in -> redirect to create account
+      if (!token) {
+        // eslint-disable-next-line no-console
+        console.log('No token found, redirecting to register');
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        if (typeof window !== 'undefined') {
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        }
+        return;
+      }
+      
+      // Token ada, cek status verifikasi user
+      // eslint-disable-next-line no-console
+      console.log('Token found, checking verification status...');
+      checkUserVerificationStatus(token);
+    }
+  }, [router.isReady, router.query, id, checkUserVerificationStatus]);
 
   if (loading) {
     return (
