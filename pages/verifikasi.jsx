@@ -17,46 +17,98 @@ export default function Verification() {
   const [modalSendMailSuccess, setModalSendMailSuccess] = useState(false);
 
   // after successful verification, redirect to original target if provided
-  const onSuccess = () => {
+  const onSuccess = (response) => {
+    
     try {
-      // Gunakan router.query yang lebih reliable daripada URLSearchParams
+      // Check if there's QR data from registration
+      const qrData = response?.data?.qr_data || router.query.qr_data;
       const next = router.query.next;
 
+      if (qrData) {
+        // QR scan flow - process QR data or redirect accordingly
+        
+        // Parse QR data if it's JSON string
+        try {
+          const parsedQrData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+          
+          if (parsedQrData.type === 'promo' || parsedQrData.type === 'voucher') {
+            // Redirect to promo/voucher validation page
+            const targetUrl = `/app/validate/${parsedQrData.type}?id=${parsedQrData.promoId || parsedQrData.voucherId}&community=${parsedQrData.communityId}`;
+            
+            setTimeout(() => {
+              window.location.href = targetUrl;
+            }, 500); // Reduced delay
+            return;
+          }
+        } catch (e) {
+          // silent error handling
+        }
+      }
 
       if (next) {
-        // Decode dan redirect ke target asli
+        // Regular redirect flow
         const targetUrl = decodeURIComponent(String(next));
-        window.location.href = targetUrl;
+        
+        setTimeout(() => {
+          window.location.href = targetUrl;
+        }, 500); // Reduced delay
         return;
       }
     } catch (e) {
+      // silent error handling
     }
 
     // Default redirect ke app
-    window.location.href = '/app';
+    setTimeout(() => {
+      window.location.href = '/app';
+    }, 500); // Reduced delay
   };
 
   const [{ submit, loading, values, setValues, errors }] = useForm(
     {
       path: 'auth/verify-mail',
+      // Add email to the form data for new verification system
+      data: {
+        email: router.query.email || ''
+      }
     },
     false,
-    onSuccess, // gunakan onSuccess yang sudah dimodifikasi
+    onSuccess,
   );
 
   const resendMail = async (e) => {
     e.preventDefault();
     setSendMailLoading(true);
 
-    const formData = new FormData();
+    try {
+      const formData = new FormData();
+      
+      // Try new system first if email is available
+      const email = router.query.email || dataAccount?.data?.profile?.email;
+      
+      if (email) {
+        const response = await post({ path: 'email-verification/resend-code' }, {
+          email: email
+        });
+        
+        if (response?.data?.success) {
+          setWaitingMail(60);
+          setModalSendMailSuccess(true);
+          setSendMailLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to old system
+      const response = await post({ path: 'auth/resend-mail' }, formData);
 
-    const response = await post({ path: 'auth/resend-mail' }, formData);
-
-    if (response?.status == 200) {
-      setWaitingMail(60);
-      setModalSendMailSuccess(true);
-      setSendMailLoading(false);
-    } else {
+      if (response?.status == 200 || response?.data?.message) {
+        setWaitingMail(60);
+        setModalSendMailSuccess(true);
+      }
+    } catch (error) {
+      // silent error handling
+    } finally {
       setSendMailLoading(false);
     }
   };
@@ -94,10 +146,10 @@ export default function Verification() {
             </h1>
             <p className="mt-1 text-slate-500 text-center w-[90%]">
               Silahkan masukkan kode verifikasi yang dikirim ke email{' '}
-              {dataAccount?.data?.profile?.email}
+              {router.query.email || dataAccount?.data?.profile?.email}
             </p>
             <p className="mt-1 text-slate-500 text-center w-[90%] font-semibold">
-              Jika pesaan verifikasi tidak masuk, silahkan cek folder spam!
+              Jika pesan verifikasi tidak masuk, silahkan cek folder spam!
             </p>
           </div>
 
@@ -112,7 +164,7 @@ export default function Verification() {
                   ]);
                 }}
                 error={errors?.find(({ name }) => name == 'token')?.error}
-                max={5}
+                max={6} // Updated to support 6-digit codes
               />
             </div>
             <div className="px-20 mt-4">
