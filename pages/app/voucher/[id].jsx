@@ -174,7 +174,7 @@ const DetailVoucherPage = () => {
     }
   }, [router.isReady, router.query, id]);
 
-  // Fungsi untuk cek status verifikasi
+  // Fungsi untuk cek status verifikasi - DIPERBAIKI
   const checkUserVerificationStatus = async (token) => {
     try {
       const response = await get({
@@ -184,19 +184,24 @@ const DetailVoucherPage = () => {
         }
       });
       
-      // Jika user belum terverifikasi (status 200 = belum verifikasi)
+      
+      // PERBAIKAN: Cek dengan lebih teliti
+      // Status 200 dengan verified: false = belum verifikasi
+      // Status 404 atau error = sudah verifikasi
       if (response?.status === 200) {
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-        window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
-        return;
+        // Cek apakah response menunjukkan belum verifikasi
+        const isUnverified = response?.data?.verified === false || 
+                             response?.data?.message?.includes('not verified') ||
+                             !response?.data?.profile?.email_verified_at;
+        
+        if (isUnverified) {
+          const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+          window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+          return;
+        }
       }
       
-      // Jika sudah terverifikasi, lanjutkan normal
-      // Auto-claim voucher jika diperlukan
-      if (voucher && !isClaimed) {
-        // Optional: auto-claim voucher
-        // handleClaim();
-      }
+      
     } catch (err) {
       // Jika error checking verification, asumsikan sudah terverifikasi
     }

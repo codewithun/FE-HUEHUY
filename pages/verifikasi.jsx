@@ -1,6 +1,7 @@
 import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import {
   ButtonComponent,
@@ -10,6 +11,7 @@ import InputOtpComponent from '../components/base.components/input/InputOtpCompo
 import { post, useForm, useGet } from '../helpers';
 
 export default function Verification() {
+  const router = useRouter();
   const [sendMailLoading, setSendMailLoading] = useState(false);
   const [waitingMail, setWaitingMail] = useState(60);
   const [modalSendMailSuccess, setModalSendMailSuccess] = useState(false);
@@ -17,18 +19,17 @@ export default function Verification() {
   // after successful verification, redirect to original target if provided
   const onSuccess = () => {
     try {
-      // Cek parameter next dari URL query
-      const urlParams = new URLSearchParams(window.location.search);
-      const next = urlParams.get('next');
+      // Gunakan router.query yang lebih reliable daripada URLSearchParams
+      const next = router.query.next;
+
 
       if (next) {
         // Decode dan redirect ke target asli
-        const targetUrl = decodeURIComponent(next);
+        const targetUrl = decodeURIComponent(String(next));
         window.location.href = targetUrl;
         return;
       }
     } catch (e) {
-      // ignore and fallback
     }
 
     // Default redirect ke app
