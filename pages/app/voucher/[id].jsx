@@ -148,108 +148,6 @@ const DetailVoucherPage = () => {
     router.push('/app/saku');
   };
 
-  // --- MODIFIED: handle autoRegister / source param and login check ---
-  useEffect(() => {
-    if (!router.isReady) return;
-    
-    // accept both `autoRegister` or `source=qr`
-    const autoRegister = router.query.autoRegister || router.query.source;
-
-    if (autoRegister) {
-      // Coba ambil token dengan berbagai cara
-      let token = null;
-      
-      // 1. Coba dari cookie dengan decrypt
-      const encrypted = Cookies.get(token_cookie_name);
-      if (encrypted) {
-        try {
-          token = Decrypt(encrypted);
-          // eslint-disable-next-line no-console
-          console.log('Token from cookie:', token?.substring(0, 20) + '...');
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error('Failed to decrypt token:', e);
-          // Cookie corrupt, hapus
-          Cookies.remove(token_cookie_name);
-        }
-      }
-      
-      // 2. Fallback ke localStorage
-      if (!token) {
-        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-        if (token) {
-          // eslint-disable-next-line no-console
-          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
-        }
-      }
-      
-      // If user is not logged in -> redirect to create account
-      if (!token) {
-        // eslint-disable-next-line no-console
-        console.log('No token found, redirecting to register');
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-        if (typeof window !== 'undefined') {
-          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-        }
-        return;
-      }
-      
-      // Token ada, cek status verifikasi user
-      // eslint-disable-next-line no-console
-      console.log('Token found, checking verification status...');
-      checkUserVerificationStatus(token);
-    }
-  }, [router.isReady, router.query, id, checkUserVerificationStatus]);
-
-  // Fungsi untuk handle auto register setelah QR scan
-  const handleAutoRegister = useCallback(async (token) => {
-    try {
-      const voucherData = await fetchVoucherDetails();
-      if (!voucherData) return;
-
-      // Cek apakah user sudah punya voucher ini
-      const userVoucherItems = voucherData.voucher_items || [];
-      const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const alreadyClaimed = userVoucherItems.length > 0 || 
-                            claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
-
-      if (!alreadyClaimed) {
-        // Lakukan auto claim voucher
-        try {
-          const response = await post({
-            path: `admin/vouchers/${voucherData.id}/send-to-user`,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            body: { source: 'qr_scan' }
-          });
-
-          if (response?.status === 200) {
-            // Simpan ke localStorage
-            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-            const newVoucherItem = {
-              id: response.data.data.id,
-              voucher_id: voucherData.id,
-              code: response.data.data.code,
-              claimed_at: new Date().toISOString(),
-              expired_at: voucherData.valid_until,
-              voucher: voucherData
-            };
-            claimedVouchers.push(newVoucherItem);
-            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
-            
-            setIsClaimed(true);
-            setShowSuccessModal(true);
-          }
-        } catch (error) {
-          // Silent error - user bisa manual claim
-        }
-      }
-    } catch (error) {
-      // Silent error
-    }
-  }, [fetchVoucherDetails]);
-
   // Fungsi untuk cek status verifikasi - DIPERBAIKI
   const checkUserVerificationStatus = useCallback(async (token) => {
     try {
@@ -330,6 +228,108 @@ const DetailVoucherPage = () => {
       window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
     }
   }, [id, handleAutoRegister]);
+
+  // Fungsi untuk handle auto register setelah QR scan
+  const handleAutoRegister = useCallback(async (token) => {
+    try {
+      const voucherData = await fetchVoucherDetails();
+      if (!voucherData) return;
+
+      // Cek apakah user sudah punya voucher ini
+      const userVoucherItems = voucherData.voucher_items || [];
+      const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+      const alreadyClaimed = userVoucherItems.length > 0 || 
+                            claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
+
+      if (!alreadyClaimed) {
+        // Lakukan auto claim voucher
+        try {
+          const response = await post({
+            path: `admin/vouchers/${voucherData.id}/send-to-user`,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: { source: 'qr_scan' }
+          });
+
+          if (response?.status === 200) {
+            // Simpan ke localStorage
+            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+            const newVoucherItem = {
+              id: response.data.data.id,
+              voucher_id: voucherData.id,
+              code: response.data.data.code,
+              claimed_at: new Date().toISOString(),
+              expired_at: voucherData.valid_until,
+              voucher: voucherData
+            };
+            claimedVouchers.push(newVoucherItem);
+            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+            
+            setIsClaimed(true);
+            setShowSuccessModal(true);
+          }
+        } catch (error) {
+          // Silent error - user bisa manual claim
+        }
+      }
+    } catch (error) {
+      // Silent error
+    }
+  }, [fetchVoucherDetails]);
+
+  // --- MODIFIED: handle autoRegister / source param and login check ---
+  useEffect(() => {
+    if (!router.isReady) return;
+    
+    // accept both `autoRegister` or `source=qr`
+    const autoRegister = router.query.autoRegister || router.query.source;
+
+    if (autoRegister) {
+      // Coba ambil token dengan berbagai cara
+      let token = null;
+      
+      // 1. Coba dari cookie dengan decrypt
+      const encrypted = Cookies.get(token_cookie_name);
+      if (encrypted) {
+        try {
+          token = Decrypt(encrypted);
+          // eslint-disable-next-line no-console
+          console.log('Token from cookie:', token?.substring(0, 20) + '...');
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to decrypt token:', e);
+          // Cookie corrupt, hapus
+          Cookies.remove(token_cookie_name);
+        }
+      }
+      
+      // 2. Fallback ke localStorage
+      if (!token) {
+        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        if (token) {
+          // eslint-disable-next-line no-console
+          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
+        }
+      }
+      
+      // If user is not logged in -> redirect to create account
+      if (!token) {
+        // eslint-disable-next-line no-console
+        console.log('No token found, redirecting to register');
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        if (typeof window !== 'undefined') {
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        }
+        return;
+      }
+      
+      // Token ada, cek status verifikasi user
+      // eslint-disable-next-line no-console
+      console.log('Token found, checking verification status...');
+      checkUserVerificationStatus(token);
+    }
+  }, [router.isReady, router.query, id, checkUserVerificationStatus]);
 
   if (loading) {
     return (
