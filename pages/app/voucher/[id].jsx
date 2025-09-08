@@ -177,33 +177,94 @@ const DetailVoucherPage = () => {
   // Fungsi untuk cek status verifikasi - DIPERBAIKI
   const checkUserVerificationStatus = async (token) => {
     try {
+      // Gunakan endpoint profil untuk cek verifikasi
       const response = await get({
-        path: 'account-unverified',
+        path: 'account',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
-      
-      // PERBAIKAN: Cek dengan lebih teliti
-      // Status 200 dengan verified: false = belum verifikasi
-      // Status 404 atau error = sudah verifikasi
       if (response?.status === 200) {
-        // Cek apakah response menunjukkan belum verifikasi
-        const isUnverified = response?.data?.verified === false || 
-                             response?.data?.message?.includes('not verified') ||
-                             !response?.data?.profile?.email_verified_at;
+        const userData = response?.data?.data?.profile || response?.data?.profile;
         
-        if (isUnverified) {
+        // Cek field verifikasi di profil user
+        const emailVerified = userData?.email_verified_at || 
+                              userData?.verified_at ||
+                              userData?.verified === true ||
+                              userData?.is_verified === true;
+        
+        if (!emailVerified) {
           const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
           window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
           return;
         }
+        
+        // User sudah terverifikasi, lakukan auto-register untuk QR scan
+        handleAutoRegister(token);
+        
+      } else if (response?.status === 401) {
+        // Token tidak valid, redirect ke login
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        return;
       }
       
-      
     } catch (err) {
-      // Jika error checking verification, asumsikan sudah terverifikasi
+      // Jika error, coba auto register tetap
+      const tokenFromStorage = getToken();
+      if (tokenFromStorage) {
+        handleAutoRegister(tokenFromStorage);
+      }
+    }
+  };
+
+  // Fungsi untuk handle auto register setelah QR scan
+  const handleAutoRegister = async (token) => {
+    try {
+      const voucherData = await fetchVoucherDetails();
+      if (!voucherData) return;
+
+      // Cek apakah user sudah punya voucher ini
+      const userVoucherItems = voucherData.voucher_items || [];
+      const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+      const alreadyClaimed = userVoucherItems.length > 0 || 
+                            claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
+
+      if (!alreadyClaimed) {
+        // Lakukan auto claim voucher
+        try {
+          const response = await post({
+            path: `admin/vouchers/${voucherData.id}/send-to-user`,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: { source: 'qr_scan' }
+          });
+
+          if (response?.status === 200) {
+            // Simpan ke localStorage
+            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+            const newVoucherItem = {
+              id: response.data.data.id,
+              voucher_id: voucherData.id,
+              code: response.data.data.code,
+              claimed_at: new Date().toISOString(),
+              expired_at: voucherData.valid_until,
+              voucher: voucherData
+            };
+            claimedVouchers.push(newVoucherItem);
+            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+            
+            setIsClaimed(true);
+            setShowSuccessModal(true);
+          }
+        } catch (error) {
+          // Silent error - user bisa manual claim
+        }
+      }
+    } catch (error) {
+      // Silent error
     }
   };
 
