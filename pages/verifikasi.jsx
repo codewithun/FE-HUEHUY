@@ -18,16 +18,32 @@ export default function Verification() {
 
   // after successful verification, redirect to original target if provided
   const onSuccess = (response) => {
-
     try {
-      // Check if there's QR data from registration
+      // PERBAIKAN: Simpan token dari response untuk auto-login
+      if (response?.data?.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user || {}));
+      }
+
+      // PERBAIKAN: Prioritaskan redirect_info dari backend response
+      const redirectInfo = response?.data?.redirect_info;
+      
+      if (redirectInfo && redirectInfo.redirect_url) {
+        // Backend sudah kasih redirect URL yang tepat
+        const targetUrl = redirectInfo.redirect_url;
+        
+        setTimeout(() => {
+          window.location.href = targetUrl;
+        }, 500);
+        return;
+      }
+
+      // FALLBACK: Logic lama untuk handle QR data manual
       const qrData = response?.data?.qr_data || router.query.qr_data;
       const next = router.query.next;
 
       if (qrData) {
         // QR scan flow - process QR data or redirect accordingly
-
-        // Parse QR data if it's JSON string
         try {
           const parsedQrData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
 
@@ -37,31 +53,36 @@ export default function Verification() {
 
             setTimeout(() => {
               window.location.href = targetUrl;
-            }, 500); // Reduced delay
+            }, 500);
             return;
           }
         } catch (e) {
-          // silent error handling
+          // eslint-disable-next-line no-console
+          console.error('Error parsing QR data:', e);
         }
       }
 
       if (next) {
         // Regular redirect flow
         const targetUrl = decodeURIComponent(String(next));
-
         setTimeout(() => {
           window.location.href = targetUrl;
-        }, 500); // Reduced delay
+        }, 500);
         return;
       }
-    } catch (e) {
-      // silent error handling
-    }
 
-    // Default redirect ke app
-    setTimeout(() => {
-      window.location.href = '/app';
-    }, 500); // Reduced delay
+      // Default redirect ke app
+      setTimeout(() => {
+        window.location.href = '/app';
+      }, 500);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Error in onSuccess:', e);
+      // Fallback redirect
+      setTimeout(() => {
+        window.location.href = '/app';
+      }, 500);
+    }
   };
 
   const [{ submit, loading, values, setValues, errors }] = useForm(
@@ -69,7 +90,8 @@ export default function Verification() {
       path: 'auth/verify-mail-simple',
       data: {
         email: router.query.email || '',
-        token: ''
+        token: '',
+        qr_data: router.query.qr_data || null // TAMBAHKAN INI untuk kirim QR data ke backend
       }
     },
     false,
