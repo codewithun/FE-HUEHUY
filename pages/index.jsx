@@ -34,9 +34,15 @@ export default function Login() {
         Encrypt(token),
         { expires: 365, secure: true }
       );
-      window.location.href = '/app';
+      
+      // Tambahkan sedikit delay untuk memastikan cookie tersimpan
+      setTimeout(() => {
+        window.location.href = '/app';
+      }, 100);
     } else {
       // No token found in response
+      // eslint-disable-next-line no-console
+      console.error('No token found in login response:', data);
     }
   };
 
@@ -85,6 +91,8 @@ export default function Login() {
           );
         } else {
           // No token found in Firebase login response
+          // eslint-disable-next-line no-console
+          console.error('No token found in Firebase login response:', response);
         }
       }
 
@@ -105,7 +113,10 @@ export default function Login() {
       const response = await loginFirebase(result.user.accessToken, true);
 
       if (response?.status === 200) {
-        window.location.href = '/app';
+        // Tambahkan delay untuk memastikan cookie tersimpan
+        setTimeout(() => {
+          window.location.href = '/app';
+        }, 100);
       } else if (response?.status === 202) {
         // Handle specific case for status 202
         setBtnGoogleLoading(false);

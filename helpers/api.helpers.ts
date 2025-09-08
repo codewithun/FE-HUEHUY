@@ -132,8 +132,14 @@ export const get = async ({
   } catch (err: any) {
     const resp = err?.response;
     if (resp?.status === 401) {
-      Cookies.remove(token_cookie_name);
-      Router.push(loginPath);
+      // eslint-disable-next-line no-console
+      console.error('401 Unauthorized error for path:', path || url, 'Headers:', fetchHeaders);
+      
+      // Berikan delay kecil sebelum redirect untuk menghindari race condition
+      setTimeout(() => {
+        Cookies.remove(token_cookie_name);
+        Router.push(loginPath);
+      }, 100);
     }
     return resp;
   }
