@@ -81,33 +81,24 @@ export default function Verification() {
     setSendMailLoading(true);
 
     try {
-      const formData = new FormData();
-
-      // Try new system first if email is available
       const email = router.query.email || dataAccount?.data?.profile?.email;
 
       if (email) {
-        const response = await post({ path: 'email-verification/resend-code' }, {
-          email: email
+        // Gunakan endpoint yang benar sesuai backend
+        const response = await post({ 
+          path: 'auth/resend-mail',
+          body: { email: email },
+          contentType: 'application/json'
         });
 
-        if (response?.data?.success) {
+        if (response?.status === 200 || response?.data?.success || response?.data?.message) {
           setWaitingMail(60);
           setModalSendMailSuccess(true);
-          setSendMailLoading(false);
-          return;
         }
       }
-
-      // Fallback to old system
-      const response = await post({ path: 'auth/resend-mail' }, formData);
-
-      if (response?.status == 200 || response?.data?.message) {
-        setWaitingMail(60);
-        setModalSendMailSuccess(true);
-      }
     } catch (error) {
-      // silent error handling
+      // eslint-disable-next-line no-console
+      console.error('Resend email error:', error);
     } finally {
       setSendMailLoading(false);
     }
