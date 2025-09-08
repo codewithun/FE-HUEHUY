@@ -29,12 +29,15 @@ export default function BuatAkun() {
   }, [router]);
 
   const onSuccess = (data) => {
-    // perbaiki opsi Cookies.set -> gabungkan ke satu object
-    Cookies.set(
-      token_cookie_name,
-      Encrypt(data.user_token),
-      { expires: 365, secure: true }
-    );
+    // PERBAIKAN: Pastikan token disimpan dengan benar dari response registrasi
+    const token = data?.data?.token || data?.token || data?.user_token;
+    if (token) {
+      Cookies.set(
+        token_cookie_name,
+        Encrypt(token),
+        { expires: 365, secure: true }
+      );
+    }
 
     // preserve next param so after verification user returns to original target
     const rawNext = router?.query?.next;
