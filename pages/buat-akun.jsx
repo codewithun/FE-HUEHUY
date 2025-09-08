@@ -1,15 +1,15 @@
+import Cookies from 'js-cookie';
 import Image from 'next/image';
-import React, { useEffect, useState } from 'react';
-import { ButtonComponent, InputComponent } from '../components/base.components';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
+import { ButtonComponent, InputComponent } from '../components/base.components';
 import { token_cookie_name, useForm } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
-import Cookies from 'js-cookie';
-import { useRouter } from 'next/router';
 
 // tambahan import
-import axios from 'axios';
 import { faGoogle } from '@fortawesome/free-brands-svg-icons';
+import axios from 'axios';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 export default function BuatAkun() {
@@ -39,8 +39,17 @@ export default function BuatAkun() {
     // preserve next param so after verification user returns to original target
     const rawNext = router?.query?.next;
     const next = rawNext ? String(rawNext) : null;
-    const target = next ? `/verifikasi?next=${encodeURIComponent(next)}` : '/verifikasi';
-    window.location.href = target;
+    
+    // Jika ada parameter next, redirect ke sana setelah berhasil register
+    if (next) {
+      // Decode URL dan redirect
+      const targetUrl = decodeURIComponent(next);
+      window.location.href = targetUrl;
+    } else {
+      // Default flow ke verifikasi
+      const target = '/verifikasi';
+      window.location.href = target;
+    }
   };
   
   const [{ formControl, submit, loading }] = useForm(
@@ -84,7 +93,13 @@ export default function BuatAkun() {
           if (response.status == 200) {
             const rawNext = router?.query?.next;
             const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
-            window.location.href = next || '/app';
+            
+            // Redirect ke next URL jika ada, atau ke app
+            if (next) {
+              window.location.href = next;
+            } else {
+              window.location.href = '/app';
+            }
           } else if (response.status == 202) {
             setBtnGoogleLoading(false);
           }

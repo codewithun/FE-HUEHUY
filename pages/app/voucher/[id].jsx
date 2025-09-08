@@ -1,11 +1,11 @@
 import { faArrowLeft, faCheckCircle, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Image from 'next/image';
 import Cookies from 'js-cookie';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { get, post } from '../../../helpers/api.helpers';
 import { token_cookie_name } from '../../../helpers';
+import { get, post } from '../../../helpers/api.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 
 const DetailVoucherPage = () => {
@@ -153,15 +153,21 @@ const DetailVoucherPage = () => {
       if (!token) {
         // gunakan absolute URL supaya next mengandung host + query
         const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-        router.replace(`/buat-akun?next=${encodeURIComponent(next)}`);
+        // Gunakan window.location.href untuk memastikan redirect
+        if (typeof window !== 'undefined') {
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        }
         return;
       }
-
-      // logged-in flow...
+      
+      // Jika sudah login, lanjutkan proses normal
+      // Auto-claim voucher jika diperlukan
+      if (voucher && !isClaimed) {
+        // Optional: auto-claim voucher
+        // handleClaim();
+      }
     }
-
-    // rest of effect...
-  }, [router.isReady, router.query, id]);
+  }, [router.isReady, router.query, id, voucher, isClaimed]);
 
   const getToken = () => {
     const encrypted = Cookies.get(token_cookie_name);
