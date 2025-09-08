@@ -66,7 +66,7 @@ export default function Verification() {
 
   const [{ submit, loading, values, setValues, errors }] = useForm(
     {
-      path: 'auth/verify-mail',
+      path: 'auth/verify-mail-simple',
       data: {
         email: router.query.email || '',
         token: ''
@@ -86,7 +86,7 @@ export default function Verification() {
 
       if (email) {
         // Gunakan endpoint yang benar sesuai backend
-        const response = await post({ 
+        const response = await post({
           path: 'auth/resend-mail',
           body: { email: email },
           contentType: 'application/json'
