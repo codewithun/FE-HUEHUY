@@ -3,12 +3,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import Cookies from 'js-cookie'; // TAMBAH INI
 import {
   ButtonComponent,
   ModalConfirmComponent,
 } from '../components/base.components';
 import InputOtpComponent from '../components/base.components/input/InputOtpComponent';
-import { post, useForm, useGet } from '../helpers';
+import { post, useForm, useGet, token_cookie_name } from '../helpers'; // TAMBAH token_cookie_name
+import { Encrypt } from '../helpers/encryption.helpers'; // TAMBAH INI
 
 export default function Verification() {
   const router = useRouter();
@@ -19,8 +21,16 @@ export default function Verification() {
   // after successful verification, redirect to original target if provided
   const onSuccess = (response) => {
     try {
-      // PERBAIKAN: Simpan token dari response untuk auto-login
+      // PERBAIKAN: Simpan token di cookie dengan encryption seperti login normal
       if (response?.data?.token) {
+        // Simpan di cookie dengan encryption (format yang sama dengan login)
+        Cookies.set(
+          token_cookie_name,
+          Encrypt(response.data.token),
+          { expires: 365, secure: true }
+        );
+        
+        // Backup ke localStorage juga
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user || {}));
       }
