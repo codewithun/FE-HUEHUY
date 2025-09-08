@@ -67,14 +67,15 @@ export default function Verification() {
   const [{ submit, loading, values, setValues, errors }] = useForm(
     {
       path: 'auth/verify-mail',
-      // Add email to the form data for new verification system
       data: {
-        email: router.query.email || ''
+        email: router.query.email || '',
+        token: ''
       }
     },
     false,
     onSuccess,
   );
+
 
   const resendMail = async (e) => {
     e.preventDefault();
@@ -148,7 +149,7 @@ export default function Verification() {
           <form onSubmit={submit}>
             <div className="flex justify-center pt-8 pb-6">
               <InputOtpComponent
-                value={values?.find(({ name }) => name == 'token')?.value}
+                value={values?.find(({ name }) => name == 'token')?.value || ''} // ← PERBAIKAN: Tambahkan || ''
                 onChange={(e) => {
                   setValues([
                     ...values.filter(({ name }) => name != 'token'),
@@ -156,7 +157,7 @@ export default function Verification() {
                   ]);
                 }}
                 error={errors?.find(({ name }) => name == 'token')?.error}
-                max={6} // Updated to support 6-digit codes
+                max={6}
               />
             </div>
             <div className="px-20 mt-4">
