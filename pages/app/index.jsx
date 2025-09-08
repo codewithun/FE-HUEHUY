@@ -31,11 +31,20 @@ import { distanceConvert } from '../../helpers/distanceConvert.helpers';
 
 export default function Index() {
   const [map, setMap] = useState(null);
+  const [apiReady, setApiReady] = useState(false);
+
+  // Delay API calls sedikit untuk memastikan token ready setelah redirect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setApiReady(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingBanner, codeBanner, dataBanner] = useGet({
     path: 'banner',
-  });
+  }, !apiReady); // Sleep jika apiReady = false
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -60,23 +69,23 @@ export default function Index() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingMenu, codeMenu, dataMenu] = useGet({
     path: `dynamic-content?type=home`,
-  });
+  }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingNear, codeNear, dataNear] = useGet({
     path: map ? `ads/promo-nearest/${map?.lat}/${map?.lng}` : '',
-  });
+  }, !apiReady || !map);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingRecommendation, codeRecommendation, dataRecommendation] =
     useGet({
       path: `ads/promo-recommendation`,
-    });
+    }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingCategories, codeCategories, dataCategories] = useGet({
     path: `ads-category`,
-  });
+  }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [
@@ -85,17 +94,17 @@ export default function Index() {
     dataPrimaryCategories,
   ] = useGet({
     path: `primary-category`,
-  });
+  }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [configLoading, codeConfig, dataConfig, resetConfig] = useGet({
     path: 'admin/app-config/2',
-  });
+  }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingUser, codeUser, dataUser] = useGet({
     path: `account`,
-  });
+  }, !apiReady); // PENTING: Delay request account sampai apiReady = true
 
   if (dataUser?.data?.profile?.phone) {
     return (

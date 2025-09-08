@@ -82,16 +82,17 @@ export default function Verification() {
       }
 
       // Default redirect ke app
+      // Redirect dengan delay yang lebih panjang untuk memastikan cookie tersimpan
       setTimeout(() => {
         window.location.href = '/app';
-      }, 500);
+      }, 200);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('Error in onSuccess:', e);
       // Fallback redirect
       setTimeout(() => {
         window.location.href = '/app';
-      }, 500);
+      }, 200);
     }
   };
 
