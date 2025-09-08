@@ -39,18 +39,22 @@ export default function BuatAkun() {
       );
     }
 
+    // Get user info dari response
+    const user = data?.data?.user || data?.user || data?.data?.data?.user;
+    const userEmail = user?.email || '';
+
     // preserve next param so after verification user returns to original target
     const rawNext = router?.query?.next;
     const next = rawNext ? String(rawNext) : null;
     
-    // SELALU ke verifikasi dulu, baru setelah verifikasi redirect ke target
+    // SELALU ke verifikasi dulu dengan email parameter, baru setelah verifikasi redirect ke target
     if (next) {
-      // Pass next parameter ke halaman verifikasi
-      const target = `/verifikasi?next=${encodeURIComponent(next)}`;
+      // Pass next parameter DAN email ke halaman verifikasi
+      const target = `/verifikasi?email=${encodeURIComponent(userEmail)}&next=${encodeURIComponent(next)}`;
       window.location.href = target;
     } else {
-      // Default flow ke verifikasi
-      const target = '/verifikasi';
+      // Default flow ke verifikasi dengan email
+      const target = `/verifikasi?email=${encodeURIComponent(userEmail)}`;
       window.location.href = target;
     }
   };
@@ -126,19 +130,7 @@ export default function BuatAkun() {
       });
   };
 
-  // setelah registrasi/login sukses:
-  async function onRegisterSuccess(response) {
-    // sesuaikan sesuai response backend
-    const token = response?.data?.token || response?.token || response?.access_token;
-    if (token) {
-      // set cookie agar halaman lain (voucher/promo) dapat baca via Cookies.get(token_cookie_name)
-      Cookies.set(token_cookie_name, token, { path: '/', sameSite: 'Lax' });
-    }
-
-    // redirect ke next jika ada
-    const next = router.query.next ? decodeURIComponent(String(router.query.next)) : '/';
-    router.replace(next);
-  }
+  // setelah registrasi/login sukses: (REMOVED - tidak terpakai)
 
   return (
     <>

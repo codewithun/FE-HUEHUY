@@ -18,6 +18,18 @@ export default function Verification() {
   const [waitingMail, setWaitingMail] = useState(60);
   const [modalSendMailSuccess, setModalSendMailSuccess] = useState(false);
 
+  // DEBUG: Log query parameters saat halaman dimuat
+  useEffect(() => {
+    if (router.isReady) {
+      // eslint-disable-next-line no-console
+      console.log('Verification page loaded with query:', router.query);
+      // eslint-disable-next-line no-console
+      console.log('Email from query:', router.query.email);
+      // eslint-disable-next-line no-console
+      console.log('Next from query:', router.query.next);
+    }
+  }, [router.isReady, router.query]);
+
   // after successful verification, redirect to original target if provided
   const onSuccess = (response) => {
     try {
@@ -151,6 +163,7 @@ export default function Verification() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const shouldSkipRequest = !router.query.email; // Skip jika tidak ada email di query
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingAccount, codeDataAccount, dataAccount] = useGet({
     path: `account-unverified`,
   }, shouldSkipRequest);
