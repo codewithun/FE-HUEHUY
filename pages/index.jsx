@@ -26,7 +26,7 @@ export default function Login() {
   const onSuccess = (data) => {
     // Laravel API biasanya mengembalikan { data: { token: "...", user: {...} } }
     // Coba berbagai kemungkinan path token
-    const token = data?.data?.token || data?.token || data?.data?.data?.token;
+    const token = data?.data?.token || data?.token || data?.data?.data?.token || data?.user_token;
 
     if (token) {
       Cookies.set(
@@ -35,7 +35,19 @@ export default function Login() {
         { expires: 365, secure: true }
       );
       
-      // Tambahkan sedikit delay untuk memastikan cookie tersimpan
+      // CHECK: Apakah user sudah verified
+      const user = data?.data?.user || data?.user || data?.data?.data?.user;
+      const isVerified = user?.verified_at || user?.email_verified_at;
+      
+      if (!isVerified) {
+        // User belum verified, ke halaman verifikasi dengan email
+        setTimeout(() => {
+          window.location.href = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
+        }, 100);
+        return;
+      }
+      
+      // User sudah verified, langsung ke app
       setTimeout(() => {
         window.location.href = '/app';
       }, 100);
@@ -113,12 +125,28 @@ export default function Login() {
       const response = await loginFirebase(result.user.accessToken, true);
 
       if (response?.status === 200) {
-        // Tambahkan delay untuk memastikan cookie tersimpan
-        setTimeout(() => {
-          window.location.href = '/app';
-        }, 100);
+        // CHECK: Firebase login biasanya sudah verified
+        // Tapi tetap cek response untuk memastikan
+        const user = response?.data?.user || response?.user;
+        const isVerified = user?.verified_at || user?.email_verified_at || true; // Firebase biasanya auto-verified
+
+        if (!isVerified) {
+          // Jarang terjadi, tapi handle jika perlu verifikasi
+          setTimeout(() => {
+            window.location.href = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
+          }, 100);
+        } else {
+          // Langsung ke app
+          setTimeout(() => {
+            window.location.href = '/app';
+          }, 100);
+        }
       } else if (response?.status === 202) {
-        // Handle specific case for status 202
+        // Handle specific case for status 202 - butuh verifikasi
+        const user = response?.data?.user || response?.user;
+        setTimeout(() => {
+          window.location.href = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
+        }, 100);
         setBtnGoogleLoading(false);
       } else {
         // Handle other error cases

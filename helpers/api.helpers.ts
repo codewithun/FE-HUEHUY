@@ -33,6 +33,8 @@ const getAuthHeader = () => {
     
     return { Authorization: `Bearer ${token}` };
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('Failed to decrypt token from cookie:', error);
     // Clear corrupted cookie
     Cookies.remove(token_cookie_name);
     return {};

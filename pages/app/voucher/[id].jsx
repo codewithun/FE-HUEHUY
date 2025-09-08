@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { token_cookie_name } from '../../../helpers';
 import { get, post } from '../../../helpers/api.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
@@ -46,7 +46,7 @@ const DetailVoucherPage = () => {
   }, [id]);
 
   // --- MODIFIED: fetchVoucherDetails now returns fetched data (or null) ---
-  const fetchVoucherDetails = async () => {
+  const fetchVoucherDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -80,7 +80,7 @@ const DetailVoucherPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   const handleBack = () => {
     // Cek apakah ada parameter autoRegister
@@ -151,76 +151,58 @@ const DetailVoucherPage = () => {
   // --- MODIFIED: handle autoRegister / source param and login check ---
   useEffect(() => {
     if (!router.isReady) return;
-    const encrypted = Cookies.get(token_cookie_name);
-    const token = encrypted ? Decrypt(encrypted) : null;
-
+    
     // accept both `autoRegister` or `source=qr`
     const autoRegister = router.query.autoRegister || router.query.source;
 
     if (autoRegister) {
-      // If user is not logged in -> redirect to create account (preserve absolute current URL)
+      // Coba ambil token dengan berbagai cara
+      let token = null;
+      
+      // 1. Coba dari cookie dengan decrypt
+      const encrypted = Cookies.get(token_cookie_name);
+      if (encrypted) {
+        try {
+          token = Decrypt(encrypted);
+          // eslint-disable-next-line no-console
+          console.log('Token from cookie:', token?.substring(0, 20) + '...');
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to decrypt token:', e);
+          // Cookie corrupt, hapus
+          Cookies.remove(token_cookie_name);
+        }
+      }
+      
+      // 2. Fallback ke localStorage
       if (!token) {
-        // gunakan absolute URL supaya next mengandung host + query
+        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        if (token) {
+          // eslint-disable-next-line no-console
+          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
+        }
+      }
+      
+      // If user is not logged in -> redirect to create account
+      if (!token) {
+        // eslint-disable-next-line no-console
+        console.log('No token found, redirecting to register');
         const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-        // Gunakan window.location.href untuk memastikan redirect
         if (typeof window !== 'undefined') {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }
         return;
       }
       
-      // Jika ada token, cek status verifikasi user
+      // Token ada, cek status verifikasi user
+      // eslint-disable-next-line no-console
+      console.log('Token found, checking verification status...');
       checkUserVerificationStatus(token);
     }
-  }, [router.isReady, router.query, id]);
-
-  // Fungsi untuk cek status verifikasi - DIPERBAIKI
-  const checkUserVerificationStatus = async (token) => {
-    try {
-      // Gunakan endpoint profil untuk cek verifikasi
-      const response = await get({
-        path: 'account',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response?.status === 200) {
-        const userData = response?.data?.data?.profile || response?.data?.profile;
-        
-        // Cek field verifikasi di profil user
-        const emailVerified = userData?.email_verified_at || 
-                              userData?.verified_at ||
-                              userData?.verified === true ||
-                              userData?.is_verified === true;
-        
-        if (!emailVerified) {
-          const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-          window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
-          return;
-        }
-        
-        // User sudah terverifikasi, lakukan auto-register untuk QR scan
-        handleAutoRegister(token);
-        
-      } else if (response?.status === 401) {
-        // Token tidak valid, redirect ke login
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-        return;
-      }
-      
-    } catch (err) {
-      // Jika error, coba auto register tetap
-      const tokenFromStorage = getToken();
-      if (tokenFromStorage) {
-        handleAutoRegister(tokenFromStorage);
-      }
-    }
-  };
+  }, [router.isReady, router.query, id, checkUserVerificationStatus]);
 
   // Fungsi untuk handle auto register setelah QR scan
-  const handleAutoRegister = async (token) => {
+  const handleAutoRegister = useCallback(async (token) => {
     try {
       const voucherData = await fetchVoucherDetails();
       if (!voucherData) return;
@@ -266,15 +248,88 @@ const DetailVoucherPage = () => {
     } catch (error) {
       // Silent error
     }
-  };
+  }, [fetchVoucherDetails]);
 
-  const getToken = () => {
-    const encrypted = Cookies.get(token_cookie_name);
-    if (encrypted) return Decrypt(encrypted);
-    // fallback: coba localStorage (beberapa flow menyimpan di sana)
-    const ls = localStorage.getItem('auth_token') || localStorage.getItem('token');
-    return ls || null;
-  };
+  // Fungsi untuk cek status verifikasi - DIPERBAIKI
+  const checkUserVerificationStatus = useCallback(async (token) => {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
+      
+      // Coba endpoint account-unverified dulu (untuk user belum verified)
+      let response = await get({
+        path: 'account-unverified',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // eslint-disable-next-line no-console
+      console.log('account-unverified response:', response?.status, response?.data);
+      
+      if (response?.status === 200) {
+        // User belum terverifikasi, redirect ke verifikasi
+        const userData = response?.data?.data?.profile || response?.data?.profile;
+        const emailVerified = userData?.email_verified_at || userData?.verified_at;
+        
+        if (!emailVerified) {
+          // eslint-disable-next-line no-console
+          console.log('User not verified, redirecting to verification');
+          const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+          window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+          return;
+        }
+      }
+      
+      // Jika account-unverified gagal atau user sudah verified, coba endpoint account
+      if (response?.status === 401 || response?.status === 404) {
+        // eslint-disable-next-line no-console
+        console.log('Trying account endpoint...');
+        response = await get({
+          path: 'account',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        // eslint-disable-next-line no-console
+        console.log('account response:', response?.status, response?.data);
+        
+        if (response?.status === 200) {
+          // User sudah terverifikasi, lakukan auto-register untuk QR scan
+          // eslint-disable-next-line no-console
+          console.log('User verified, proceeding with auto register');
+          handleAutoRegister(token);
+          return;
+        }
+        
+        if (response?.status === 401) {
+          // Token tidak valid, redirect ke login
+          // eslint-disable-next-line no-console
+          console.log('Token invalid (401), redirecting to register');
+          const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+          return;
+        }
+      }
+      
+      // Fallback: assume user is verified dan lanjut auto register
+      // eslint-disable-next-line no-console
+      console.log('Fallback: proceeding with auto register');
+      handleAutoRegister(token);
+      
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error checking verification status:', err);
+      // Jika semua endpoint error, redirect ke login ulang
+      const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+      window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+    }
+  }, [id, handleAutoRegister]);
 
   if (loading) {
     return (
