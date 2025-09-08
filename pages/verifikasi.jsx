@@ -1,13 +1,13 @@
+import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import Image from 'next/image';
-import React, { useEffect, useState } from 'react';
-import { post, useForm, useGet } from '../helpers';
-import InputOtpComponent from '../components/base.components/input/InputOtpComponent';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import {
   ButtonComponent,
   ModalConfirmComponent,
 } from '../components/base.components';
-import { faCheck } from '@fortawesome/free-solid-svg-icons';
-import Link from 'next/link';
+import InputOtpComponent from '../components/base.components/input/InputOtpComponent';
+import { post, useForm, useGet } from '../helpers';
 
 export default function Verification() {
   const [sendMailLoading, setSendMailLoading] = useState(false);
@@ -17,15 +17,21 @@ export default function Verification() {
   // after successful verification, redirect to original target if provided
   const onSuccess = () => {
     try {
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get('next');
+      // Cek parameter next dari URL query
+      const urlParams = new URLSearchParams(window.location.search);
+      const next = urlParams.get('next');
+
       if (next) {
-        window.location.href = decodeURIComponent(next);
+        // Decode dan redirect ke target asli
+        const targetUrl = decodeURIComponent(next);
+        window.location.href = targetUrl;
         return;
       }
     } catch (e) {
       // ignore and fallback
     }
+
+    // Default redirect ke app
     window.location.href = '/app';
   };
 
@@ -34,7 +40,7 @@ export default function Verification() {
       path: 'auth/verify-mail',
     },
     false,
-  onSuccess
+    onSuccess, // gunakan onSuccess yang sudah dimodifikasi
   );
 
   const resendMail = async (e) => {
@@ -50,7 +56,6 @@ export default function Verification() {
       setModalSendMailSuccess(true);
       setSendMailLoading(false);
     } else {
-      setFormToken('');
       setSendMailLoading(false);
     }
   };
