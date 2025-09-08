@@ -18,7 +18,7 @@ export default function Verification() {
 
   // after successful verification, redirect to original target if provided
   const onSuccess = (response) => {
-    
+
     try {
       // Check if there's QR data from registration
       const qrData = response?.data?.qr_data || router.query.qr_data;
@@ -26,15 +26,15 @@ export default function Verification() {
 
       if (qrData) {
         // QR scan flow - process QR data or redirect accordingly
-        
+
         // Parse QR data if it's JSON string
         try {
           const parsedQrData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
-          
+
           if (parsedQrData.type === 'promo' || parsedQrData.type === 'voucher') {
             // Redirect to promo/voucher validation page
             const targetUrl = `/app/validate/${parsedQrData.type}?id=${parsedQrData.promoId || parsedQrData.voucherId}&community=${parsedQrData.communityId}`;
-            
+
             setTimeout(() => {
               window.location.href = targetUrl;
             }, 500); // Reduced delay
@@ -48,7 +48,7 @@ export default function Verification() {
       if (next) {
         // Regular redirect flow
         const targetUrl = decodeURIComponent(String(next));
-        
+
         setTimeout(() => {
           window.location.href = targetUrl;
         }, 500); // Reduced delay
@@ -82,15 +82,15 @@ export default function Verification() {
 
     try {
       const formData = new FormData();
-      
+
       // Try new system first if email is available
       const email = router.query.email || dataAccount?.data?.profile?.email;
-      
+
       if (email) {
         const response = await post({ path: 'email-verification/resend-code' }, {
           email: email
         });
-        
+
         if (response?.data?.success) {
           setWaitingMail(60);
           setModalSendMailSuccess(true);
@@ -98,7 +98,7 @@ export default function Verification() {
           return;
         }
       }
-      
+
       // Fallback to old system
       const response = await post({ path: 'auth/resend-mail' }, formData);
 
@@ -125,9 +125,10 @@ export default function Verification() {
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const shouldSkipRequest = !router.query.email; // Skip jika tidak ada email di query
   const [loadingAccount, codeDataAccount, dataAccount] = useGet({
     path: `account-unverified`,
-  });
+  }, shouldSkipRequest);
 
   return (
     <>
