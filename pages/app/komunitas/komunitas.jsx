@@ -10,32 +10,35 @@ import Cookies from "js-cookie";
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
 import { token_cookie_name } from "../../../helpers";
 import { Decrypt } from "../../../helpers/encryption.helpers";
 
-// --- ADD: helper aman untuk ngebangun URL logo ---
+/** =========================
+ * Util API base
+ * ========================= */
+const getApiBase = () => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  // pastikan tidak double /api
+  return baseUrl.replace(/\/api\/?$/, "");
+};
+
+/** =========================
+ * Logo URL builder (aman)
+ * ========================= */
 const buildLogoUrl = (apiUrl, logo) => {
   try {
     if (!logo) return null;
+    if (/^https?:\/\//i.test(logo)) return logo; // already absolute
 
-    // kalau sudah absolute (http/https), langsung pakai
-    if (/^https?:\/\//i.test(logo)) return logo;
-
-    // pastikan base pakai URL() supaya slash2 rapi
     const base = new URL(apiUrl);
-
-    // file statis sebaiknya TIDAK di bawah /api → hapus /api kalau ada
     base.pathname = base.pathname.replace(/\/api\/?$/, "/");
 
-    // normalisasi path "logo" dari backend
-    // contoh: "api/storage/xxx" → "storage/xxx"
     const cleanLogo = String(logo)
-      .replace(/^\/+/, "")                  // hapus leading slash
+      .replace(/^\/+/, "")
       .replace(/^api\/storage\//, "storage/");
 
-    // pastikan ada prefix /storage saat perlu
     const relative = cleanLogo.startsWith("storage/")
       ? `/${cleanLogo}`
       : `/storage/${cleanLogo}`;
@@ -46,49 +49,98 @@ const buildLogoUrl = (apiUrl, logo) => {
   }
 };
 
-// --- ADD: API helper functions ---
+/** =========================
+ * Auth header helper
+ * ========================= */
 const getAuthHeaders = () => {
   const encryptedToken = Cookies.get(token_cookie_name);
   const token = encryptedToken ? Decrypt(encryptedToken) : "";
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
+    "Accept": "application/json", // <-- penting untuk Laravel
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
+/** =========================
+ * API calls
+ * ========================= */
 const joinCommunityAPI = async (communityId) => {
-  // Handle API URL properly - remove /api if it exists, then add it back
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const apiUrl = baseUrl.replace(/\/api\/?$/, "");
-  
-  const response = await fetch(`${apiUrl}/api/communities/${communityId}/join`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-  
-  if (!response.ok) {
-    // Try to read server message (422/400/500)
-    const errorData = await response.json().catch(() => ({}));
-    const msg = errorData.message || errorData.error || 'Gagal bergabung dengan komunitas';
-    throw new Error(msg);
+  const apiUrl = getApiBase();
+  const headers = getAuthHeaders();
+
+  if (!("Authorization" in headers)) {
+    throw new Error("Sesi habis. Silakan login ulang.");
   }
-  
-  return response.json();
+
+  const res = await fetch(`${apiUrl}/api/communities/${communityId}/join`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.message || err?.error || 'Gagal bergabung dengan komunitas');
+  }
+  return res.json();
+};
+
+/**
+ * @typedef {Object} CommunityItem
+ * @property {number} id
+ * @property {string} name
+ * @property {string=} description
+ * @property {string=} category
+ * @property {string|null=} logo
+ * @property {'public'|'private'|string=} privacy
+ * @property {boolean=} is_verified
+ * @property {boolean=} isVerified
+ * @property {boolean|number=} is_joined
+ * @property {boolean|number=} isJoined
+ * @property {number|string=} members
+ * @property {number=} activePromos
+ */
+
+/** Normalisasi bentuk respons dari backend menjadi array CommunityItem */
+const normalizeCommunities = (raw) => {
+  // backend kita sekarang balikin { data: [...] }, tapi handle array langsung juga
+  const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
+  return list.map((c) => {
+    const isJoinedRaw = c.isJoined ?? c.is_joined ?? false;
+    const isJoined = typeof isJoinedRaw === 'number'
+      ? Boolean(isJoinedRaw)
+      : Boolean(isJoinedRaw);
+
+    const membersNum = Number(c.members ?? 0);
+    return {
+      id: Number(c.id),
+      name: String(c.name ?? ''),
+      description: c.description ?? '',
+      category: c.category ?? '',
+      logo: c.logo ?? null,
+      privacy: c.privacy ?? 'public',
+      isVerified: Boolean(c.isVerified ?? c.is_verified ?? false),
+      isJoined,
+      members: Number.isFinite(membersNum) ? membersNum : 0,
+      activePromos: Number(c.activePromos ?? 0),
+    };
+  });
 };
 
 const fetchCommunitiesWithMembership = async () => {
-  // Handle API URL properly - remove /api if it exists, then add it back
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const apiUrl = baseUrl.replace(/\/api\/?$/, "");
-  
+  const apiUrl = getApiBase();
   const headers = getAuthHeaders();
 
-  // try a list of candidate endpoints (some deployments put routes under /api/admin)
+  if (!("Authorization" in headers)) {
+    // biar FE bisa fallback ke tampilan kosong tanpa crash
+    return [];
+  }
+
   const candidates = [
-    `${apiUrl}/api/communities/with-membership`,
-    `${apiUrl}/api/admin/communities/with-membership`,
-    `${apiUrl}/api/admin/communities`, // fallback shape
-    `${apiUrl}/api/communities` // another fallback
+    `${apiUrl}/api/communities/with-membership`,     // utama (auth)
+    `${apiUrl}/api/admin/communities/with-membership`, // fallback admin (kalau diset)
+    `${apiUrl}/api/admin/communities`,               // fallback list admin
+    `${apiUrl}/api/communities`,                     // fallback list public
   ];
 
   const tryFetch = async (url) => {
@@ -101,68 +153,43 @@ const fetchCommunitiesWithMembership = async () => {
     }
   };
 
-  // try candidates in order, return first successful useful response
   for (const url of candidates) {
     const data = await tryFetch(url);
     if (!data) continue;
 
-    // if endpoint returns array or object with data array, normalize and return
-    if (Array.isArray(data)) return data;
-    if (data?.data && Array.isArray(data.data)) return data;
-    // if admin/communities returns an object (maybe list), return it too
-    if (typeof data === 'object') return data;
+    // bentuk standar
+    const normalized = normalizeCommunities(data);
+
+    // kalau ini endpoint utama (with-membership), biasanya sudah ada isJoined
+    if (url.endsWith('/with-membership')) {
+      return normalized;
+    }
+
+    // kalau bukan, mungkin belum ada isJoined → biarkan fallback di bawah yang ngisi dari user-communities
+    if (normalized.length) {
+      // coba lengkapi membership dari /user-communities
+      try {
+        const ucRes = await fetch(`${apiUrl}/api/communities/user-communities`, { headers });
+        if (ucRes.ok) {
+          const ucData = await ucRes.json().catch(() => ({}));
+          const userCommunities = normalizeCommunities(ucData);
+          const userIds = new Set(userCommunities.map(u => u.id));
+          return normalized.map(c => ({
+            ...c,
+            isJoined: userIds.has(c.id),
+          }));
+        }
+      } catch {}
+      return normalized;
+    }
   }
 
-  // Fallback: try to fetch admin list + user-communities (try both admin/non-admin)
-  try {
-    const communityUrls = [
-      `${apiUrl}/api/admin/communities`,
-      `${apiUrl}/api/communities`
-    ];
-    const userCommunityUrls = [
-      `${apiUrl}/api/communities/user-communities`,
-      `${apiUrl}/api/admin/communities/user-communities`
-    ];
-
-    // pick first working communities endpoint
-    let communitiesResponse = null;
-    for (const u of communityUrls) {
-      try {
-        const r = await fetch(u, { headers });
-        if (r.ok) { communitiesResponse = r; break; }
-      } catch {}
-    }
-
-    // pick first working user-communities endpoint (optional)
-    let userCommunitiesResponse = null;
-    for (const u of userCommunityUrls) {
-      try {
-        const r = await fetch(u, { headers });
-        if (r.ok) { userCommunitiesResponse = r; break; }
-      } catch {}
-    }
-
-    const allCommunities = communitiesResponse ? await communitiesResponse.json().catch(() => ({ data: [] })) : { data: [] };
-    let userCommunities = [];
-    if (userCommunitiesResponse && userCommunitiesResponse.ok) {
-      const userData = await userCommunitiesResponse.json().catch(() => ({}));
-      userCommunities = userData.data || userData || [];
-    }
-
-    const list = allCommunities.data || allCommunities || [];
-    const userCommunityIds = userCommunities.map(uc => uc.id);
-    const communitiesWithMembership = list.map(community => ({
-      ...community,
-      isJoined: userCommunityIds.includes(community.id),
-      members: community.members || 0
-    }));
-
-    return communitiesWithMembership;
-  } catch (fallbackError) {
-    return [];
-  }
+  return [];
 };
 
+/** =========================
+ * Komponen utama
+ * ========================= */
 export default function Komunitas() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('semua');
@@ -177,70 +204,64 @@ export default function Komunitas() {
     setIsClient(true);
   }, []);
 
-  // Updated: Fetch communities with membership status
   const fetchCommunities = async () => {
     setLoading(true);
     try {
-      const data = await fetchCommunitiesWithMembership();
-
-      // Process communities data to construct proper logo URLs for Next.js Image
-      const list = Array.isArray(data) ? data : (data?.data || []);
-      const processedCommunities = list.map((community) => ({
-        ...community,
-        logo: buildLogoUrl((process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, ""), community.logo),
-        // Ensure isJoined field exists (backend should provide this)
-        isJoined: community.isJoined || community.is_joined || false,
+      const list = await fetchCommunitiesWithMembership();
+      // build absolute logo url disini biar 1x proses
+      const apiBase = getApiBase();
+      const processed = list.map(c => ({
+        ...c,
+        logo: buildLogoUrl(apiBase, c.logo || undefined),
       }));
-      setCommunities(processedCommunities);
-
-    } catch (err) {
+      setCommunities(processed);
+    } catch {
       setCommunities([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     fetchCommunities();
   }, []);
 
-  // Filter communities sesuai tab dan pencarian
-  const filteredCommunities = () => {
-    let data = communities;
+  const filteredCommunities = useMemo(() => {
+    let data = [...communities];
+
     if (activeTab === 'komunitasku') {
-      data = data.filter(c => c.isJoined); // sesuaikan dengan field backend
+      data = data.filter(c => Boolean(c.isJoined));
     } else if (activeTab === 'belum-gabung') {
       data = data.filter(c => !c.isJoined);
     }
-    if (searchQuery) {
-      data = data.filter(community =>
-        community.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (community.category || '').toLowerCase().includes(searchQuery.toLowerCase())
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      data = data.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        (c.category ?? '').toLowerCase().includes(q)
       );
     }
-    return data;
-  };
 
-  // Function untuk handle buka komunitas - redirect langsung ke dashboard
+    return data;
+  }, [communities, activeTab, searchQuery]);
+
   const handleOpenCommunity = (communityId) => {
     router.push(`/app/komunitas/dashboard/${communityId}`);
   };
 
-  // Format number function with consistent locale
   const formatNumber = (num) => {
-    if (!isClient) return num ? num.toString() : "0";
-    if (typeof num !== "number") return "0";
+    if (!isClient) return num ? String(num) : "0";
+    if (typeof num !== "number" || Number.isNaN(num)) return "0";
     return num.toLocaleString('id-ID');
   };
-
-  const notJoinedCommunities = communities.filter(c => !c.isJoined);
 
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="container mx-auto relative z-10 pb-28">
-          {/* Header Banner dengan ilustrasi 3D style - IMPROVED */}
+          {/* Header */}
           <div className="w-full bg-primary relative overflow-hidden">
-            {/* Background decoration - lebih subtle */}
             <div className="absolute inset-0">
               <div className="absolute top-4 right-4 w-16 h-16 bg-cyan-400 rounded-full opacity-15"></div>
               <div className="absolute bottom-8 left-8 w-12 h-12 bg-teal-300 rounded-full opacity-10"></div>
@@ -248,7 +269,6 @@ export default function Komunitas() {
             </div>
 
             <div className="relative px-4 py-6 text-white">
-              {/* Header dengan back button */}
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
                   <Link href="/app">
@@ -258,11 +278,9 @@ export default function Komunitas() {
                 </div>
               </div>
 
-              {/* Ilustrasi area dengan 3D characters - IMPROVED */}
+              {/* Ilustrasi */}
               <div className="flex items-center justify-center py-6 relative">
-                {/* Central illustration placeholder - 3 characters with speech bubbles */}
                 <div className="flex items-center gap-3">
-                  {/* Character 1 */}
                   <div className="relative">
                     <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
                       <div className="w-8 h-8 bg-orange-200 rounded-full"></div>
@@ -272,7 +290,6 @@ export default function Komunitas() {
                     </div>
                   </div>
 
-                  {/* Character 2 (center with ADS badge) */}
                   <div className="relative">
                     <div className="w-18 h-18 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
                       <div className="w-12 h-12 bg-blue-200 rounded-full"></div>
@@ -285,7 +302,6 @@ export default function Komunitas() {
                     </div>
                   </div>
 
-                  {/* Character 3 */}
                   <div className="relative">
                     <div className="w-14 h-14 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full flex items-center justify-center shadow-lg">
                       <div className="w-8 h-8 bg-gray-100 rounded-full"></div>
@@ -296,7 +312,6 @@ export default function Komunitas() {
                   </div>
                 </div>
 
-                {/* Floating elements - lebih kecil dan subtle */}
                 <div className="absolute top-2 left-6 bg-blue-400 text-white p-1.5 rounded-lg text-xs shadow-sm">
                   👍
                 </div>
@@ -305,7 +320,6 @@ export default function Komunitas() {
                 </div>
               </div>
 
-              {/* Tagline - Clean dan Simple */}
               <div className="text-center mt-6 mb-4">
                 <p className="text-lg font-semibold text-white drop-shadow-md">
                   Lebih mudah berbagi promo sesama anggota komunitas
@@ -314,10 +328,9 @@ export default function Komunitas() {
             </div>
           </div>
 
-          {/* Content area - matching background gradient */}
+          {/* Content */}
           <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
             <div className="relative -top-5 px-4">
-              {/* Search Bar - matching style from index */}
               <div className="mb-6">
                 <div className="w-full bg-white border border__primary px-6 py-4 rounded-[20px] flex justify-between items-center shadow-sm">
                   <input
@@ -327,17 +340,12 @@ export default function Komunitas() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="flex-1 outline-none bg-transparent"
                   />
-                  <FontAwesomeIcon
-                    icon={faSearch}
-                    className="text__primary"
-                  />
+                  <FontAwesomeIcon icon={faSearch} className="text__primary" />
                 </div>
               </div>
             </div>
 
-            {/* Content with proper padding */}
             <div className="px-4 pb-6">
-              {/* Tab navigation */}
               <div className="flex mb-4 border-b border-slate-200">
                 <button
                   className={`px-4 py-2 ${activeTab === 'semua' ? 'text-primary font-semibold border-b-2 border-primary' : 'text-slate-600'}`}
@@ -359,25 +367,17 @@ export default function Komunitas() {
                 </button>
               </div>
 
-              {/* Communities List */}
-              {/* Show recommended communities section only when viewing all or joined communities */}
-
-
-              {/* Komunitas Lainnya section */}
               <div className="mb-6">
                 <div className="mb-4">
                   <h2 className="text-slate-900 text-lg font-semibold">Komunitas Lainnya</h2>
-                  <p className="text-slate-600 text-sm">
-                    Temukan komunitas baru yang menarik
-                  </p>
+                  <p className="text-slate-600 text-sm">Temukan komunitas baru yang menarik</p>
                 </div>
 
-                {/* Other Communities List */}
                 <div className="space-y-3">
                   {loading ? (
                     <div>Loading komunitas...</div>
                   ) : (
-                    filteredCommunities().map((community) => (
+                    filteredCommunities.map((community) => (
                       <CommunityCard
                         key={community.id}
                         community={community}
@@ -386,8 +386,8 @@ export default function Komunitas() {
                         formatNumber={formatNumber}
                         refreshCommunities={fetchCommunities}
                         setActiveTab={setActiveTab}
-                        onShowJoinPopup={(community) => {
-                          setSelectedCommunity(community);
+                        onShowJoinPopup={(c) => {
+                          setSelectedCommunity(c);
                           setShowJoinPopup(true);
                         }}
                       />
@@ -399,7 +399,7 @@ export default function Komunitas() {
           </div>
         </div>
 
-        {/* Join Confirmation Popup */}
+        {/* Join Popup */}
         {showJoinPopup && selectedCommunity && (
           <JoinConfirmationPopup
             community={selectedCommunity}
@@ -408,17 +408,14 @@ export default function Komunitas() {
                 await joinCommunityAPI(selectedCommunity.id);
                 setShowJoinPopup(false);
                 setSelectedCommunity(null);
-                
-                // Update the specific community as joined
-                setCommunities(prev => prev.map(community => 
-                  community.id === selectedCommunity.id 
-                    ? { ...community, isJoined: true }
-                    : community
-                ));
-                
+
+                setCommunities(prev =>
+                  prev.map(c => (c.id === selectedCommunity.id ? { ...c, isJoined: true } : c))
+                );
                 setActiveTab('komunitasku');
               } catch (error) {
-                // Silent error handling - just close popup and don't update state
+                // boleh kamu ganti jadi toast
+                alert(error?.message || 'Gagal bergabung');
                 setShowJoinPopup(false);
                 setSelectedCommunity(null);
               }
@@ -436,8 +433,14 @@ export default function Komunitas() {
   );
 }
 
-// Join Confirmation Popup Component
-function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
+/** =========================
+ * Join Confirmation Popup
+ * ========================= */
+function JoinConfirmationPopup({
+  community,
+  onConfirm,
+  onCancel,
+}) {
   const [isJoining, setIsJoining] = useState(false);
 
   const handleConfirm = async () => {
@@ -452,7 +455,6 @@ function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-auto shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-800">Bergabung Komunitas</h3>
           <button
@@ -463,7 +465,6 @@ function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
           </button>
         </div>
 
-        {/* Community Info */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
             {community.logo && /^https?:\/\/[^ "]+$/.test(community.logo) ? (
@@ -484,11 +485,10 @@ function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
           </div>
           <div>
             <h4 className="font-semibold text-slate-900">{community.name}</h4>
-            <p className="text-sm text-slate-600">{community.members || 0} anggota</p>
+            <p className="text-sm text-slate-600">{(community.members ?? 0).toString()} anggota</p>
           </div>
         </div>
 
-        {/* Confirmation Message */}
         <div className="mb-6">
           <p className="text-slate-700 text-center leading-relaxed">
             Apakah Anda yakin ingin bergabung dengan komunitas <span className="font-semibold">{community.name}</span>?
@@ -501,7 +501,6 @@ function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-3">
           <button
             onClick={onCancel}
@@ -516,7 +515,7 @@ function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
           >
             {isJoining ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                 Bergabung...
               </>
             ) : (
@@ -532,30 +531,35 @@ function JoinConfirmationPopup({ community, onConfirm, onCancel }) {
   );
 }
 
-// Community Card Component - IMPROVED dengan type untuk membedakan joined/notJoined
-function CommunityCard({ community, type, onOpenCommunity, formatNumber, refreshCommunities, setActiveTab, onShowJoinPopup }) {
-  const [joinError, setJoinError] = useState('');
-  const [isJoined, setIsJoined] = useState(community.isJoined);
+/** =========================
+ * Community Card
+ * ========================= */
+function CommunityCard({
+  community,
+  type,
+  onOpenCommunity,
+  formatNumber,
+  setActiveTab,
+  onShowJoinPopup,
+}) {
+  const [isJoined, setIsJoined] = useState(Boolean(community.isJoined));
   const [justJoined, setJustJoined] = useState(false);
 
-  // Update isJoined when community prop changes
   useEffect(() => {
-    setIsJoined(community.isJoined);
-    if (community.isJoined && !isJoined) {
+    const next = Boolean(community.isJoined);
+    if (next && !isJoined) {
       setJustJoined(true);
       setTimeout(() => setJustJoined(false), 2000);
     }
+    setIsJoined(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [community.isJoined]);
 
+  const handleClickCard = () => onOpenCommunity(community.id);
+
   const handleJoinCommunity = (e) => {
-    e.stopPropagation(); // Prevent opening community when clicking join button
-    
-    // Check if already joined
-    if (isJoined || community.isJoined) {
-      return;
-    }
-    
-    // Show join popup
+    e.stopPropagation();
+    if (isJoined) return;
     onShowJoinPopup(community);
   };
 
@@ -572,22 +576,21 @@ function CommunityCard({ community, type, onOpenCommunity, formatNumber, refresh
       'Teknologi': 'bg-cyan-100 text-cyan-800',
       'Travel': 'bg-yellow-100 text-yellow-800'
     };
-    return colors[category] || 'bg-gray-100 text-gray-800';
+    return colors[category || ''] || 'bg-gray-100 text-gray-800';
   };
 
   return (
     <div
       className={`bg-white bg-opacity-60 backdrop-blur-sm rounded-[15px] p-4 shadow-sm border transition-all duration-300 cursor-pointer ${
-        justJoined 
-          ? 'border-green-300 bg-green-50 shadow-md' 
-          : isJoined 
-            ? 'border-primary bg-primary/5' 
+        justJoined
+          ? 'border-green-300 bg-green-50 shadow-md'
+          : isJoined
+            ? 'border-primary bg-primary/5'
             : 'border-slate-200 hover:shadow-md'
       }`}
-      onClick={() => onOpenCommunity(community.id)}
+      onClick={handleClickCard}
     >
       <div className="flex gap-3">
-        {/* Community Avatar */}
         <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
           {community.logo && /^https?:\/\/[^ "]+$/.test(community.logo) ? (
             <Image
@@ -606,44 +609,35 @@ function CommunityCard({ community, type, onOpenCommunity, formatNumber, refresh
           )}
         </div>
 
-        {/* Community Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between mb-1">
             <h3 className="font-semibold text-slate-900 text-sm truncate pr-2">
               {community.name}
-              {justJoined && (
-                <span className="ml-2 text-xs text-green-600 font-medium">✓ Bergabung!</span>
-              )}
+              {justJoined && <span className="ml-2 text-xs text-green-600 font-medium">✓ Bergabung!</span>}
             </h3>
             <div className="flex items-center gap-2">
-              {community.isVerified && (
-                <span className="text-blue-500 text-xs">✓</span>
-              )}
-              {community.privacy === 'private' && (
-                <span className="text-gray-400 text-xs">🔒</span>
-              )}
+              {community.isVerified && <span className="text-blue-500 text-xs">✓</span>}
+              {community.privacy === 'private' && <span className="text-gray-400 text-xs">🔒</span>}
             </div>
           </div>
 
           <p className="text-slate-600 text-xs leading-relaxed mb-2">
-            {community.description}
+            {community.description || '-'}
           </p>
 
           <div className="flex items-center justify-between">
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(community.category)}`}>
-              {community.category}
+              {community.category || 'Umum'}
             </span>
 
             <div className="flex items-center gap-3 text-xs text-slate-500">
               <span>{formatNumber(community.members)} anggota</span>
-              {type === 'joined' || isJoined ? (
+              {isJoined ? (
                 <div className="flex items-center gap-1">
                   <span className="text-primary font-medium">
                     {community.activePromos || 0} promo
                   </span>
-                  {isJoined && (
-                    <span className="text-green-600 text-sm">✓</span>
-                  )}
+                  <span className="text-green-600 text-sm">✓</span>
                 </div>
               ) : (
                 <button
