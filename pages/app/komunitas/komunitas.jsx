@@ -67,8 +67,10 @@ const joinCommunityAPI = async (communityId) => {
   });
   
   if (!response.ok) {
+    // Try to read server message (422/400/500)
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Gagal bergabung dengan komunitas');
+    const msg = errorData.message || errorData.error || 'Gagal bergabung dengan komunitas';
+    throw new Error(msg);
   }
   
   return response.json();
@@ -79,47 +81,84 @@ const fetchCommunitiesWithMembership = async () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const apiUrl = baseUrl.replace(/\/api\/?$/, "");
   
-  try {
-    // Try the with-membership endpoint first
-    const response = await fetch(`${apiUrl}/api/communities/with-membership`, {
-      headers: getAuthHeaders(),
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      return data;
-    } else {
+  const headers = getAuthHeaders();
+
+  // try a list of candidate endpoints (some deployments put routes under /api/admin)
+  const candidates = [
+    `${apiUrl}/api/communities/with-membership`,
+    `${apiUrl}/api/admin/communities/with-membership`,
+    `${apiUrl}/api/admin/communities`, // fallback shape
+    `${apiUrl}/api/communities` // another fallback
+  ];
+
+  const tryFetch = async (url) => {
+    try {
+      const r = await fetch(url, { headers });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch {
+      return null;
     }
-  } catch (error) {
+  };
+
+  // try candidates in order, return first successful useful response
+  for (const url of candidates) {
+    const data = await tryFetch(url);
+    if (!data) continue;
+
+    // if endpoint returns array or object with data array, normalize and return
+    if (Array.isArray(data)) return data;
+    if (data?.data && Array.isArray(data.data)) return data;
+    // if admin/communities returns an object (maybe list), return it too
+    if (typeof data === 'object') return data;
   }
-  
-  // Fallback: Get all communities and user's communities separately
+
+  // Fallback: try to fetch admin list + user-communities (try both admin/non-admin)
   try {
-    const [communitiesResponse, userCommunitiesResponse] = await Promise.all([
-      fetch(`${apiUrl}/api/admin/communities`, { headers: getAuthHeaders() }),
-      fetch(`${apiUrl}/api/communities/user-communities`, { headers: getAuthHeaders() }).catch(() => null)
-    ]);
-    
-    const allCommunities = await communitiesResponse.json();
-    let userCommunities = [];
-    
-    // If user-communities endpoint works, get user's joined communities
-    if (userCommunitiesResponse && userCommunitiesResponse.ok) {
-      const userCommunitiesData = await userCommunitiesResponse.json();
-      userCommunities = userCommunitiesData.data || userCommunitiesData || [];
+    const communityUrls = [
+      `${apiUrl}/api/admin/communities`,
+      `${apiUrl}/api/communities`
+    ];
+    const userCommunityUrls = [
+      `${apiUrl}/api/communities/user-communities`,
+      `${apiUrl}/api/admin/communities/user-communities`
+    ];
+
+    // pick first working communities endpoint
+    let communitiesResponse = null;
+    for (const u of communityUrls) {
+      try {
+        const r = await fetch(u, { headers });
+        if (r.ok) { communitiesResponse = r; break; }
+      } catch {}
     }
-    
-    // Mark communities as joined based on user communities
+
+    // pick first working user-communities endpoint (optional)
+    let userCommunitiesResponse = null;
+    for (const u of userCommunityUrls) {
+      try {
+        const r = await fetch(u, { headers });
+        if (r.ok) { userCommunitiesResponse = r; break; }
+      } catch {}
+    }
+
+    const allCommunities = communitiesResponse ? await communitiesResponse.json().catch(() => ({ data: [] })) : { data: [] };
+    let userCommunities = [];
+    if (userCommunitiesResponse && userCommunitiesResponse.ok) {
+      const userData = await userCommunitiesResponse.json().catch(() => ({}));
+      userCommunities = userData.data || userData || [];
+    }
+
+    const list = allCommunities.data || allCommunities || [];
     const userCommunityIds = userCommunities.map(uc => uc.id);
-    const communitiesWithMembership = (allCommunities.data || allCommunities || []).map(community => ({
+    const communitiesWithMembership = list.map(community => ({
       ...community,
       isJoined: userCommunityIds.includes(community.id),
       members: community.members || 0
     }));
-    
+
     return communitiesWithMembership;
   } catch (fallbackError) {
-    // Return empty array if all fails
     return [];
   }
 };
