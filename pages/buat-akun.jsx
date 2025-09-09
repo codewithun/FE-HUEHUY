@@ -183,8 +183,10 @@ export default function BuatAkun() {
             <InputComponent
               name="name"
               label="Nama Lengkap"
+              type="text"
               size="lg"
               placeholder="Example: Joko Gunawan"
+              autoComplete="name"
               {...formControl('name')}
               validations={{
                 required: true,
@@ -193,8 +195,10 @@ export default function BuatAkun() {
             <InputComponent
               name="email"
               label="Email"
+              type="email"
               size="lg"
               placeholder="Example: jokogunawan@gmail.com..."
+              autoComplete="email"
               {...formControl('email')}
               validations={{
                 required: true,
@@ -204,8 +208,10 @@ export default function BuatAkun() {
             <InputComponent
               name="phone"
               label="No HP/WA"
+              type="tel"
               size="lg"
               placeholder="Example: 08000000000..."
+              autoComplete="tel"
               {...formControl('phone')}
               validations={{
                 required: true,
@@ -217,6 +223,7 @@ export default function BuatAkun() {
               label="Kata Sandi"
               size="lg"
               placeholder="Masukkan kata sandi kamu..."
+              autoComplete="new-password"
               {...formControl('password')}
               validations={{
                 min: 8,
@@ -229,6 +236,7 @@ export default function BuatAkun() {
               label="Konfirmasi Kata Sandi"
               size="lg"
               placeholder="Masukkan lagi kata sandi kamu..."
+              autoComplete="new-password"
               {...formControl('password_confirmation')}
             />
 
