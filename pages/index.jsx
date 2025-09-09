@@ -35,19 +35,23 @@ export default function Login() {
         { expires: 365, secure: true }
       );
       
-      // CHECK: Apakah user sudah verified
-      const user = data?.data?.user || data?.user || data?.data?.data?.user;
-      const isVerified = user?.verified_at || user?.email_verified_at;
+      // PERBAIKAN: Untuk login biasa (scope: user), jika berhasil login berarti user sudah verified
+      // Tidak perlu cek verified_at lagi karena backend sudah handle verification
+      // Hanya redirect ke verifikasi jika response status 202 atau ada flag khusus
       
-      if (!isVerified) {
-        // User belum verified, ke halaman verifikasi dengan email
+      const user = data?.data?.user || data?.user || data?.data?.data?.user;
+      const responseStatus = data?.status || data?.response?.status;
+      const needsVerification = responseStatus === 202 || data?.needs_verification || data?.data?.needs_verification;
+      
+      if (needsVerification) {
+        // Khusus jika backend bilang butuh verifikasi
         setTimeout(() => {
           window.location.href = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
         }, 100);
         return;
       }
       
-      // User sudah verified, langsung ke app
+      // Login sukses, langsung ke app (karena login sukses = user sudah verified)
       setTimeout(() => {
         window.location.href = '/app';
       }, 100);
@@ -125,22 +129,11 @@ export default function Login() {
       const response = await loginFirebase(result.user.accessToken, true);
 
       if (response?.status === 200) {
-        // CHECK: Firebase login biasanya sudah verified
-        // Tapi tetap cek response untuk memastikan
-        const user = response?.data?.user || response?.user;
-        const isVerified = user?.verified_at || user?.email_verified_at || true; // Firebase biasanya auto-verified
-
-        if (!isVerified) {
-          // Jarang terjadi, tapi handle jika perlu verifikasi
-          setTimeout(() => {
-            window.location.href = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
-          }, 100);
-        } else {
-          // Langsung ke app
-          setTimeout(() => {
-            window.location.href = '/app';
-          }, 100);
-        }
+        // PERBAIKAN: Firebase login sukses berarti user sudah verified
+        // Langsung ke app tanpa cek verification lagi
+        setTimeout(() => {
+          window.location.href = '/app';
+        }, 100);
       } else if (response?.status === 202) {
         // Handle specific case for status 202 - butuh verifikasi
         const user = response?.data?.user || response?.user;
