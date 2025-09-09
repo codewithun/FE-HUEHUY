@@ -1,18 +1,18 @@
 import {
-    faArrowLeft,
-    faCalendar,
-    faClock,
-    faFilter,
-    faMapMarkerAlt,
-    faSearch,
-    faTimes,
-    faUsers
+  faArrowLeft,
+  faCalendar,
+  faClock,
+  faFilter,
+  faMapMarkerAlt,
+  faSearch,
+  faTimes,
+  faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // Import helpers
 import { Decrypt } from '../../../../../helpers/encryption.helpers';
@@ -166,55 +166,53 @@ const CommunityEvents = () => {
 
   const fetchCommunityEvents = async () => {
     try {
-      setLoading(true);
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      
-      const response = await fetch(`${apiUrl}/communities/${communityId}/events`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const eventsData = Array.isArray(result.data) ? result.data : [];
+        setLoading(true);
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : '';
         
-        // Transform backend data
-        const transformedEvents = eventsData.map(event => ({
-          id: event.id,
-          title: event.title,
-          subtitle: event.subtitle,
-          category: event.category || 'general',
-          image: event.image ? (
-            event.image.startsWith('http') 
-              ? event.image 
-              : `${apiUrl.replace('/api', '')}/storage/${event.image}`
-          ) : '/images/event/default-event.jpg',
-          date: event.date,
-          time: event.time,
-          location: event.location,
-          address: event.address,
-          participants: event.participants || 0,
-          maxParticipants: event.max_participants,
-          price: event.price || 0,
-          organizer: {
-            name: event.organizer_name || communityData?.name || 'Organizer',
-            logo: event.organizer_logo || communityData?.logo,
-            type: event.organizer_type || 'community'
-          }
-        }));
+        const response = await fetch(`${apiUrl}/communities/${communityId}/events`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : '',
+            },
+        });
 
-        setEvents(transformedEvents);
-      } else {
-        setEvents([]);
-      }
+        if (response.ok) {
+            const result = await response.json();
+            const eventsData = Array.isArray(result.data) ? result.data : [];
+            
+            // Transform backend data
+            const transformedEvents = eventsData.map(event => ({
+                id: event.id,
+                title: event.title,
+                subtitle: event.subtitle,
+                category: event.category || 'general',
+                // Use the transformed image_url from backend, with fallbacks
+                image: event.image_url || event.image || '/images/event/default-event.jpg',
+                date: event.date,
+                time: event.time,
+                location: event.location,
+                address: event.address,
+                participants: event.participants || 0,
+                maxParticipants: event.max_participants,
+                price: event.price || 0,
+                organizer: {
+                    name: event.organizer_name || communityData?.name || 'Organizer',
+                    // Use the transformed organizer_logo_url from backend, with fallbacks
+                    logo: event.organizer_logo_url || event.organizer_logo || communityData?.logo || '/images/organizer/default-organizer.png',
+                    type: event.organizer_type || 'community'
+                }
+            }));
+
+            setEvents(transformedEvents);
+        } else {
+            setEvents([]);
+        }
     } catch (error) {
-      setEvents([]);
+        setEvents([]);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 

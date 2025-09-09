@@ -42,7 +42,7 @@ export default function EventDetail() {
             const encryptedToken = Cookies.get(token_cookie_name);
             const token = encryptedToken ? Decrypt(encryptedToken) : '';
             
-            const response = await fetch(`${apiUrl}/events/${eventId}`, {
+            const response = await fetch(`${apiUrl}/api/events/${eventId}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -61,18 +61,12 @@ export default function EventDetail() {
                 id: result.data.id,
                 title: result.data.title,
                 subtitle: result.data.subtitle,
-                image: result.data.image ? (
-                    result.data.image.startsWith('http') 
-                        ? result.data.image 
-                        : `${apiUrl}/storage/${result.data.image}`
-                ) : '/api/placeholder/400/300',
+                // Use the transformed image_url from backend, with fallback
+                image: result.data.image_url || result.data.image || '/images/event/default-event.jpg',
                 organizer: {
                     name: result.data.organizer_name,
-                    logo: result.data.organizer_logo ? (
-                        result.data.organizer_logo.startsWith('http')
-                            ? result.data.organizer_logo
-                            : `${apiUrl}/storage/${result.data.organizer_logo}`
-                    ) : '/api/placeholder/80/80',
+                    // Use the transformed organizer_logo_url from backend, with fallback
+                    logo: result.data.organizer_logo_url || result.data.organizer_logo || '/images/organizer/default-organizer.png',
                     type: result.data.organizer_type
                 },
                 date: result.data.date,
