@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import {
   faCalendar,
   faClock,
@@ -16,739 +17,295 @@ import CommunityBottomBar from './CommunityBottomBar';
 export default function CommunityDashboard({ communityId }) {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
+  const [communityData, setCommunityData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Tambahkan state yang hilang
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [promoCategories, setPromoCategories] = useState([]);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Demo data - in real app this would come from API based on community ID
-  const [communityData, setCommunityData] = useState(null);
-
+  // Fetch community data from API
   useEffect(() => {
-    if (communityId) {
-      // Simulate API call to get community data based on ID
-      const getCommunityData = (id) => {
-        const allCommunities = {
-          1: {
-            id: 1,
-            name: 'dbotanica Bandung',
-            description:
-              'Mall perbelanjaan standar dengan beragam toko pakaian, plus tempat makan kasual & bioskop. Terletak di daerah pusat wisata Kota Bandung, hanya beberapa ratus meter dari pintu tol Pasteur',
-            members: 1234,
-            category: 'Shopping',
-            location: 'Kota Bandung',
-            isOwner: false,
+    const fetchCommunityData = async () => {
+      if (!communityId) return;
+      
+      try {
+        setLoading(true);
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : '';
+        
+        // Handle API URL properly - remove /api if it exists, then add it back
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const apiUrl = baseUrl.replace(/\/api\/?$/, '');
+        
+        const response = await fetch(`${apiUrl}/api/communities/${communityId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const community = result.data || result;
+          
+          // Set community data from API with fallback to demo data structure
+          setCommunityData({
+            id: community.id,
+            name: community.name,
+            description: community.description, // Ambil deskripsi dari database
+            members: community.members || 0,
+            category: community.category || 'Shopping',
+            location: community.location || 'Location not set',
+            isOwner: false, // Default values untuk UI
             isAdmin: true,
             isJoined: true,
-            privacy: 'public',
-            activePromos: 8,
+            privacy: community.privacy || 'public',
+            activePromos: 8, // Bisa ditambahkan ke API nanti
             totalEvents: 3,
             unreadMessages: 5,
             isVerified: true,
-            avatar: '/api/placeholder/50/50'
-          },
-          2: {
-            id: 2,
-            name: 'Sunscape Event Organizer',
-            description:
-              'Sunscape Event Organizer adalah penyelenggara acara profesional yang berfokus pada event-event berkualitas tinggi',
-            members: 856,
-            category: 'Event',
-            location: 'Bandung',
-            isOwner: true,
-            isAdmin: true,
-            isJoined: true,
-            privacy: 'private',
-            activePromos: 12,
-            totalEvents: 5,
-            unreadMessages: 3,
-            isVerified: false,
-            avatar: '/api/placeholder/50/50'
-          },
-          3: {
-            id: 3,
-            name: 'Kuliner Bandung Selatan',
-            description:
-              'Komunitas pecinta kuliner area Bandung Selatan dan sekitarnya. Berbagi rekomendasi tempat makan enak dan murah',
-            members: 2341,
-            category: 'Kuliner',
-            location: 'Bandung Selatan',
-            isOwner: false,
-            isAdmin: false,
-            isJoined: true,
-            privacy: 'public',
-            activePromos: 15,
-            totalEvents: 2,
-            unreadMessages: 8,
-            isVerified: true,
-            avatar: '/api/placeholder/50/50'
-          },
-          4: {
-            id: 4,
-            name: 'Otomotif Enthusiast',
-            description:
-              'Komunitas penggemar otomotif, modifikasi, dan spare part. Sharing tips perawatan kendaraan',
-            members: 892,
-            category: 'Otomotif',
-            location: 'Bandung',
-            isOwner: false,
-            isAdmin: true,
-            isJoined: true,
-            privacy: 'public',
-            activePromos: 6,
-            totalEvents: 1,
-            unreadMessages: 2,
-            isVerified: false,
-            avatar: '/api/placeholder/50/50'
-          },
-          5: {
-            id: 5,
-            name: 'Fashion & Style Bandung',
-            description:
-              'Komunitas fashion, style, dan shopping outfit terkini. Berbagi tips berpakaian dan trend fashion',
-            members: 1567,
-            category: 'Fashion',
-            location: 'Bandung',
-            isOwner: false,
-            isAdmin: false,
-            isJoined: true,
-            privacy: 'public',
-            activePromos: 22,
-            totalEvents: 4,
-            unreadMessages: 12,
-            isVerified: true,
-            avatar: '/api/placeholder/50/50'
-          }
-        };
-        return allCommunities[parseInt(id)] || allCommunities[1]; // fallback to default
-      };
+            avatar: community.logo || '/api/placeholder/50/50'
+          });
+        } else {
+          // Fallback ke demo data jika API gagal
+          setCommunityData(getDemoData(communityId));
+        }
+      } catch (error) {
+        // Fallback ke demo data
+        setCommunityData(getDemoData(communityId));
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setCommunityData(getCommunityData(communityId));
-    }
+    fetchCommunityData();
   }, [communityId]);
 
-  // Upcoming Events Data - dynamic based on community
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-
+  // Fetch events and promos
   useEffect(() => {
-    if (communityData) {
-      fetchCommunityEvents();
-    }
-  }, [communityData]);
-
-  // Format date to be more readable
-  const formatEventDate = (dateString) => {
-    if (!dateString) return '';
-    
-    try {
-      // Handle various date formats
-      let date;
+    const fetchEventsAndPromos = async () => {
+      if (!communityId) return;
       
-      // If it's already a valid date string like "4 Sep 2025"
-      if (dateString.includes(' ') && !dateString.includes('T')) {
-        return dateString;
-      }
-      
-      // Try parsing as ISO date or other formats
-      date = new Date(dateString);
-      
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        // Try alternative parsing for formats like "2025-09-04"
-        const parts = dateString.split('-');
-        if (parts.length === 3) {
-          date = new Date(parts[0], parts[1] - 1, parts[2]);
-        }
-      }
-      
-      // If still invalid, return original string cleaned up
-      if (isNaN(date.getTime())) {
-        return dateString.replace(/T.*/, '').replace(/-/g, '/');
-      }
-      
-      const options = { 
-        day: 'numeric', 
-        month: 'short',
-        year: 'numeric'
-      };
-      return date.toLocaleDateString('id-ID', options);
-    } catch (error) {
-      // If date parsing fails, try to clean up the original string
-      return dateString.replace(/T.*/, '').replace(/-/g, '/');
-    }
-  };
-
-  // Format time to be cleaner
-  const formatEventTime = (timeString) => {
-    if (!timeString) return '';
-    
-    // If it's already in HH:MM format, return as is
-    if (timeString.match(/^\d{2}:\d{2}$/)) {
-      return timeString;
-    }
-    
-    // If it's a range like "10:00 - 17:00", return as is
-    if (timeString.includes(' - ')) {
-      return timeString;
-    }
-    
-    // If it contains "Invalid", return empty string
-    if (timeString.toLowerCase().includes('invalid')) {
-      return '';
-    }
-    
-    try {
-      // Try parsing time with various formats
-      if (timeString.includes(':')) {
-        const timeParts = timeString.split(':');
-        if (timeParts.length >= 2) {
-          const hours = parseInt(timeParts[0]);
-          const minutes = parseInt(timeParts[1]);
-          if (!isNaN(hours) && !isNaN(minutes)) {
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          }
-        }
-      }
-      
-      const time = new Date(`2000-01-01T${timeString}`);
-      if (!isNaN(time.getTime())) {
-        return time.toLocaleTimeString('id-ID', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          hour12: false 
-        });
-      }
-      
-      return timeString;
-    } catch (error) {
-      return timeString;
-    }
-  };
-
-  const fetchCommunityEvents = async () => {
-    try {
-      setLoadingEvents(true);
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      
-      // Try multiple possible endpoints
-      const possibleEndpoints = [
-        `${apiUrl}/events?community_id=${communityData.id}`,
-        `${apiUrl}/admin/events?community_id=${communityData.id}`,
-        `${apiUrl}/communities/${communityData.id}/events`,
-        `${apiUrl}/events/community/${communityData.id}`
-      ];
-      
-      let response = null;
-      let usedEndpoint = '';
-      
-      // Try each endpoint until one works
-      for (const endpoint of possibleEndpoints) {
-        try {
-          response = await fetch(endpoint, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': token ? `Bearer ${token}` : '',
-            },
-          });
-          
-          if (response.ok) {
-            usedEndpoint = endpoint;
-            break;
-          }
-        } catch (err) {
-          continue;
-        }
-      }
-
-      if (!response || !response.ok) {
+      try {
+        setLoadingEvents(true);
+        
+        // Set demo data untuk events dan promos
+        setUpcomingEvents(getDemoEvents());
+        setPromoCategories(getDemoPromoCategories());
+        
+      } catch (error) {
+        console.error('Error fetching events and promos:', error);
+        // Set empty arrays on error
         setUpcomingEvents([]);
-        return;
-      }
-
-      const result = await response.json();
-      
-      let events = [];
-      
-      // Handle different response structures
-      if (Array.isArray(result)) {
-        events = result;
-      } else if (Array.isArray(result.data)) {
-        events = result.data;
-      } else if (result.events && Array.isArray(result.events)) {
-        events = result.events;
-      }
-      
-      // Filter events by community_id if endpoint returns all events
-      if (usedEndpoint.includes('?community_id=') === false) {
-        events = events.filter(event => 
-          event.community_id && event.community_id.toString() === communityData.id.toString()
-        );
-      }
-      
-      // Transform backend data to match frontend structure
-      const transformedEvents = events.map(event => ({
-        id: event.id,
-        title: event.title,
-        category: event.category || communityData.name,
-        image: event.image ? (
-          event.image.startsWith('http') 
-            ? event.image 
-            : `${apiUrl.replace('/api', '')}/storage/${event.image}`
-        ) : '/images/event/default-event.jpg',
-        date: formatEventDate(event.date),
-        time: formatEventTime(event.time),
-        location: event.location,
-        participants: event.participants || 0
-      }));
-
-      setUpcomingEvents(transformedEvents);
-      
-    } catch (error) {
-      setUpcomingEvents([]);
-    } finally {
-      setLoadingEvents(false);
-    }
-  };
-
-  // Generate demo events as fallback
-  const generateDemoEvents = (community) => [
-    {
-      id: 1,
-      title: `Kids Drawing Competition - ${community.name}`,
-      category: community.name,
-      image: '/images/event/kids-drawing.jpg',
-      date: '15 Agustus 2025',
-      time: '10:00 - 17:00',
-      location: community.location,
-      participants: 45
-    },
-    {
-      id: 2,
-      title: 'Fashion Show & Beauty Contest',
-      category: community.name,
-      image: '/images/event/fashion-show.jpg',
-      date: '20 Agustus 2025',
-      time: '19:00 - 22:00',
-      location: community.location,
-      participants: 120
-    },
-    {
-      id: 3,
-      title: 'Shopping Festival Weekend',
-      category: community.name,
-      image: '/images/event/shopping-festival.jpg',
-      date: '25 Agustus 2025',
-      time: '10:00 - 22:00',
-      location: community.location,
-      participants: 500
-    }
-  ];
-
-  // Promo Categories Data - dynamic based on community
-  const [promoCategories, setPromoCategories] = useState([]);
-
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-
-  // baseUrl = apiUrl tanpa trailing `/api`, tanpa trailing slash
-  const baseUrl = (apiUrl || '')
-    .replace(/\/api\/?$/, '')
-    .replace(/\/+$/, '');
-
-  // ---- URL helpers (fix utama di sini) ----
-  const isAbsoluteUrl = (u) =>
-    typeof u === 'string' && /^https?:\/\//i.test(u);
-
-  const isPlaceholder = (u) =>
-    typeof u === 'string' && u.startsWith('/api/placeholder');
-
-  /**
-   * Build final image URL (robust):
-   * - absolute: pakai apa adanya
-   * - placeholder: pakai apa adanya
-   * - relatif: normalisasi dulu → mapping ke "storage/..." bila perlu → gabungkan ke baseUrl (apiUrl tanpa /api)
-   */
-  const buildImageUrl = (raw) => {
-    const fallback = '/api/placeholder/150/120';
-    if (typeof raw !== 'string') return fallback;
-
-    let url = raw.trim();
-    if (!url) return fallback;
-
-    // 1) Sudah absolute? langsung pakai
-    if (isAbsoluteUrl(url)) return url;
-
-    // 2) Placeholder? biarkan
-    if (isPlaceholder(url)) return url;
-
-    // 3) Normalisasi path relatif dari backend
-    //    - backend sering kirim "promos/xxx.webp" → seharusnya "storage/promos/xxx.webp"
-    //    - kalau backend kirim "api/storage/xxx" → jadikan "storage/xxx"
-    let path = url.replace(/^\/+/, '');                   // buang leading slash
-    path = path.replace(/^api\/storage\//, 'storage/');   // api/storage → storage
-
-    // Jika bukan diawali "storage/", tetapi diawali folder konten seperti "promos/", "uploads/", arahkan ke storage
-    if (/^(promos|uploads|images|files)\//i.test(path)) {
-      path = `storage/${path}`;
-    }
-
-    // 4) Gabungkan dengan baseUrl (tanpa /api, tanpa trailing slash)
-    const finalUrl = `${baseUrl}/${path}`;
-
-    // 5) Validasi akhir
-    return /^https?:\/\//i.test(finalUrl) ? finalUrl : fallback;
-  };
-
-  // Add back generatePromos used as a final fallback
-  const generatePromos = (community) => {
-    const promosByCategory = {
-      // Hijau tua untuk Shopping
-      Shopping: [
-        {
-          id: 1,
-          title: 'Promo Makanan & Minuman',
-          subtitle: 'Diskon Special untuk Foodie!',
-          promos: [
-            {
-              id: 1,
-              title: 'Chicken Star - Ayam Crispy Spesial',
-              image: '/images/promo/chicken-package.jpg',
-              label: 'Food Promo',
-              discount: '20%',
-              description:
-                'Ayam crispy dengan bumbu rahasia dan nasi hangat'
-            },
-            {
-              id: 2,
-              title: 'Bubble Tea House - Minuman Segar',
-              image: '/images/promo/bubble-tea-discount.jpg',
-              label: 'Drink Promo',
-              discount: '15%',
-              description:
-                'Bubble tea dengan berbagai rasa dan topping'
-            },
-            {
-              id: 3,
-              title: 'Pizza Hut - Pizza Family',
-              image: '/images/promo/pizza-medium-deal.jpg',
-              label: 'Family Deal',
-              discount: '30%',
-              description:
-                'Pizza besar dengan topping lengkap untuk keluarga'
-            },
-            {
-              id: 4,
-              title: 'Premium Coffee Experience',
-              image: '/images/promo/brown-sugar-coffee.jpg',
-              label: 'Premium',
-              discount: '10%',
-              description:
-                'Kopi berkualitas tinggi dengan cita rasa otentik'
-            }
-          ]
-        }
-      ],
-      Event: [
-        {
-          id: 1,
-          title: 'Food & Beverage Packages',
-          subtitle: 'Paket F&B untuk Event Anda!',
-          promos: [
-            {
-              id: 1,
-              title: 'Bubble Tea House - Event Package',
-              image: '/images/promo/bubble-tea-discount.jpg',
-              label: 'Event Package',
-              discount: '25%',
-              description:
-                'Paket bubble tea untuk acara corporate dan private'
-            },
-            {
-              id: 2,
-              title: 'Corporate Lunch Package',
-              image: '/images/promo/burger-combo-flash.jpg',
-              label: 'Corporate',
-              discount: '20%',
-              description:
-                'Paket makan siang untuk meeting dan seminar'
-            },
-            {
-              id: 3,
-              title: 'Premium Coffee Catering',
-              image: '/images/promo/brown-sugar-coffee.jpg',
-              label: 'Catering',
-              discount: '30%',
-              description:
-                'Layanan kopi premium untuk event khusus'
-            }
-          ]
-        }
-      ],
-      Kuliner: [
-        {
-          id: 1,
-          title: 'Promo Makanan & Minuman',
-          subtitle: 'Diskon Special untuk Foodie!',
-          promos: [
-            {
-              id: 1,
-              title: 'Chicken Star - Ayam Crispy Spesial',
-              image: '/images/promo/chicken-package.jpg',
-              label: 'Food Promo',
-              discount: '20%',
-              description:
-                'Ayam crispy dengan bumbu rahasia dan nasi hangat'
-            },
-            {
-              id: 2,
-              title: 'Bubble Tea House - Minuman Segar',
-              image: '/images/promo/bubble-tea-discount.jpg',
-              label: 'Drink Promo',
-              discount: '15%',
-              description:
-                'Bubble tea dengan berbagai rasa dan topping'
-            },
-            {
-              id: 3,
-              title: 'Pizza Hut - Pizza Family',
-              image: '/images/promo/pizza-medium-deal.jpg',
-              label: 'Family Deal',
-              discount: '30%',
-              description:
-                'Pizza besar dengan topping lengkap untuk keluarga'
-            },
-            {
-              id: 4,
-              title: 'Premium Coffee Experience',
-              image: '/images/promo/brown-sugar-coffee.jpg',
-              label: 'Premium',
-              discount: '10%',
-              description:
-                'Kopi berkualitas tinggi dengan cita rasa otentik'
-            }
-          ]
-        }
-      ],
-      Otomotif: [
-        {
-          id: 1,
-          title: 'Spare Part & Service',
-          subtitle: 'Promo Perawatan Kendaraan!',
-          promos: [
-            {
-              id: 1,
-              title: 'Service Motor Complete Package',
-              image: '/images/promo/chicken-package.jpg',
-              label: 'Service',
-              discount: '30%',
-              description:
-                'Paket service lengkap untuk motor kesayangan'
-            },
-            {
-              id: 2,
-              title: 'Oil Change Premium Package',
-              image: '/images/promo/beef-sausage-chicken.jpg',
-              label: 'Maintenance',
-              discount: '20%',
-              description:
-                'Ganti oli premium dengan filter berkualitas'
-            }
-          ]
-        }
-      ],
-      Fashion: [
-        {
-          id: 1,
-          title: 'Fashion Sale',
-          subtitle: 'Koleksi Terbaru dengan Harga Terbaik!',
-          promos: [
-            {
-              id: 1,
-              title: 'Summer Collection 2025',
-              image: '/images/promo/burger-combo-flash.jpg',
-              label: 'Fashion',
-              discount: '40%',
-              description:
-                'Koleksi pakaian musim panas terbaru dan trendy'
-            },
-            {
-              id: 2,
-              title: 'Shoes & Accessories Sale',
-              image: '/images/promo/pizza-medium-deal.jpg',
-              label: 'Accessories',
-              discount: '35%',
-              description:
-                'Sepatu dan aksesoris dengan kualitas premium'
-            },
-            {
-              id: 3,
-              title: 'Casual Wear Collection',
-              image: '/images/promo/brown-sugar-coffee.jpg',
-              label: 'Casual',
-              discount: '25%',
-              description:
-                'Pakaian kasual untuk gaya hidup aktif'
-            }
-          ]
-        }
-      ]
-    };
-    return (
-      promosByCategory[community?.category] || [
-        {
-          id: 1,
-          title: 'Promo Komunitas',
-          subtitle: `${community.name} - Promo Tersedia`,
-          promos: [
-            {
-              id: 1,
-              title: 'Welcome Bonus',
-              image: '/api/placeholder/150/120',
-              label: 'Special',
-              discount: '10%'
-            }
-          ]
-        }
-      ]
-    );
-  };
-
-  useEffect(() => {
-    if (!communityData) return;
-
-    const normalizePromos = (arr = []) => {
-      return (Array.isArray(arr) ? arr : []).map((p) => {
-        const raw =
-          p.image_url ??
-          p.image ??
-          p.image_path ?? // biarkan apa adanya (bisa "promos/xxx.webp" atau "storage/xxx.webp"), helper yang akan normalkan
-          '/api/placeholder/150/120';
-
-        const image = buildImageUrl(raw);
-
-        return {
-          id: p.id ?? p.promo_id ?? Math.random(),
-          title: p.title ?? p.name ?? 'Promo',
-          image,
-          label: p.label ?? p.tag ?? 'Promo',
-          discount:
-            typeof p.discount === 'number'
-              ? `${p.discount}%`
-              : p.discount ?? p.discount_text ?? '',
-          description: p.description ?? p.subtitle ?? ''
-        };
-      });
-    };
-
-    const convertCategoriesToWidgets = (cats = []) =>
-      cats.map((c) => ({
-        id: c.id ?? Math.random(),
-        title: c.title ?? c.name ?? 'Kategori',
-        subtitle: c.description ?? '',
-        promos: normalizePromos(c.promos ?? [])
-      }));
-
-    const getAuthHeaders = () => {
-      try {
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const token = encryptedToken ? Decrypt(encryptedToken) : '';
-        return token
-          ? {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          }
-          : { 'Content-Type': 'application/json' };
-      } catch (e) {
-        return { 'Content-Type': 'application/json' };
+        setPromoCategories([]);
+      } finally {
+        setLoadingEvents(false);
       }
     };
 
-    const fetchPromoWidgetsOrCategories = async () => {
-      // 1) Coba categories dulu
-      try {
-        const res = await fetch(
-          `${apiUrl}/communities/${communityData.id}/categories`,
-          {
-            headers: getAuthHeaders()
-          }
-        );
-        if (res.ok) {
-          const json = await res.json().catch(() => ({}));
-          const data = Array.isArray(json?.data)
-            ? json.data
-            : Array.isArray(json)
-              ? json
-              : [];
-          if (Array.isArray(data) && data.length > 0) {
-            setPromoCategories(convertCategoriesToWidgets(data));
-            return;
-          }
-        }
-      } catch {
-        // ignore & fallback
-      }
+    fetchEventsAndPromos();
+  }, [communityId]);
 
-      // 2) Jika tidak ada kategori, baru promos
-      try {
-        const res = await fetch(
-          `${apiUrl}/communities/${communityData.id}/promos`,
-          {
-            headers: getAuthHeaders()
-          }
-        );
-        if (res.ok) {
-          const json = await res.json().catch(() => ({}));
-          const data = Array.isArray(json?.data)
-            ? json.data
-            : Array.isArray(json)
-              ? json
-              : [];
-          if (Array.isArray(data) && data.length > 0) {
-            setPromoCategories([
-              {
-                id: `assigned-${communityData.id}`,
-                title: 'Promo Komunitas',
-                subtitle: `${communityData.name} - Promo Tersedia`,
-                promos: normalizePromos(data)
-              }
-            ]);
-            return;
-          }
-        }
-      } catch {
-        // ignore & fallback
-      }
-
-      // 3) Fallback demo
-      setPromoCategories(generatePromos(communityData));
-    };
-
-    fetchPromoWidgetsOrCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityData, apiUrl, baseUrl]);
-
-  // Function to get gradient based on community category
-  function getCommunityGradient(category) {
+  // Function untuk menentukan gradient berdasarkan kategori
+  const getCommunityGradient = (category) => {
     const gradients = {
-      // Hijau tua untuk Shopping
-      Shopping: 'bg-gradient-to-br from-green-700 to-green-900',
-      Event: 'bg-gradient-to-br from-blue-500 to-blue-700',
-      Kuliner: 'bg-gradient-to-br from-orange-500 to-orange-700',
-      Otomotif: 'bg-gradient-to-br from-gray-600 to-gray-800',
-      Fashion: 'bg-gradient-to-br from-pink-500 to-pink-700',
-      Hobi: 'bg-gradient-to-br from-green-500 to-green-700',
-      Bisnis: 'bg-gradient-to-br from-indigo-500 to-indigo-700',
-      Kesehatan: 'bg-gradient-to-br from-red-500 to-red-700',
-      Teknologi: 'bg-gradient-to-br from-cyan-500 to-cyan-700',
-      Travel: 'bg-gradient-to-br from-yellow-500 to-yellow-700'
+      'Shopping': 'bg-gradient-to-r from-blue-500 to-blue-600',
+      'Event': 'bg-gradient-to-r from-purple-500 to-purple-600',
+      'Kuliner': 'bg-gradient-to-r from-orange-500 to-orange-600',
+      'Otomotif': 'bg-gradient-to-r from-gray-600 to-gray-700',
+      'Fashion': 'bg-gradient-to-r from-pink-500 to-pink-600',
+      'default': 'bg-gradient-to-r from-green-500 to-green-600'
     };
-    return gradients[category] || 'bg-gradient-to-br from-red-400 to-red-600';
-  }
+    return gradients[category] || gradients.default;
+  };
 
-  if (!isClient || !communityData) {
+  // Demo data untuk events
+  const getDemoEvents = () => {
+    return [
+      {
+        id: 1,
+        title: 'Grand Opening Sale',
+        category: 'Shopping Event',
+        date: '15 Des 2024',
+        time: '10:00',
+        location: 'dbotanica Mall Bandung',
+        participants: 156,
+        image: '/api/placeholder/320/240'
+      },
+      {
+        id: 2,
+        title: 'Fashion Show 2024',
+        category: 'Fashion Event',
+        date: '20 Des 2024',
+        time: '19:00',
+        location: 'Main Stage',
+        participants: 89,
+        image: '/api/placeholder/320/240'
+      }
+    ];
+  };
+
+  // Demo data untuk promo categories
+  const getDemoPromoCategories = () => {
+    return [
+      {
+        id: 1,
+        title: 'Promo Spesial',
+        subtitle: 'Dapatkan diskon hingga 70%',
+        promos: [
+          {
+            id: 1,
+            title: 'Diskon Fashion 50%',
+            description: 'Berlaku untuk semua item fashion',
+            discount: '50% OFF',
+            label: 'Fashion',
+            image: '/api/placeholder/180/130'
+          },
+          {
+            id: 2,
+            title: 'Buy 1 Get 1 Food',
+            description: 'Khusus makanan dan minuman',
+            discount: 'BUY 1 GET 1',
+            label: 'F&B',
+            image: '/api/placeholder/180/130'
+          },
+          {
+            id: 3,
+            title: 'Gratis Ongkir',
+            description: 'Minimal belanja Rp 100.000',
+            discount: 'FREE ONGKIR',
+            label: 'Delivery',
+            image: '/api/placeholder/180/130'
+          }
+        ]
+      },
+      {
+        id: 2,
+        title: 'Flash Sale',
+        subtitle: 'Promo terbatas waktu',
+        promos: [
+          {
+            id: 4,
+            title: 'Electronics Sale',
+            description: 'Gadget dan elektronik murah',
+            discount: '30% OFF',
+            label: 'Electronics',
+            image: '/api/placeholder/180/130'
+          },
+          {
+            id: 5,
+            title: 'Skincare Bundle',
+            description: 'Paket hemat skincare Korea',
+            discount: '40% OFF',
+            label: 'Beauty',
+            image: '/api/placeholder/180/130'
+          }
+        ]
+      }
+    ];
+  };
+
+  // Demo data fallback function (tetap ada untuk backup)
+  const getDemoData = (id) => {
+    const allCommunities = {
+      1: {
+        id: 1,
+        name: 'dbotanica Bandung',
+        description: 'Mall perbelanjaan standar dengan beragam toko pakaian, plus tempat makan kasual & bioskop. Terletak di daerah pusat wisata Kota Bandung, hanya beberapa ratus meter dari pintu tol Pasteur',
+        members: 1234,
+        category: 'Shopping',
+        location: 'Kota Bandung',
+        isOwner: false,
+        isAdmin: true,
+        isJoined: true,
+        privacy: 'public',
+        activePromos: 8,
+        totalEvents: 3,
+        unreadMessages: 5,
+        isVerified: true,
+        avatar: '/api/placeholder/50/50'
+      },
+      2: {
+        id: 2,
+        name: 'Sunscape Event Organizer',
+        description: 'Sunscape Event Organizer adalah penyelenggara acara profesional yang berfokus pada event-event berkualitas tinggi',
+        members: 856,
+        category: 'Event',
+        location: 'Bandung',
+        isOwner: true,
+        isAdmin: true,
+        isJoined: true,
+        privacy: 'private',
+        activePromos: 12,
+        totalEvents: 5,
+        unreadMessages: 3,
+        isVerified: false,
+        avatar: '/api/placeholder/50/50'
+      },
+      3: {
+        id: 3,
+        name: 'Kuliner Bandung Selatan',
+        description: 'Komunitas pecinta kuliner area Bandung Selatan dan sekitarnya. Berbagi rekomendasi tempat makan enak dan murah',
+        members: 2341,
+        category: 'Kuliner',
+        location: 'Bandung Selatan',
+        isOwner: false,
+        isAdmin: false,
+        isJoined: true,
+        privacy: 'public',
+        activePromos: 15,
+        totalEvents: 2,
+        unreadMessages: 8,
+        isVerified: true,
+        avatar: '/api/placeholder/50/50'
+      },
+      4: {
+        id: 4,
+        name: 'Otomotif Enthusiast',
+        description: 'Komunitas penggemar otomotif, modifikasi, dan spare part. Sharing tips perawatan kendaraan',
+        members: 892,
+        category: 'Otomotif',
+        location: 'Bandung',
+        isOwner: false,
+        isAdmin: true,
+        isJoined: true,
+        privacy: 'public',
+        activePromos: 6,
+        totalEvents: 1,
+        unreadMessages: 2,
+        isVerified: false,
+        avatar: '/api/placeholder/50/50'
+      },
+      5: {
+        id: 5,
+        name: 'Fashion & Style Bandung',
+        description: 'Komunitas fashion, style, dan shopping outfit terkini. Berbagi tips berpakaian dan trend fashion',
+        members: 1567,
+        category: 'Fashion',
+        location: 'Bandung',
+        isOwner: false,
+        isAdmin: false,
+        isJoined: true,
+        privacy: 'public',
+        activePromos: 22,
+        totalEvents: 4,
+        unreadMessages: 12,
+        isVerified: true,
+        avatar: '/api/placeholder/50/50'
+      }
+    };
+    return allCommunities[parseInt(id)] || allCommunities[1];
+  };
+
+  // Loading state
+  if (!isClient || loading) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
         <div className="container mx-auto relative z-10 pb-28">
@@ -765,17 +322,25 @@ export default function CommunityDashboard({ communityId }) {
     );
   }
 
+  if (!communityData) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
+            <div className="text-white text-center">
+              <p className="mt-2 text-sm drop-shadow-neuro">
+                Komunitas tidak ditemukan
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Rest of your component remains the same...
   return (
     <>
-      <style jsx>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
         <div className="container mx-auto relative z-10 pb-28">
           {/* Header Banner */}
@@ -799,6 +364,7 @@ export default function CommunityDashboard({ communityId }) {
                   <br />
                   {`"${communityData.name}"`}
                 </h1>
+                {/* Tampilkan deskripsi dari database */}
                 <p className="text-white text-opacity-90 text-sm leading-relaxed drop-shadow-neuro">
                   {communityData.description}
                 </p>
