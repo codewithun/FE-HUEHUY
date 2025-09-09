@@ -22,11 +22,19 @@ export default function Login() {
   const onSuccess = (data) => {
     // Debug response untuk melihat struktur data admin login
     // eslint-disable-next-line no-console
-    console.log('Admin login response:', data);
+    console.log('=== ADMIN LOGIN SUCCESS RESPONSE ===');
+    // eslint-disable-next-line no-console
+    console.log('Full data:', data);
+    // eslint-disable-next-line no-console
+    console.log('Status Code:', data?.status);
     
-    const token = data?.data?.token || data?.token;
+    // REKOMENDASI: Simpan token dari field data.token
+    const token = data?.data?.token;
     
     if (token) {
+      // eslint-disable-next-line no-console
+      console.log('Admin token found, saving...');
+      
       Cookies.set(
         token_cookie_name,
         Encrypt(token),
@@ -45,6 +53,8 @@ export default function Login() {
                      user?.role === 'admin' || user?.role_id === 1;
       
       if (isAdmin) {
+        // eslint-disable-next-line no-console
+        console.log('Admin access confirmed, redirecting to dashboard...');
         setTimeout(() => {
           window.location.href = '/admin/dashboard';
         }, 100);

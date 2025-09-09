@@ -36,21 +36,11 @@ export default function Index() {
   // Delay API calls sedikit untuk memastikan token ready setelah redirect
   useEffect(() => {
     const timer = setTimeout(() => {
-      // Debug: cek apakah token ada setelah login
-      const tokenName = String(process.env.NEXT_PUBLIC_APP_NAME || '')
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '-')
-        .replace(/^-+|-+$/g, '') + '.user.token';
-      
-      const encryptedToken = document.cookie.split('; ').find(row => row.startsWith(tokenName + '='));
+      // DEBUG: Simple token check
       // eslint-disable-next-line no-console
-      console.log('App page loaded, token check:', {
-        tokenExists: !!encryptedToken,
-        tokenPreview: encryptedToken ? encryptedToken.substring(0, 50) + '...' : 'No token',
-        timestamp: new Date().toISOString()
-      });
+      console.log('=== APP PAGE LOADED ===');
+      // eslint-disable-next-line no-console
+      console.log('Will start API calls in 200ms...');
       
       setApiReady(true);
     }, 200);
