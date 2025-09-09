@@ -33,59 +33,30 @@ export default function Verification() {
   // after successful verification, redirect to original target if provided
   const onSuccess = (response) => {
     try {
-      // PERBAIKAN: Simpan token di cookie dengan encryption seperti login normal
+      // Backend returns token in response.data.token
       if (response?.data?.token) {
-        // Simpan di cookie dengan encryption (format yang sama dengan login)
         Cookies.set(
           token_cookie_name,
           Encrypt(response.data.token),
           { expires: 365, secure: true }
         );
-        
-        // Backup ke localStorage juga
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user || {}));
       }
 
-      // PERBAIKAN: Prioritaskan redirect_info dari backend response
-      const redirectInfo = response?.data?.redirect_info;
+      // Backend includes redirect_url in response.data.redirect_url
+      const redirectUrl = response?.data?.redirect_url;
       
-      if (redirectInfo && redirectInfo.redirect_url) {
-        // Backend sudah kasih redirect URL yang tepat
-        const targetUrl = redirectInfo.redirect_url;
-        
+      if (redirectUrl) {
         setTimeout(() => {
-          window.location.href = targetUrl;
+          window.location.href = redirectUrl;
         }, 500);
         return;
       }
 
-      // FALLBACK: Logic lama untuk handle QR data manual
+      // Fallback logic
       const qrData = response?.data?.qr_data || router.query.qr_data;
       const next = router.query.next;
 
-      if (qrData) {
-        // QR scan flow - process QR data or redirect accordingly
-        try {
-          const parsedQrData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
-
-          if (parsedQrData.type === 'promo' || parsedQrData.type === 'voucher') {
-            // Redirect to promo/voucher validation page
-            const targetUrl = `/app/validate/${parsedQrData.type}?id=${parsedQrData.promoId || parsedQrData.voucherId}&community=${parsedQrData.communityId}`;
-
-            setTimeout(() => {
-              window.location.href = targetUrl;
-            }, 500);
-            return;
-          }
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error('Error parsing QR data:', e);
-        }
-      }
-
       if (next) {
-        // Regular redirect flow
         const targetUrl = decodeURIComponent(String(next));
         setTimeout(() => {
           window.location.href = targetUrl;
@@ -93,8 +64,6 @@ export default function Verification() {
         return;
       }
 
-      // Default redirect ke app
-      // Redirect dengan delay yang lebih panjang untuk memastikan cookie tersimpan
       setTimeout(() => {
         window.location.href = '/app';
       }, 200);
@@ -108,13 +77,14 @@ export default function Verification() {
     }
   };
 
+  // Use mailVerify endpoint (not mailVerifySimple)
   const [{ submit, loading, values, setValues, errors }] = useForm(
     {
-      path: 'auth/verify-mail-simple',
+      path: 'auth/verify-mail', // Changed from 'auth/verify-mail-simple'
       data: {
         email: router.query.email || '',
         token: '',
-        qr_data: router.query.qr_data || null // TAMBAHKAN INI untuk kirim QR data ke backend
+        qr_data: router.query.qr_data || null
       }
     },
     false,
@@ -122,6 +92,7 @@ export default function Verification() {
   );
 
 
+  // Fix resend mail function
   const resendMail = async (e) => {
     e.preventDefault();
     setSendMailLoading(true);
@@ -130,14 +101,13 @@ export default function Verification() {
       const email = router.query.email || dataAccount?.data?.profile?.email;
 
       if (email) {
-        // Gunakan endpoint yang benar sesuai backend
         const response = await post({
           path: 'auth/resend-mail',
           body: { email: email },
           contentType: 'application/json'
         });
 
-        if (response?.status === 200 || response?.data?.success || response?.data?.message) {
+        if (response?.status === 200) {
           setWaitingMail(60);
           setModalSendMailSuccess(true);
         }

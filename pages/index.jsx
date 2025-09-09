@@ -24,43 +24,25 @@ export default function Login() {
 
   // Perbaiki onSuccess function
   const onSuccess = (data) => {
-    // DEBUG: Log semua detail response login
     // eslint-disable-next-line no-console
     console.log('=== LOGIN SUCCESS RESPONSE ===');
     // eslint-disable-next-line no-console
     console.log('Full data:', data);
-    // eslint-disable-next-line no-console
-    console.log('Status Code:', data?.status);
     
-    // REKOMENDASI: Simpan token dari field data.token
+    // Backend returns token in data.token (confirmed from AuthController)
     const token = data?.data?.token;
 
-    // eslint-disable-next-line no-console
-    console.log('Extracted token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
-
     if (token) {
-      // eslint-disable-next-line no-console
-      console.log('Saving token to cookie...');
-      
       Cookies.set(
         token_cookie_name,
         Encrypt(token),
         { expires: 365, secure: true }
       );
       
-      // Verify token saved
-      const savedToken = Cookies.get(token_cookie_name);
-      // eslint-disable-next-line no-console
-      console.log('Token saved to cookie:', savedToken ? 'YES' : 'NO');
-      
-      // PERBAIKAN: Login sukses langsung ke app
-      // eslint-disable-next-line no-console
-      console.log('Redirecting to /app...');
       setTimeout(() => {
         window.location.href = '/app';
       }, 100);
     } else {
-      // No token found in response
       // eslint-disable-next-line no-console
       console.error('No token found in login response:', data);
     }
@@ -99,11 +81,9 @@ export default function Login() {
         contentType: 'multipart/form-data'
       });
 
-      // DEBUG: Log response structure
-
-      if (response?.status === 200 || response?.status === 201) {
-        // Sama seperti onSuccess, coba berbagai path token
-        const token = response?.data?.token || response?.token || response?.data?.data?.token;
+      if (response?.status === 200) {
+        // Backend returns token directly in response for Firebase
+        const token = response?.data?.token || response?.token;
 
         if (token) {
           Cookies.set(
@@ -111,16 +91,11 @@ export default function Login() {
             Encrypt(token),
             { expires: 365, secure: true }
           );
-        } else {
-          // No token found in Firebase login response
-          // eslint-disable-next-line no-console
-          console.error('No token found in Firebase login response:', response);
         }
       }
 
       return response;
     } catch (error) {
-      // Firebase login error
       return null;
     }
   };
