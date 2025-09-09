@@ -21,20 +21,26 @@ const getAuthHeader = () => {
   try {
     const enc = Cookies.get(token_cookie_name);
     if (!enc) {
+      // eslint-disable-next-line no-console
+      console.debug('No encrypted token found in cookies');
       return {};
     }
     
     const token = Decrypt(enc);
     if (!token || token.trim() === '') {
+      // eslint-disable-next-line no-console
+      console.warn('Token decryption failed or empty token, clearing cookie');
       // Clear corrupted cookie
       Cookies.remove(token_cookie_name);
       return {};
     }
     
+    // eslint-disable-next-line no-console
+    console.debug('Token found and decrypted successfully, length:', token.length);
     return { Authorization: `Bearer ${token}` };
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.warn('Failed to decrypt token from cookie:', error);
+    console.error('Failed to decrypt token from cookie:', error);
     // Clear corrupted cookie
     Cookies.remove(token_cookie_name);
     return {};
@@ -135,13 +141,28 @@ export const get = async ({
     const resp = err?.response;
     if (resp?.status === 401) {
       // eslint-disable-next-line no-console
-      console.error('401 Unauthorized error for path:', path || url, 'Headers:', fetchHeaders);
+      console.error('401 Unauthorized error details:', {
+        path: path || url,
+        fullUrl: fetchUrl,
+        headers: fetchHeaders,
+        requestParams: params,
+        responseData: resp?.data,
+        responseHeaders: resp?.headers,
+        timestamp: new Date().toISOString()
+      });
+      
+      // TAMBAHAN: Cek apakah ini request ke endpoint yang memang butuh delay
+      const isAccountRequest = (path || url || '').includes('account');
+      const delayTime = isAccountRequest ? 500 : 100; // Delay lebih lama untuk account request
+      
+      // eslint-disable-next-line no-console
+      console.warn(`Will redirect to login in ${delayTime}ms due to 401 error`);
       
       // Berikan delay kecil sebelum redirect untuk menghindari race condition
       setTimeout(() => {
         Cookies.remove(token_cookie_name);
         Router.push(loginPath);
-      }, 100);
+      }, delayTime);
     }
     return resp;
   }

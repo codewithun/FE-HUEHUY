@@ -107,8 +107,10 @@ export default function Login() {
               <InputComponent
                 name="email"
                 label="Email"
+                type="email"
                 size="lg"
                 placeholder="Example: jokogunawan@gmail.com..."
+                autoComplete="email"
                 validations={{ required: true, email: true }}
                 onChange={(e) => {
                   setValues([
@@ -139,6 +141,7 @@ export default function Login() {
               label="Kata Sandi"
               size="lg"
               placeholder="Masukkan kata sandi kamu..."
+              autoComplete="current-password"
               {...formControl('password')}
             />
 
