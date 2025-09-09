@@ -3,14 +3,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import Cookies from 'js-cookie'; // TAMBAH INI
+import Cookies from 'js-cookie';
 import {
   ButtonComponent,
   ModalConfirmComponent,
 } from '../components/base.components';
 import InputOtpComponent from '../components/base.components/input/InputOtpComponent';
-import { post, useForm, useGet, token_cookie_name } from '../helpers'; // TAMBAH token_cookie_name
-import { Encrypt } from '../helpers/encryption.helpers'; // TAMBAH INI
+import { post, useForm, useGet, token_cookie_name } from '../helpers';
+import { Encrypt } from '../helpers/encryption.helpers';
 
 export default function Verification() {
   const router = useRouter();
@@ -33,6 +33,9 @@ export default function Verification() {
   // after successful verification, redirect to original target if provided
   const onSuccess = (response) => {
     try {
+      // eslint-disable-next-line no-console
+      console.log('Verification success response:', response);
+      
       // Backend returns token in response.data.token
       if (response?.data?.token) {
         Cookies.set(
@@ -77,13 +80,13 @@ export default function Verification() {
     }
   };
 
-  // Use mailVerify endpoint (not mailVerifySimple)
+  // UBAH KE SISTEM BARU: email-verification/verify-code
   const [{ submit, loading, values, setValues, errors }] = useForm(
     {
-      path: 'auth/verify-mail', // Changed from 'auth/verify-mail-simple'
+      path: 'email-verification/verify-code', // ← UBAH dari 'auth/verify-mail'
       data: {
         email: router.query.email || '',
-        token: '',
+        code: '', // ← UBAH dari 'token' ke 'code'
         qr_data: router.query.qr_data || null
       }
     },
@@ -91,8 +94,7 @@ export default function Verification() {
     onSuccess,
   );
 
-
-  // Fix resend mail function
+  // UBAH resend mail function ke sistem baru
   const resendMail = async (e) => {
     e.preventDefault();
     setSendMailLoading(true);
@@ -101,13 +103,18 @@ export default function Verification() {
       const email = router.query.email || dataAccount?.data?.profile?.email;
 
       if (email) {
+        // UBAH ke endpoint baru
         const response = await post({
-          path: 'auth/resend-mail',
+          path: 'email-verification/resend-code', // ← UBAH dari 'auth/resend-mail'
           body: { email: email },
           contentType: 'application/json'
         });
 
-        if (response?.status === 200) {
+        // eslint-disable-next-line no-console
+        console.log('Resend response:', response);
+
+        // Check success dari response baru
+        if (response?.success || response?.status === 200) {
           setWaitingMail(60);
           setModalSendMailSuccess(true);
         }
@@ -131,9 +138,7 @@ export default function Verification() {
     };
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const shouldSkipRequest = !router.query.email; // Skip jika tidak ada email di query
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const shouldSkipRequest = !router.query.email;
   const [loadingAccount, codeDataAccount, dataAccount] = useGet({
     path: `account-unverified`,
   }, shouldSkipRequest);
@@ -165,14 +170,14 @@ export default function Verification() {
           <form onSubmit={submit}>
             <div className="flex justify-center pt-8 pb-6">
               <InputOtpComponent
-                value={values?.find(({ name }) => name == 'token')?.value || ''} // ← PERBAIKAN: Tambahkan || ''
+                value={values?.find(({ name }) => name == 'code')?.value || ''} // ← UBAH dari 'token' ke 'code'
                 onChange={(e) => {
                   setValues([
-                    ...values.filter(({ name }) => name != 'token'),
-                    { name: 'token', value: e },
+                    ...values.filter(({ name }) => name != 'code'), // ← UBAH dari 'token' ke 'code'
+                    { name: 'code', value: e }, // ← UBAH dari 'token' ke 'code'
                   ]);
                 }}
-                error={errors?.find(({ name }) => name == 'token')?.error}
+                error={errors?.find(({ name }) => name == 'code')?.error} // ← UBAH dari 'token' ke 'code'
                 max={6}
               />
             </div>
