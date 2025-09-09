@@ -1,9 +1,11 @@
+/* eslint-disable no-console */
 import { faArrowLeft, faCheckCircle, faExclamationTriangle, faMapMarkerAlt, faPhone, faShare, faWifi, faWifiSlash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { get, post } from '../../../../helpers/api.helpers';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
@@ -22,16 +24,56 @@ const PromoDetailPage = () => {
   // Tambahkan state untuk cek apakah promo sudah direbut
   const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
 
-  useEffect(() => {
-    // jangan lanjut sebelum router siap
-    if (!router.isReady) return;
+  // NEW: Add QR entry related functions
+  const fetchPromoDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Try API first if we have communityId
+      if (communityId && communityId !== 'promo-entry') {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+        const response = await get({
+          path: `communities/${communityId}/promos/${promoId}`
+        });
 
-    // Reset state setiap kali promoId atau communityId berubah
-    setPromoData(null);
-    setLoading(true);
+        if (response?.status === 200 && response?.data?.data) {
+          const promoData = response.data.data;
+          // Transform API data to our format
+          const transformedData = {
+            id: promoData.id,
+            title: promoData.title,
+            merchant: promoData.owner_name || 'Merchant',
+            image: promoData.image_url || promoData.image || '/default-avatar.png',
+            distance: promoData.promo_distance ? `${promoData.promo_distance} KM` : '3 KM',
+            location: promoData.location || '',
+            coordinates: '',
+            originalPrice: promoData.original_price || null,
+            discountPrice: promoData.discount_price || null,
+            discount: promoData.discount_percentage ? `${promoData.discount_percentage}%` : null,
+            schedule: {
+              day: promoData.always_available ? 'Setiap Hari' : 'Weekday',
+              details: promoData.end_date ? `Berlaku hingga ${new Date(promoData.end_date).toLocaleDateString()}` : 'Berlaku',
+              time: '10:00 - 22:00',
+              timeDetails: 'Jam Berlaku Promo'
+            },
+            status: {
+              type: promoData.promo_type === 'online' ? 'Online' : 'Offline',
+              description: `Tipe Promo: ${promoData.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
+            },
+            description: promoData.description || '',
+            seller: {
+              name: promoData.owner_name || 'Admin',
+              phone: promoData.owner_contact || ''
+            },
+            terms: 'TERM & CONDITIONS APPLY'
+          };
+          
+          setPromoData(transformedData);
+          return transformedData;
+        }
+      }
 
-    if (promoId && communityId) {
-      // Mock data untuk detail promo berdasarkan ID dengan gambar yang sesuai
+      // Fallback to mock data if API fails or no communityId
       const mockPromoDetails = {
         1: {
           id: 1,
@@ -235,52 +277,215 @@ const PromoDetailPage = () => {
         }
       };
 
-      // Simulasi async fetch (bisa diganti fetch API jika sudah ada backend)
-      setTimeout(() => {
-        // robust lookup: coba string key dulu lalu numeric
-        const keyStr = String(promoId);
-        const keyNum = Number(promoId);
-        const selectedPromo =
-          mockPromoDetails[keyStr] ?? mockPromoDetails[keyNum] ?? null;
-
-        if (selectedPromo) {
-          setPromoData(selectedPromo);
-        } else {
-          setPromoData(null);
-        }
-        setLoading(false);
-      }, 300); // simulasi loading 300ms
-    } else {
+      const keyStr = String(promoId);
+      const keyNum = Number(promoId);
+      const selectedPromo = mockPromoDetails[keyStr] ?? mockPromoDetails[keyNum] ?? null;
+      
+      setPromoData(selectedPromo);
+      return selectedPromo;
+    } catch (err) {
+      console.error('Error fetching promo details:', err);
+      return null;
+    } finally {
       setLoading(false);
     }
-  }, [router.isReady, promoId, communityId]);
+  }, [promoId, communityId]);
 
-  // Tambahkan useEffect untuk cek promo sudah direbut atau belum
+  // NEW: Handle auto register after QR scan
+  const handleAutoRegister = useCallback(async (token) => {
+    try {
+      const promoData = await fetchPromoDetails();
+      if (!promoData) return;
+
+      // Check if user already claimed this promo
+      const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+      const alreadyClaimed = existingVouchers.some(v => 
+        String(v.ad?.id) === String(promoData.id) || 
+        String(v.id) === String(promoData.id)
+      );
+
+      if (!alreadyClaimed) {
+        // Auto claim promo
+        try {
+          const response = await post({
+            path: `admin/promos/${promoData.id}/items`,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: { 
+              promo_id: promoData.id,
+              source: 'qr_scan' 
+            }
+          });
+
+          if (response?.status === 200) {
+            // Save to localStorage
+            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+            const newPromoItem = {
+              id: response.data.data.id,
+              promo_id: promoData.id,
+              code: response.data.data.code,
+              claimed_at: new Date().toISOString(),
+              expired_at: promoData.expires_at,
+              ad: {
+                id: promoData.id,
+                title: promoData.title,
+                picture_source: promoData.image,
+                status: 'active',
+                cube: null,
+              }
+            };
+            claimedVouchers.push(newPromoItem);
+            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+            
+            setIsAlreadyClaimed(true);
+            setShowSuccessModal(true);
+          }
+        } catch (error) {
+          // Silent error - user can manually claim
+          console.warn('Auto claim failed:', error);
+        }
+      }
+    } catch (error) {
+      console.warn('Auto register failed:', error);
+    }
+  }, [fetchPromoDetails]);
+
+  // NEW: Check user verification status
+  const checkUserVerificationStatus = useCallback(async (token) => {
+    try {
+      console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
+      
+      // Try account endpoint first
+      let response = await get({
+        path: 'account',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('account response:', response?.status, response?.data);
+      
+      if (response?.status === 200) {
+        console.log('User verified and logged in, proceeding with auto register');
+        handleAutoRegister(token);
+        return;
+      }
+      
+      // Try account-unverified if account fails
+      if (response?.status === 401 || response?.status === 404) {
+        console.log('Trying account-unverified endpoint...');
+        response = await get({
+          path: 'account-unverified',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('account-unverified response:', response?.status, response?.data);
+        
+        if (response?.status === 200) {
+          const userData = response?.data?.data?.profile || response?.data?.profile;
+          const emailVerified = userData?.email_verified_at || userData?.verified_at;
+          
+          if (!emailVerified) {
+            console.log('User not verified, redirecting to verification');
+            const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`;
+            window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+            return;
+          } else {
+            console.log('User email verified, proceeding with auto register');
+            handleAutoRegister(token);
+            return;
+          }
+        }
+      }
+      
+      // If token invalid, redirect to register
+      if (response?.status === 401) {
+        console.log('Token invalid (401), redirecting to register');
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`;
+        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        return;
+      }
+      
+      // Fallback: proceed with auto register
+      console.log('Fallback: proceeding with auto register');
+      handleAutoRegister(token);
+      
+    } catch (err) {
+      console.error('Error checking verification status:', err);
+      const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`;
+      window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+    }
+  }, [promoId, communityId, handleAutoRegister]);
+
+  // NEW: Handle QR entry flow
   useEffect(() => {
-    if (!promoData?.id) return;
+    if (!router.isReady) return;
     
-    // Cek di localStorage apakah promo sudah pernah direbut
-    const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-    const alreadyClaimed = existingVouchers.some(v => 
-      String(v.ad?.id) === String(promoData.id) || 
-      String(v.id) === String(promoData.id)
-    );
-    
-    setIsAlreadyClaimed(alreadyClaimed);
-  }, [promoData]);
+    // Check for QR entry parameters
+    const autoRegister = router.query.autoRegister || router.query.source;
 
+    if (autoRegister) {
+      // Try to get token
+      let token = null;
+      
+      // 1. Try from cookie with decrypt
+      const encrypted = Cookies.get(token_cookie_name);
+      if (encrypted) {
+        try {
+          token = Decrypt(encrypted);
+          console.log('Token from cookie:', token?.substring(0, 20) + '...');
+        } catch (e) {
+          console.error('Failed to decrypt token:', e);
+          Cookies.remove(token_cookie_name);
+        }
+      }
+      
+      // 2. Fallback to localStorage
+      if (!token) {
+        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        if (token) {
+          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
+        }
+      }
+      
+      // If no token, redirect to register
+      if (!token) {
+        console.log('No token found, redirecting to register');
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`;
+        if (typeof window !== 'undefined') {
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        }
+        return;
+      }
+      
+      // Check verification status
+      console.log('Token found, checking verification status...');
+      checkUserVerificationStatus(token);
+    }
+  }, [router.isReady, router.query, promoId, communityId, checkUserVerificationStatus]);
+
+  // MODIFIED: Update handleBack to support QR entry
   const handleBack = () => {
     const { from } = router.query;
+    const autoRegister = router.query.autoRegister || router.query.source;
     
-    if (from === 'saku') {
+    if (autoRegister) {
+      // If from QR scan, redirect to main app
+      router.push('/app');
+    } else if (from === 'saku') {
       router.push('/app/saku');
     } else if (communityId === 'promo-entry') {
       router.push('/app');
     } else if (communityId) {
-      // When coming from QR scan or any promo detail, go back to community home
       router.push(`/app/komunitas/dashboard/${communityId}`);
     } else {
-      // Fallback to main app if no communityId
       router.push('/app');
     }
   };
