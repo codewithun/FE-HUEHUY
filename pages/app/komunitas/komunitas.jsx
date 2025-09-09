@@ -192,13 +192,13 @@ const fetchCommunitiesWithMembership = async () => {
  * ========================= */
 export default function Komunitas() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'semua' | 'komunitasku' | 'belum-gabung'>('semua');
+  const [activeTab, setActiveTab] = useState('semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [isClient, setIsClient] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showJoinPopup, setShowJoinPopup] = useState(false);
-  const [selectedCommunity, setSelectedCommunity] = useState<CommunityItem | null>(null);
+  const [selectedCommunity, setSelectedCommunity] = useState(null);
 
   useEffect(() => {
     setIsClient(true);
