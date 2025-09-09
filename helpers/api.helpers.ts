@@ -269,13 +269,13 @@ export const post = async ({
 
   if (bearer) fetchHeaders.Authorization = `Bearer ${bearer}`;
 
-  // Fix: Selalu set Content-Type ke application/json untuk login
+  // Backend expects proper Content-Type headers
   if (contentType === 'multipart/form-data') {
-    // Untuk FormData, biarkan axios set boundary otomatis
+    // Let browser set boundary for FormData
     delete fetchHeaders['Content-Type'];
   } else {
-    // Default ke application/json
-    fetchHeaders['Content-Type'] = contentType || 'application/json';
+    // Default to application/json for all other requests
+    fetchHeaders['Content-Type'] = 'application/json';
   }
 
   try {

@@ -29,8 +29,8 @@ export default function BuatAkun() {
   }, [router]);
 
   const onSuccess = (data) => {
-    // PERBAIKAN: Pastikan token disimpan dengan benar dari response registrasi
-    const token = data?.data?.token || data?.token || data?.user_token;
+    // Backend returns token in data.token
+    const token = data?.data?.token || data?.data?.user_token;
     if (token) {
       Cookies.set(
         token_cookie_name,
@@ -39,21 +39,17 @@ export default function BuatAkun() {
       );
     }
 
-    // Get user info dari response
-    const user = data?.data?.user || data?.user || data?.data?.data?.user;
+    // Backend returns user in data.user
+    const user = data?.data?.user;
     const userEmail = user?.email || '';
 
-    // preserve next param so after verification user returns to original target
-    const rawNext = router?.query?.next;
-    const next = rawNext ? String(rawNext) : null;
+    // Always redirect to verification after registration
+    const next = router?.query?.next;
     
-    // SELALU ke verifikasi dulu dengan email parameter, baru setelah verifikasi redirect ke target
     if (next) {
-      // Pass next parameter DAN email ke halaman verifikasi
       const target = `/verifikasi?email=${encodeURIComponent(userEmail)}&next=${encodeURIComponent(next)}`;
       window.location.href = target;
     } else {
-      // Default flow ke verifikasi dengan email
       const target = `/verifikasi?email=${encodeURIComponent(userEmail)}`;
       window.location.href = target;
     }

@@ -112,7 +112,37 @@ export default function Index() {
     path: `account`,
   }, !apiReady); // PENTING: Delay request account sampai apiReady = true
 
-  if (dataUser?.data?.profile?.phone) {
+  // DEBUG: Log user data untuk debugging
+  useEffect(() => {
+    if (dataUser && !loadingUser) {
+      // eslint-disable-next-line no-console
+      console.log('=== USER DATA DEBUG ===');
+      // eslint-disable-next-line no-console
+      console.log('Full dataUser:', dataUser);
+      // eslint-disable-next-line no-console
+      console.log('Profile:', dataUser?.data?.profile);
+      // eslint-disable-next-line no-console
+      console.log('Phone:', dataUser?.data?.profile?.phone);
+      // eslint-disable-next-line no-console
+      console.log('User ID:', dataUser?.data?.profile?.id);
+    }
+  }, [dataUser, loadingUser]);
+
+  // PERBAIKAN: Cek jika user ada dan verified, allow akses meski phone kosong
+  // Atau buat phone optional/bisa dilewati untuk user yang sudah verified
+  // Backend returns profile in data.profile structure
+  const userProfile = dataUser?.data?.profile;
+  const hasPhone = userProfile?.phone && userProfile.phone.trim() !== '';
+  const isVerified = userProfile?.verified_at;
+  const hasUserId = userProfile?.id;
+  const phoneFormSkipped = typeof window !== 'undefined' && localStorage.getItem('phone_form_skipped') === 'true';
+
+  // Check verification status from backend response
+  const verificationStatus = dataUser?.data?.verification_status;
+  const isEmailVerified = verificationStatus?.is_verified || isVerified;
+
+  // Allow access if user has ID and is verified OR phone form was skipped
+  if (userProfile && hasUserId && (hasPhone || phoneFormSkipped || isEmailVerified)) {
     return (
       <>
         <div className="lg:mx-auto lg:relative lg:max-w-md">
@@ -485,21 +515,29 @@ export default function Index() {
         />
       </>
     );
-  } else if (!loadingUser) {
+  } else if (!loadingUser && userProfile && !hasPhone && !phoneFormSkipped && codeUser === 200) {
+    // TAMPILKAN form phone hanya jika:
+    // 1. User data berhasil dimuat (codeUser === 200)
+    // 2. User ada tapi belum ada phone
+    // 3. Belum pernah di-skip
+    // 4. Bukan loading state
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="container mx-auto relative z-10 pb-28">
           <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 p-4">
             <h1 className="text-lg mb-4">
-              Kamu belum memasukkan Nomor Hp/WA, Masukkan dulu dibawah ini...
+              Lengkapi profil Anda
             </h1>
+            <p className="text-sm text-slate-600 mb-4">
+              Nomor HP/WA diperlukan untuk notifikasi dan komunikasi. Anda bisa mengisi sekarang atau nanti.
+            </p>
 
             <FormSupervisionComponent
               submitControl={{
                 path: 'auth/edit-profile',
               }}
               defaultValue={{
-                phone: dataUser?.data?.profile?.phone,
+                phone: userProfile?.phone || '',
               }}
               onSuccess={() => {
                 window.location.reload();
@@ -514,11 +552,56 @@ export default function Index() {
                 },
               ]}
             />
+            
+            {/* TAMBAHAN: Button untuk skip form phone */}
+            <div className="mt-4">
+              <button 
+                onClick={() => {
+                  // Skip dengan mengupdate state atau redirect
+                  localStorage.setItem('phone_form_skipped', 'true');
+                  window.location.reload();
+                }}
+                className="w-full py-3 px-4 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
+              >
+                Lewati untuk sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  } else if (!loadingUser && !userProfile) {
+    // PERBAIKAN: Jika tidak ada user profile, redirect ke login
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 p-4 text-center">
+            <h1 className="text-lg mb-4">Sesi login telah berakhir</h1>
+            <p className="text-sm text-slate-600 mb-4">Silakan login kembali</p>
+            
+            <button 
+              onClick={() => window.location.href = '/'}
+              className="w-full py-3 px-4 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-colors"
+            >
+              Login Kembali
+            </button>
           </div>
         </div>
       </div>
     );
   } else {
-    return '';
+    // Loading state
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 p-4 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-slate-600">Memuat profil...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 }
