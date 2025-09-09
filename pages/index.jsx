@@ -24,34 +24,38 @@ export default function Login() {
 
   // Perbaiki onSuccess function
   const onSuccess = (data) => {
-    // Laravel API biasanya mengembalikan { data: { token: "...", user: {...} } }
-    // Coba berbagai kemungkinan path token
-    const token = data?.data?.token || data?.token || data?.data?.data?.token || data?.user_token;
+    // DEBUG: Log semua detail response login
+    // eslint-disable-next-line no-console
+    console.log('=== LOGIN SUCCESS RESPONSE ===');
+    // eslint-disable-next-line no-console
+    console.log('Full data:', data);
+    // eslint-disable-next-line no-console
+    console.log('Status Code:', data?.status);
+    
+    // REKOMENDASI: Simpan token dari field data.token
+    const token = data?.data?.token;
+
+    // eslint-disable-next-line no-console
+    console.log('Extracted token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
 
     if (token) {
+      // eslint-disable-next-line no-console
+      console.log('Saving token to cookie...');
+      
       Cookies.set(
         token_cookie_name,
         Encrypt(token),
         { expires: 365, secure: true }
       );
       
-      // PERBAIKAN: Untuk login biasa (scope: user), jika berhasil login berarti user sudah verified
-      // Tidak perlu cek verified_at lagi karena backend sudah handle verification
-      // Hanya redirect ke verifikasi jika response status 202 atau ada flag khusus
+      // Verify token saved
+      const savedToken = Cookies.get(token_cookie_name);
+      // eslint-disable-next-line no-console
+      console.log('Token saved to cookie:', savedToken ? 'YES' : 'NO');
       
-      const user = data?.data?.user || data?.user || data?.data?.data?.user;
-      const responseStatus = data?.status || data?.response?.status;
-      const needsVerification = responseStatus === 202 || data?.needs_verification || data?.data?.needs_verification;
-      
-      if (needsVerification) {
-        // Khusus jika backend bilang butuh verifikasi
-        setTimeout(() => {
-          window.location.href = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
-        }, 100);
-        return;
-      }
-      
-      // Login sukses, langsung ke app (karena login sukses = user sudah verified)
+      // PERBAIKAN: Login sukses langsung ke app
+      // eslint-disable-next-line no-console
+      console.log('Redirecting to /app...');
       setTimeout(() => {
         window.location.href = '/app';
       }, 100);
@@ -71,8 +75,10 @@ export default function Login() {
   );
 
   useEffect(() => {
+    // REKOMENDASI: Untuk user biasa, JANGAN kirim scope atau kirim scope "user"
+    // Kita coba tanpa scope dulu sesuai saran
     setDefaultValues({
-      scope: 'user', // Gunakan scope 'user' untuk semua user app
+      // scope: 'user', // COMMENT OUT: test tanpa scope dulu
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
