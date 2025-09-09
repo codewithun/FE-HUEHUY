@@ -29,51 +29,82 @@ const PromoDetailPage = () => {
     try {
       setLoading(true);
       
-      // Try API first if we have communityId
-      if (communityId && communityId !== 'promo-entry') {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-        const response = await get({
-          path: `communities/${communityId}/promos/${promoId}`
-        });
+      // DEBUG: Log parameter yang diterima
+      console.log('=== FETCH PROMO DEBUG ===');
+      console.log('promoId:', promoId);
+      console.log('communityId:', communityId);
+      
+      // Try multiple endpoints untuk promo
+      const endpoints = [
+        `communities/${communityId}/promos/${promoId}`, // Community specific
+        `admin/promos/${promoId}`, // Admin endpoint (public)
+        `promos/${promoId}`, // Direct endpoint (jika ada)
+      ];
 
-        if (response?.status === 200 && response?.data?.data) {
-          const promoData = response.data.data;
-          // Transform API data to our format
-          const transformedData = {
-            id: promoData.id,
-            title: promoData.title,
-            merchant: promoData.owner_name || 'Merchant',
-            image: promoData.image_url || promoData.image || '/default-avatar.png',
-            distance: promoData.promo_distance ? `${promoData.promo_distance} KM` : '3 KM',
-            location: promoData.location || '',
-            coordinates: '',
-            originalPrice: promoData.original_price || null,
-            discountPrice: promoData.discount_price || null,
-            discount: promoData.discount_percentage ? `${promoData.discount_percentage}%` : null,
-            schedule: {
-              day: promoData.always_available ? 'Setiap Hari' : 'Weekday',
-              details: promoData.end_date ? `Berlaku hingga ${new Date(promoData.end_date).toLocaleDateString()}` : 'Berlaku',
-              time: '10:00 - 22:00',
-              timeDetails: 'Jam Berlaku Promo'
-            },
-            status: {
-              type: promoData.promo_type === 'online' ? 'Online' : 'Offline',
-              description: `Tipe Promo: ${promoData.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
-            },
-            description: promoData.description || '',
-            seller: {
-              name: promoData.owner_name || 'Admin',
-              phone: promoData.owner_contact || ''
-            },
-            terms: 'TERM & CONDITIONS APPLY'
-          };
+      let response = null;
+      let lastError = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          console.log('Trying endpoint:', endpoint);
+          response = await get({ path: endpoint });
           
-          setPromoData(transformedData);
-          return transformedData;
+          console.log('Response status:', response?.status);
+          console.log('Response data:', response?.data);
+          
+          if (response?.status === 200 && response?.data?.data) {
+            console.log('✅ Success with endpoint:', endpoint);
+            break;
+          }
+        } catch (err) {
+          console.warn('❌ Failed endpoint:', endpoint, err.message);
+          lastError = err;
+          continue;
         }
       }
 
-      // Fallback to mock data if API fails or no communityId
+      if (response?.status === 200 && response?.data?.data) {
+        const promoData = response.data.data;
+        console.log('Promo found via API:', promoData);
+        
+        // Transform API data to our format
+        const transformedData = {
+          id: promoData.id,
+          title: promoData.title,
+          merchant: promoData.owner_name || 'Merchant',
+          image: promoData.image_url || promoData.image || '/default-avatar.png',
+          distance: promoData.promo_distance ? `${promoData.promo_distance} KM` : '3 KM',
+          location: promoData.location || '',
+          coordinates: '',
+          originalPrice: promoData.original_price || null,
+          discountPrice: promoData.discount_price || null,
+          discount: promoData.discount_percentage ? `${promoData.discount_percentage}%` : null,
+          schedule: {
+            day: promoData.always_available ? 'Setiap Hari' : 'Weekday',
+            details: promoData.end_date ? `Berlaku hingga ${new Date(promoData.end_date).toLocaleDateString()}` : 'Berlaku',
+            time: '10:00 - 22:00',
+            timeDetails: 'Jam Berlaku Promo'
+          },
+          status: {
+            type: promoData.promo_type === 'online' ? 'Online' : 'Offline',
+            description: `Tipe Promo: ${promoData.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
+          },
+          description: promoData.description || '',
+          seller: {
+            name: promoData.owner_name || 'Admin',
+            phone: promoData.owner_contact || ''
+          },
+          terms: 'TERM & CONDITIONS APPLY'
+        };
+        
+        setPromoData(transformedData);
+        return transformedData;
+      }
+
+      // Fallback to mock data if all API calls fail
+      console.log('All API endpoints failed, using fallback mock data');
+      console.log('Last error:', lastError);
+      
       const mockPromoDetails = {
         1: {
           id: 1,
@@ -278,13 +309,13 @@ const PromoDetailPage = () => {
       };
 
       const keyStr = String(promoId);
-      const keyNum = Number(promoId);
-      const selectedPromo = mockPromoDetails[keyStr] ?? mockPromoDetails[keyNum] ?? null;
+      const selectedPromo = mockPromoDetails[keyStr] ?? mockPromoDetails[1] ?? null;
       
+      console.log('Mock promo selected:', selectedPromo);
       setPromoData(selectedPromo);
       return selectedPromo;
     } catch (err) {
-      console.error('Error fetching promo details:', err);
+      console.error('Critical error in fetchPromoDetails:', err);
       return null;
     } finally {
       setLoading(false);

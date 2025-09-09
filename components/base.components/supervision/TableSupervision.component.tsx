@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable @next/next/no-img-element */
 import { faEdit, faPlus, faTrash, faDownload } from '@fortawesome/free-solid-svg-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -358,20 +359,25 @@ export function TableSupervisionComponent({
                         const communityId = getCommunityIdFromItem(item);
                         let qrValue = '';
                         const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+                        
+                        console.log('=== QR GENERATION DEBUG ===');
+                        console.log('Item:', item);
+                        console.log('Community ID:', communityId);
+                        
                         if (item.promo) {
-                          qrValue = `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${communityId}&autoRegister=1`;
-                        } else if (item.voucher) {
-                          const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-                          if (!id) {
-                            alert('Data voucher tidak memiliki id yang valid!');
+                          const promoId = item.promo.id || item.promo_id || item.id;
+                          console.log('Promo ID:', promoId);
+                          
+                          if (!promoId) {
+                            alert('Promo ID tidak ditemukan!');
                             return;
                           }
-                          qrValue = `${origin}/app/voucher/${id}?communityId=${communityId}&autoRegister=1`;
-                        } else {
-                          alert('Data promo/voucher tidak ditemukan!');
-                          return;
+                          
+                          // PERBAIKAN: Gunakan endpoint yang pasti ada
+                          qrValue = `${origin}/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
+                          console.log('Generated QR Value:', qrValue);
                         }
-
+                        
                         try {
                           const QRCode = await import('qrcode');
                           // Generate QR langsung ke halaman voucher/promo
