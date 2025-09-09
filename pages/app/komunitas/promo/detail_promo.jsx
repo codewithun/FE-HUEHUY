@@ -335,8 +335,8 @@ const PromoDetailPage = () => {
 
       const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
       const endpoints = [
-        `${base}/api/admin/promos/${promoData.id}/items`,
-        `${base}/api/admin/promo-items`,
+        `${base}/admin/promos/${promoData.id}/items`,
+        `${base}/admin/promo-items`,
       ];
 
       // console.log('claim endpoints:', endpoints);
