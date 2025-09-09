@@ -2,7 +2,7 @@ import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
 import {
   ButtonComponent,
@@ -18,36 +18,27 @@ export default function Verification() {
   const [waitingMail, setWaitingMail] = useState(60);
   const [modalSendMailSuccess, setModalSendMailSuccess] = useState(false);
 
-  // DEBUG: Log query parameters saat halaman dimuat
   useEffect(() => {
     if (router.isReady) {
       // eslint-disable-next-line no-console
-      console.log('Verification page loaded with query:', router.query);
-      // eslint-disable-next-line no-console
-      console.log('Email from query:', router.query.email);
-      // eslint-disable-next-line no-console
-      console.log('Next from query:', router.query.next);
+      console.log('Verification page query:', router.query);
     }
   }, [router.isReady, router.query]);
 
-  // after successful verification, redirect to original target if provided
   const onSuccess = (response) => {
     try {
       // eslint-disable-next-line no-console
       console.log('Verification success response:', response);
-      
-      // Backend returns token in response.data.token
-      if (response?.data?.token) {
-        Cookies.set(
-          token_cookie_name,
-          Encrypt(response.data.token),
-          { expires: 365, secure: true }
-        );
+
+      const maybeToken = response?.data?.token || response?.data?.data?.token;
+      if (maybeToken) {
+        Cookies.set(token_cookie_name, Encrypt(maybeToken), {
+          expires: 365,
+          secure: true,
+        });
       }
 
-      // Backend includes redirect_url in response.data.redirect_url
-      const redirectUrl = response?.data?.redirect_url;
-      
+      const redirectUrl = response?.data?.redirect_url || response?.data?.data?.redirect_url;
       if (redirectUrl) {
         setTimeout(() => {
           window.location.href = redirectUrl;
@@ -55,9 +46,8 @@ export default function Verification() {
         return;
       }
 
-      // Fallback logic
-      const qrData = response?.data?.qr_data || router.query.qr_data;
       const next = router.query.next;
+      const email = router.query.email;
 
       if (next) {
         const targetUrl = decodeURIComponent(String(next));
@@ -67,57 +57,86 @@ export default function Verification() {
         return;
       }
 
+      // Jika tidak ada token dari BE setelah verify, arahkan ke login agar sesi jelas
+      if (!maybeToken) {
+        const loginUrl = email ? `/?email=${encodeURIComponent(String(email))}&verified=1` : '/';
+        setTimeout(() => {
+          window.location.href = loginUrl;
+        }, 300);
+        return;
+      }
+
       setTimeout(() => {
         window.location.href = '/app';
       }, 200);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('Error in onSuccess:', e);
-      // Fallback redirect
       setTimeout(() => {
-        window.location.href = '/app';
+        window.location.href = '/';
       }, 200);
     }
   };
 
-  // UBAH KE SISTEM BARU: email-verification/verify-code
   const [{ submit, loading, values, setValues, errors }] = useForm(
     {
-      path: 'email-verification/verify-code', // ← UBAH dari 'auth/verify-mail'
+      path: 'email-verification/verify-code',
       data: {
-        email: router.query.email || '',
-        code: '', // ← UBAH dari 'token' ke 'code'
-        qr_data: router.query.qr_data || null
-      }
+        email: '',
+        code: '',
+        qr_data: router.query.qr_data || null,
+      },
     },
     false,
-    onSuccess,
+    onSuccess
   );
 
-  // UBAH resend mail function ke sistem baru
+  // Selalu fetch account-unverified agar punya fallback email
+  const [loadingAccount, codeDataAccount, dataAccount] = useGet(
+    { path: 'account-unverified' },
+    false
+  );
+
+  // Gabungkan email dari query atau dari account-unverified ke payload
+  const qEmail = useMemo(() => (typeof router.query.email === 'string' ? router.query.email : ''), [router.query.email]);
+  const acctEmail = useMemo(() => (dataAccount?.data?.profile?.email ? String(dataAccount.data.profile.email) : ''), [dataAccount]);
+
+  useEffect(() => {
+    const merged = (qEmail || acctEmail || '').trim();
+    if (!merged) return;
+    setValues((prev) => {
+      const others = prev.filter((v) => v.name !== 'email');
+      return [...others, { name: 'email', value: merged }];
+    });
+  }, [qEmail, acctEmail, setValues]);
+
+  // Timer aman untuk tombol Kirim Ulang
+  useEffect(() => {
+    if (!waitingMail) return;
+    const t = setInterval(() => {
+      setWaitingMail((v) => (v > 0 ? v - 1 : 0));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [waitingMail]);
+
   const resendMail = async (e) => {
     e.preventDefault();
     setSendMailLoading(true);
-
     try {
-      const email = router.query.email || dataAccount?.data?.profile?.email;
+      const emailVal = qEmail || acctEmail;
+      if (!emailVal) return;
 
-      if (email) {
-        // UBAH ke endpoint baru
-        const response = await post({
-          path: 'email-verification/resend-code', // ← UBAH dari 'auth/resend-mail'
-          body: { email: email },
-          contentType: 'application/json'
-        });
+      const response = await post({
+        path: 'email-verification/resend-code',
+        body: { email: emailVal },
+        contentType: 'application/json',
+      });
 
-        // eslint-disable-next-line no-console
-        console.log('Resend response:', response);
-
-        // Check success dari response baru
-        if (response?.success || response?.status === 200) {
-          setWaitingMail(60);
-          setModalSendMailSuccess(true);
-        }
+      // eslint-disable-next-line no-console
+      console.log('Resend response:', response);
+      if (response?.success || response?.status === 200) {
+        setWaitingMail(60);
+        setModalSendMailSuccess(true);
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -127,21 +146,7 @@ export default function Verification() {
     }
   };
 
-  useEffect(() => {
-    let myInterval = setInterval(() => {
-      if (waitingMail > 0) {
-        setWaitingMail(waitingMail - 1);
-      }
-    }, 1000);
-    return () => {
-      clearInterval(myInterval);
-    };
-  });
-
-  const shouldSkipRequest = !router.query.email;
-  const [loadingAccount, codeDataAccount, dataAccount] = useGet({
-    path: `account-unverified`,
-  }, shouldSkipRequest);
+  const codeValue = values?.find((v) => v.name === 'code')?.value || '';
 
   return (
     <>
@@ -155,12 +160,9 @@ export default function Verification() {
               <Image src={'/logo.png'} width={500} height={500} alt="" />
             </div>
 
-            <h1 className="text-3xl font-bold text-primary mt-6">
-              Verifikasi Email
-            </h1>
+            <h1 className="text-3xl font-bold text-primary mt-6">Verifikasi Email</h1>
             <p className="mt-1 text-slate-500 text-center w-[90%]">
-              Silahkan masukkan kode verifikasi yang dikirim ke email{' '}
-              {router.query.email || dataAccount?.data?.profile?.email}
+              Silahkan masukkan kode verifikasi yang dikirim ke email {qEmail || acctEmail}
             </p>
             <p className="mt-1 text-slate-500 text-center w-[90%] font-semibold">
               Jika pesan verifikasi tidak masuk, silahkan cek folder spam!
@@ -170,45 +172,36 @@ export default function Verification() {
           <form onSubmit={submit}>
             <div className="flex justify-center pt-8 pb-6">
               <InputOtpComponent
-                value={values?.find(({ name }) => name == 'code')?.value || ''} // ← UBAH dari 'token' ke 'code'
+                value={codeValue}
                 onChange={(e) => {
-                  setValues([
-                    ...values.filter(({ name }) => name != 'code'), // ← UBAH dari 'token' ke 'code'
-                    { name: 'code', value: e }, // ← UBAH dari 'token' ke 'code'
-                  ]);
+                  const clean = String(e || '').replace(/\D/g, '').slice(0, 6);
+                  setValues((prev) => {
+                    const others = prev.filter((v) => v.name !== 'code');
+                    return [...others, { name: 'code', value: clean }];
+                  });
                 }}
-                error={errors?.find(({ name }) => name == 'code')?.error} // ← UBAH dari 'token' ke 'code'
+                error={errors?.find(({ name }) => name === 'code')?.error}
                 max={6}
               />
             </div>
             <div className="px-20 mt-4">
-              <ButtonComponent
-                type="submit"
-                label="Verifikasi"
-                block
-                size="xl"
-                loading={loading}
-              />
+              <ButtonComponent type="submit" label="Verifikasi" block size="xl" loading={loading} />
             </div>
             <div className="text-center text-gray-500 mt-6 flex items-center gap-2 justify-center">
               Belum mendapat pesan verifikasi?
               <ButtonComponent
-                label={
-                  waitingMail ? `Kirim Ulang (${waitingMail})` : 'Kirim Ulang'
-                }
+                label={waitingMail ? `Kirim Ulang (${waitingMail})` : 'Kirim Ulang'}
                 variant="light"
                 size={'sm'}
-                disabled={waitingMail}
+                disabled={!!waitingMail}
                 loading={sendMailLoading}
-                onClick={(e) => resendMail(e)}
+                onClick={resendMail}
               />
             </div>
           </form>
           <div className="mt-10 px-4 py-4">
             <Link href="/app/hubungi-kami">
-              <div className="text-center text-primary font-semibold underline">
-                Hubungi Admin
-              </div>
+              <div className="text-center text-primary font-semibold underline">Hubungi Admin</div>
             </Link>
           </div>
         </div>

@@ -6,8 +6,6 @@ import { useEffect, useState } from 'react';
 import { ButtonComponent, InputComponent } from '../components/base.components';
 import { token_cookie_name, useForm } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
-
-// tambahan import
 import { faGoogle } from '@fortawesome/free-brands-svg-icons';
 import axios from 'axios';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -15,73 +13,41 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 export default function BuatAkun() {
   const router = useRouter();
   const [btnGoogleLoading, setBtnGoogleLoading] = useState(false);
-
-  // buat provider firebase (jika pakai firebase)
   const googleProvider = new GoogleAuthProvider();
 
   useEffect(() => {
-    // Cek status user, misal dari localStorage atau cookie
     const sudahRegister = localStorage.getItem('sudahRegister');
-    if (sudahRegister) {
-      router.replace('/dashboard'); // redirect jika sudah pernah scan/register
-    }
-    // else tampilkan form register
+    if (sudahRegister) router.replace('/dashboard');
   }, [router]);
 
   const onSuccess = (data) => {
-    // Backend returns token in data.token
     const token = data?.data?.token || data?.data?.user_token;
     if (token) {
-      Cookies.set(
-        token_cookie_name,
-        Encrypt(token),
-        { expires: 365, secure: true }
-      );
+      Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
     }
 
-    // Backend returns user in data.user
     const user = data?.data?.user;
     const userEmail = user?.email || '';
-
-    // Always redirect to verification after registration
-    const next = router?.query?.next;
-    
-    if (next) {
-      const target = `/verifikasi?email=${encodeURIComponent(userEmail)}&next=${encodeURIComponent(next)}`;
-      window.location.href = target;
-    } else {
-      const target = `/verifikasi?email=${encodeURIComponent(userEmail)}`;
-      window.location.href = target;
-    }
+    const rawNext = router?.query?.next;
+    const target = rawNext
+      ? `/verifikasi?email=${encodeURIComponent(userEmail)}&next=${encodeURIComponent(String(rawNext))}`
+      : `/verifikasi?email=${encodeURIComponent(userEmail)}`;
+    window.location.href = target;
   };
-  
+
   const [{ formControl, submit, loading }] = useForm(
-    {
-      path: 'auth/register',
-    },
+    { path: 'auth/register' },
     false,
     onSuccess
   );
 
-  const loginFirebase = async (
-    idToken,
-    remember,
-    url_path = '/auth/login-firebase'
-  ) => {
+  const loginFirebase = async (idToken, remember, url_path = '/auth/login-firebase') => {
     try {
-      const formData = new FormData();
-      formData.append('idToken', idToken);
-
-      // confirm backend
-      return axios
-        .post(`${process.env.NEXT_PUBLIC_API_URL + url_path}`, formData)
-        .then((res) => {
-          Cookies.set(token_cookie_name, Encrypt(res.data.token), {
-            secure: true,
-          });
-
-          return res;
-        });
+      return axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL + url_path}`,
+        { idToken },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     } catch (error) {
       return error;
     }
@@ -89,44 +55,29 @@ export default function BuatAkun() {
 
   const submitLoginFirebase = async (provider) => {
     setBtnGoogleLoading(true);
-    const auth = getAuth();
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        loginFirebase(result.user.accessToken, true).then((response) => {
-          if (response.status == 200) {
-            const rawNext = router?.query?.next;
-            const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
-            
-            // Untuk Google login, cek apakah user sudah terverifikasi
-            // Jika sudah terverifikasi, langsung ke target
-            // Jika belum, ke verifikasi dulu
-            if (next) {
-              // Asumsikan Google login sudah terverifikasi, langsung ke target
-              window.location.href = next;
-            } else {
-              window.location.href = '/app';
-            }
-          } else if (response.status == 202) {
-            // Status 202 biasanya berarti butuh verifikasi
-            const rawNext = router?.query?.next;
-            const next = rawNext ? String(rawNext) : null;
-            
-            if (next) {
-              const target = `/verifikasi?next=${encodeURIComponent(next)}`;
-              window.location.href = target;
-            } else {
-              window.location.href = '/verifikasi';
-            }
-            setBtnGoogleLoading(false);
-          }
-        });
-      })
-      .catch(() => {
-        setBtnGoogleLoading(false);
-      });
-  };
+    try {
+      const auth = getAuth();
+      const result = await signInWithPopup(auth, provider);
+      const idToken = await result.user.getIdToken(/* forceRefresh */ true);
+      const response = await loginFirebase(idToken, true);
 
-  // setelah registrasi/login sukses: (REMOVED - tidak terpakai)
+      if (response.status === 200) {
+        Cookies.set(token_cookie_name, Encrypt(response.data.token), { secure: true });
+        const rawNext = router?.query?.next;
+        const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
+        window.location.href = next || '/app';
+      } else if (response.status === 202) {
+        const rawNext = router?.query?.next;
+        const next = rawNext ? String(rawNext) : null;
+        window.location.href = next ? `/verifikasi?next=${encodeURIComponent(next)}` : '/verifikasi';
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(e);
+    } finally {
+      setBtnGoogleLoading(false);
+    }
+  };
 
   return (
     <>
