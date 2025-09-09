@@ -203,9 +203,9 @@ const DetailVoucherPage = () => {
       // eslint-disable-next-line no-console
       console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
       
-      // Coba endpoint account-unverified dulu (untuk user belum verified)
+      // Coba endpoint account dulu (untuk user yang sudah login dan terverifikasi)
       let response = await get({
-        path: 'account-unverified',
+        path: 'account',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -214,28 +214,22 @@ const DetailVoucherPage = () => {
       });
       
       // eslint-disable-next-line no-console
-      console.log('account-unverified response:', response?.status, response?.data);
+      console.log('account response:', response?.status, response?.data);
       
       if (response?.status === 200) {
-        // User belum terverifikasi, redirect ke verifikasi
-        const userData = response?.data?.data?.profile || response?.data?.profile;
-        const emailVerified = userData?.email_verified_at || userData?.verified_at;
-        
-        if (!emailVerified) {
-          // eslint-disable-next-line no-console
-          console.log('User not verified, redirecting to verification');
-          const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-          window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
-          return;
-        }
+        // User sudah terverifikasi dan bisa akses, lakukan auto-register
+        // eslint-disable-next-line no-console
+        console.log('User verified and logged in, proceeding with auto register');
+        handleAutoRegister(token);
+        return;
       }
       
-      // Jika account-unverified gagal atau user sudah verified, coba endpoint account
+      // Jika account endpoint gagal (401/404), coba account-unverified
       if (response?.status === 401 || response?.status === 404) {
         // eslint-disable-next-line no-console
-        console.log('Trying account endpoint...');
+        console.log('Trying account-unverified endpoint...');
         response = await get({
-          path: 'account',
+          path: 'account-unverified',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json',
@@ -244,24 +238,36 @@ const DetailVoucherPage = () => {
         });
         
         // eslint-disable-next-line no-console
-        console.log('account response:', response?.status, response?.data);
+        console.log('account-unverified response:', response?.status, response?.data);
         
         if (response?.status === 200) {
-          // User sudah terverifikasi, lakukan auto-register untuk QR scan
-          // eslint-disable-next-line no-console
-          console.log('User verified, proceeding with auto register');
-          handleAutoRegister(token);
-          return;
+          // User belum terverifikasi, redirect ke verifikasi
+          const userData = response?.data?.data?.profile || response?.data?.profile;
+          const emailVerified = userData?.email_verified_at || userData?.verified_at;
+          
+          if (!emailVerified) {
+            // eslint-disable-next-line no-console
+            console.log('User not verified, redirecting to verification');
+            const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+            window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+            return;
+          } else {
+            // Email sudah terverifikasi, lanjut auto register
+            // eslint-disable-next-line no-console
+            console.log('User email verified, proceeding with auto register');
+            handleAutoRegister(token);
+            return;
+          }
         }
-        
-        if (response?.status === 401) {
-          // Token tidak valid, redirect ke login
-          // eslint-disable-next-line no-console
-          console.log('Token invalid (401), redirecting to register');
-          const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-          return;
-        }
+      }
+      
+      // Jika token tidak valid, redirect ke register
+      if (response?.status === 401) {
+        // eslint-disable-next-line no-console
+        console.log('Token invalid (401), redirecting to register');
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        return;
       }
       
       // Fallback: assume user is verified dan lanjut auto register
