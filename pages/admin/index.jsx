@@ -20,15 +20,42 @@ export default function Login() {
   const [loadingScreen, setLoadingScreen] = useState(true);
 
   const onSuccess = (data) => {
-    Cookies.set(
-      token_cookie_name,
-      Encrypt(data.data?.token),
-      { expires: 365 },
-      { secure: true }
-    );
+    // Debug response untuk melihat struktur data admin login
+    // eslint-disable-next-line no-console
+    console.log('Admin login response:', data);
+    
+    const token = data?.data?.token || data?.token;
+    
+    if (token) {
+      Cookies.set(
+        token_cookie_name,
+        Encrypt(token),
+        { expires: 365, secure: true }
+      );
 
-    if (data?.data?.role?.id == 1) {
-      window.location.href = 'admin/dashboard/';
+      // PERBAIKAN: Cek role dan redirect sesuai role
+      const role = data?.data?.role || data?.role;
+      const user = data?.data?.user || data?.user;
+      
+      // eslint-disable-next-line no-console
+      console.log('Admin role:', role, 'User:', user);
+      
+      // Admin role check - berbagai kemungkinan struktur role
+      const isAdmin = role?.id === 1 || role?.name === 'admin' || role === 'admin' || 
+                     user?.role === 'admin' || user?.role_id === 1;
+      
+      if (isAdmin) {
+        setTimeout(() => {
+          window.location.href = '/admin/dashboard';
+        }, 100);
+      } else {
+        // eslint-disable-next-line no-console
+        console.error('User bukan admin:', { role, user });
+        alert('Anda tidak memiliki akses admin');
+      }
+    } else {
+      // eslint-disable-next-line no-console
+      console.error('No token found in admin login response:', data);
     }
   };
 
@@ -39,6 +66,17 @@ export default function Login() {
     false,
     onSuccess
   );
+
+  useEffect(() => {
+    // Set default scope untuk admin
+    if (!values.find(v => v.name === 'scope')) {
+      setValues([
+        ...values.filter(v => v.name !== 'scope'),
+        { name: 'scope', value: 'admin' }
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (Cookies.get(token_cookie_name)) {
