@@ -55,31 +55,25 @@ export default function CommunityDashboard({ communityId }) {
           const result = await response.json();
           const community = result.data || result;
           
-          // Set community data from API with fallback to demo data structure
+          // Use API response directly, no dummy/default values
           setCommunityData({
             id: community.id,
             name: community.name,
-            description: community.description, // Ambil deskripsi dari database
-            members: community.members || 0,
-            category: community.category || 'Shopping',
-            location: community.location || 'Location not set',
-            isOwner: false, // Default values untuk UI
-            isAdmin: true,
-            isJoined: true,
-            privacy: community.privacy || 'public',
-            activePromos: 8, // Bisa ditambahkan ke API nanti
-            totalEvents: 3,
-            unreadMessages: 5,
-            isVerified: true,
-            avatar: community.logo || '/api/placeholder/50/50'
+            description: community.description ?? null,
+            members: community.members ?? 0,
+            category: community.category ?? null,
+            location: community.location ?? null,
+            privacy: community.privacy ?? null,
+            isVerified: community.isVerified ?? community.is_verified ?? null,
+            avatar: community.logo ?? null,
           });
         } else {
-          // Fallback ke demo data jika API gagal
-          setCommunityData(getDemoData(communityId));
+          // No dummy fallback — set null so UI shows "not found" or handle accordingly
+          setCommunityData(null);
         }
       } catch (error) {
-        // Fallback ke demo data
-        setCommunityData(getDemoData(communityId));
+        // On error, don't inject dummy data — set null
+        setCommunityData(null);
       } finally {
         setLoading(false);
       }
@@ -92,17 +86,90 @@ export default function CommunityDashboard({ communityId }) {
   useEffect(() => {
     const fetchEventsAndPromos = async () => {
       if (!communityId) return;
-      
+
+      // Prepare base URL & auth header
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiBase = baseUrl.replace(/\/api\/?$/, '');
+
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : '';
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
+
+      // helper: build image url (similar logic to promo page)
+      const buildImageUrl = (raw) => {
+        const fallback = '/api/placeholder/180/130';
+        if (typeof raw !== 'string') return fallback;
+        let url = raw.trim();
+        if (!url) return fallback;
+        if (/^https?:\/\//i.test(url)) return url;
+        if (url.startsWith('/api/placeholder')) return url;
+        let path = url.replace(/^\/+/, '');
+        path = path.replace(/^api\/storage\//, 'storage/');
+        if (/^(promos|uploads|images|files)\//i.test(path)) {
+          path = `storage/${path}`;
+        }
+        return `${apiBase}/${path}`;
+      };
+
+      const normalizePromos = (arr = []) => {
+        return (Array.isArray(arr) ? arr : []).map(p => {
+          const raw = p.image_url ?? p.image ?? p.image_path ?? '/api/placeholder/180/130';
+          return {
+            id: p.id ?? p.promo_id ?? Math.random().toString(36).slice(2,9),
+            title: p.title ?? p.name ?? p.label ?? 'Promo',
+            description: p.description ?? p.subtitle ?? null,
+            image: buildImageUrl(raw),
+            label: p.label ?? 'Promo',
+            discount: p.discount ?? p.discount_percentage ?? null,
+            location: p.location ?? p.community?.location ?? null
+          };
+        });
+      };
+
       try {
         setLoadingEvents(true);
-        
-        // Set demo data untuk events dan promos
-        setUpcomingEvents(getDemoEvents());
-        setPromoCategories(getDemoPromoCategories());
-        
-      } catch (error) {
-        console.error('Error fetching events and promos:', error);
-        // Set empty arrays on error
+
+        // Fetch upcoming events (best-effort, keep empty on fail)
+        try {
+          const evRes = await fetch(`${apiBase}/api/communities/${communityId}/events`, { headers });
+          if (evRes.ok) {
+            const evJson = await evRes.json().catch(() => null);
+            const evList = Array.isArray(evJson?.data) ? evJson.data : Array.isArray(evJson) ? evJson : [];
+            setUpcomingEvents(Array.isArray(evList) ? evList : []);
+          } else {
+            setUpcomingEvents([]);
+          }
+        } catch (e) {
+          setUpcomingEvents([]);
+        }
+
+        // Fetch promos for community
+        try {
+          const promoRes = await fetch(`${apiBase}/api/communities/${communityId}/promos`, { headers });
+          if (promoRes.ok) {
+            const promoJson = await promoRes.json().catch(() => null);
+            const promoList = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
+            const normalized = normalizePromos(promoList);
+            setPromoCategories([
+              {
+                id: 'promo-terkini',
+                title: 'Promo Terkini',
+                subtitle: 'Promo dari komunitas',
+                promos: normalized
+              }
+            ]);
+          } else {
+            // no promos or unauthorized → empty
+            setPromoCategories([]);
+          }
+        } catch (e) {
+          setPromoCategories([]);
+        }
+      } catch (err) {
+        console.error('Error fetching events/promos:', err);
         setUpcomingEvents([]);
         setPromoCategories([]);
       } finally {
@@ -124,184 +191,6 @@ export default function CommunityDashboard({ communityId }) {
       'default': 'bg-gradient-to-r from-green-500 to-green-600'
     };
     return gradients[category] || gradients.default;
-  };
-
-  // Demo data untuk events
-  const getDemoEvents = () => {
-    return [
-      {
-        id: 1,
-        title: 'Grand Opening Sale',
-        category: 'Shopping Event',
-        date: '15 Des 2024',
-        time: '10:00',
-        location: 'dbotanica Mall Bandung',
-        participants: 156,
-        image: '/api/placeholder/320/240'
-      },
-      {
-        id: 2,
-        title: 'Fashion Show 2024',
-        category: 'Fashion Event',
-        date: '20 Des 2024',
-        time: '19:00',
-        location: 'Main Stage',
-        participants: 89,
-        image: '/api/placeholder/320/240'
-      }
-    ];
-  };
-
-  // Demo data untuk promo categories
-  const getDemoPromoCategories = () => {
-    return [
-      {
-        id: 1,
-        title: 'Promo Spesial',
-        subtitle: 'Dapatkan diskon hingga 70%',
-        promos: [
-          {
-            id: 1,
-            title: 'Diskon Fashion 50%',
-            description: 'Berlaku untuk semua item fashion',
-            discount: '50% OFF',
-            label: 'Fashion',
-            image: '/api/placeholder/180/130'
-          },
-          {
-            id: 2,
-            title: 'Buy 1 Get 1 Food',
-            description: 'Khusus makanan dan minuman',
-            discount: 'BUY 1 GET 1',
-            label: 'F&B',
-            image: '/api/placeholder/180/130'
-          },
-          {
-            id: 3,
-            title: 'Gratis Ongkir',
-            description: 'Minimal belanja Rp 100.000',
-            discount: 'FREE ONGKIR',
-            label: 'Delivery',
-            image: '/api/placeholder/180/130'
-          }
-        ]
-      },
-      {
-        id: 2,
-        title: 'Flash Sale',
-        subtitle: 'Promo terbatas waktu',
-        promos: [
-          {
-            id: 4,
-            title: 'Electronics Sale',
-            description: 'Gadget dan elektronik murah',
-            discount: '30% OFF',
-            label: 'Electronics',
-            image: '/api/placeholder/180/130'
-          },
-          {
-            id: 5,
-            title: 'Skincare Bundle',
-            description: 'Paket hemat skincare Korea',
-            discount: '40% OFF',
-            label: 'Beauty',
-            image: '/api/placeholder/180/130'
-          }
-        ]
-      }
-    ];
-  };
-
-  // Demo data fallback function (tetap ada untuk backup)
-  const getDemoData = (id) => {
-    const allCommunities = {
-      1: {
-        id: 1,
-        name: 'dbotanica Bandung',
-        description: 'Mall perbelanjaan standar dengan beragam toko pakaian, plus tempat makan kasual & bioskop. Terletak di daerah pusat wisata Kota Bandung, hanya beberapa ratus meter dari pintu tol Pasteur',
-        members: 1234,
-        category: 'Shopping',
-        location: 'Kota Bandung',
-        isOwner: false,
-        isAdmin: true,
-        isJoined: true,
-        privacy: 'public',
-        activePromos: 8,
-        totalEvents: 3,
-        unreadMessages: 5,
-        isVerified: true,
-        avatar: '/api/placeholder/50/50'
-      },
-      2: {
-        id: 2,
-        name: 'Sunscape Event Organizer',
-        description: 'Sunscape Event Organizer adalah penyelenggara acara profesional yang berfokus pada event-event berkualitas tinggi',
-        members: 856,
-        category: 'Event',
-        location: 'Bandung',
-        isOwner: true,
-        isAdmin: true,
-        isJoined: true,
-        privacy: 'private',
-        activePromos: 12,
-        totalEvents: 5,
-        unreadMessages: 3,
-        isVerified: false,
-        avatar: '/api/placeholder/50/50'
-      },
-      3: {
-        id: 3,
-        name: 'Kuliner Bandung Selatan',
-        description: 'Komunitas pecinta kuliner area Bandung Selatan dan sekitarnya. Berbagi rekomendasi tempat makan enak dan murah',
-        members: 2341,
-        category: 'Kuliner',
-        location: 'Bandung Selatan',
-        isOwner: false,
-        isAdmin: false,
-        isJoined: true,
-        privacy: 'public',
-        activePromos: 15,
-        totalEvents: 2,
-        unreadMessages: 8,
-        isVerified: true,
-        avatar: '/api/placeholder/50/50'
-      },
-      4: {
-        id: 4,
-        name: 'Otomotif Enthusiast',
-        description: 'Komunitas penggemar otomotif, modifikasi, dan spare part. Sharing tips perawatan kendaraan',
-        members: 892,
-        category: 'Otomotif',
-        location: 'Bandung',
-        isOwner: false,
-        isAdmin: true,
-        isJoined: true,
-        privacy: 'public',
-        activePromos: 6,
-        totalEvents: 1,
-        unreadMessages: 2,
-        isVerified: false,
-        avatar: '/api/placeholder/50/50'
-      },
-      5: {
-        id: 5,
-        name: 'Fashion & Style Bandung',
-        description: 'Komunitas fashion, style, dan shopping outfit terkini. Berbagi tips berpakaian dan trend fashion',
-        members: 1567,
-        category: 'Fashion',
-        location: 'Bandung',
-        isOwner: false,
-        isAdmin: false,
-        isJoined: true,
-        privacy: 'public',
-        activePromos: 22,
-        totalEvents: 4,
-        unreadMessages: 12,
-        isVerified: true,
-        avatar: '/api/placeholder/50/50'
-      }
-    };
-    return allCommunities[parseInt(id)] || allCommunities[1];
   };
 
   // Loading state
