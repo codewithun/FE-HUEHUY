@@ -148,22 +148,59 @@ export default function CommunityDashboard({ communityId }) {
 
         // Fetch promos for community
         try {
-          const promoRes = await fetch(`${apiBase}/api/communities/${communityId}/promos`, { headers });
-          if (promoRes.ok) {
-            const promoJson = await promoRes.json().catch(() => null);
-            const promoList = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
-            const normalized = normalizePromos(promoList);
-            setPromoCategories([
-              {
-                id: 'promo-terkini',
-                title: 'Promo Terkini',
-                subtitle: 'Promo dari komunitas',
-                promos: normalized
+          // Prefer promo-categories (created via "Tambah Kategori") which include title/subtitle and attached promos
+          const pcRes = await fetch(`${apiBase}/api/communities/${communityId}/promo-categories`, { headers });
+          if (pcRes.ok) {
+            const pcJson = await pcRes.json().catch(() => null);
+            const pcList = Array.isArray(pcJson?.data) ? pcJson.data : Array.isArray(pcJson) ? pcJson : [];
+            // Normalize each category and its promos
+            const normalizedCategories = (pcList || []).map((cat) => {
+              const rawPromos = Array.isArray(cat.promos) ? cat.promos : (cat.items || []);
+              return {
+                id: cat.id ?? `pc-${cat.title ?? Math.random().toString(36).slice(2,8)}`,
+                title: cat.title ?? cat.name ?? 'Promo',
+                subtitle: cat.subtitle ?? cat.description ?? '',
+                promos: normalizePromos(rawPromos),
+              };
+            });
+            // if server returned empty promo-categories, fallback to the generic promos endpoint
+            if (normalizedCategories.length > 0) {
+              setPromoCategories(normalizedCategories);
+            } else {
+              // fallback: use /promos endpoint as single "Promo Terkini" category
+              const promoRes = await fetch(`${apiBase}/api/communities/${communityId}/promos`, { headers });
+              if (promoRes.ok) {
+                const promoJson = await promoRes.json().catch(() => null);
+                const promoList = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
+                setPromoCategories([
+                  {
+                    id: 'promo-terkini',
+                    title: 'Promo Terkini',
+                    subtitle: 'Promo dari komunitas',
+                    promos: normalizePromos(promoList),
+                  },
+                ]);
+              } else {
+                setPromoCategories([]);
               }
-            ]);
+            }
           } else {
-            // no promos or unauthorized → empty
-            setPromoCategories([]);
+            // If promo-categories endpoint not available, fallback to previous behavior
+            const promoRes = await fetch(`${apiBase}/api/communities/${communityId}/promos`, { headers });
+            if (promoRes.ok) {
+              const promoJson = await promoRes.json().catch(() => null);
+              const promoList = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
+              setPromoCategories([
+                {
+                  id: 'promo-terkini',
+                  title: 'Promo Terkini',
+                  subtitle: 'Promo dari komunitas',
+                  promos: normalizePromos(promoList),
+                },
+              ]);
+            } else {
+              setPromoCategories([]);
+            }
           }
         } catch (e) {
           setPromoCategories([]);
