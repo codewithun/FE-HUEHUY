@@ -326,7 +326,7 @@ export default function VoucherCrud() {
         noControlBar={false}
         searchable={true}
         fetchControl={{
-          path: 'api/admin/vouchers', // biar komponen internal fetch bisa pakai relative; tapi kita sudah fetch manual di atas juga
+          path: 'admin/vouchers', // hapus "api/" di sini supaya tidak menghasilkan "/api/api/..." saat komponen menambahkan prefix
           method: 'GET',
           headers: () => ({
             'Content-Type': 'application/json',
