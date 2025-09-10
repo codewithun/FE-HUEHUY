@@ -1,80 +1,122 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import { useGet } from '../../helpers';
 import { DateFormatComponent } from '../../components/base.components';
 
-export default function Save() {
-  const [type, setType] = useState('hunter');
+export default function NotificationPage() {
+  const [type, setType] = useState('hunter'); // 'hunter' | 'merchant'
+
+  // Trik kecil biar useGet refetch waktu type ganti
+  const path = useMemo(() => `notification${type ? `?type=${type}` : ''}`, [type]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loadingNotifications, codeNotifications, dataNotifications] = useGet({
-    path: `notification?type=${type}`,
-  });
+  const [loading, code, data] = useGet({ path });
+
+  const items = Array.isArray(data?.data) ? data.data : [];
+
+  const cardMeta = (n) => {
+    // Ambil kandidat gambar dari beberapa relasi, pakai yang ada duluan
+    const img =
+      n?.grab?.ad?.picture_source ||
+      n?.ad?.picture_source ||
+      n?.ad?.image_url ||
+      n?.cube?.logo ||
+      null;
+
+    // Judul yg masuk akal
+    const title =
+      n?.grab?.ad?.title ||
+      n?.ad?.title ||
+      n?.cube?.name ||
+      'Notifikasi';
+
+    return { img, title };
+  };
 
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
+        {/* Header */}
         <div className="bg-primary w-full px-4 pt-4 pb-16">
           <h2 className="text-white font-semibold text-lg">Notifikasi</h2>
           <p className="text-slate-300 text-sm mt-1">
-            Lihat pembaruan dan aktifitas kamu disini...
+            Lihat pembaruan dan aktivitas kamu di sini...
           </p>
         </div>
 
+        {/* Body */}
         <div className="bg-background min-h-screen w-full relative z-20 pb-28 pt-4">
+          {/* Tabs */}
           <div className="-mt-16 grid grid-cols-2 gap-3">
-            <div
-              className={`text-center py-3 font-semibold rounded-t-xl cursor-pointer ${
-                type == 'hunter' ? 'bg-background' : 'text-gray-300'
+            <button
+              className={`text-center py-3 font-semibold rounded-t-xl ${
+                type === 'hunter' ? 'bg-background text-slate-900' : 'text-gray-300'
               }`}
               onClick={() => setType('hunter')}
             >
               Hunter
-            </div>
-            <div
-              className={`text-center py-3 font-semibold rounded-t-xl cursor-pointer ${
-                type == 'merchant' ? 'bg-background' : 'text-gray-300'
+            </button>
+            <button
+              className={`text-center py-3 font-semibold rounded-t-xl ${
+                type === 'merchant' ? 'bg-background text-slate-900' : 'text-gray-300'
               }`}
               onClick={() => setType('merchant')}
             >
               Merchant
-            </div>
+            </button>
           </div>
 
+          {/* List */}
           <div className="px-4 mt-6">
             <div className="flex flex-col gap-3">
-              {dataNotifications?.data?.at(0) ? (
+              {loading ? (
+                // Skeleton
                 <>
-                  {dataNotifications?.data?.map((item, key) => {
-                    return (
-                      <div
-                        className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative"
-                        key={key}
-                      >
-                        <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
+                  {[1,2,3].map((i) => (
+                    <div key={i} className="grid grid-cols-4 gap-3 p-3 rounded-[15px] bg-white shadow-sm">
+                      <div className="w-full aspect-square rounded-lg bg-slate-200 animate-pulse" />
+                      <div className="col-span-3 space-y-2">
+                        <div className="h-4 bg-slate-200 rounded animate-pulse" />
+                        <div className="h-3 bg-slate-100 rounded animate-pulse" />
+                        <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : items.length > 0 ? (
+                items.map((item, idx) => {
+                  const { img, title } = cardMeta(item);
+                  return (
+                    <div
+                      className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] bg-white"
+                      key={`${item.id || idx}`}
+                    >
+                      <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-100 flex justify-center items-center">
+                        {img ? (
                           <img
-                            src={item?.grab?.ad?.picture_source}
+                            src={img}
                             height={700}
                             width={700}
-                            alt=""
+                            alt={title}
+                            onError={(e) => { e.currentTarget.src = '/icons/icon-192x192.png'; }}
                           />
-                        </div>
-                        <div className="col-span-3">
-                          <p className="font-semibold">
-                            {item?.grab?.ad?.title}
-                          </p>
-                          <p className="text-sm text-slate-600 my-1">
-                            {item?.message}
-                          </p>
-                          <p className="text-slate-600 text-xs">
-                            <DateFormatComponent date={item?.created_at} />
-                          </p>
-                        </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">No Image</span>
+                        )}
                       </div>
-                    );
-                  })}
-                </>
+                      <div className="col-span-3">
+                        <p className="font-semibold line-clamp-2">{title}</p>
+                        <p className="text-sm text-slate-600 my-1">
+                          {item?.message || '-'}
+                        </p>
+                        <p className="text-slate-600 text-xs">
+                          <DateFormatComponent date={item?.created_at} />
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
               ) : (
                 <div className="py-4 text-slate-500 text-center">
                   Belum ada notifikasi...
@@ -84,7 +126,7 @@ export default function Save() {
           </div>
         </div>
 
-        <BottomBarComponent active={'notification'} />
+        <BottomBarComponent active="notification" />
       </div>
     </>
   );
