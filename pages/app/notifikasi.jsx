@@ -1,80 +1,52 @@
-/* eslint-disable no-console */
 /* eslint-disable @next/next/no-img-element */
 import React, { useMemo, useState, useEffect } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import { useGet } from '../../helpers';
 import { DateFormatComponent } from '../../components/base.components';
 
-export default function NotificationPage() {
-  const [type, setType] = useState('all'); // <- ganti ke 'all' untuk test
+const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 
+export default function NotificationPage() {
+  // kalau mau langsung munculin voucher/promo di tab Merchant:
+  // const [type, setType] = useState('merchant');
+  const [type, setType] = useState('merchant'); // 'hunter' | 'merchant' | 'all'
+
+  // path API — backend route: /api/notification (singular)
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}`,
     [type]
   );
 
-  const _res = useGet({ path });
-  const loading = Array.isArray(_res) ? _res[0] : false;
-  const code = Array.isArray(_res) ? _res[1] : null;
-  const data = Array.isArray(_res) ? _res[2] : null;
+  // Guard supaya gak “number is not iterable” pas SSR/edge case
+  const res = useGet({ path });
+  const loading = Array.isArray(res) ? Boolean(res[0]) : false;
+  const httpCode = Array.isArray(res) ? res[1] : null;
+  const payload = Array.isArray(res) ? res[2] : null;
 
-  // TAMBAHKAN DEBUG LOGGING
+  // Normalisasi data agar aman
+  const items = Array.isArray(payload?.data) ? payload.data : [];
+
   useEffect(() => {
+    if (!DEBUG) return;
+    // Debug ringan saat dev saja
+    /* eslint-disable no-console */
     console.log('=== NOTIFICATION DEBUG ===');
-    console.log('Type selected:', type);
+    console.log('Type:', type);
     console.log('API Path:', path);
-    console.log('Raw useGet response:', _res);
-    console.log('Loading:', loading);
-    console.log('HTTP Code:', code);
-    console.log('Response Data:', data);
-    console.log('Items from data.data:', data?.data);
-    console.log('Is items array?', Array.isArray(data?.data));
-    console.log('Items length:', data?.data?.length);
-
-    // TAMBAHKAN INI: Test dengan type 'all'
-    if (data?.data?.length === 0) {
-      console.log('❌ No data found. Testing with type=all...');
-      // Test manual dengan type all
-      testAllNotifications();
-    }
-    console.log('========================');
-  }, [type, path, _res, loading, code, data]);
-
-  // Tambahkan fungsi test manual
-  const testAllNotifications = async () => {
-    try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const response = await fetch('/api/notification?type=all', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-      const result = await response.json();
-      console.log('🔍 Test with type=all:', result);
-
-      // Test juga tanpa type parameter
-      const response2 = await fetch('/api/notification', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-      const result2 = await response2.json();
-      console.log('🔍 Test without type:', result2);
-    } catch (error) {
-      console.error('❌ Test failed:', error);
-    }
-  };
-
-  const items = Array.isArray(data?.data) ? data.data : [];
+    console.log('useGet raw:', res);
+    console.log('Loading:', loading, 'HTTP code:', httpCode);
+    console.log('payload:', payload);
+    console.log('items:', items);
+    console.log('==========================');
+    /* eslint-enable no-console */
+  }, [type, path, res, loading, httpCode, payload]);
 
   const cardMeta = (n) => {
     if (!n || typeof n !== 'object') {
       return { img: null, title: 'Notifikasi', isVoucher: false, actionUrl: null };
     }
 
-    // Ambil image yang paling relevan terlebih dahulu dari schema notifikasi voucher/promo
+    // Ambil image prioritas dari payload datar, fallback ke relasi legacy
     const img =
       n.image_url ||
       n?.grab?.ad?.picture_source ||
@@ -83,7 +55,7 @@ export default function NotificationPage() {
       n?.cube?.logo ||
       null;
 
-    // Judul prioritas dari notifikasi
+    // Judul prioritas
     const title =
       n.title ||
       n?.grab?.ad?.title ||
@@ -94,10 +66,10 @@ export default function NotificationPage() {
     // Deteksi voucher untuk CTA
     const isVoucher = n.type === 'voucher' || n.target_type === 'voucher';
 
-    // Gunakan action_url dari API jika ada; kalau tidak, pakai pola default
+    // Pakai action_url dari backend kalau ada; fallback ke pattern default
     let actionUrl = n.action_url || (isVoucher && n.target_id ? `/vouchers/${n.target_id}` : null);
 
-    // Tambahkan prefix /app kalau belum ada (menyesuaikan v2.huehuy.com/app/…)
+    // Prefix /app untuk konsistensi v2.huehuy.com/app/...
     if (actionUrl && !actionUrl.startsWith('/app')) {
       actionUrl = `/app${actionUrl}`;
     }
@@ -119,24 +91,36 @@ export default function NotificationPage() {
         {/* Body */}
         <div className="bg-background min-h-screen w-full relative z-20 pb-28 pt-4">
           {/* Tabs */}
-          <div className="-mt-16 grid grid-cols-2 gap-3">
+          <div className="-mt-16 grid grid-cols-3 gap-3">
             <button
+              type="button"
+              aria-pressed={type === 'hunter'}
               className={`text-center py-3 font-semibold rounded-t-xl ${
                 type === 'hunter' ? 'bg-background text-slate-900' : 'text-gray-300'
               }`}
               onClick={() => setType('hunter')}
-              type="button"
             >
               Hunter
             </button>
             <button
+              type="button"
+              aria-pressed={type === 'merchant'}
               className={`text-center py-3 font-semibold rounded-t-xl ${
                 type === 'merchant' ? 'bg-background text-slate-900' : 'text-gray-300'
               }`}
               onClick={() => setType('merchant')}
-              type="button"
             >
               Merchant
+            </button>
+            <button
+              type="button"
+              aria-pressed={type === 'all'}
+              className={`text-center py-3 font-semibold rounded-t-xl ${
+                type === 'all' ? 'bg-background text-slate-900' : 'text-gray-300'
+              }`}
+              onClick={() => setType('all')}
+            >
+              Semua
             </button>
           </div>
 
@@ -157,9 +141,9 @@ export default function NotificationPage() {
                     </div>
                   ))}
                 </>
-              ) : code && Number(code) >= 400 ? (
+              ) : httpCode && Number(httpCode) >= 400 ? (
                 <div className="py-4 text-red-600 text-center text-sm">
-                  Gagal memuat notifikasi (kode {code}). Coba muat ulang.
+                  Gagal memuat notifikasi (kode {httpCode}). Coba muat ulang.
                 </div>
               ) : items.length > 0 ? (
                 items.map((item, idx) => {
@@ -167,7 +151,7 @@ export default function NotificationPage() {
                   return (
                     <div
                       className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] bg-white"
-                      key={`${item?.id ?? idx}`}
+                      key={item?.id ?? `notif-${idx}`}
                     >
                       <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-100 flex justify-center items-center">
                         {img ? (
