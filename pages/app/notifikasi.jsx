@@ -6,8 +6,7 @@ import { useGet } from '../../helpers';
 import { DateFormatComponent } from '../../components/base.components';
 
 export default function NotificationPage() {
-  // GANTI DEFAULT KE MERCHANT untuk test voucher yang sudah ada
-  const [type, setType] = useState('merchant'); // <- ubah dari 'hunter' ke 'merchant'
+  const [type, setType] = useState('all'); // <- ganti ke 'all' untuk test
 
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}`,
@@ -31,8 +30,42 @@ export default function NotificationPage() {
     console.log('Items from data.data:', data?.data);
     console.log('Is items array?', Array.isArray(data?.data));
     console.log('Items length:', data?.data?.length);
+
+    // TAMBAHKAN INI: Test dengan type 'all'
+    if (data?.data?.length === 0) {
+      console.log('❌ No data found. Testing with type=all...');
+      // Test manual dengan type all
+      testAllNotifications();
+    }
     console.log('========================');
   }, [type, path, _res, loading, code, data]);
+
+  // Tambahkan fungsi test manual
+  const testAllNotifications = async () => {
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await fetch('/api/notification?type=all', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+      const result = await response.json();
+      console.log('🔍 Test with type=all:', result);
+
+      // Test juga tanpa type parameter
+      const response2 = await fetch('/api/notification', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+      const result2 = await response2.json();
+      console.log('🔍 Test without type:', result2);
+    } catch (error) {
+      console.error('❌ Test failed:', error);
+    }
+  };
 
   const items = Array.isArray(data?.data) ? data.data : [];
 
