@@ -1,25 +1,38 @@
+/* eslint-disable no-console */
 /* eslint-disable @next/next/no-img-element */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import { useGet } from '../../helpers';
 import { DateFormatComponent } from '../../components/base.components';
 
 export default function NotificationPage() {
-  // kalau mau langsung munculin voucher/promo, ganti jadi 'merchant'
-  const [type, setType] = useState('hunter'); // 'hunter' | 'merchant'
+  // GANTI DEFAULT KE MERCHANT untuk test voucher yang sudah ada
+  const [type, setType] = useState('merchant'); // <- ubah dari 'hunter' ke 'merchant'
 
-  // Refetch waktu tab ganti; route backend kamu: /api/notification (singular)
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}`,
     [type]
   );
 
-  // SAFETY GUARD untuk mencegah "number is not iterable"
-  // Kadang custom hook bisa balik non-array; kita pastikan formatnya [loading, code, data].
   const _res = useGet({ path });
   const loading = Array.isArray(_res) ? _res[0] : false;
   const code = Array.isArray(_res) ? _res[1] : null;
   const data = Array.isArray(_res) ? _res[2] : null;
+
+  // TAMBAHKAN DEBUG LOGGING
+  useEffect(() => {
+    console.log('=== NOTIFICATION DEBUG ===');
+    console.log('Type selected:', type);
+    console.log('API Path:', path);
+    console.log('Raw useGet response:', _res);
+    console.log('Loading:', loading);
+    console.log('HTTP Code:', code);
+    console.log('Response Data:', data);
+    console.log('Items from data.data:', data?.data);
+    console.log('Is items array?', Array.isArray(data?.data));
+    console.log('Items length:', data?.data?.length);
+    console.log('========================');
+  }, [type, path, _res, loading, code, data]);
 
   const items = Array.isArray(data?.data) ? data.data : [];
 
