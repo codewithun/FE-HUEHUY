@@ -229,7 +229,7 @@ export default function PromoDetailUnified() {
     if (autoRegister) return;
     
     fetchPromoDetails();
-  }, [router.isReady, promoId, communityId, fetchPromoDetails]);
+  }, [router.isReady, promoId, communityId]); // Remove fetchPromoDetails from dependency array
 
   // Perkuat effect yang mem-fetch dari API
   const fetchPromoDetails = useCallback(async () => {
