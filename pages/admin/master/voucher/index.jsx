@@ -27,9 +27,12 @@ export default function VoucherCrud() {
     delivery: 'manual',
     code: '',
     community_id: '', // tambahkan community_id
+    target_type: 'all', // 'all' atau 'user'
+    target_user_id: '', // jika target_type === 'user'
   });
   const [imageFile, setImageFile] = useState(null);
   const [communities, setCommunities] = useState([]); // state untuk daftar community
+  const [users, setUsers] = useState([]); // daftar pengguna untuk pilihan target
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -77,6 +80,28 @@ export default function VoucherCrud() {
     fetchCommunities();
   }, [apiUrl]);
 
+  // Fetch users for selecting specific recipient
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : '';
+        const res = await fetch(`${apiUrl}/admin/users`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        const result = await res.json();
+        setUsers(Array.isArray(result.data) ? result.data : []);
+      } catch (err) {
+        setUsers([]);
+      }
+    };
+    fetchUsers();
+  }, [apiUrl]);
+
   // Handler untuk upload gambar
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -115,6 +140,11 @@ export default function VoucherCrud() {
       body.append('delivery', formData.delivery);
       body.append('code', formData.code);
       if (formData.community_id) body.append('community_id', formData.community_id);
+      // append target fields
+      body.append('target_type', formData.target_type || 'all');
+      if (formData.target_type === 'user' && formData.target_user_id) {
+        body.append('target_user_id', formData.target_user_id);
+      }
       
       // Method spoofing for updates
       if (selectedVoucher) {
@@ -126,7 +156,10 @@ export default function VoucherCrud() {
       }
     } else {
       // JSON for create without image
-      body = JSON.stringify(formData);
+      body = JSON.stringify({
+        ...formData,
+        target_type: formData.target_type || 'all',
+      });
       headers['Content-Type'] = 'application/json';
     }
 
@@ -140,7 +173,7 @@ export default function VoucherCrud() {
       if (!response.ok) {
         const errorData = await response.json();
         // console.error('Error:', errorData);
-        alert('Gagal menyimpan voucher: ' + errorData.message);
+        alert('Gagal menyimpan voucher: ' + (errorData.message || 'server error'));
         return;
       }
 
@@ -158,6 +191,8 @@ export default function VoucherCrud() {
         delivery: 'manual',
         code: '',
         community_id: '', // reset community_id
+        target_type: 'all',
+        target_user_id: '',
       });
       setImageFile(null);
       setSelectedVoucher(null);
@@ -208,6 +243,8 @@ export default function VoucherCrud() {
       delivery: voucher.delivery || 'manual',
       code: voucher.code || '',
       community_id: voucher.community_id || '', // isi community_id
+      target_type: voucher.target_type || 'all',
+      target_user_id: voucher.target_user_id || '',
     });
     setImageFile(null);
     setModalForm(true);
@@ -276,6 +313,8 @@ export default function VoucherCrud() {
           delivery: 'manual',
           code: '',
           community_id: '', // reset community_id
+          target_type: 'all',
+          target_user_id: '',
         });
         setModalForm(true);
       }}
@@ -328,6 +367,8 @@ export default function VoucherCrud() {
             delivery: 'manual',
             code: '',
             community_id: '', // reset community_id
+            target_type: 'all',
+            target_user_id: '',
           });
           setImageFile(null);
         }}
@@ -421,6 +462,41 @@ export default function VoucherCrud() {
               <option value="auto">Otomatis</option>
             </select>
           </div>
+
+          {/* Pilihan target pengiriman: Semua pengguna atau Pengguna tertentu */}
+          <div>
+            <label className="font-semibold">Target Pengguna</label>
+            <select
+              className="select select-bordered w-full"
+              value={formData.target_type}
+              onChange={e => setFormData({ ...formData, target_type: e.target.value, target_user_id: '' })}
+            >
+              <option value="all">Semua Pengguna</option>
+              <option value="user">Pengguna Tertentu</option>
+            </select>
+            <span className="text-xs text-gray-500">Pilih target penerima voucher. Jika memilih Pengguna Tertentu, pilih user di bawah.</span>
+          </div>
+
+          {formData.target_type === 'user' && (
+            <div>
+              <label className="font-semibold">Pilih Pengguna</label>
+              <select
+                className="select select-bordered w-full"
+                value={formData.target_user_id}
+                onChange={e => setFormData({ ...formData, target_user_id: e.target.value })}
+                required
+              >
+                <option value="">Pilih Pengguna</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email || `#${u.id}`}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-gray-500">Voucher akan dikirim ke pengguna ini dan diharapkan masuk ke notifikasi untuk diklaim.</span>
+            </div>
+          )}
+
           {/* Tambahkan select untuk memilih community */}
           <div>
             <label className="font-semibold">Community</label>
@@ -493,6 +569,8 @@ export default function VoucherCrud() {
                   delivery: 'manual',
                   code: '',
                   community_id: '', // reset community_id
+                  target_type: 'all',
+                  target_user_id: '',
                 });
                 setImageFile(null);
               }}
