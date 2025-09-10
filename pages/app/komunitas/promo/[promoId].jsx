@@ -219,6 +219,18 @@ export default function PromoDetailUnified() {
     setLoading(false);
   }, [promoId, communityId]);
 
+  // ADD: Effect to fetch promo details from API when both promoId and communityId are available
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!promoId || !communityId) return;
+    
+    // Skip if this is QR entry flow (handled by separate effect)
+    const autoRegister = router.query.autoRegister || router.query.source;
+    if (autoRegister) return;
+    
+    fetchPromoDetails();
+  }, [router.isReady, promoId, communityId, fetchPromoDetails]);
+
   // Perkuat effect yang mem-fetch dari API
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady) return null;
