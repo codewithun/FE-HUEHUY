@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
 import {
@@ -19,7 +20,7 @@ import moment from 'moment';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { QRCodeSVG } from 'qrcode.react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
 import { token_cookie_name } from '../../helpers';
@@ -31,212 +32,204 @@ export default function Save() {
   const [modalValidation, setModalValidation] = useState(false);
   const [selected, setSelected] = useState(null);
   const [data, setData] = useState({ data: [] });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
-    // Muat saku dari backend (promo items / voucher) — tidak pakai localStorage untuk data
-    let mounted = true;
+  // Extracted data fetching function for reusability
+  const fetchData = useCallback(async () => {
     const controller = new AbortController();
 
-    (async () => {
-      try {
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const token = encryptedToken ? Decrypt(encryptedToken) : '';
-        const headers = {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        };
+    try {
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : '';
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
 
-        // Fetch both promo items and voucher items
-        const [promoRes, voucherRes] = await Promise.allSettled([
-          fetch(`${apiUrl}/admin/promo-items`, { headers, signal: controller.signal }),
-          fetch(`${apiUrl}/vouchers/voucher-items`, { headers, signal: controller.signal })
-        ]);
+      // Fetch both promo items and voucher items from API only
+      const [promoRes, voucherRes] = await Promise.allSettled([
+        fetch(`${apiUrl}/admin/promo-items`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/vouchers/voucher-items`, { headers, signal: controller.signal })
+      ]);
 
-        let allItems = [];
+      let allItems = [];
 
-        // Handle promo items response
-        if (promoRes.status === 'fulfilled' && promoRes.value.ok) {
-          const promoJson = await promoRes.value.json();
-          const promoItems = Array.isArray(promoJson) ? promoJson : (promoJson.data || []);
+      // Handle promo items response
+      if (promoRes.status === 'fulfilled' && promoRes.value.ok) {
+        const promoJson = await promoRes.value.json();
+        const promoItems = Array.isArray(promoJson) ? promoJson : (promoJson.data || []);
+        
+        // Map promo items to consistent format
+        const mappedPromoItems = promoItems.map((it) => {
+          const promo = it.promo || (it.promo_id ? it.promo : null);
+          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
           
-          // Map promo items to consistent format
-          const mappedPromoItems = promoItems.map((it) => {
-            const promo = it.promo || (it.promo_id ? it.promo : null);
-            const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
-            
-            const adFromPromo = promo
-              ? {
-                  id: promo.id || it.promo_id || null,
-                  title: promo.title || promo.name || it.title || 'Promo',
-                  picture_source: promo.image 
-                    ? `${baseUrl}/storage/${promo.image}` 
-                    : (promo.picture_source || '/default-avatar.png'),
-                  status: promo.status || it.status || 'active',
-                  owner_name: promo.owner_name || '',
-                  owner_contact: promo.owner_contact || '',
-                  cube: {
-                    ...promo.cube || it.cube || {},
-                    community_id: promo.community_id || it.community_id || 1,
-                    code: promo.code || `community-${promo.community_id || 1}`,
-                    user: { 
-                      name: promo.owner_name || 'Admin', 
-                      phone: promo.owner_contact || '' 
-                    },
-                    corporate: null,
-                    tags: [{ 
-                      address: promo.location || '', 
-                      link: null, 
-                      map_lat: null, 
-                      map_lng: null 
-                    }],
-                  },
-                }
-              : (it.ad ? {
-                  id: it.ad.id || it.promo_id || null,
-                  title: it.ad.title || it.title || 'Promo',
-                  picture_source: it.ad.image 
-                    ? `${baseUrl}/storage/${it.ad.image}` 
-                    : (it.ad.picture_source || it.picture_source || '/default-avatar.png'),
-                  status: it.ad.status || it.status || 'active',
-                  owner_name: it.ad.owner_name || '',
-                  owner_contact: it.ad.owner_contact || '',
-                  cube: {
-                    ...it.ad.cube || it.cube || {},
-                    community_id: it.ad.community_id || it.community_id || 1,
-                  }
-                } : {});
-
-            return {
-              id: it.id,
-              type: 'promo',
-              code: it.code || it.voucher_code || (it.voucher_item && it.voucher_item.code) || null,
-              claimed_at: it.created_at || it.claimed_at || it.claimedAt || null,
-              expired_at: it.expires_at || it.expired_at || it.expiry || null,
-              validation_at: it.redeemed_at || it.validation_at || null,
-              voucher_item: it.voucher_item || (it.voucher_code ? { code: it.voucher_code } : null),
-              ad: adFromPromo
-            };
-          });
-
-          allItems = [...allItems, ...mappedPromoItems];
-        }
-
-        // Handle voucher items response
-        if (voucherRes.status === 'fulfilled' && voucherRes.value.ok) {
-          const voucherJson = await voucherRes.value.json();
-          const voucherItems = Array.isArray(voucherJson) ? voucherJson : (voucherJson.data || []);
-          
-          // Map voucher items to consistent format
-          const mappedVoucherItems = voucherItems.map((voucherItem) => {
-            const voucher = voucherItem.voucher;
-            const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
-            
-            return {
-              id: voucherItem.id,
-              type: 'voucher',
-              code: voucherItem.code,
-              claimed_at: voucherItem.created_at,
-              expired_at: voucher?.valid_until || null,
-              validation_at: voucherItem.used_at || null,
-              voucher_item: {
-                id: voucherItem.id,
-                code: voucherItem.code,
-                user_id: voucherItem.user_id,
-                voucher_id: voucherItem.voucher_id,
-                used_at: voucherItem.used_at
-              },
-              voucher: voucher,
-              ad: voucher ? {
-                id: voucher.id,
-                title: voucher.name || voucher.title || 'Voucher',
-                picture_source: voucher.image 
-                  ? `${baseUrl}/storage/${voucher.image}` 
-                  : '/default-avatar.png',
-                status: 'active',
-                description: voucher.description,
-                type: voucher.type,
-                tenant_location: voucher.tenant_location,
-                delivery: voucher.delivery,
-                stock: voucher.stock,
-                community: voucher.community,
-                cube: voucher.community ? {
-                  community_id: voucher.community.id,
-                  code: `community-${voucher.community.id}`,
+          const adFromPromo = promo
+            ? {
+                id: promo.id || it.promo_id || null,
+                title: promo.title || promo.name || it.title || 'Promo',
+                picture_source: promo.image 
+                  ? `${baseUrl}/storage/${promo.image}` 
+                  : (promo.picture_source || '/default-avatar.png'),
+                status: promo.status || it.status || 'active',
+                owner_name: promo.owner_name || '',
+                owner_contact: promo.owner_contact || '',
+                cube: {
+                  ...promo.cube || it.cube || {},
+                  community_id: promo.community_id || it.community_id || 1,
+                  code: promo.code || `community-${promo.community_id || 1}`,
                   user: { 
-                    name: voucher.community.name || 'Community', 
-                    phone: '' 
+                    name: promo.owner_name || 'Admin', 
+                    phone: promo.owner_contact || '' 
                   },
                   corporate: null,
                   tags: [{ 
-                    address: voucher.tenant_location || '', 
+                    address: promo.location || '', 
                     link: null, 
                     map_lat: null, 
                     map_lng: null 
                   }],
-                } : {}
-              } : null
-            };
-          });
+                },
+              }
+            : (it.ad ? {
+                id: it.ad.id || it.promo_id || null,
+                title: it.ad.title || it.title || 'Promo',
+                picture_source: it.ad.image 
+                  ? `${baseUrl}/storage/${it.ad.image}` 
+                  : (it.ad.picture_source || it.picture_source || '/default-avatar.png'),
+                status: it.ad.status || it.status || 'active',
+                owner_name: it.ad.owner_name || '',
+                owner_contact: it.ad.owner_contact || '',
+                cube: {
+                  ...it.ad.cube || it.cube || {},
+                  community_id: it.ad.community_id || it.community_id || 1,
+                }
+              } : {});
 
-          allItems = [...allItems, ...mappedVoucherItems];
-        }
-
-        // If both requests failed with 401, redirect or clear data
-        if ((promoRes.status === 'fulfilled' && promoRes.value.status === 401) || 
-            (voucherRes.status === 'fulfilled' && voucherRes.value.status === 401)) {
-          if (mounted) {
-            setData({ data: [] });
-            // router.push('/login'); // opsional: redirect ke login
-          }
-          return;
-        }
-
-        // If no data from API, fallback to localStorage
-        if (allItems.length === 0) {
-          try {
-            const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-            if (mounted) setData({ data: local });
-          } catch (_) {
-            if (mounted) setData({ data: [] });
-          }
-          return;
-        }
-
-        // Combine with localStorage (without duplicates based on code and type)
-        let combined = allItems;
-        try {
-          const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-          const existingKeys = new Set(allItems.map((x) => `${x?.type || 'promo'}-${x?.code}`));
-          const uniqueLocal = local.filter((x) => !existingKeys.has(`${x?.type || 'promo'}-${x?.code}`));
-          combined = [...allItems, ...uniqueLocal];
-        } catch (_) {}
-
-        // Sort by claimed_at (newest first)
-        combined.sort((a, b) => {
-          const dateA = new Date(a.claimed_at || 0);
-          const dateB = new Date(b.claimed_at || 0);
-          return dateB - dateA;
+          return {
+            id: it.id,
+            type: 'promo',
+            status: it.status, // Include PromoItem status
+            code: it.code || it.voucher_code || (it.voucher_item && it.voucher_item.code) || null,
+            claimed_at: it.created_at || it.claimed_at || it.claimedAt || null,
+            expired_at: it.expires_at || it.expired_at || it.expiry || null,
+            validation_at: it.redeemed_at || it.validation_at || it.used_at || null,
+            voucher_item: it.voucher_item || (it.voucher_code ? { code: it.voucher_code } : null),
+            ad: adFromPromo
+          };
         });
 
-        if (mounted) setData({ data: combined });
-      } catch (err) {
-        if (mounted) {
-          // fallback dari localStorage jika request error
-          try {
-            const local = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-            setData({ data: local });
-          } catch (_) {
-            setData({ data: [] });
-          }
-        }
+        allItems = [...allItems, ...mappedPromoItems];
       }
-    })();
+
+      // Handle voucher items response
+      if (voucherRes.status === 'fulfilled' && voucherRes.value.ok) {
+        const voucherJson = await voucherRes.value.json();
+        const voucherItems = Array.isArray(voucherJson) ? voucherJson : (voucherJson.data || []);
+        
+        // Map voucher items to consistent format
+        const mappedVoucherItems = voucherItems.map((voucherItem) => {
+          const voucher = voucherItem.voucher;
+          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '').replace(/\/$/, '');
+          
+          return {
+            id: voucherItem.id,
+            type: 'voucher',
+            code: voucherItem.code,
+            claimed_at: voucherItem.created_at,
+            expired_at: voucher?.valid_until || null,
+            validation_at: voucherItem.used_at || null,
+            voucher_item: {
+              id: voucherItem.id,
+              code: voucherItem.code,
+              user_id: voucherItem.user_id,
+              voucher_id: voucherItem.voucher_id,
+              used_at: voucherItem.used_at
+            },
+            voucher: voucher,
+            ad: voucher ? {
+              id: voucher.id,
+              title: voucher.name || voucher.title || 'Voucher',
+              picture_source: voucher.image 
+                ? `${baseUrl}/storage/${voucher.image}` 
+                : '/default-avatar.png',
+              status: 'active',
+              description: voucher.description,
+              type: voucher.type,
+              tenant_location: voucher.tenant_location,
+              delivery: voucher.delivery,
+              stock: voucher.stock,
+              community: voucher.community,
+              cube: voucher.community ? {
+                community_id: voucher.community.id,
+                code: `community-${voucher.community.id}`,
+                user: { 
+                  name: voucher.community.name || 'Community', 
+                  phone: '' 
+                },
+                corporate: null,
+                tags: [{ 
+                  address: voucher.tenant_location || '', 
+                  link: null, 
+                  map_lat: null, 
+                  map_lng: null 
+                }],
+              } : {}
+            } : null
+          };
+        });
+
+        allItems = [...allItems, ...mappedVoucherItems];
+      }
+
+      // If both requests failed with 401, clear data
+      if ((promoRes.status === 'fulfilled' && promoRes.value.status === 401) || 
+          (voucherRes.status === 'fulfilled' && voucherRes.value.status === 401)) {
+        setData({ data: [] });
+        return;
+      }
+
+      // Sort by claimed_at (newest first)
+      allItems.sort((a, b) => {
+        const dateA = new Date(a.claimed_at || 0);
+        const dateB = new Date(b.claimed_at || 0);
+        return dateB - dateA;
+      });
+
+      setData({ data: allItems });
+    } catch (err) {
+      console.error('Error fetching saku data:', err);
+      // On error, show empty state instead of localStorage fallback
+      setData({ data: [] });
+    }
 
     return () => {
-      mounted = false;
       controller.abort();
     };
-  }, []);
+  }, [refreshTrigger]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Auto-refresh on window focus and route changes
+  useEffect(() => {
+    const handleFocus = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+
+    const handleRouteChange = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    router.events.on('routeChangeComplete', handleRouteChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      router.events.off('routeChangeComplete', handleRouteChange);
+    };
+  }, [router.events]);
 
   // Helper function untuk menghitung waktu kedaluwarsa
   const getTimeRemaining = (expiredAt) => {
@@ -545,7 +538,7 @@ export default function Save() {
                   ? `/app/voucher/${selected?.voucher?.id || selected?.ad?.id || selected?.voucher_item?.voucher_id}` 
                   : `/app/komunitas/promo/${selected?.ad?.id}?communityId=${selected?.ad?.cube?.community_id || 1}&from=saku`
               }>
-                <div className="flex items-center gap-1 text-sm text-primary font-medium bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors">
+                <div className="flex items-center gap-1 text-sm text-primary font-medium bg-primary/10 px-3 py-2 rounded-full text-xs hover:bg-primary/20 transition-colors">
                   Detail
                   <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
                 </div>
@@ -752,7 +745,7 @@ export default function Save() {
                   </span>
                 </div>
                 
-                <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                <div className="bg-slate-50 rounded-xl p-4">
                   <QRCodeSVG
                     value={selected?.code}
                     size={180}
@@ -761,19 +754,7 @@ export default function Save() {
                     className="mx-auto rounded-lg"
                   />
                 </div>
-                <div className="text-xl font-bold text-slate-600 mb-4">
-                  {selected?.code}
-                </div>
                 
-                <button
-                  className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
-                  onClick={() => {
-                    alert('QR Code siap untuk divalidasi');
-                  }}
-                >
-                  <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                  Validasi Promo
-                </button>
                 <p className="text-slate-500 text-xs mt-3">
                   Tunjukkan kode ini kepada merchant
                 </p>
