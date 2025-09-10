@@ -1,6 +1,7 @@
+/* eslint-disable react/no-unescaped-entities */
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ButtonComponent,
   FloatingPageComponent,
@@ -11,11 +12,31 @@ import { AdminLayout } from '../../../../components/construct.components/layout/
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
+// --- Helper: normalize API base & image URL ---
+const getApiBase = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // buang /api di env kalau ada, nanti kita tambahkan lagi
+  return raw.replace(/\/api\/?$/, '');
+};
+
+const buildImageUrl = (raw) => {
+  if (!raw) return null;
+  // absolute
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = getApiBase();
+  // normalisasi path storage
+  let path = String(raw).replace(/^\/+/, '');
+  path = path.replace(/^api\/storage\//, 'storage/');
+  if (!/^storage\//.test(path)) path = `storage/${path}`;
+  return `${base}/${path}`;
+};
+
 export default function VoucherCrud() {
   const [voucherList, setVoucherList] = useState([]);
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -24,209 +45,194 @@ export default function VoucherCrud() {
     valid_until: '',
     tenant_location: '',
     stock: 0,
-    delivery: 'manual',
     code: '',
-    community_id: '', // tambahkan community_id
-    target_type: 'all', // 'all' atau 'user'
-    target_user_id: '', // jika target_type === 'user'
+    community_id: '',
+    target_type: 'all',      // all | user | community
+    target_user_id: '',      // required if target_type === 'user'
   });
-  const [imageFile, setImageFile] = useState(null);
-  const [communities, setCommunities] = useState([]); // state untuk daftar community
-  const [users, setUsers] = useState([]); // daftar pengguna untuk pilihan target
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const [imageFile, setImageFile] = useState(null);
+  const [communities, setCommunities] = useState([]);
+  const [users, setUsers] = useState([]);
+
+  const apiBase = useMemo(() => getApiBase(), []);
+  const authHeader = () => {
+    const encryptedToken = Cookies.get(token_cookie_name);
+    const token = encryptedToken ? Decrypt(encryptedToken) : '';
+    return { Authorization: `Bearer ${token}` };
+  };
 
   // Fetch voucher list
-  useEffect(() => {
-    const fetchData = async () => {
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      try {
-        const res = await fetch(`${apiUrl}/admin/vouchers`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const result = await res.json();
-        setVoucherList(Array.isArray(result.data) ? result.data : []);
-      } catch (err) {
-        setVoucherList([]);
-      }
-    };
-    fetchData();
-  }, [apiUrl]);
+  const fetchVouchers = async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/admin/vouchers`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
+      });
+      const result = await res.json();
+      setVoucherList(Array.isArray(result.data) ? result.data : []);
+    } catch {
+      setVoucherList([]);
+    }
+  };
+
+  useEffect(() => { fetchVouchers(); }, [apiBase]);
 
   // Fetch community list
   useEffect(() => {
-    const fetchCommunities = async () => {
+    (async () => {
       try {
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const token = encryptedToken ? Decrypt(encryptedToken) : '';
-        const res = await fetch(`${apiUrl}/admin/communities`, {
+        const res = await fetch(`${apiBase}/api/admin/communities`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            ...authHeader(),
           },
         });
         const result = await res.json();
         setCommunities(Array.isArray(result.data) ? result.data : []);
-      } catch (err) {
+      } catch {
         setCommunities([]);
       }
-    };
-    fetchCommunities();
-  }, [apiUrl]);
+    })();
+  }, [apiBase]);
 
-  // Fetch users for selecting specific recipient
+  // Fetch users (buat target user)
   useEffect(() => {
-    const fetchUsers = async () => {
+    (async () => {
       try {
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const token = encryptedToken ? Decrypt(encryptedToken) : '';
-        const res = await fetch(`${apiUrl}/admin/users`, {
+        const res = await fetch(`${apiBase}/api/admin/users`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            ...authHeader(),
           },
         });
         const result = await res.json();
         setUsers(Array.isArray(result.data) ? result.data : []);
-      } catch (err) {
+      } catch {
         setUsers([]);
       }
-    };
-    fetchUsers();
-  }, [apiUrl]);
+    })();
+  }, [apiBase]);
 
-  // Handler untuk upload gambar
+  // Upload image handler
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setImageFile(e.target.files[0]);
-      // Kosongkan input image di formData agar tidak terkirim sebagai string
-      setFormData({ ...formData, image: '' });
+      // kosongkan string image agar tidak terkirim sebagai text
+      setFormData((s) => ({ ...s, image: '' }));
     }
   };
 
-  // Add or update voucher
+  // Submit (create / update)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : '';
-    
-    // Always use POST, add _method for updates
-    const method = 'POST';
-    const url = selectedVoucher
-      ? `${apiUrl}/admin/vouchers/${selectedVoucher.id}`
-      : `${apiUrl}/admin/vouchers`;
 
-    let body;
-    let headers = {
-      'Authorization': `Bearer ${token}`,
-    };
+    // Validasi client-side untuk target_type
+    if (formData.target_type === 'user' && !formData.target_user_id) {
+      alert('Pilih pengguna untuk target_type=user');
+      return;
+    }
+    if (formData.target_type === 'community' && !formData.community_id) {
+      alert('Pilih community untuk target_type=community');
+      return;
+    }
 
-    // Always use FormData when uploading files or updating
-    if (imageFile || selectedVoucher) {
-      body = new FormData();
-      body.append('name', formData.name);
-      body.append('description', formData.description);
-      body.append('type', formData.type);
-      body.append('valid_until', formData.valid_until);
-      body.append('tenant_location', formData.tenant_location);
-      body.append('stock', formData.stock);
-      body.append('delivery', formData.delivery);
-      body.append('code', formData.code);
-      if (formData.community_id) body.append('community_id', formData.community_id);
-      // append target fields
-      body.append('target_type', formData.target_type || 'all');
-      if (formData.target_type === 'user' && formData.target_user_id) {
-        body.append('target_user_id', formData.target_user_id);
-      }
-      
-      // Method spoofing for updates
-      if (selectedVoucher) {
-        body.append('_method', 'PUT');
-      }
-      
-      if (imageFile) {
-        body.append('image', imageFile);
-      }
-    } else {
-      // JSON for create without image
-      body = JSON.stringify({
-        ...formData,
-        target_type: formData.target_type || 'all',
-      });
-      headers['Content-Type'] = 'application/json';
+    const isUpdate = Boolean(selectedVoucher);
+    const url = isUpdate
+      ? `${apiBase}/api/admin/vouchers/${selectedVoucher.id}`
+      : `${apiBase}/api/admin/vouchers`;
+
+    const body = new FormData();
+    body.append('name', formData.name);
+    if (formData.description) body.append('description', formData.description);
+    if (formData.type) body.append('type', formData.type);
+    if (formData.valid_until) body.append('valid_until', formData.valid_until);
+    if (formData.tenant_location) body.append('tenant_location', formData.tenant_location);
+    body.append('stock', String(formData.stock ?? 0));
+    body.append('code', formData.code);
+
+    // targeting
+    body.append('target_type', formData.target_type || 'all');
+    if (formData.target_type === 'user' && formData.target_user_id) {
+      body.append('target_user_id', formData.target_user_id);
+    }
+    if (formData.community_id) {
+      body.append('community_id', formData.community_id);
+    }
+
+    if (imageFile) {
+      body.append('image', imageFile);
+    }
+
+    if (isUpdate) {
+      body.append('_method', 'PUT');
     }
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers,
+      const res = await fetch(url, {
+        method: 'POST', // selalu POST + spoof _method utk update
+        headers: { ...authHeader() },
         body,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        // console.error('Error:', errorData);
-        alert('Gagal menyimpan voucher: ' + (errorData.message || 'server error'));
+      const resultText = await res.text();
+      let result;
+      try { result = resultText ? JSON.parse(resultText) : {}; } catch { result = { raw: resultText }; }
+
+      if (!res.ok) {
+        const msg = result?.message || 'server error';
+        alert('Gagal menyimpan voucher: ' + msg);
         return;
       }
 
-      const result = await response.json();
-
+      // Sukses
+      resetForm();
+      await fetchVouchers();
       setModalForm(false);
-      setFormData({
-        name: '',
-        description: '',
-        image: '',
-        type: '',
-        valid_until: '',
-        tenant_location: '',
-        stock: 0,
-        delivery: 'manual',
-        code: '',
-        community_id: '', // reset community_id
-        target_type: 'all',
-        target_user_id: '',
-      });
-      setImageFile(null);
-      setSelectedVoucher(null);
-
-      // Refresh list
-      const res = await fetch(`${apiUrl}/admin/vouchers`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const refreshResult = await res.json();
-      setVoucherList(Array.isArray(refreshResult.data) ? refreshResult.data : []);
-    } catch (error) {
-      // console.error('Network error:', error);
+    } catch {
       alert('Terjadi kesalahan jaringan');
     }
   };
 
+  const resetForm = () => {
+    setSelectedVoucher(null);
+    setFormData({
+      name: '',
+      description: '',
+      image: '',
+      type: '',
+      valid_until: '',
+      tenant_location: '',
+      stock: 0,
+      code: '',
+      community_id: '',
+      target_type: 'all',
+      target_user_id: '',
+    });
+    setImageFile(null);
+  };
+
   // Delete voucher
   const handleDelete = async () => {
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : '';
-    await fetch(`${apiUrl}/admin/vouchers/${selectedVoucher.id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    setVoucherList(voucherList.filter(v => v.id !== selectedVoucher.id));
-    setModalDelete(false);
-    setSelectedVoucher(null);
+    if (!selectedVoucher) return;
+    try {
+      await fetch(`${apiBase}/api/admin/vouchers/${selectedVoucher.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
+      });
+      setVoucherList(voucherList.filter((v) => v.id !== selectedVoucher.id));
+    } finally {
+      setModalDelete(false);
+      setSelectedVoucher(null);
+    }
   };
 
   // Open form for edit
@@ -239,10 +245,9 @@ export default function VoucherCrud() {
       type: voucher.type || '',
       valid_until: voucher.valid_until || '',
       tenant_location: voucher.tenant_location || '',
-      stock: voucher.stock || 0,
-      delivery: voucher.delivery || 'manual',
+      stock: voucher.stock ?? 0,
       code: voucher.code || '',
-      community_id: voucher.community_id || '', // isi community_id
+      community_id: voucher.community_id || '',
       target_type: voucher.target_type || 'all',
       target_user_id: voucher.target_user_id || '',
     });
@@ -258,24 +263,23 @@ export default function VoucherCrud() {
       item: ({ name }) => <span className="font-semibold">{name}</span>,
     },
     {
-      selector: 'description',
-      label: 'Deskripsi',
-      item: ({ description }) => description || '-',
+      selector: 'code',
+      label: 'Kode',
+      sortable: true,
+      item: ({ code }) => code || '-',
     },
     {
       selector: 'image',
       label: 'Gambar',
       width: '100px',
-      item: ({ image }) =>
-        image ? (
-          image.startsWith('http') ? (
-            <img src={image} alt="Voucher" width={48} height={48} />
-          ) : (
-            <img src={`http://localhost:8000/storage/${image}`} alt="Voucher" width={48} height={48} />
-          )
+      item: ({ image }) => {
+        const src = buildImageUrl(image);
+        return src ? (
+          <img src={src} alt="Voucher" width={48} height={48} />
         ) : (
           <span className="text-gray-400">-</span>
-        ),
+        );
+      },
     },
     {
       selector: 'stock',
@@ -284,15 +288,20 @@ export default function VoucherCrud() {
       item: ({ stock }) => stock,
     },
     {
-      selector: 'delivery',
-      label: 'Pengiriman',
-      item: ({ delivery }) => delivery === 'auto' ? 'Otomatis' : 'Manual',
+      selector: 'target_type',
+      label: 'Target',
+      item: ({ target_type, target_user_id, community_id }) => {
+        if (target_type === 'user') return `User #${target_user_id}`;
+        if (target_type === 'community') return `Community #${community_id}`;
+        return 'Semua';
+      },
     },
     {
       selector: 'valid_until',
       label: 'Berlaku Sampai',
       item: ({ valid_until }) => valid_until || '-',
     },
+    // Aksi edit/hapus disediakan oleh TableSupervisionComponent kalau ada; kalau tidak, tambahkan di sini
   ];
 
   const topBarActions = (
@@ -301,21 +310,7 @@ export default function VoucherCrud() {
       icon={faPlus}
       paint="primary"
       onClick={() => {
-        setSelectedVoucher(null);
-        setFormData({
-          name: '',
-          description: '',
-          image: '',
-          type: '',
-          valid_until: '',
-          tenant_location: '',
-          stock: 0,
-          delivery: 'manual',
-          code: '',
-          community_id: '', // reset community_id
-          target_type: 'all',
-          target_user_id: '',
-        });
+        resetForm();
         setModalForm(true);
       }}
     />
@@ -331,22 +326,23 @@ export default function VoucherCrud() {
         noControlBar={false}
         searchable={true}
         fetchControl={{
-          path: 'admin/vouchers',
+          path: 'api/admin/vouchers', // biar komponen internal fetch bisa pakai relative; tapi kita sudah fetch manual di atas juga
           method: 'GET',
-          headers: () => {
-            const encryptedToken = Cookies.get(token_cookie_name);
-            const token = encryptedToken ? Decrypt(encryptedToken) : '';
-            return {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            };
-          },
+          headers: () => ({
+            'Content-Type': 'application/json',
+            ...authHeader(),
+          }),
           mapData: (result) => {
             if (Array.isArray(result.data)) {
               return { data: result.data, totalRow: result.total_row || result.data.length };
             }
             return { data: [], totalRow: 0 };
           },
+        }}
+        onEdit={handleEdit}
+        onDelete={(row) => {
+          setSelectedVoucher(row);
+          setModalDelete(true);
         }}
       />
 
@@ -355,22 +351,7 @@ export default function VoucherCrud() {
         show={modalForm}
         onClose={() => {
           setModalForm(false);
-          setSelectedVoucher(null);
-          setFormData({
-            name: '',
-            description: '',
-            image: '',
-            type: '',
-            valid_until: '',
-            tenant_location: '',
-            stock: 0,
-            delivery: 'manual',
-            code: '',
-            community_id: '', // reset community_id
-            target_type: 'all',
-            target_user_id: '',
-          });
-          setImageFile(null);
+          resetForm();
         }}
         title={selectedVoucher ? 'Ubah Voucher' : 'Tambah Voucher'}
         size="md"
@@ -388,6 +369,7 @@ export default function VoucherCrud() {
               required
             />
           </div>
+
           <div>
             <label className="font-semibold">Deskripsi</label>
             <input
@@ -398,7 +380,7 @@ export default function VoucherCrud() {
               onChange={e => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
-          {/* Tambahkan input kode unik voucher */}
+
           <div>
             <label className="font-semibold">Kode Unik</label>
             <input
@@ -411,6 +393,7 @@ export default function VoucherCrud() {
             />
             <span className="text-xs text-gray-500">Kode unik voucher, wajib diisi dan tidak boleh sama.</span>
           </div>
+
           <div>
             <label className="font-semibold">Tipe Voucher</label>
             <input
@@ -421,6 +404,7 @@ export default function VoucherCrud() {
               onChange={e => setFormData({ ...formData, type: e.target.value })}
             />
           </div>
+
           <div>
             <label className="font-semibold">Berlaku Sampai</label>
             <input
@@ -430,6 +414,7 @@ export default function VoucherCrud() {
               onChange={e => setFormData({ ...formData, valid_until: e.target.value })}
             />
           </div>
+
           <div>
             <label className="font-semibold">Lokasi Tenant</label>
             <input
@@ -440,6 +425,7 @@ export default function VoucherCrud() {
               onChange={e => setFormData({ ...formData, tenant_location: e.target.value })}
             />
           </div>
+
           <div>
             <label className="font-semibold">Stock</label>
             <input
@@ -451,21 +437,10 @@ export default function VoucherCrud() {
               required
             />
           </div>
-          <div>
-            <label className="font-semibold">Pengiriman</label>
-            <select
-              className="select select-bordered w-full"
-              value={formData.delivery}
-              onChange={e => setFormData({ ...formData, delivery: e.target.value })}
-            >
-              <option value="manual">Manual</option>
-              <option value="auto">Otomatis</option>
-            </select>
-          </div>
 
-          {/* Pilihan target pengiriman: Semua pengguna atau Pengguna tertentu */}
+          {/* Targeting */}
           <div>
-            <label className="font-semibold">Target Pengguna</label>
+            <label className="font-semibold">Target Penerima</label>
             <select
               className="select select-bordered w-full"
               value={formData.target_type}
@@ -473,8 +448,9 @@ export default function VoucherCrud() {
             >
               <option value="all">Semua Pengguna</option>
               <option value="user">Pengguna Tertentu</option>
+              <option value="community">Anggota Community</option>
             </select>
-            <span className="text-xs text-gray-500">Pilih target penerima voucher. Jika memilih Pengguna Tertentu, pilih user di bawah.</span>
+            <span className="text-xs text-gray-500">Pilih target penerima voucher.</span>
           </div>
 
           {formData.target_type === 'user' && (
@@ -493,17 +469,17 @@ export default function VoucherCrud() {
                   </option>
                 ))}
               </select>
-              <span className="text-xs text-gray-500">Voucher akan dikirim ke pengguna ini dan diharapkan masuk ke notifikasi untuk diklaim.</span>
+              <span className="text-xs text-gray-500">Voucher akan dikirim ke pengguna ini.</span>
             </div>
           )}
 
-          {/* Tambahkan select untuk memilih community */}
           <div>
-            <label className="font-semibold">Community</label>
+            <label className="font-semibold">Community (opsional / wajib jika target=community)</label>
             <select
               className="select select-bordered w-full"
               value={formData.community_id}
               onChange={e => setFormData({ ...formData, community_id: e.target.value })}
+              required={formData.target_type === 'community'}
             >
               <option value="">Pilih Community</option>
               {communities.map((c) => (
@@ -512,8 +488,11 @@ export default function VoucherCrud() {
                 </option>
               ))}
             </select>
-            <span className="text-xs text-gray-500">Pilih community untuk voucher ini (opsional).</span>
+            <span className="text-xs text-gray-500">
+              Pilih community untuk voucher ini (wajib jika targetnya "community").
+            </span>
           </div>
+
           <div>
             <label className="font-semibold">Upload Gambar</label>
             <input
@@ -522,14 +501,11 @@ export default function VoucherCrud() {
               className="input input-bordered w-full"
               onChange={handleImageChange}
             />
+            {/* preview existing / new */}
             {formData.image && !imageFile && (
               <div className="mt-2">
                 <img
-                  src={
-                    formData.image.startsWith('http')
-                      ? formData.image
-                      : `http://localhost:8000/storage/${formData.image}`
-                  }
+                  src={buildImageUrl(formData.image) || formData.image}
                   alt="Voucher"
                   width={80}
                   height={80}
@@ -550,6 +526,7 @@ export default function VoucherCrud() {
             )}
             <span className="text-xs text-gray-500">Upload gambar voucher (opsional).</span>
           </div>
+
           <div className="flex gap-2 justify-end mt-4">
             <ButtonComponent
               label="Batal"
@@ -557,22 +534,7 @@ export default function VoucherCrud() {
               variant="outline"
               onClick={() => {
                 setModalForm(false);
-                setSelectedVoucher(null);
-                setFormData({
-                  name: '',
-                  description: '',
-                  image: '',
-                  type: '',
-                  valid_until: '',
-                  tenant_location: '',
-                  stock: 0,
-                  delivery: 'manual',
-                  code: '',
-                  community_id: '', // reset community_id
-                  target_type: 'all',
-                  target_user_id: '',
-                });
-                setImageFile(null);
+                resetForm();
               }}
             />
             <ButtonComponent
