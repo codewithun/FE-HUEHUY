@@ -5,33 +5,58 @@ import { useGet } from '../../helpers';
 import { DateFormatComponent } from '../../components/base.components';
 
 export default function NotificationPage() {
+  // kalau mau langsung munculin voucher/promo, ganti jadi 'merchant'
   const [type, setType] = useState('hunter'); // 'hunter' | 'merchant'
 
-  // Trik kecil biar useGet refetch waktu type ganti
-  const path = useMemo(() => `notification${type ? `?type=${type}` : ''}`, [type]);
+  // Refetch waktu tab ganti; route backend kamu: /api/notification (singular)
+  const path = useMemo(
+    () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}`,
+    [type]
+  );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loading, code, data] = useGet({ path });
+  // SAFETY GUARD untuk mencegah "number is not iterable"
+  // Kadang custom hook bisa balik non-array; kita pastikan formatnya [loading, code, data].
+  const _res = useGet({ path });
+  const loading = Array.isArray(_res) ? _res[0] : false;
+  const code = Array.isArray(_res) ? _res[1] : null;
+  const data = Array.isArray(_res) ? _res[2] : null;
 
   const items = Array.isArray(data?.data) ? data.data : [];
 
   const cardMeta = (n) => {
-    // Ambil kandidat gambar dari beberapa relasi, pakai yang ada duluan
+    if (!n || typeof n !== 'object') {
+      return { img: null, title: 'Notifikasi', isVoucher: false, actionUrl: null };
+    }
+
+    // Ambil image yang paling relevan terlebih dahulu dari schema notifikasi voucher/promo
     const img =
+      n.image_url ||
       n?.grab?.ad?.picture_source ||
       n?.ad?.picture_source ||
       n?.ad?.image_url ||
       n?.cube?.logo ||
       null;
 
-    // Judul yg masuk akal
+    // Judul prioritas dari notifikasi
     const title =
+      n.title ||
       n?.grab?.ad?.title ||
       n?.ad?.title ||
       n?.cube?.name ||
       'Notifikasi';
 
-    return { img, title };
+    // Deteksi voucher untuk CTA
+    const isVoucher = n.type === 'voucher' || n.target_type === 'voucher';
+
+    // Gunakan action_url dari API jika ada; kalau tidak, pakai pola default
+    let actionUrl = n.action_url || (isVoucher && n.target_id ? `/vouchers/${n.target_id}` : null);
+
+    // Tambahkan prefix /app kalau belum ada (menyesuaikan v2.huehuy.com/app/…)
+    if (actionUrl && !actionUrl.startsWith('/app')) {
+      actionUrl = `/app${actionUrl}`;
+    }
+
+    return { img, title, isVoucher, actionUrl };
   };
 
   return (
@@ -54,6 +79,7 @@ export default function NotificationPage() {
                 type === 'hunter' ? 'bg-background text-slate-900' : 'text-gray-300'
               }`}
               onClick={() => setType('hunter')}
+              type="button"
             >
               Hunter
             </button>
@@ -62,6 +88,7 @@ export default function NotificationPage() {
                 type === 'merchant' ? 'bg-background text-slate-900' : 'text-gray-300'
               }`}
               onClick={() => setType('merchant')}
+              type="button"
             >
               Merchant
             </button>
@@ -73,7 +100,7 @@ export default function NotificationPage() {
               {loading ? (
                 // Skeleton
                 <>
-                  {[1,2,3].map((i) => (
+                  {[1, 2, 3].map((i) => (
                     <div key={i} className="grid grid-cols-4 gap-3 p-3 rounded-[15px] bg-white shadow-sm">
                       <div className="w-full aspect-square rounded-lg bg-slate-200 animate-pulse" />
                       <div className="col-span-3 space-y-2">
@@ -84,13 +111,17 @@ export default function NotificationPage() {
                     </div>
                   ))}
                 </>
+              ) : code && Number(code) >= 400 ? (
+                <div className="py-4 text-red-600 text-center text-sm">
+                  Gagal memuat notifikasi (kode {code}). Coba muat ulang.
+                </div>
               ) : items.length > 0 ? (
                 items.map((item, idx) => {
-                  const { img, title } = cardMeta(item);
+                  const { img, title, isVoucher, actionUrl } = cardMeta(item);
                   return (
                     <div
                       className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] bg-white"
-                      key={`${item.id || idx}`}
+                      key={`${item?.id ?? idx}`}
                     >
                       <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-100 flex justify-center items-center">
                         {img ? (
@@ -99,7 +130,9 @@ export default function NotificationPage() {
                             height={700}
                             width={700}
                             alt={title}
-                            onError={(e) => { e.currentTarget.src = '/icons/icon-192x192.png'; }}
+                            onError={(e) => {
+                              e.currentTarget.src = '/icons/icon-192x192.png';
+                            }}
                           />
                         ) : (
                           <span className="text-slate-400 text-xs">No Image</span>
@@ -107,20 +140,22 @@ export default function NotificationPage() {
                       </div>
                       <div className="col-span-3">
                         <p className="font-semibold line-clamp-2">{title}</p>
-                        <p className="text-sm text-slate-600 my-1">
-                          {item?.message || '-'}
-                        </p>
+                        <p className="text-sm text-slate-600 my-1">{item?.message || '-'}</p>
                         <p className="text-slate-600 text-xs">
                           <DateFormatComponent date={item?.created_at} />
                         </p>
+
+                        {isVoucher && actionUrl && (
+                          <a href={actionUrl} className="inline-block mt-2 text-sm font-semibold underline">
+                            Klaim voucher →
+                          </a>
+                        )}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="py-4 text-slate-500 text-center">
-                  Belum ada notifikasi...
-                </div>
+                <div className="py-4 text-slate-500 text-center">Belum ada notifikasi...</div>
               )}
             </div>
           </div>
