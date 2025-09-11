@@ -1,12 +1,37 @@
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ButtonComponent, InputComponent } from '../components/base.components';
 import { useForm } from '../helpers';
+
+const isSafeInternal = (url) => {
+  try { return new URL(url, window.location.origin).origin === window.location.origin; }
+  catch { return false; }
+};
+const saveNext = (router) => {
+  const rawNext = router?.query?.next;
+  const guess = typeof window !== 'undefined' ? window.location.href : null;
+  const target = (typeof rawNext === 'string' && rawNext) ? rawNext : guess;
+  if (target) localStorage.setItem('postAuthRedirect', target);
+};
+const consumeNext = () => {
+  const stored = localStorage.getItem('postAuthRedirect');
+  if (stored && isSafeInternal(stored)) {
+    localStorage.removeItem('postAuthRedirect');
+    return stored;
+  }
+  return null;
+};
 
 export default function QrEntry() {
   const router = useRouter();
   const [step, setStep] = useState('register'); // 'register' or 'verify'
   const [userEmail, setUserEmail] = useState('');
+
+  // Simpan tujuan awal saat masuk flow QR
+  useEffect(() => {
+    if (!router.isReady) return;
+    saveNext(router);
+  }, [router.isReady]);
 
   const onRegisterSuccess = (data) => {
     if (data?.data?.user?.email) {
@@ -17,18 +42,22 @@ export default function QrEntry() {
 
   const onVerifySuccess = (data) => {
     const redirectUrl = data?.data?.redirect_url;
-    if (redirectUrl) {
-      window.location.href = redirectUrl;
-    } else {
-      window.location.href = '/app';
-    }
+    const qNext = typeof router.query.next === 'string' ? router.query.next : null;
+    const storedNext = consumeNext();
+    const target =
+      (redirectUrl && isSafeInternal(redirectUrl) && redirectUrl) ||
+      (qNext && isSafeInternal(qNext) && qNext) ||
+      storedNext ||
+      '/app';
+    window.location.href = target;
   };
 
   const [{ formControl: registerFormControl, submit: registerSubmit, loading: registerLoading }] = useForm(
     {
       path: 'qr-entry/register',
       data: {
-        qr_data: router.query.qr_data || null
+        qr_data: router.query.qr_data || null,
+        next: typeof router.query.next === 'string' ? router.query.next : null
       }
     },
     false,
@@ -40,7 +69,8 @@ export default function QrEntry() {
       path: 'qr-entry/verify',
       data: {
         email: userEmail,
-        qr_data: router.query.qr_data || null
+        qr_data: router.query.qr_data || null,
+        next: typeof router.query.next === 'string' ? router.query.next : null
       }
     },
     false,

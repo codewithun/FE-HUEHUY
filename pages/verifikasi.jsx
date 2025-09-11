@@ -12,6 +12,19 @@ import InputOtpComponent from '../components/base.components/input/InputOtpCompo
 import { post, useForm, useGet, token_cookie_name } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
 
+const isSafeInternal = (url) => {
+  try { return new URL(url, window.location.origin).origin === window.location.origin; }
+  catch { return false; }
+};
+const consumeNext = () => {
+  const s = typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null;
+  if (s && isSafeInternal(s)) {
+    localStorage.removeItem('postAuthRedirect');
+    return s;
+  }
+  return null;
+};
+
 export default function Verification() {
   const router = useRouter();
   const [sendMailLoading, setSendMailLoading] = useState(false);
@@ -54,6 +67,12 @@ export default function Verification() {
         setTimeout(() => {
           window.location.href = targetUrl;
         }, 500);
+        return;
+      }
+      // Fallback ke postAuthRedirect jika redirect_url & next kosong
+      const storedNext = consumeNext();
+      if (storedNext) {
+        setTimeout(() => { window.location.href = storedNext; }, 400);
         return;
       }
 
