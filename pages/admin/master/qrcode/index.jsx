@@ -2,7 +2,7 @@
 import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 import React, { useRef, useState } from 'react';
 import {
   ButtonComponent,
@@ -255,82 +255,21 @@ export default function QRCodeCrud() {
   };
 
   // Download PNG dari SVG dalam kontainer khusus
-  const handleDownloadPng = async () => {
+  const handleDownloadPng = () => {
     const container = qrContainerRef.current;
-    if (!container) {
-      alert('Kontainer QR tidak ditemukan.');
+    const canvas = container?.querySelector('canvas');
+    if (!canvas) {
+      alert('Canvas QR tidak ditemukan.');
       return;
     }
-    const svgEl = container.querySelector('svg');
-    if (!svgEl) {
-      alert('QR SVG tidak ditemukan.');
-      return;
-    }
-    try {
-      const serializer = new XMLSerializer();
-      const svgStr = serializer.serializeToString(svgEl);
-      const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
 
-      const img = new Image();
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = svgUrl;
-      });
-
-      // skala untuk ketajaman PNG
-      const scale = 4; // ubah sesuai kebutuhan: 2, 3, 4, dst.
-      // fallback ukuran
-      const vb = svgEl.viewBox?.baseVal;
-      const baseW =
-        (vb && vb.width) ||
-        svgEl.width?.baseVal?.value ||
-        svgEl.getBoundingClientRect().width ||
-        200;
-      const baseH =
-        (vb && vb.height) ||
-        svgEl.height?.baseVal?.value ||
-        svgEl.getBoundingClientRect().height ||
-        200;
-
-      const width = Math.ceil(baseW * scale);
-      const height = Math.ceil(baseH * scale);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-
-      // background putih. Hapus jika ingin transparan
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
-
-      // gambar SVG ke canvas pada resolusi target
-      ctx.drawImage(img, 0, 0, width, height);
-
-      // simpan sebagai PNG via Blob (lebih hemat memori)
-      canvas.toBlob(
-        blob => {
-          if (!blob) {
-            alert('Gagal membuat file PNG.');
-            return;
-          }
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `qr-event-${selectedItem?.text || selectedItem?.id || 'qr'}.png`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        },
-        'image/png',
-        1
-      );
-    } catch (e) {
-      console.error(e);
-      alert('Gagal mengunduh QR Code (PNG).');
-    }
+    // simpan PNG
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png'); // hasil PNG base64
+    link.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -461,39 +400,41 @@ export default function QRCodeCrud() {
           <div className="flex flex-col items-center gap-4 p-6" ref={qrContainerRef}>
             {/* build url and use as QR value (not JSON) */}
             {(() => {
-              const qrUrl = buildTargetUrl(selectedItem);
-              return (
-                <>
-                  <QRCodeSVG
-                    value={qrUrl}
-                    size={200}
-                    bgColor="#fff"
-                    fgColor="#0f172a"
-                    level="H"
-                    includeMargin={true}
-                  />
-                  <div className="text-center">
-                    <div className="font-bold text-primary text-lg">
-                      {selectedItem.promo
-                        ? `Promo: ${selectedItem.promo.name || selectedItem.promo.kode || selectedItem.promo.id}`
-                        : `Voucher: ${selectedItem.voucher.name || selectedItem.voucher.kode || selectedItem.voucher.id}`}
+               const qrUrl = buildTargetUrl(selectedItem);
+                return (
+                  <>
+                    <QRCodeCanvas
+                      value={qrUrl}
+                      size={512}            // lebih tajam untuk cetak
+                      includeMargin={true}
+                      level="H"
+                      bgColor="#ffffff"
+                      fgColor="#0f172a"
+                    />
+
+                    <div className="text-center">
+                      <div className="font-bold text-primary text-lg">
+                        {selectedItem.promo
+                          ? `Promo: ${selectedItem.promo.name || selectedItem.promo.kode || selectedItem.promo.id}`
+                          : `Voucher: ${selectedItem.voucher.name || selectedItem.voucher.kode || selectedItem.voucher.id}`}
+                      </div>
+                      <div className="text-sm text-secondary mt-1">
+                        Community:{' '}
+                        {selectedItem.promo?.community_id ||
+                          selectedItem.voucher?.community?.id ||
+                          selectedItem.voucher?.community_id ||
+                          'default'}
+                      </div>
                     </div>
-                    <div className="text-sm text-secondary mt-1">
-                      Community:{' '}
-                      {selectedItem.promo?.community_id ||
-                        selectedItem.voucher?.community?.id ||
-                        selectedItem.voucher?.community_id ||
-                        'default'}
-                    </div>
-                  </div>
-                  <ButtonComponent
-                    label="Download QR (PNG)"
-                    icon={faDownload}
-                    paint="primary"
-                    onClick={handleDownloadPng}
-                  />
-                </>
-              );
+
+                    <ButtonComponent
+                      label="Download QR (PNG)"
+                      icon={faDownload}
+                      paint="primary"
+                      onClick={handleDownloadPng}
+                    />
+                  </>
+                );
             })()}
           </div>
         ) : (
