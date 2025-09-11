@@ -11,11 +11,11 @@ const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
 
 export default function NotificationPage() {
-  const [type, setType] = useState('merchant');       // 'hunter' | 'merchant'
-  const [version, setVersion] = useState(0);          // << cache-buster
-  const [localItems, setLocalItems] = useState([]);   // << mirror utk optimistic UI
+  const [type, setType] = useState('merchant'); // 'hunter' | 'merchant'
+  const [version, setVersion] = useState(0);    // cache-buster
+  const [localItems, setLocalItems] = useState([]);
+  const [clearing, setClearing] = useState(false); // << loading utk tombol hapus semua
 
-  // paksa re-fetch tiap version berubah
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}&v=${version}`,
     [type, version]
@@ -28,7 +28,6 @@ export default function NotificationPage() {
 
   const items = Array.isArray(payload?.data) ? payload.data : [];
 
-  // sinkronkan data API -> localItems setiap fetch selesai
   useEffect(() => {
     if (!loading) setLocalItems(items);
   }, [loading, items]);
@@ -67,17 +66,50 @@ export default function NotificationPage() {
         return;
       }
 
-      // 1) Optimistic remove di FE
+      // Optimistic remove + re-fetch
       setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
-
-      // 2) Paksa re-fetch (hapus cache SWR/useGet)
       setVersion((v) => v + 1);
 
-      // 3) Opsional redirect ke Saku (kalau mau)
-      // window.location.href = '/app/saku';
       alert('Voucher berhasil diklaim! Cek di Saku.');
     } catch (e) {
       alert('Gagal klaim: ' + (e?.message || 'Network error'));
+    }
+  }
+
+  // === NEW: Hapus semua notifikasi pengguna ini ===
+  async function clearAllNotifications() {
+    const ok = window.confirm('Hapus semua notifikasi? Tindakan ini tidak bisa dibatalkan.');
+    if (!ok) return;
+
+    try {
+      setClearing(true);
+      const res = await fetch(`${apiBase}/api/notification/read-all`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
+        body: JSON.stringify({}),
+      });
+
+      const text = await res.text();
+      let json = {};
+      try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+
+      if (!res.ok) {
+        const msg = json?.message || `HTTP ${res.status}`;
+        alert('Gagal menghapus notifikasi: ' + msg);
+        return;
+      }
+
+      // FE kosongkan list & re-fetch (cache-buster)
+      setLocalItems([]);
+      setVersion((v) => v + 1);
+    } catch (e) {
+      alert('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -110,10 +142,27 @@ export default function NotificationPage() {
               <h1 className="text-white font-bold text-2xl">Notifikasi</h1>
               <p className="text-white text-sm mt-1">Lihat pembaruan dan aktivitas terbaru</p>
             </div>
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-              </svg>
+
+            <div className="flex items-center gap-2">
+              {/* Tombol Hapus Semua */}
+              <button
+                type="button"
+                onClick={clearAllNotifications}
+                disabled={clearing}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold border border-white/40 text-white hover:bg-white/15 transition ${
+                  clearing ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
+                title="Hapus semua notifikasi"
+              >
+                {clearing ? 'Menghapus…' : 'Hapus semua'}
+              </button>
+
+              {/* Icon bell */}
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -130,7 +179,7 @@ export default function NotificationPage() {
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
                 }`}
-                onClick={() => { setType('hunter'); setVersion(v => v + 1); }} // re-fetch saat ganti tab
+                onClick={() => { setType('hunter'); setVersion(v => v + 1); }}
               >
                 Hunter
               </button>
