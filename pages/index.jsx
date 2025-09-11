@@ -25,23 +25,24 @@ export default function Login() {
   // Perbaiki onSuccess function
   const onSuccess = (data) => {
     // eslint-disable-next-line no-console
-    console.log('=== LOGIN SUCCESS RESPONSE ===');
-    // eslint-disable-next-line no-console
-    console.log('Full data:', data);
-    
-    // Backend returns token in data.token (confirmed from AuthController)
-    const token = data?.data?.token;
+    console.log('=== LOGIN SUCCESS RESPONSE ===', data);
 
+    // TANGANI UNVERIFIED (202) atau payload reason
+    const status = data?.status || data?.data?.status;
+    const reason = data?.data?.reason || data?.reason;
+    const email = data?.data?.email || data?.email || '';
+
+    if (status === 202 || reason === 'unverified') {
+      const target = email ? `/verifikasi?email=${encodeURIComponent(email)}` : '/verifikasi';
+      window.location.href = target;
+      return; // stop, JANGAN set token
+    }
+
+    // flow lama: ambil token bila ada
+    const token = data?.data?.token;
     if (token) {
-      Cookies.set(
-        token_cookie_name,
-        Encrypt(token),
-        { expires: 365, secure: true }
-      );
-      
-      setTimeout(() => {
-        window.location.href = '/app';
-      }, 100);
+      Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
+      setTimeout(() => { window.location.href = '/app'; }, 100);
     } else {
       // eslint-disable-next-line no-console
       console.error('No token found in login response:', data);
