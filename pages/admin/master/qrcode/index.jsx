@@ -229,13 +229,20 @@ export default function QRCodeCrud() {
     if (item.promo) {
       const communityId = item.promo.community?.id || item.promo.community_id || 'default';
       console.log('Promo Community ID:', communityId);
-      return `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${communityId}&autoRegister=1`;
+      console.log('Promo ID:', item.promo.id);
+      const qrValue = `${origin}/app/komunitas/promo/detail_promo?promoId=${item.promo.id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
+      console.log('Generated QR Value:', qrValue);
+      return qrValue;
     }
     if (item.voucher) {
       const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-      const communityId = item.voucher.community?.id || item.voucher.community_id || 'default';
+      // Use community_id field directly since voucher doesn't have community relationship
+      const communityId = item.voucher.community_id || 'global';
       console.log('Voucher Community ID:', communityId);
-      return `${origin}/app/voucher/${id}?communityId=${communityId}&autoRegister=1`;
+      console.log('Voucher ID:', id);
+      const qrValue = `${origin}/app/voucher/detail_voucher?voucherId=${id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
+      console.log('Generated QR Value:', qrValue);
+      return qrValue;
     }
     return '';
   };
