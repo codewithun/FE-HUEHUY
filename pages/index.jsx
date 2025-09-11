@@ -23,30 +23,36 @@ export default function Login() {
   const [loading, setLoading] = useState(true);
 
   // Perbaiki onSuccess function
-  const onSuccess = (data) => {
+  const onSuccess = (res) => {
     // eslint-disable-next-line no-console
-    console.log('=== LOGIN SUCCESS RESPONSE ===', data);
+    console.log('=== LOGIN SUCCESS RESPONSE ===', res);
 
-    // TANGANI UNVERIFIED (202) atau payload reason
-    const status = data?.status || data?.data?.status;
-    const reason = data?.data?.reason || data?.reason;
-    const email = data?.data?.email || data?.email || '';
+    // 1) Tangkap sinyal unverified dari BE
+    const statusStr = res?.status || res?.data?.status;        // "unverified" (string)
+    const reason = res?.reason || res?.data?.reason;        // "unverified"
+    const rurl = res?.redirect_url || res?.data?.redirect_url; // "/verifikasi?email=..."
+    const email = res?.email || res?.data?.email || '';
 
-    if (status === 202 || reason === 'unverified') {
-      const target = email ? `/verifikasi?email=${encodeURIComponent(email)}` : '/verifikasi';
+    if (statusStr === 'unverified' || reason === 'unverified' || rurl) {
+      const next = router?.query?.next ? String(router.query.next) : null;
+      const target = rurl
+        ? rurl + (next ? `&next=${encodeURIComponent(next)}` : '')
+        : `/verifikasi?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
       window.location.href = target;
-      return; // stop, JANGAN set token
+      return;
     }
 
-    // flow lama: ambil token bila ada
-    const token = data?.data?.token;
+    // 2) Normal flow (sudah verified): simpan token
+    const token = res?.data?.token || res?.token;
     if (token) {
       Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
       setTimeout(() => { window.location.href = '/app'; }, 100);
-    } else {
-      // eslint-disable-next-line no-console
-      console.error('No token found in login response:', data);
+      return;
     }
+
+    // 3) Fallback: kalau tidak ada token & bukan unverified → log saja
+    // eslint-disable-next-line no-console
+    console.error('No token and no unverified signal in response:', res);
   };
 
   const [{ formControl, submit, submitLoading, setDefaultValues }] = useForm(
