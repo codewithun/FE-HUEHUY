@@ -4,10 +4,10 @@ import Image from 'next/image';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useState } from 'react';
 import {
-    ButtonComponent,
-    FloatingPageComponent,
-    ModalConfirmComponent,
-    TableSupervisionComponent,
+  ButtonComponent,
+  FloatingPageComponent,
+  ModalConfirmComponent,
+  TableSupervisionComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
 import { token_cookie_name } from '../../../../helpers';
