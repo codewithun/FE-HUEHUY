@@ -11,12 +11,14 @@ const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
 
 export default function NotificationPage() {
-  const [type, setType] = useState('merchant'); // 'hunter' | 'merchant'
+  const [type, setType] = useState('merchant');       // 'hunter' | 'merchant'
+  const [version, setVersion] = useState(0);          // << cache-buster
+  const [localItems, setLocalItems] = useState([]);   // << mirror utk optimistic UI
 
-  // endpoint backend: /api/notification
+  // paksa re-fetch tiap version berubah
   const path = useMemo(
-    () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}`,
-    [type]
+    () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}&v=${version}`,
+    [type, version]
   );
 
   const res = useGet({ path });
@@ -26,11 +28,16 @@ export default function NotificationPage() {
 
   const items = Array.isArray(payload?.data) ? payload.data : [];
 
+  // sinkronkan data API -> localItems setiap fetch selesai
+  useEffect(() => {
+    if (!loading) setLocalItems(items);
+  }, [loading, items]);
+
   useEffect(() => {
     if (!DEBUG) return;
     // eslint-disable-next-line no-console
-    console.log('NOTIF DEBUG', { type, path, res, loading, httpCode, payload, items });
-  }, [type, path, res, loading, httpCode, payload]);
+    console.log('NOTIF DEBUG', { type, path, loading, httpCode, payload, items, localItems, version });
+  }, [type, path, loading, httpCode, payload, items, localItems, version]);
 
   const authHeader = () => {
     const enc = Cookies.get(token_cookie_name);
@@ -47,9 +54,7 @@ export default function NotificationPage() {
           'Content-Type': 'application/json',
           ...authHeader(),
         },
-        body: JSON.stringify({
-          notification_id: notificationId, // <<— penting: kirim ke BE biar notif dihapus
-        }),
+        body: JSON.stringify({ notification_id: notificationId }),
       });
 
       const text = await res.text();
@@ -62,9 +67,15 @@ export default function NotificationPage() {
         return;
       }
 
-      alert('Voucher berhasil diklaim!');
-      // Voucher sudah masuk Saku; notifikasi terkait sudah dibersihkan di BE
-      window.location.href = '/app/saku';
+      // 1) Optimistic remove di FE
+      setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+
+      // 2) Paksa re-fetch (hapus cache SWR/useGet)
+      setVersion((v) => v + 1);
+
+      // 3) Opsional redirect ke Saku (kalau mau)
+      // window.location.href = '/app/saku';
+      alert('Voucher berhasil diklaim! Cek di Saku.');
     } catch (e) {
       alert('Gagal klaim: ' + (e?.message || 'Network error'));
     }
@@ -74,25 +85,18 @@ export default function NotificationPage() {
     if (!n || typeof n !== 'object') {
       return { img: null, title: 'Notifikasi', isVoucher: false, isPromo: false };
     }
-
     const img =
       n.image_url ||
       n?.grab?.ad?.picture_source ||
       n?.ad?.picture_source ||
       n?.ad?.image_url ||
-      n?.cube?.logo ||
-      null;
+      n?.cube?.logo || null;
 
     const title =
-      n.title ||
-      n?.grab?.ad?.title ||
-      n?.ad?.title ||
-      n?.cube?.name ||
-      'Notifikasi';
+      n.title || n?.grab?.ad?.title || n?.ad?.title || n?.cube?.name || 'Notifikasi';
 
     const isVoucher = n.type === 'voucher' || n.target_type === 'voucher';
     const isPromo   = n.type === 'promo'   || n.target_type === 'promo';
-
     return { img, title, isVoucher, isPromo };
   };
 
@@ -126,7 +130,7 @@ export default function NotificationPage() {
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
                 }`}
-                onClick={() => setType('hunter')}
+                onClick={() => { setType('hunter'); setVersion(v => v + 1); }} // re-fetch saat ganti tab
               >
                 Hunter
               </button>
@@ -137,7 +141,7 @@ export default function NotificationPage() {
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
                 }`}
-                onClick={() => setType('merchant')}
+                onClick={() => { setType('merchant'); setVersion(v => v + 1); }}
               >
                 Merchant
               </button>
@@ -149,7 +153,7 @@ export default function NotificationPage() {
             <div className="space-y-4">
               {loading ? (
                 <>
-                  {[1, 2, 3].map((i) => (
+                  {[1,2,3].map((i) => (
                     <div key={i} className="bg-white rounded-2xl p-4 shadow-sm">
                       <div className="flex gap-4">
                         <div className="w-16 h-16 rounded-xl bg-gray-200 animate-pulse flex-shrink-0" />
@@ -172,8 +176,8 @@ export default function NotificationPage() {
                   <p className="text-red-600 font-medium">Gagal memuat notifikasi</p>
                   <p className="text-gray-500 text-sm mt-1">Kode error: {httpCode}</p>
                 </div>
-              ) : items.length > 0 ? (
-                items.map((item, idx) => {
+              ) : localItems.length > 0 ? (
+                localItems.map((item, idx) => {
                   const { img, title, isVoucher } = cardMeta(item);
                   const isUnread = !item.read_at;
 
@@ -185,7 +189,6 @@ export default function NotificationPage() {
                       key={item?.id ?? `notif-${idx}`}
                     >
                       <div className="flex gap-4">
-                        {/* Image */}
                         <div className="relative flex-shrink-0">
                           <div className="w-16 h-16 overflow-hidden rounded-xl bg-gray-100 flex items-center justify-center">
                             {img ? (
@@ -193,9 +196,7 @@ export default function NotificationPage() {
                                 src={img}
                                 className="w-full h-full object-cover"
                                 alt={title}
-                                onError={(e) => {
-                                  e.currentTarget.src = '/icons/icon-192x192.png';
-                                }}
+                                onError={(e) => { e.currentTarget.src = '/icons/icon-192x192.png'; }}
                               />
                             ) : (
                               <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
@@ -208,7 +209,6 @@ export default function NotificationPage() {
                           )}
                         </div>
 
-                        {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="mb-2">
                             <h3 className={`font-semibold ${isUnread ? 'text-gray-900' : 'text-gray-700'} line-clamp-2`}>
