@@ -27,22 +27,38 @@ export default function Login() {
     // eslint-disable-next-line no-console
     console.log('=== LOGIN SUCCESS RESPONSE ===', res);
 
-    // 1) Tangkap sinyal unverified dari BE
-    const statusStr = res?.status || res?.data?.status;        // "unverified" (string)
-    const reason = res?.reason || res?.data?.reason;        // "unverified"
-    const rurl = res?.redirect_url || res?.data?.redirect_url; // "/verifikasi?email=..."
-    const email = res?.email || res?.data?.email || '';
+    // bedakan http code vs business status
+    const httpCode = res?.status ?? res?.code ?? 200;
+    const bizStatus = typeof res?.data?.status === 'string'
+      ? res.data.status
+      : (typeof res?.status === 'string' ? res.status : undefined);
 
-    if (statusStr === 'unverified' || reason === 'unverified' || rurl) {
+    const reason = typeof res?.data?.reason === 'string'
+      ? res.data.reason
+      : (typeof res?.reason === 'string' ? res.reason : undefined);
+
+    // ambil redirect_url & email dari body lebih dulu
+    const rurl = res?.data?.redirect_url || res?.redirect_url || null;
+    const email = res?.data?.email || res?.email || '';
+
+    // anggap unverified jika: http 202 ATAU business status/reason 'unverified' ATAU ada redirect_url
+    const needVerify =
+      httpCode === 202 ||
+      bizStatus === 'unverified' ||
+      reason === 'unverified' ||
+      !!rurl ||
+      res?.data?.need_verification === true ||
+      res?.need_verification === true;
+
+    if (needVerify) {
       const next = router?.query?.next ? String(router.query.next) : null;
-      const target = rurl
-        ? rurl + (next ? `&next=${encodeURIComponent(next)}` : '')
-        : `/verifikasi?email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
+      const target = (rurl || `/verifikasi?email=${encodeURIComponent(email)}`)
+        + (next ? `&next=${encodeURIComponent(next)}` : '');
       window.location.href = target;
       return;
     }
 
-    // 2) Normal flow (sudah verified): simpan token
+    // sudah verified → simpan token
     const token = res?.data?.token || res?.token;
     if (token) {
       Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
@@ -50,7 +66,6 @@ export default function Login() {
       return;
     }
 
-    // 3) Fallback: kalau tidak ada token & bukan unverified → log saja
     // eslint-disable-next-line no-console
     console.error('No token and no unverified signal in response:', res);
   };
