@@ -2,11 +2,7 @@
 import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
-import dynamic from 'next/dynamic';
-const QRCodeCanvas = dynamic(
-  () => import('qrcode.react').then(m => m.QRCodeCanvas),
-  { ssr: false }
-);
+import { QRCodeCanvas } from 'qrcode.react';
 import React, { useRef, useState } from 'react';
 import {
   ButtonComponent,
