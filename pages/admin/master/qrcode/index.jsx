@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../../../helpers';
-import { Decrypt } from '../../../../helpers/encryption.helpers';
 import Image from 'next/image';
 import { QRCodeSVG } from 'qrcode.react';
-import { faEdit, faPlus, faTrash, faDownload } from '@fortawesome/free-solid-svg-icons';
+import React, { useState } from 'react';
 import {
-  ButtonComponent,
-  TableSupervisionComponent,
-  FloatingPageComponent,
-  ModalConfirmComponent,
+    ButtonComponent,
+    FloatingPageComponent,
+    ModalConfirmComponent,
+    TableSupervisionComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
+import { token_cookie_name } from '../../../../helpers';
+import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 export default function QRCodeCrud() {
   const [qrList, setQrList] = useState([]);
@@ -372,7 +372,7 @@ export default function QRCodeCrud() {
                         : `Voucher: ${selectedItem.voucher.name || selectedItem.voucher.kode || selectedItem.voucher.id}`}
                     </div>
                     <div className="text-sm text-secondary mt-1">
-                      Community: {selectedItem.promo?.community_id || selectedItem.voucher?.community_id || 'default'}
+                      Community: {selectedItem.promo?.community_id || selectedItem.voucher?.community?.id || selectedItem.voucher?.community_id || 'default'}
                     </div>
                   </div>
                   <ButtonComponent
