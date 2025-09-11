@@ -21,15 +21,15 @@ export default function BuatAkun() {
   }, [router]);
 
   const onSuccess = (data) => {
-    // PASTIKAN tidak menyimpan token dari register
     try { Cookies.remove(token_cookie_name); } catch (e) { }
 
     const user = data?.data?.user;
     const userEmail = user?.email || '';
-    const rawNext = router?.query?.next;
+    const rawNext = router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
     const target = rawNext
       ? `/verifikasi?email=${encodeURIComponent(userEmail)}&next=${encodeURIComponent(String(rawNext))}`
       : `/verifikasi?email=${encodeURIComponent(userEmail)}`;
+    if (rawNext) localStorage.removeItem('postAuthRedirect');
     window.location.href = target;
   };
 
@@ -61,14 +61,17 @@ export default function BuatAkun() {
 
       if (response.status === 200) {
         Cookies.set(token_cookie_name, Encrypt(response.data.token), { secure: true });
-        const rawNext = router?.query?.next;
+        const rawNext = router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
         const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
+        if (rawNext) localStorage.removeItem('postAuthRedirect');
         window.location.href = next || '/app';
       } else if (response.status === 202) {
-        const rawNext = router?.query?.next;
+        const rawNext = router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
         const next = rawNext ? String(rawNext) : null;
+        if (rawNext) localStorage.removeItem('postAuthRedirect');
         window.location.href = next ? `/verifikasi?next=${encodeURIComponent(next)}` : '/verifikasi';
       }
+
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e);
