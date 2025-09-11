@@ -68,7 +68,7 @@ export default function NotificationPage() {
 
   const cardMeta = (n) => {
     if (!n || typeof n !== 'object') {
-      return { img: null, title: 'Notifikasi', isVoucher: false, isPromo: false, actionUrl: null, badge: null };
+      return { img: null, title: 'Notifikasi', isVoucher: false, isPromo: false };
     }
 
     const img =
@@ -89,13 +89,7 @@ export default function NotificationPage() {
     const isVoucher = n.type === 'voucher' || n.target_type === 'voucher';
     const isPromo   = n.type === 'promo'   || n.target_type === 'promo';
 
-    let badge = null;
-    if (isVoucher) badge = { text: 'Voucher', color: 'bg-purple-100 text-purple-700' };
-    else if (isPromo) badge = { text: 'Promo', color: 'bg-orange-100 text-orange-700' };
-    else if (n.type === 'grab') badge = { text: 'Grab', color: 'bg-green-100 text-green-700' };
-    else if (n.type === 'ad') badge = { text: 'Iklan', color: 'bg-blue-100 text-blue-700' };
-
-    return { img, title, isVoucher, isPromo, badge };
+    return { img, title, isVoucher, isPromo };
   };
 
   return (
@@ -176,7 +170,7 @@ export default function NotificationPage() {
                 </div>
               ) : items.length > 0 ? (
                 items.map((item, idx) => {
-                  const { img, title, isVoucher, badge } = cardMeta(item);
+                  const { img, title, isVoucher } = cardMeta(item);
                   const isUnread = !item.read_at;
 
                   return (
@@ -212,15 +206,10 @@ export default function NotificationPage() {
 
                         {/* Content */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="mb-2">
                             <h3 className={`font-semibold ${isUnread ? 'text-gray-900' : 'text-gray-700'} line-clamp-2`}>
                               {title}
                             </h3>
-                            {badge && (
-                              <span className={`px-2 py-1 text-xs font-medium rounded-lg ${badge.color} flex-shrink-0`}>
-                                {badge.text}
-                              </span>
-                            )}
                           </div>
 
                           <p className="text-gray-600 text-sm mb-3 line-clamp-2">
