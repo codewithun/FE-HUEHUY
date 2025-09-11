@@ -8,27 +8,26 @@ import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
-
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
 
 export default function NotificationPage() {
   const [type, setType] = useState('merchant'); // 'hunter' | 'merchant'
 
+  // endpoint backend: /api/notification
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}`,
     [type]
   );
 
   const res = useGet({ path });
-  const loading = Array.isArray(res) ? Boolean(res[0]) : false;
+  const loading  = Array.isArray(res) ? Boolean(res[0]) : false;
   const httpCode = Array.isArray(res) ? res[1] : null;
-  const payload = Array.isArray(res) ? res[2] : null;
+  const payload  = Array.isArray(res) ? res[2] : null;
 
   const items = Array.isArray(payload?.data) ? payload.data : [];
 
   useEffect(() => {
     if (!DEBUG) return;
-    // Debug ringan
     // eslint-disable-next-line no-console
     console.log('NOTIF DEBUG', { type, path, res, loading, httpCode, payload, items });
   }, [type, path, res, loading, httpCode, payload]);
@@ -39,14 +38,18 @@ export default function NotificationPage() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  async function claimVoucher(voucherId) {
+  async function claimVoucher(voucherId, notificationId) {
     try {
       const res = await fetch(`${apiBase}/api/vouchers/${voucherId}/claim`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
+          'Content-Type': 'application/json',
           ...authHeader(),
         },
+        body: JSON.stringify({
+          notification_id: notificationId, // <<— penting: kirim ke BE biar notif dihapus
+        }),
       });
 
       const text = await res.text();
@@ -60,6 +63,7 @@ export default function NotificationPage() {
       }
 
       alert('Voucher berhasil diklaim!');
+      // Voucher sudah masuk Saku; notifikasi terkait sudah dibersihkan di BE
       window.location.href = '/app/saku';
     } catch (e) {
       alert('Gagal klaim: ' + (e?.message || 'Network error'));
@@ -223,7 +227,7 @@ export default function NotificationPage() {
 
                             {isVoucher && item?.target_id && (
                               <button
-                                onClick={() => claimVoucher(item.target_id)}
+                                onClick={() => claimVoucher(item.target_id, item.id)}
                                 className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark transition-colors"
                               >
                                 Klaim voucher
