@@ -236,11 +236,9 @@ export default function QRCodeCrud() {
     }
     if (item.voucher) {
       const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-      // Use community_id field directly since voucher doesn't have community relationship
-      const communityId = item.voucher.community_id || 'global';
-      console.log('Voucher Community ID:', communityId);
+      // Voucher tidak memerlukan community_id karena bersifat global
       console.log('Voucher ID:', id);
-      const qrValue = `${origin}/app/voucher/detail_voucher?voucherId=${id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
+      const qrValue = `${origin}/app/voucher/${id}?autoRegister=1&source=qr_scan`;
       console.log('Generated QR Value:', qrValue);
       return qrValue;
     }
