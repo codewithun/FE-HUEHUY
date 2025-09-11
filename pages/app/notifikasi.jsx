@@ -76,22 +76,27 @@ export default function NotificationPage() {
     }
   }
 
-  // === NEW: Hapus semua notifikasi pengguna ini ===
+  // === NEW: Hapus semua notifikasi pengguna ini (HARD DELETE) ===
   async function clearAllNotifications() {
-    const ok = window.confirm('Hapus semua notifikasi? Tindakan ini tidak bisa dibatalkan.');
+    const ok = window.confirm(
+      `Hapus semua notifikasi di tab "${type}"? Tindakan ini tidak bisa dibatalkan.`
+    );
     if (!ok) return;
 
     try {
       setClearing(true);
-      const res = await fetch(`${apiBase}/api/notification/read-all`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          ...authHeader(),
-        },
-        body: JSON.stringify({}),
-      });
+
+      // pakai DELETE dan kirim filter sesuai tab aktif
+      const res = await fetch(
+        `${apiBase}/api/notification?type=${encodeURIComponent(type)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Accept: 'application/json',
+            ...authHeader(), // pastikan Authorization: Bearer <token>
+          },
+        }
+      );
 
       const text = await res.text();
       let json = {};
@@ -103,15 +108,16 @@ export default function NotificationPage() {
         return;
       }
 
-      // FE kosongkan list & re-fetch (cache-buster)
+      // Kosongkan list lokal & paksa re-fetch
       setLocalItems([]);
-      setVersion((v) => v + 1);
+      setVersion(v => v + 1);
     } catch (e) {
       alert('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
     } finally {
       setClearing(false);
     }
   }
+
 
   const cardMeta = (n) => {
     if (!n || typeof n !== 'object') {
