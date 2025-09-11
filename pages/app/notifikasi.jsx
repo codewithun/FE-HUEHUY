@@ -3,13 +3,17 @@ import React, { useMemo, useState, useEffect } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import { useGet } from '../../helpers';
 import { DateFormatComponent } from '../../components/base.components';
+import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../helpers';
+import { Decrypt } from '../../helpers/encryption.helpers';
 
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
+
+const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
 
 export default function NotificationPage() {
   const [type, setType] = useState('merchant'); // 'hunter' | 'merchant'
 
-  // path API — backend route: /api/notification (singular)
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}`,
     [type]
@@ -20,30 +24,53 @@ export default function NotificationPage() {
   const httpCode = Array.isArray(res) ? res[1] : null;
   const payload = Array.isArray(res) ? res[2] : null;
 
-  // Normalisasi data agar aman
   const items = Array.isArray(payload?.data) ? payload.data : [];
 
   useEffect(() => {
     if (!DEBUG) return;
-    // Debug ringan saat dev saja
-    /* eslint-disable no-console */
-    console.log('=== NOTIFICATION DEBUG ===');
-    console.log('Type:', type);
-    console.log('API Path:', path);
-    console.log('useGet raw:', res);
-    console.log('Loading:', loading, 'HTTP code:', httpCode);
-    console.log('payload:', payload);
-    console.log('items:', items);
-    console.log('==========================');
-    /* eslint-enable no-console */
+    // Debug ringan
+    // eslint-disable-next-line no-console
+    console.log('NOTIF DEBUG', { type, path, res, loading, httpCode, payload, items });
   }, [type, path, res, loading, httpCode, payload]);
+
+  const authHeader = () => {
+    const enc = Cookies.get(token_cookie_name);
+    const token = enc ? Decrypt(enc) : '';
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  async function claimVoucher(voucherId) {
+    try {
+      const res = await fetch(`${apiBase}/api/vouchers/${voucherId}/claim`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          ...authHeader(),
+        },
+      });
+
+      const text = await res.text();
+      let json = {};
+      try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+
+      if (!res.ok) {
+        const msg = json?.message || `HTTP ${res.status}`;
+        alert('Gagal klaim: ' + msg);
+        return;
+      }
+
+      alert('Voucher berhasil diklaim!');
+      window.location.href = '/app/saku';
+    } catch (e) {
+      alert('Gagal klaim: ' + (e?.message || 'Network error'));
+    }
+  }
 
   const cardMeta = (n) => {
     if (!n || typeof n !== 'object') {
-      return { img: null, title: 'Notifikasi', isVoucher: false, actionUrl: null };
+      return { img: null, title: 'Notifikasi', isVoucher: false, isPromo: false };
     }
 
-    // Ambil image prioritas dari payload datar, fallback ke relasi legacy
     const img =
       n.image_url ||
       n?.grab?.ad?.picture_source ||
@@ -52,7 +79,6 @@ export default function NotificationPage() {
       n?.cube?.logo ||
       null;
 
-    // Judul prioritas
     const title =
       n.title ||
       n?.grab?.ad?.title ||
@@ -60,41 +86,22 @@ export default function NotificationPage() {
       n?.cube?.name ||
       'Notifikasi';
 
-    // Deteksi voucher untuk CTA
     const isVoucher = n.type === 'voucher' || n.target_type === 'voucher';
-    const isPromo = n.type === 'promo' || n.target_type === 'promo';
+    const isPromo   = n.type === 'promo'   || n.target_type === 'promo';
 
-    // Pakai action_url dari backend kalau ada; fallback ke pattern default
-    let actionUrl = n.action_url || (isVoucher && n.target_id ? `/vouchers/${n.target_id}` : null);
-
-    // Prefix /app untuk konsistensi v2.huehuy.com/app/...
-    if (actionUrl && !actionUrl.startsWith('/app')) {
-      actionUrl = `/app${actionUrl}`;
-    }
-
-    // Badge untuk tipe notifikasi
-    let badge = null;
-    if (isVoucher) badge = { text: 'Voucher', color: 'bg-purple-100 text-purple-700' };
-    else if (isPromo) badge = { text: 'Promo', color: 'bg-orange-100 text-orange-700' };
-    else if (n.type === 'grab') badge = { text: 'Grab', color: 'bg-green-100 text-green-700' };
-    else if (n.type === 'ad') badge = { text: 'Iklan', color: 'bg-blue-100 text-blue-700' };
-
-    return { img, title, isVoucher, isPromo, actionUrl, badge };
+    return { img, title, isVoucher, isPromo };
   };
 
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
-        {/* Header dengan background hijau penuh */}
+        {/* Header */}
         <div className="bg-primary w-full px-4 pt-6 pb-16">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-white font-bold text-2xl">Notifikasi</h1>
-              <p className="text-white text-sm mt-1">
-                Lihat pembaruan dan aktivitas terbaru
-              </p>
+              <p className="text-white text-sm mt-1">Lihat pembaruan dan aktivitas terbaru</p>
             </div>
-            {/* Icon notifikasi */}
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
@@ -105,7 +112,7 @@ export default function NotificationPage() {
 
         {/* Body */}
         <div className="bg-gray-50 min-h-screen w-full relative z-20 pb-28">
-          {/* Tabs dengan design sederhana */}
+          {/* Tabs */}
           <div className="-mt-12 mx-4 mb-6">
             <div className="grid grid-cols-2 gap-1">
               <button
@@ -133,11 +140,10 @@ export default function NotificationPage() {
             </div>
           </div>
 
-          {/* List dengan spacing yang lebih baik */}
+          {/* List */}
           <div className="px-4">
             <div className="space-y-4">
               {loading ? (
-                // Skeleton dengan design yang lebih halus
                 <>
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="bg-white rounded-2xl p-4 shadow-sm">
@@ -164,7 +170,7 @@ export default function NotificationPage() {
                 </div>
               ) : items.length > 0 ? (
                 items.map((item, idx) => {
-                  const { img, title, isVoucher, actionUrl, badge } = cardMeta(item);
+                  const { img, title, isVoucher } = cardMeta(item);
                   const isUnread = !item.read_at;
 
                   return (
@@ -175,7 +181,7 @@ export default function NotificationPage() {
                       key={item?.id ?? `notif-${idx}`}
                     >
                       <div className="flex gap-4">
-                        {/* Image dengan ukuran yang lebih konsisten */}
+                        {/* Image */}
                         <div className="relative flex-shrink-0">
                           <div className="w-16 h-16 overflow-hidden rounded-xl bg-gray-100 flex items-center justify-center">
                             {img ? (
@@ -193,7 +199,6 @@ export default function NotificationPage() {
                               </svg>
                             )}
                           </div>
-                          {/* Indicator unread */}
                           {isUnread && (
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full border-2 border-white"></div>
                           )}
@@ -201,15 +206,10 @@ export default function NotificationPage() {
 
                         {/* Content */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <h3 className={`font-semibold text-gray-900 line-clamp-2 ${isUnread ? 'text-gray-900' : 'text-gray-700'}`}>
+                          <div className="mb-2">
+                            <h3 className={`font-semibold ${isUnread ? 'text-gray-900' : 'text-gray-700'} line-clamp-2`}>
                               {title}
                             </h3>
-                            {badge && (
-                              <span className={`px-2 py-1 text-xs font-medium rounded-lg ${badge.color} flex-shrink-0`}>
-                                {badge.text}
-                              </span>
-                            )}
                           </div>
 
                           <p className="text-gray-600 text-sm mb-3 line-clamp-2">
@@ -221,16 +221,16 @@ export default function NotificationPage() {
                               <DateFormatComponent date={item?.created_at} />
                             </p>
 
-                            {isVoucher && actionUrl && (
-                              <a
-                                href={actionUrl}
+                            {isVoucher && item?.target_id && (
+                              <button
+                                onClick={() => claimVoucher(item.target_id)}
                                 className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark transition-colors"
                               >
                                 Klaim voucher
                                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
-                              </a>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -247,9 +247,7 @@ export default function NotificationPage() {
                     </svg>
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-2">Belum ada notifikasi</h3>
-                  <p className="text-gray-500 text-sm">
-                    Notifikasi baru akan muncul di sini
-                  </p>
+                  <p className="text-gray-500 text-sm">Notifikasi baru akan muncul di sini</p>
                 </div>
               )}
             </div>
