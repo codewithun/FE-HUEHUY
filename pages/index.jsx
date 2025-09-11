@@ -23,30 +23,51 @@ export default function Login() {
   const [loading, setLoading] = useState(true);
 
   // Perbaiki onSuccess function
-  const onSuccess = (data) => {
+  const onSuccess = (res) => {
     // eslint-disable-next-line no-console
-    console.log('=== LOGIN SUCCESS RESPONSE ===', data);
+    console.log('=== LOGIN SUCCESS RESPONSE ===', res);
 
-    // TANGANI UNVERIFIED (202) atau payload reason
-    const status = data?.status || data?.data?.status;
-    const reason = data?.data?.reason || data?.reason;
-    const email = data?.data?.email || data?.email || '';
+    // bedakan http code vs business status
+    const httpCode = res?.status ?? res?.code ?? 200;
+    const bizStatus = typeof res?.data?.status === 'string'
+      ? res.data.status
+      : (typeof res?.status === 'string' ? res.status : undefined);
 
-    if (status === 202 || reason === 'unverified') {
-      const target = email ? `/verifikasi?email=${encodeURIComponent(email)}` : '/verifikasi';
+    const reason = typeof res?.data?.reason === 'string'
+      ? res.data.reason
+      : (typeof res?.reason === 'string' ? res.reason : undefined);
+
+    // ambil redirect_url & email dari body lebih dulu
+    const rurl = res?.data?.redirect_url || res?.redirect_url || null;
+    const email = res?.data?.email || res?.email || '';
+
+    // anggap unverified jika: http 202 ATAU business status/reason 'unverified' ATAU ada redirect_url
+    const needVerify =
+      httpCode === 202 ||
+      bizStatus === 'unverified' ||
+      reason === 'unverified' ||
+      !!rurl ||
+      res?.data?.need_verification === true ||
+      res?.need_verification === true;
+
+    if (needVerify) {
+      const next = router?.query?.next ? String(router.query.next) : null;
+      const target = (rurl || `/verifikasi?email=${encodeURIComponent(email)}`)
+        + (next ? `&next=${encodeURIComponent(next)}` : '');
       window.location.href = target;
-      return; // stop, JANGAN set token
+      return;
     }
 
-    // flow lama: ambil token bila ada
-    const token = data?.data?.token;
+    // sudah verified → simpan token
+    const token = res?.data?.token || res?.token;
     if (token) {
       Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
       setTimeout(() => { window.location.href = '/app'; }, 100);
-    } else {
-      // eslint-disable-next-line no-console
-      console.error('No token found in login response:', data);
+      return;
     }
+
+    // eslint-disable-next-line no-console
+    console.error('No token and no unverified signal in response:', res);
   };
 
   const [{ formControl, submit, submitLoading, setDefaultValues }] = useForm(

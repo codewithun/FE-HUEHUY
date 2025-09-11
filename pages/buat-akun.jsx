@@ -21,10 +21,8 @@ export default function BuatAkun() {
   }, [router]);
 
   const onSuccess = (data) => {
-    const token = data?.data?.token || data?.data?.user_token;
-    if (token) {
-      Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
-    }
+    // PASTIKAN tidak menyimpan token dari register
+    try { Cookies.remove(token_cookie_name); } catch (e) { }
 
     const user = data?.data?.user;
     const userEmail = user?.email || '';
