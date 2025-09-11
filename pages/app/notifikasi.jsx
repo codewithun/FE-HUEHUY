@@ -85,12 +85,12 @@ export default function NotificationPage() {
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
-        {/* Header dengan gradient yang lebih smooth */}
-        <div className="bg-gradient-to-br from-primary to-primary-dark w-full px-4 pt-6 pb-20">
+        {/* Header dengan background hijau penuh */}
+        <div className="bg-primary w-full px-4 pt-6 pb-16">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-white font-bold text-2xl">Notifikasi</h1>
-              <p className="text-white/80 text-sm mt-1">
+              <p className="text-white text-sm mt-1">
                 Lihat pembaruan dan aktivitas terbaru
               </p>
             </div>
@@ -105,30 +105,30 @@ export default function NotificationPage() {
 
         {/* Body */}
         <div className="bg-gray-50 min-h-screen w-full relative z-20 pb-28">
-          {/* Tabs dengan design yang lebih modern */}
+          {/* Tabs dengan design sederhana */}
           <div className="-mt-12 mx-4 mb-6">
-            <div className="bg-white rounded-2xl shadow-lg p-1 grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-2 gap-1">
               <button
                 type="button"
-                className={`text-center py-4 font-semibold rounded-xl transition-all duration-200 ${
+                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${
                   type === 'hunter'
-                    ? 'bg-primary text-white shadow-md'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'bg-white text-primary border-b-2 border-primary'
+                    : 'bg-white/80 text-gray-600'
                 }`}
                 onClick={() => setType('hunter')}
               >
-                🎯 Hunter
+                Hunter
               </button>
               <button
                 type="button"
-                className={`text-center py-4 font-semibold rounded-xl transition-all duration-200 ${
+                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${
                   type === 'merchant'
-                    ? 'bg-primary text-white shadow-md'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'bg-white text-primary border-b-2 border-primary'
+                    : 'bg-white/80 text-gray-600'
                 }`}
                 onClick={() => setType('merchant')}
               >
-                🏪 Merchant
+                Merchant
               </button>
             </div>
           </div>
