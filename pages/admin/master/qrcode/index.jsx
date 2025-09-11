@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
@@ -221,12 +222,20 @@ export default function QRCodeCrud() {
   const buildTargetUrl = (item) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     if (!item) return '';
+    
+    console.log('=== QR GENERATION DEBUG ===');
+    console.log('Item:', item);
+    
     if (item.promo) {
-      return `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${item.promo.community_id || 'default'}&autoRegister=1`;
+      const communityId = item.promo.community?.id || item.promo.community_id || 'default';
+      console.log('Promo Community ID:', communityId);
+      return `${origin}/app/komunitas/promo/${item.promo.id}?communityId=${communityId}&autoRegister=1`;
     }
     if (item.voucher) {
       const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-      return `${origin}/app/voucher/${id}?communityId=${item.voucher.community_id || 'default'}&autoRegister=1`;
+      const communityId = item.voucher.community?.id || item.voucher.community_id || 'default';
+      console.log('Voucher Community ID:', communityId);
+      return `${origin}/app/voucher/${id}?communityId=${communityId}&autoRegister=1`;
     }
     return '';
   };
