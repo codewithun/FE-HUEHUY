@@ -3,7 +3,7 @@ import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { QRCodeCanvas } from 'qrcode.react';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   ButtonComponent,
   FloatingPageComponent,
@@ -31,10 +31,19 @@ export default function QRCodeCrud() {
   // qrUrl disimpan di state supaya tidak re-render aneh
   const [qrUrl, setQrUrl] = useState('');
 
+  // Base API & Storage
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const apiBase = apiUrl.replace(/\/+$/, '');
-  // Base URL untuk storage tanpa /api/ path
-  const storageBase = apiBase.replace('/api', '');
+  // Hapus '/api' hanya jika berada di UJUNG string
+  const storageBase = apiBase.replace(/\/api\/?$/, '');
+
+  // Helper membentuk URL image storage yang aman
+  const toStorageUrl = (path) => {
+    if (!path) return '';
+    // kalau backend sudah kirim absolute URL, langsung pakai
+    if (/^https?:\/\//i.test(path)) return path;
+    return `${storageBase}/storage/${path}`.replace(/([^:]\/)\/+/g, '$1');
+  };
 
   const columns = [
     {
@@ -62,7 +71,7 @@ export default function QRCodeCrud() {
       item: ({ qr_code }) =>
         qr_code ? (
           <Image
-            src={`${storageBase}/storage/${qr_code}`}
+            src={toStorageUrl(qr_code)}
             alt="QR"
             width={48}
             height={48}
@@ -81,7 +90,7 @@ export default function QRCodeCrud() {
   ];
 
   // Fetch data QR code saat halaman dibuka
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
@@ -108,8 +117,9 @@ export default function QRCodeCrud() {
                 .filter(Boolean)
                 .join(' | '),
               voucher: item.voucher, // keep as object
-              promo: item.promo, // keep as object
-              qr_code: item.qr_code || item.path, // path file di storage (SVG/PNG)
+              promo: item.promo,     // keep as object
+              // backend bisa kirim path relatif (qr_code/path) atau absolute url
+              qr_code: item.qr_code || item.path,
               created_at: item.created_at,
             }))
           );
@@ -122,7 +132,7 @@ export default function QRCodeCrud() {
   }, [apiBase]);
 
   // Fetch data voucher, promo saat modalForm dibuka
-  React.useEffect(() => {
+  useEffect(() => {
     if (modalForm) {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
@@ -168,11 +178,10 @@ export default function QRCodeCrud() {
         }),
       });
 
-      // Antisipasi 204/500 tanpa body JSON
       let result = {};
       try {
-        result = await res.json();
-      } catch (_) {
+        result = await res.json(); // antisipasi 204/500 tanpa body
+      } catch {
         result = {};
       }
 
@@ -218,17 +227,8 @@ export default function QRCodeCrud() {
   };
 
   const handleUpdate = () => {
-    // FE-only placeholder, bisa disambungkan ke API update jika diperlukan
-    if (!formData.text) return;
-    const qr_code_value = formData.text + (formData.voucher ? `|${formData.voucher}` : '');
-    setQrList(
-      qrList.map(item =>
-        item.id === selectedItem.id
-          ? { ...item, text: formData.text, voucher: formData.voucher, qr_code: qr_code_value }
-          : item
-      )
-    );
-    setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
+    // FE-only placeholder; sambungkan ke API update jika diperlukan
+    if (!formData.tenant_name) return;
     setModalForm(false);
     setSelectedItem(null);
   };
@@ -258,7 +258,7 @@ export default function QRCodeCrud() {
     if (!item) return '';
 
     if (item.promo) {
-      const communityId = item.promo.community?.id || item.promo.community_id || 'default';
+      const communityId = item.promo?.community?.id || item.promo?.community_id || 'default';
       return `${origin}/app/komunitas/promo/detail_promo?promoId=${item.promo.id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
     }
     if (item.voucher) {
@@ -269,83 +269,65 @@ export default function QRCodeCrud() {
   };
 
   // setiap selectedItem berubah, stabilkan qrUrl di state
-  React.useEffect(() => {
+  useEffect(() => {
     if (!selectedItem) return setQrUrl('');
     setQrUrl(buildTargetUrl(selectedItem));
     // reset ref biar clean
     qrCanvasRef.current = null;
   }, [selectedItem]);
 
-  // === Download PNG dari SERVER (kalau backend simpan PNG) ===
-  const handleDownloadPngServer = async () => {
+  // === Download: pilih otomatis server-PNG atau FE konversi SVG -> PNG ===
+  const smartDownload = async () => {
     try {
       const path = selectedItem?.qr_code || selectedItem?.path;
       if (!path) {
         alert('Path QR di server tidak ditemukan.');
         return;
       }
-      // Gunakan storageBase (tanpa /api/) untuk mengakses file storage
-      const fileUrl = `${storageBase}/storage/${path}`;
 
-      // Hindari mixed-content: FE https, API http
+      const fileUrl = toStorageUrl(path);
+
+      // Hindari mixed-content: FE https, file http
       if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fileUrl.startsWith('http:')) {
-        alert('Gagal karena mixed-content (FE https, API http). Pakai https untuk API.');
+        alert('Gagal karena mixed-content (FE https, API http). Pastikan API/storage pakai HTTPS.');
         return;
       }
 
+      // Coba GET untuk cek content-type
       const res = await fetch(fileUrl, { mode: 'cors' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const blob = await res.blob();
-      const fileName = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
-      const objectUrl = URL.createObjectURL(blob);
-
-      const a = document.createElement('a');
-      a.href = objectUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objectUrl);
-    } catch (e) {
-      console.error('Download PNG server gagal:', e);
-      alert('Tidak bisa mengunduh PNG dari server. Cek URL /storage dan CORS server.');
-    }
-  };
-
-  // === Download PNG via FE Convert (SVG -> PNG) ===
-  const handleDownloadPngFE = async () => {
-    try {
-      const path = selectedItem?.qr_code || selectedItem?.path;
-      if (!path) {
-        alert('Path QR di server tidak ditemukan.');
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('image/png') || /\.png(\?|#|$)/i.test(fileUrl)) {
+        // langsung unduh PNG dari server
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
         return;
       }
 
-      // Gunakan storageBase (tanpa /api/) untuk mengakses file storage
-      const url = `${storageBase}/storage/${path}`;
-
-      // Ambil SVG sebagai text
-      const res = await fetch(url, { mode: 'cors' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Kalau SVG, ambil sebagai text lalu convert ke PNG
       const svgText = await res.text();
 
-      // Buat Image dari data:URL SVG
+      // Buat Image dari data:URL SVG (hindari unicode issue)
       const img = new Image();
-      // penting utk menghindari tainting saat toDataURL
       img.crossOrigin = 'anonymous';
       const svg64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
 
-      // Tunggu load, lalu gambar ke canvas dengan size tinggi
       await new Promise((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = reject;
         img.src = svg64;
       });
 
-      // Tentukan target size PNG (misal 2048px biar tajam)
-      const TARGET = 2048;
-      // jaga rasio
+      // Render ke canvas resolusi besar (tajam cetak)
+      const TARGET = 2048; // px sisi lebar
       const ratio = img.width && img.height ? img.height / img.width : 1;
       const canvas = document.createElement('canvas');
       canvas.width = TARGET;
@@ -353,7 +335,6 @@ export default function QRCodeCrud() {
 
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas 2D context not available');
-      // background putih supaya tidak transparan
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -366,8 +347,8 @@ export default function QRCodeCrud() {
       a.click();
       a.remove();
     } catch (e) {
-      console.error('FE convert SVG->PNG gagal:', e);
-      alert('Gagal mengubah SVG ke PNG di browser.');
+      console.error('Unduh QR gagal:', e);
+      alert('Tidak bisa mengunduh QR. Cek URL /storage, HTTPS, dan CORS server.');
     }
   };
 
@@ -418,7 +399,7 @@ export default function QRCodeCrud() {
       >
         <form
           className="flex flex-col gap-4 p-6"
-          onSubmit={e => {
+          onSubmit={(e) => {
             e.preventDefault();
             selectedItem ? handleUpdate() : handleAdd();
           }}
@@ -428,11 +409,11 @@ export default function QRCodeCrud() {
             <select
               className="input input-bordered w-full"
               value={formData.voucher_id}
-              onChange={e => setFormData({ ...formData, voucher_id: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, voucher_id: e.target.value })}
             >
               <option value="">Pilih Voucher</option>
               {voucherList.length === 0 && <option value="" disabled>Tidak ada voucher</option>}
-              {voucherList.map(v => (
+              {voucherList.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name || v.kode || v.id}
                 </option>
@@ -444,11 +425,11 @@ export default function QRCodeCrud() {
             <select
               className="input input-bordered w-full"
               value={formData.promo_id}
-              onChange={e => setFormData({ ...formData, promo_id: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, promo_id: e.target.value })}
             >
               <option value="">Pilih Promo</option>
               {promoList.length === 0 && <option value="" disabled>Tidak ada promo</option>}
-              {promoList.map(p => (
+              {promoList.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name || p.kode || p.id}
                 </option>
@@ -462,7 +443,7 @@ export default function QRCodeCrud() {
               className="input input-bordered w-full"
               placeholder="Masukkan nama tenant"
               value={formData.tenant_name}
-              onChange={e => setFormData({ ...formData, tenant_name: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, tenant_name: e.target.value })}
             />
           </div>
           <div className="flex gap-2 justify-end mt-4">
@@ -522,20 +503,13 @@ export default function QRCodeCrud() {
                   </div>
                 </div>
 
-                {/* Tombol unduhan */}
+                {/* Satu tombol unduh pintar */}
                 <div className="flex gap-2">
                   <ButtonComponent
-                    label="Download QR (PNG • FE Convert)"
+                    label="Download QR (PNG)"
                     icon={faDownload}
                     paint="primary"
-                    onClick={handleDownloadPngFE}
-                  />
-                  <ButtonComponent
-                    label="Download QR (PNG • Server)"
-                    icon={faDownload}
-                    paint="secondary"
-                    variant="outline"
-                    onClick={handleDownloadPngServer}
+                    onClick={smartDownload}
                   />
                 </div>
               </>
