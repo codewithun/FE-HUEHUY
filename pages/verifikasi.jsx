@@ -13,6 +13,7 @@ import { post, useForm, useGet, token_cookie_name } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
 
 const isSafeInternal = (url) => {
+  if (typeof window === 'undefined') return false;
   try { return new URL(url, window.location.origin).origin === window.location.origin; }
   catch { return false; }
 };
@@ -52,48 +53,45 @@ export default function Verification() {
       }
 
       const redirectUrl = response?.data?.redirect_url || response?.data?.data?.redirect_url;
-      if (redirectUrl) {
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 500);
-        return;
-      }
-
-      const next = router.query.next;
+      const qNext = typeof router.query.next === 'string' ? router.query.next : null;
       const email = router.query.email;
 
-      if (next) {
-        const targetUrl = decodeURIComponent(String(next));
-        setTimeout(() => {
-          window.location.href = targetUrl;
-        }, 500);
-        return;
+      // 1) pakai next dari query terlebih dulu (prioritas utama)
+      if (qNext) {
+        let targetUrl = String(qNext);
+        try { targetUrl = decodeURIComponent(targetUrl); } catch { }
+        try { targetUrl = decodeURIComponent(targetUrl); } catch { }
+        if (isSafeInternal(targetUrl)) {
+          setTimeout(() => { window.location.href = targetUrl; }, 400);
+          return;
+        }
       }
-      // Fallback ke postAuthRedirect jika redirect_url & next kosong
+
+      // 2) fallback ke yang kita simpan sebelumnya (postAuthRedirect)
       const storedNext = consumeNext();
       if (storedNext) {
         setTimeout(() => { window.location.href = storedNext; }, 400);
         return;
       }
 
-      // Jika tidak ada token dari BE setelah verify, arahkan ke login agar sesi jelas
-      if (!maybeToken) {
-        const loginUrl = email ? `/?email=${encodeURIComponent(String(email))}&verified=1` : '/';
-        setTimeout(() => {
-          window.location.href = loginUrl;
-        }, 300);
+      // 3) kalau BE kasih redirect_url, hormati (hanya internal)
+      if (redirectUrl && isSafeInternal(redirectUrl)) {
+        setTimeout(() => { window.location.href = redirectUrl; }, 500);
         return;
       }
 
-      setTimeout(() => {
-        window.location.href = '/app';
-      }, 200);
-    } catch (e) {
+      // 4) jika tidak ada token dari BE setelah verify, arahkan ke login agar sesi jelas
+      if (!maybeToken) {
+        const loginUrl = email ? `/?email=${encodeURIComponent(String(email))}&verified=1` : '/';
+        setTimeout(() => { window.location.href = loginUrl; }, 300);
+        return;
+      }
+
+      // 5) fallback terakhir ke /app
+      setTimeout(() => { window.location.href = '/app'; }, 200);
+    } catch (error) {
       // eslint-disable-next-line no-console
-      console.error('Error in onSuccess:', e);
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 200);
+      console.error('Verification error:', error);
     }
   };
 
