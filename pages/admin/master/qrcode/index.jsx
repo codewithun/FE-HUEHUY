@@ -95,7 +95,7 @@ export default function QRCodeCrud() {
         const dataArray = Array.isArray(result) ? result : result.data;
         if (res.ok && Array.isArray(dataArray)) {
           setQrList(
-            dataArray.map(item => ({
+            dataArray.map((item) => ({
               id: item.id,
               tenant_name: item.tenant_name,
               text: [
@@ -106,8 +106,8 @@ export default function QRCodeCrud() {
                 .filter(Boolean)
                 .join(' | '),
               voucher: item.voucher, // keep as object
-              promo: item.promo,     // keep as object
-              qr_code: item.qr_code || item.path, // path file di storage (PNG)
+              promo: item.promo, // keep as object
+              qr_code: item.qr_code || item.path, // path file di storage (SVG/PNG)
               created_at: item.created_at,
             }))
           );
@@ -165,7 +165,15 @@ export default function QRCodeCrud() {
           tenant_name: formData.tenant_name,
         }),
       });
-      const result = await res.json();
+
+      // Antisipasi 204/500 tanpa body JSON
+      let result = {};
+      try {
+        result = await res.json();
+      } catch (_) {
+        result = {};
+      }
+
       if (res.ok && result.qrcode) {
         setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
         setModalForm(false);
@@ -181,7 +189,7 @@ export default function QRCodeCrud() {
         const dataArray = Array.isArray(resultList) ? resultList : resultList.data;
         if (resList.ok && Array.isArray(dataArray)) {
           setQrList(
-            dataArray.map(item => ({
+            dataArray.map((item) => ({
               id: item.id,
               tenant_name: item.tenant_name,
               text: [
@@ -208,7 +216,7 @@ export default function QRCodeCrud() {
   };
 
   const handleUpdate = () => {
-    // fungsi update FE-only (opsional), kamu bisa sambungkan ke API update bila perlu
+    // FE-only placeholder, bisa disambungkan ke API update jika diperlukan
     if (!formData.text) return;
     const qr_code_value = formData.text + (formData.voucher ? `|${formData.voucher}` : '');
     setQrList(
@@ -218,7 +226,7 @@ export default function QRCodeCrud() {
           : item
       )
     );
-    setFormData({ text: '', voucher: '' });
+    setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
     setModalForm(false);
     setSelectedItem(null);
   };
@@ -236,14 +244,14 @@ export default function QRCodeCrud() {
       paint="primary"
       onClick={() => {
         setSelectedItem(null);
-        setFormData({ text: '', voucher: '' });
+        setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
         setModalForm(true);
       }}
     />
   );
 
   // helper to build target URL (untuk nilai QR yang dipreview)
-  const buildTargetUrl = item => {
+  const buildTargetUrl = (item) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     if (!item) return '';
 
@@ -266,7 +274,7 @@ export default function QRCodeCrud() {
     qrCanvasRef.current = null;
   }, [selectedItem]);
 
-  // === Download PNG dari SERVER (bukan dari canvas) ===
+  // === Download PNG dari SERVER (kalau backend simpan PNG) ===
   const handleDownloadPngServer = async () => {
     try {
       const path = selectedItem?.qr_code || selectedItem?.path;
@@ -285,7 +293,7 @@ export default function QRCodeCrud() {
       const res = await fetch(fileUrl, { mode: 'cors' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const blob = await res.blob(); // harusnya image/png (server kita simpan PNG)
+      const blob = await res.blob();
       const fileName = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
       const objectUrl = URL.createObjectURL(blob);
 
@@ -299,6 +307,63 @@ export default function QRCodeCrud() {
     } catch (e) {
       console.error('Download PNG server gagal:', e);
       alert('Tidak bisa mengunduh PNG dari server. Cek URL /storage dan CORS server.');
+    }
+  };
+
+  // === Download PNG via FE Convert (SVG -> PNG) ===
+  const handleDownloadPngFE = async () => {
+    try {
+      const path = selectedItem?.qr_code || selectedItem?.path;
+      if (!path) {
+        alert('Path QR di server tidak ditemukan.');
+        return;
+      }
+
+      const url = `${apiBase}/storage/${path}`;
+
+      // Ambil SVG sebagai text
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const svgText = await res.text();
+
+      // Buat Image dari data:URL SVG
+      const img = new Image();
+      // penting utk menghindari tainting saat toDataURL
+      img.crossOrigin = 'anonymous';
+      const svg64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+
+      // Tunggu load, lalu gambar ke canvas dengan size tinggi
+      await new Promise((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = svg64;
+      });
+
+      // Tentukan target size PNG (misal 2048px biar tajam)
+      const TARGET = 2048;
+      // jaga rasio
+      const ratio = img.width && img.height ? img.height / img.width : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = TARGET;
+      canvas.height = Math.round(TARGET * ratio);
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context not available');
+      // background putih supaya tidak transparan
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const pngDataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = pngDataUrl;
+      a.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error('FE convert SVG->PNG gagal:', e);
+      alert('Gagal mengubah SVG ke PNG di browser.');
     }
   };
 
@@ -322,14 +387,14 @@ export default function QRCodeCrud() {
               Authorization: `Bearer ${token}`,
             };
           },
-          mapData: result => {
+          mapData: (result) => {
             if (Array.isArray(result)) {
               return { data: result, totalRow: result.length };
             }
             return result;
           },
         }}
-        onRowClick={item => {
+        onRowClick={(item) => {
           setSelectedItem(item);
           setModalView(true);
         }}
@@ -453,12 +518,19 @@ export default function QRCodeCrud() {
                   </div>
                 </div>
 
-                {/* Download via SERVER (PNG yang disimpan backend) */}
+                {/* Tombol unduhan */}
                 <div className="flex gap-2">
+                  <ButtonComponent
+                    label="Download QR (PNG • FE Convert)"
+                    icon={faDownload}
+                    paint="primary"
+                    onClick={handleDownloadPngFE}
+                  />
                   <ButtonComponent
                     label="Download QR (PNG • Server)"
                     icon={faDownload}
-                    paint="primary"
+                    paint="secondary"
+                    variant="outline"
                     onClick={handleDownloadPngServer}
                   />
                 </div>

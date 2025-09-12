@@ -119,13 +119,11 @@ export function TableSupervisionComponent({
     return data?.allowed_privileges
       ?.filter((p: string) => Number(p.split('.')[0]) == permissionCode)
       .map((p: string) => p.split('.')[1]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, permissionCode]);
 
   useEffect(() => {
     !loading && reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setToRefresh]);
+  }, [setToRefresh]); // eslint-disable-line
 
   useEffect(() => {
     if (!unUrlPage) {
@@ -139,8 +137,7 @@ export function TableSupervisionComponent({
           direction: sortDirectionParams as 'asc' | 'desc',
         });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router]); // eslint-disable-line
 
   useEffect(() => {
     if (!unUrlPage) {
@@ -153,6 +150,75 @@ export function TableSupervisionComponent({
       window.history.pushState({}, '', url.toString());
     }
   }, [page, paginate, sort.column, sort.direction, search, unUrlPage]);
+
+  // ===== Helper: unduh PNG dari /storage. Jika file SVG => convert ke PNG di FE =====
+  const downloadQrAsPng = async (path: string, filenameBase: string) => {
+    if (!path) {
+      alert('Path file QR di server tidak ditemukan.');
+      return;
+    }
+    const fileUrl = `${apiBase}/storage/${path}`;
+
+    // Hindari mixed-content: FE https, API http
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fileUrl.startsWith('http:')) {
+      alert('Gagal mengunduh karena mixed-content (FE https, API http). Pakai HTTPS untuk API.');
+      return;
+    }
+
+    const res = await fetch(fileUrl, { mode: 'cors' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const ctype = (res.headers.get('content-type') || '').toLowerCase();
+
+    // Jika sudah PNG → langsung download
+    if (ctype.includes('image/png') || /\.png(\?|$)/i.test(path)) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filenameBase}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Jika SVG → fetch text & convert ke PNG via canvas
+    const svgText = ctype.includes('svg') ? await res.text() : await (await fetch(fileUrl)).text();
+
+    // Buat <img> dari data:URL SVG
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const svg64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+      img.src = svg64;
+    });
+
+    // Render besar supaya tajam (ubah TARGET bila perlu)
+    const TARGET = 2048;
+    const ratio = img.width && img.height ? img.height / img.width : 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = TARGET;
+    canvas.height = Math.round(TARGET * ratio);
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context not available');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const pngDataUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = pngDataUrl;
+    a.download = `${filenameBase}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
 
   useEffect(() => {
     if (!loading) {
@@ -275,7 +341,7 @@ export function TableSupervisionComponent({
                       />
                     )}
 
-                  {/* Tombol Unduh QR - ambil PNG dari storage backend */}
+                  {/* Tombol Unduh QR - ambil dari storage backend; auto convert SVG -> PNG */}
                   {(originalData as any)[key]?.qr_code && (
                     <ButtonComponent
                       icon={faDownload}
@@ -288,37 +354,11 @@ export function TableSupervisionComponent({
                         try {
                           const item: any = (originalData as any)[key];
                           const path = item.qr_code || item.path;
-                          if (!path) {
-                            alert('Path file QR di server tidak ditemukan.');
-                            return;
-                          }
-                          const fileUrl = `${apiBase}/storage/${path}`;
-
-                          // Hindari mixed-content: FE https, API http
-                          if (
-                            typeof window !== 'undefined' &&
-                            window.location.protocol === 'https:' &&
-                            fileUrl.startsWith('http:')
-                          ) {
-                            alert('Gagal mengunduh karena mixed-content (FE https, API http). Pakai HTTPS untuk API.');
-                            return;
-                          }
-
-                          const res = await fetch(fileUrl, { mode: 'cors' });
-                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-                          const blob = await res.blob(); // seharusnya image/png
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `qr-${item.tenant_name || item.id || 'code'}.png`;
-                          document.body.appendChild(a);
-                          a.click();
-                          a.remove();
-                          window.URL.revokeObjectURL(url);
+                          const filenameBase = `qr-${item.tenant_name || item.id || 'code'}`;
+                          await downloadQrAsPng(path, filenameBase);
                         } catch (e) {
                           console.error('Unduh QR PNG gagal:', e);
-                          alert('Tidak bisa mengunduh PNG dari server. Cek URL /storage, HTTPS, dan CORS.');
+                          alert('Tidak bisa mengunduh QR. Cek URL /storage, HTTPS, dan CORS.');
                         }
                       }}
                     />
@@ -370,8 +410,7 @@ export function TableSupervisionComponent({
         setIsError(true);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, code, data, columnControl, formControl, actionControl]);
+  }, [loading, code, data, columnControl, formControl, actionControl]); // eslint-disable-line
 
   useEffect(() => {
     if (includeFilters) {
@@ -396,8 +435,7 @@ export function TableSupervisionComponent({
         }) as getFilterParams[]
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includeFilters, filter]);
+  }, [includeFilters, filter]); // eslint-disable-line
 
   return (
     <>
