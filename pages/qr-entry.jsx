@@ -26,6 +26,7 @@ export default function QrEntry() {
   const router = useRouter();
   const [step, setStep] = useState('register'); // 'register' or 'verify'
   const [userEmail, setUserEmail] = useState('');
+  const [didSubmitRegister, setDidSubmitRegister] = useState(false);
 
   // Simpan tujuan awal saat masuk flow QR
   useEffect(() => {
@@ -34,6 +35,8 @@ export default function QrEntry() {
   }, [router.isReady]);
 
   const onRegisterSuccess = (data) => {
+    if (!didSubmitRegister) return; // guard: jangan auto lompat
+    setDidSubmitRegister(false);
     if (data?.data?.user?.email) {
       setUserEmail(data.data.user.email);
       setStep('verify');
@@ -81,7 +84,13 @@ export default function QrEntry() {
     return (
       <div className="container mx-auto max-w-md p-4">
         <h1 className="text-2xl font-bold mb-4">QR Entry Registration</h1>
-        <form onSubmit={registerSubmit} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            setDidSubmitRegister(true);
+            registerSubmit(e);
+          }}
+          className="space-y-4"
+        >
           <InputComponent
             name="name"
             label="Nama Lengkap"
