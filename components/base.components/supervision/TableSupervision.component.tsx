@@ -70,6 +70,8 @@ export function TableSupervisionComponent({
 
   // base URL API tanpa trailing slash (dipakai tombol unduh)
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+  // Base URL untuk storage tanpa /api/ path
+  const storageBase = apiBase.replace('/api', '');
 
   // helper: cari communityId dari berbagai kemungkinan lokasi pada item
   const getCommunityIdFromItem = (item: any) => {
@@ -103,14 +105,15 @@ export function TableSupervisionComponent({
   const [loading, code, data, reset] = useGet(
     {
       ...fetchControl,
-      params: {
-        page,
-        paginate,
-        sortBy: sort.column,
-        sortDirection: sort.direction,
-        search: search,
-        filter: mutatefilter.length ? mutatefilter : undefined,
-      },
+      params:
+        {
+          page,
+          paginate,
+          sortBy: sort.column,
+          sortDirection: sort.direction,
+          search: search,
+          filter: mutatefilter.length ? mutatefilter : undefined,
+        },
     },
     setToLoading || (includeFilters && mutatefilter.length < (includeFilters?.length || 0))
   );
@@ -157,7 +160,8 @@ export function TableSupervisionComponent({
       alert('Path file QR di server tidak ditemukan.');
       return;
     }
-    const fileUrl = `${apiBase}/storage/${path}`;
+    // Gunakan storageBase (tanpa /api/) untuk mengakses file storage
+    const fileUrl = `${storageBase}/storage/${path}`;
 
     // Hindari mixed-content: FE https, API http
     if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fileUrl.startsWith('http:')) {

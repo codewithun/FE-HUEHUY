@@ -33,6 +33,8 @@ export default function QRCodeCrud() {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const apiBase = apiUrl.replace(/\/+$/, '');
+  // Base URL untuk storage tanpa /api/ path
+  const storageBase = apiBase.replace('/api', '');
 
   const columns = [
     {
@@ -60,7 +62,7 @@ export default function QRCodeCrud() {
       item: ({ qr_code }) =>
         qr_code ? (
           <Image
-            src={`${apiBase}/storage/${qr_code}`}
+            src={`${storageBase}/storage/${qr_code}`}
             alt="QR"
             width={48}
             height={48}
@@ -282,7 +284,8 @@ export default function QRCodeCrud() {
         alert('Path QR di server tidak ditemukan.');
         return;
       }
-      const fileUrl = `${apiBase}/storage/${path}`;
+      // Gunakan storageBase (tanpa /api/) untuk mengakses file storage
+      const fileUrl = `${storageBase}/storage/${path}`;
 
       // Hindari mixed-content: FE https, API http
       if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fileUrl.startsWith('http:')) {
@@ -319,7 +322,8 @@ export default function QRCodeCrud() {
         return;
       }
 
-      const url = `${apiBase}/storage/${path}`;
+      // Gunakan storageBase (tanpa /api/) untuk mengakses file storage
+      const url = `${storageBase}/storage/${path}`;
 
       // Ambil SVG sebagai text
       const res = await fetch(url, { mode: 'cors' });
