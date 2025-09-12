@@ -42,22 +42,17 @@ export function TableSupervisionComponent({
     'sort.direction': sortDirectionParams,
     'sort.column': sortColumnParams,
   } = router.query;
-  const [isError, setIsError] = useState(false);
 
+  const [isError, setIsError] = useState(false);
   const [modalForm, setModalForm] = useState(false);
   const [modalView, setModalView] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
-  // const [modalDeleteSuccess, setModalDeleteSuccess] = useState(false);
-  // const [modalDeleteError, setModalDeleteError] = useState(false);
   const [loadingDelete, setLoadingDelete] = useState(false);
 
   const [paginate, setPaginate] = useState(10);
   const [page, setPage] = useState(1);
   const [totalRow, setTotalRow] = useState(0);
-  const [sort, setSort] = useState<{
-    column: string;
-    direction: 'desc' | 'asc';
-  }>({
+  const [sort, setSort] = useState<{ column: string; direction: 'desc' | 'asc' }>({
     column: 'created_at',
     direction: 'desc',
   });
@@ -72,6 +67,9 @@ export function TableSupervisionComponent({
   const [dataSelected, setDataSelected] = useState<number | null>(null);
 
   const [forms, setForms] = useState<formProps[]>([]);
+
+  // base URL API tanpa trailing slash (dipakai tombol unduh)
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
 
   // helper: cari communityId dari berbagai kemungkinan lokasi pada item
   const getCommunityIdFromItem = (item: any) => {
@@ -105,18 +103,16 @@ export function TableSupervisionComponent({
   const [loading, code, data, reset] = useGet(
     {
       ...fetchControl,
-      params:
-        {
-          page,
-          paginate,
-          sortBy: sort.column,
-          sortDirection: sort.direction,
-          search: search,
-          filter: mutatefilter.length ? mutatefilter : undefined,
-        },
+      params: {
+        page,
+        paginate,
+        sortBy: sort.column,
+        sortDirection: sort.direction,
+        search: search,
+        filter: mutatefilter.length ? mutatefilter : undefined,
+      },
     },
-    setToLoading ||
-      (includeFilters && mutatefilter.length < includeFilters?.length)
+    setToLoading || (includeFilters && mutatefilter.length < (includeFilters?.length || 0))
   );
 
   const hasPermissions = useMemo(() => {
@@ -143,18 +139,17 @@ export function TableSupervisionComponent({
           direction: sortDirectionParams as 'asc' | 'desc',
         });
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   useEffect(() => {
     if (!unUrlPage) {
       const url = new URL(window.location.href);
-      search && url.searchParams.set('search', search);
-      page && url.searchParams.set('page', page.toString());
-      paginate && url.searchParams.set('paginate', paginate.toString());
-      sort?.column && url.searchParams.set('sort.column', sort.column);
-      sort?.direction && url.searchParams.set('sort.direction', sort.direction);
+      search ? url.searchParams.set('search', search) : url.searchParams.delete('search');
+      page ? url.searchParams.set('page', page.toString()) : url.searchParams.delete('page');
+      paginate ? url.searchParams.set('paginate', paginate.toString()) : url.searchParams.delete('paginate');
+      sort?.column ? url.searchParams.set('sort.column', sort.column) : url.searchParams.delete('sort.column');
+      sort?.direction ? url.searchParams.set('sort.direction', sort.direction) : url.searchParams.delete('sort.direction');
       window.history.pushState({}, '', url.toString());
     }
   }, [page, paginate, sort.column, sort.direction, search, unUrlPage]);
@@ -162,73 +157,43 @@ export function TableSupervisionComponent({
   useEffect(() => {
     if (!loading) {
       if (code == 200 || code == 204) {
-  const originalData = Array.isArray(data?.data) ? data.data : [];
+        const originalData = Array.isArray(data?.data) ? data.data : [];
         let newColumns: tableColumnProps[] = [];
         let newData: object[] = [];
 
-        if (data.totalRow) {
-          setTotalRow(data.totalRow);
-        }
+        if (data.totalRow) setTotalRow(data.totalRow);
 
         if (originalData.length) {
-          // if (!columnControl?.custom) {
           Object.keys(originalData.at(0)).map((keyName) => {
-            if (
-              !columnControl?.except ||
-              !columnControl?.except.includes(keyName)
-            ) {
+            if (!columnControl?.except || !columnControl?.except.includes(keyName)) {
               newColumns.push({
                 label: keyName.charAt(0).toUpperCase() + keyName.slice(1),
                 selector: keyName,
                 width: '200px',
-                sortable:
-                  !columnControl?.exceptSorts ||
-                  !columnControl?.exceptSorts.includes(keyName),
+                sortable: !columnControl?.exceptSorts || !columnControl?.exceptSorts.includes(keyName),
               });
             }
           });
-          // }
 
           if (!formControl?.custom) {
             let newForms: formProps[] = [];
-
             Object.keys(originalData.at(0)).map((keyName) => {
-              if (
-                !formControl?.except ||
-                !formControl?.except.includes(keyName)
-              ) {
-                let custom =
-                  (formControl?.change &&
-                    formControl?.change[keyName as keyof object]) ||
-                  {};
-
+              if (!formControl?.except || !formControl?.except.includes(keyName)) {
+                let custom = (formControl?.change && formControl?.change[keyName as keyof object]) || {};
                 newForms.push({
                   type: custom.type ? custom.type : 'default',
                   construction: {
-                    label:
-                      custom.construction?.label ||
-                      keyName.charAt(0).toUpperCase() + keyName.slice(1),
+                    label: custom.construction?.label || keyName.charAt(0).toUpperCase() + keyName.slice(1),
                     name: keyName,
-                    placeholder:
-                      custom.construction?.placeholder ||
-                      'Please enter ' + keyName + '...',
+                    placeholder: custom.construction?.placeholder || 'Please enter ' + keyName + '...',
                     options:
-                      (
-                        custom.construction as
-                          | selectProps
-                          | inputCheckboxProps
-                          | inputRadioProps
-                      )?.options || [],
+                      (custom.construction as selectProps | inputCheckboxProps | inputRadioProps)?.options || [],
                     validations: custom.construction?.validations || {},
                   },
                 });
               }
             });
-
-            if (formControl?.include && formControl?.include?.length) {
-              newForms = [...newForms, ...formControl?.include];
-            }
-
+            if (formControl?.include?.length) newForms = [...newForms, ...formControl.include];
             setForms(newForms);
           }
 
@@ -239,44 +204,27 @@ export function TableSupervisionComponent({
 
             if (columnControl?.custom) {
               let newItems: any = {};
-              columnControl?.custom?.map((column) => {
-                newItems[column.selector] = column.item(item);
-              });
-
+              columnControl?.custom?.map((column) => (newItems[column.selector] = column.item(item)));
               items = newItems;
             }
 
             Object.keys(items).map((keyName) => {
               const mappingIncludeColumns =
-                columnControl?.include &&
-                columnControl?.include.filter(
-                  (newCol) => newCol.before && newCol.before == keyName
-                );
+                columnControl?.include && columnControl?.include.filter((newCol) => newCol.before && newCol.before == keyName);
 
               mappingIncludeColumns &&
                 mappingIncludeColumns.map((includeColumn) => {
                   if (includeColumn && includeColumn.selector) {
-                    items[includeColumn.selector] = includeColumn.item
-                      ? includeColumn.item(originalData[key])
-                      : null;
+                    items[includeColumn.selector] = includeColumn.item ? includeColumn.item(originalData[key]) : null;
                   }
                 });
 
-              if (
-                columnControl?.change &&
-                columnControl?.change[keyName as keyof object]
-              ) {
-                items[keyName] = columnControl?.change[
-                  keyName as keyof object
-                ].custom(originalData[key]);
-
+              if (columnControl?.change && columnControl?.change[keyName as keyof object]) {
+                items[keyName] = columnControl?.change[keyName as keyof object].custom(originalData[key]);
                 if (
                   originalData[key][keyName] &&
-                  !columnControl.include?.filter(
-                    (newCol) => newCol.selector == keyName
-                  )[0] &&
-                  (typeof originalData[key][keyName] === 'object' ||
-                    Array.isArray(originalData[key][keyName]))
+                  !columnControl.include?.filter((newCol) => newCol.selector == keyName)[0] &&
+                  (typeof originalData[key][keyName] === 'object' || Array.isArray(originalData[key][keyName]))
                 ) {
                   items[keyName] = JSON.stringify(items[keyName]);
                 }
@@ -311,26 +259,8 @@ export function TableSupervisionComponent({
                       hasPermissions
                     )}
 
-                  {/* {(!actionControl?.except ||
-                    !actionControl?.except.includes('detail')) && (
-                    <ButtonComponent
-                      icon={faEye}
-                      label={'Detail'}
-                      variant="outline"
-                      paint="secondary"
-                      size={'xs'}
-                      rounded
-                      onClick={() => {
-                        setModalView(true);
-                        setDataSelected(key);
-                      }}
-                    />
-                  )} */}
-
-                  {(!permissionCode ||
-                    hasPermissions?.find((p: number) => p == 3)) &&
-                    (!actionControl?.except ||
-                      !actionControl?.except?.includes('edit')) && (
+                  {(!permissionCode || hasPermissions?.find((p: number) => p == 3)) &&
+                    (!actionControl?.except || !actionControl?.except?.includes('edit')) && (
                       <ButtonComponent
                         icon={faEdit}
                         label={'Ubah'}
@@ -345,72 +275,57 @@ export function TableSupervisionComponent({
                       />
                     )}
 
-                  {/* Tombol Unduh QR - khusus untuk halaman QR Code */}
-                  {originalData[key].qr_code && (
+                  {/* Tombol Unduh QR - ambil PNG dari storage backend */}
+                  {(originalData as any)[key]?.qr_code && (
                     <ButtonComponent
                       icon={faDownload}
-                      label={'Unduh QR'}
+                      label={'Unduh QR (PNG)'}
                       variant="outline"
                       paint="primary"
                       size={'xs'}
                       rounded
                       onClick={async () => {
-                        const item = originalData[key];
-                        const communityId = getCommunityIdFromItem(item);
-                        let qrValue = '';
-                        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-                        
-                        console.log('=== QR GENERATION DEBUG ===');
-                        console.log('Item:', item);
-                        console.log('Community ID:', communityId);
-                        
-                        if (item.promo) {
-                          const promoId = item.promo.id || item.promo_id || item.id;
-                          console.log('Promo ID:', promoId);
-                          
-                          if (!promoId) {
-                            alert('Promo ID tidak ditemukan!');
+                        try {
+                          const item: any = (originalData as any)[key];
+                          const path = item.qr_code || item.path;
+                          if (!path) {
+                            alert('Path file QR di server tidak ditemukan.');
                             return;
                           }
-                          
-                          // PERBAIKAN: Gunakan endpoint yang pasti ada
-                          qrValue = `${origin}/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
-                          console.log('Generated QR Value:', qrValue);
-                        }
-                        
-                        try {
-                          const QRCode = await import('qrcode');
-                          // Generate QR langsung ke halaman voucher/promo
-                          const qrDataURL = await QRCode.toDataURL(qrValue, {
-                            width: 300,
-                            margin: 2,
-                            color: {
-                              dark: '#000000',
-                              light: '#FFFFFF'
-                            }
-                          });
-                          const response = await fetch(qrDataURL);
-                          const blob = await response.blob();
+                          const fileUrl = `${apiBase}/storage/${path}`;
+
+                          // Hindari mixed-content: FE https, API http
+                          if (
+                            typeof window !== 'undefined' &&
+                            window.location.protocol === 'https:' &&
+                            fileUrl.startsWith('http:')
+                          ) {
+                            alert('Gagal mengunduh karena mixed-content (FE https, API http). Pakai HTTPS untuk API.');
+                            return;
+                          }
+
+                          const res = await fetch(fileUrl, { mode: 'cors' });
+                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                          const blob = await res.blob(); // seharusnya image/png
                           const url = window.URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = `qr-${item.id || 'event'}.png`;
-                          link.style.display = 'none';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `qr-${item.tenant_name || item.id || 'code'}.png`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
                           window.URL.revokeObjectURL(url);
-                        } catch (error) {
-                          alert('Gagal mengunduh QR Code. Silakan coba lagi.');
+                        } catch (e) {
+                          console.error('Unduh QR PNG gagal:', e);
+                          alert('Tidak bisa mengunduh PNG dari server. Cek URL /storage, HTTPS, dan CORS.');
                         }
                       }}
                     />
                   )}
 
-                  {(!permissionCode ||
-                    hasPermissions?.find((p: number) => p == 4)) &&
-                    (!actionControl?.except ||
-                      !actionControl?.except?.includes('delete')) && (
+                  {(!permissionCode || hasPermissions?.find((p: number) => p == 4)) &&
+                    (!actionControl?.except || !actionControl?.except?.includes('delete')) && (
                       <ButtonComponent
                         icon={faTrash}
                         label={'Hapus'}
@@ -439,7 +354,6 @@ export function TableSupervisionComponent({
 
           if (data?.columns?.length) {
             let newForms: formProps[] = [];
-
             data.columns.map((column: string) => {
               newForms.push({
                 construction: {
@@ -449,7 +363,6 @@ export function TableSupervisionComponent({
                 },
               });
             });
-
             setForms(newForms);
           }
         }
@@ -485,6 +398,7 @@ export function TableSupervisionComponent({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includeFilters, filter]);
+
   return (
     <>
       <h1 className="text-lg lg:text-xl font-bold mb-2 lg:mb-4">{title}</h1>
@@ -500,14 +414,8 @@ export function TableSupervisionComponent({
               customTopBar
             ) : (
               <>
-                {(!permissionCode ||
-                  hasPermissions?.find((p: number) => p == 2)) && (
-                  <ButtonComponent
-                    label="Tambah Baru"
-                    icon={faPlus}
-                    size="sm"
-                    onClick={() => setModalForm(true)}
-                  />
+                {(!permissionCode || hasPermissions?.find((p: number) => p == 2)) && (
+                  <ButtonComponent label="Tambah Baru" icon={faPlus} size="sm" onClick={() => setModalForm(true)} />
                 )}
               </>
             )
@@ -520,8 +428,7 @@ export function TableSupervisionComponent({
               : columnControl?.custom
                   .filter(
                     (column) =>
-                      !column.permissionCode ||
-                      data?.allowed_privileges?.includes(column.permissionCode)
+                      !column.permissionCode || data?.allowed_privileges?.includes(column.permissionCode)
                   )
                   .map((column) => {
                     return {
@@ -585,11 +492,7 @@ export function TableSupervisionComponent({
         }
         tip={'Masukkan data yang valid dan benar!'}
         show={modalForm}
-        size={
-          (dataSelected === null
-            ? formControl?.size
-            : formUpdateControl?.size || formControl?.size) || 'md'
-        }
+        size={(dataSelected === null ? formControl?.size : formUpdateControl?.size || formControl?.size) || 'md'}
         onClose={() => {
           setModalForm(false);
           setDataSelected(null);
@@ -604,42 +507,29 @@ export function TableSupervisionComponent({
                 url: fetchControl.url
                   ? dataSelected === null
                     ? fetchControl.url
-                    : fetchControl.url +
-                      '/' +
-                      (dataOriginal?.at(dataSelected) as { id: number })?.id
+                    : fetchControl.url + '/' + (dataOriginal?.at(dataSelected) as { id: number })?.id
                   : '',
                 path:
                   dataSelected === null
                     ? fetchControl.path
                     : updateEndpoint == null
-                    ? fetchControl.path +
-                      '/' +
-                      (dataOriginal?.at(dataSelected) as { id: number })?.id
+                    ? fetchControl.path + '/' + (dataOriginal?.at(dataSelected) as { id: number })?.id
                     : fetchControl.path +
                       '/' +
                       (dataOriginal?.at(dataSelected) as { id: number })?.id +
                       updateEndpoint,
                 includeHeaders: fetchControl.includeHeaders,
-                contentType: formControl?.contentType
-                  ? formControl?.contentType
-                  : undefined,
+                contentType: formControl?.contentType ? formControl?.contentType : undefined,
               }}
-              // method={dataSelected === null ? 'post' : 'put'}
               confirmation
-              forms={
-                dataSelected == null
-                  ? formControl?.custom || forms
-                  : formUpdateControl?.custom || formControl?.custom || forms
-              }
+              forms={dataSelected == null ? formControl?.custom || forms : formUpdateControl?.custom || formControl?.custom || forms}
               defaultValue={
                 dataSelected === null
                   ? formControl?.customDefaultValue || null
                   : formUpdateControl?.customDefaultValue
                   ? {
                       _method: 'PUT',
-                      ...formUpdateControl?.customDefaultValue(
-                        dataOriginal?.at(dataSelected) || {}
-                      ),
+                      ...formUpdateControl?.customDefaultValue(dataOriginal?.at(dataSelected) || {}),
                     }
                   : { _method: 'PUT', ...dataOriginal?.at(dataSelected) }
               }
@@ -654,11 +544,7 @@ export function TableSupervisionComponent({
       </FloatingPageComponent>
 
       <ModalConfirmComponent
-        title={
-          typeof title == 'string'
-            ? 'Yakin ingin menghapus ' + title
-            : 'Yakin ingin menghapus'
-        }
+        title={typeof title == 'string' ? 'Yakin ingin menghapus ' + title : 'Yakin ingin menghapus'}
         show={modalDelete}
         onClose={() => {
           setModalDelete(false);
@@ -670,15 +556,8 @@ export function TableSupervisionComponent({
           if (dataSelected !== null) {
             let response = await destroy({
               ...fetchControl,
-              url: fetchControl.url
-                ? fetchControl.url +
-                  '/' +
-                  (dataOriginal?.at(dataSelected) as { id: number }).id
-                : '',
-              path:
-                fetchControl.path +
-                '/' +
-                (dataOriginal?.at(dataSelected) as { id: number }).id,
+              url: fetchControl.url ? fetchControl.url + '/' + (dataOriginal?.at(dataSelected) as { id: number }).id : '',
+              path: fetchControl.path + '/' + (dataOriginal?.at(dataSelected) as { id: number }).id,
             });
 
             if (response?.status == 200 || response?.status == 201) {
@@ -687,9 +566,7 @@ export function TableSupervisionComponent({
               setDataSelected(null);
               setModalDelete(false);
             } else {
-              // setModalDeleteError(true);
               setLoadingDelete(false);
-              // setModalDelete(false);
             }
           }
         }}
@@ -714,17 +591,12 @@ export function TableSupervisionComponent({
           <div className="flex flex-col gap-2 p-6">
             {columns.map((column, key) => {
               return (
-                <div
-                  className="flex justify-between gap-4 py-2.5 border-b"
-                  key={key}
-                >
+                <div className="flex justify-between gap-4 py-2.5 border-b" key={key}>
                   <h6 className="text-lg">{column.label} :</h6>
                   <p className="text-lg font-semibold">
                     {dataSelected != null &&
                     dataOriginal?.at(dataSelected) &&
-                    typeof (dataOriginal?.at(dataSelected) as any)[
-                      column.selector
-                    ] != 'object'
+                    typeof (dataOriginal?.at(dataSelected) as any)[column.selector] != 'object'
                       ? (dataOriginal?.at(dataSelected) as any)[column.selector]
                       : '-'}
                   </p>

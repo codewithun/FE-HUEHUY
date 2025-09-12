@@ -24,12 +24,15 @@ export default function QRCodeCrud() {
   const [voucherList, setVoucherList] = useState([]);
   const [promoList, setPromoList] = useState([]);
 
-  // container untuk render QR + ref langsung ke canvas
+  // container untuk render QR + ref langsung ke canvas (hanya untuk preview)
   const qrContainerRef = useRef(null);
   const qrCanvasRef = useRef(null);
 
   // qrUrl disimpan di state supaya tidak re-render aneh
   const [qrUrl, setQrUrl] = useState('');
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const apiBase = apiUrl.replace(/\/+$/, '');
 
   const columns = [
     {
@@ -56,11 +59,12 @@ export default function QRCodeCrud() {
       width: '120px',
       item: ({ qr_code }) =>
         qr_code ? (
-          <img
-            src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/,'')}/storage/${qr_code}`}
+          <Image
+            src={`${apiBase}/storage/${qr_code}`}
             alt="QR"
             width={48}
             height={48}
+            unoptimized
           />
         ) : (
           '-'
@@ -74,15 +78,13 @@ export default function QRCodeCrud() {
     },
   ];
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
   // Fetch data QR code saat halaman dibuka
   React.useEffect(() => {
     const fetchData = async () => {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
       try {
-        const res = await fetch(`${apiUrl}/admin/qrcodes`, {
+        const res = await fetch(`${apiBase}/admin/qrcodes`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -104,8 +106,8 @@ export default function QRCodeCrud() {
                 .filter(Boolean)
                 .join(' | '),
               voucher: item.voucher, // keep as object
-              promo: item.promo, // keep as object
-              qr_code: item.qr_code || item.path,
+              promo: item.promo,     // keep as object
+              qr_code: item.qr_code || item.path, // path file di storage (PNG)
               created_at: item.created_at,
             }))
           );
@@ -115,7 +117,7 @@ export default function QRCodeCrud() {
       }
     };
     fetchData();
-  }, [apiUrl]);
+  }, [apiBase]);
 
   // Fetch data voucher, promo saat modalForm dibuka
   React.useEffect(() => {
@@ -123,21 +125,21 @@ export default function QRCodeCrud() {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
       // Fetch voucher
-      fetch(`${apiUrl}/admin/vouchers`, {
+      fetch(`${apiBase}/admin/vouchers`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then(res => res.json())
         .then(res => setVoucherList(res.data || []))
         .catch(() => setVoucherList([]));
       // Fetch promo
-      fetch(`${apiUrl}/admin/promos`, {
+      fetch(`${apiBase}/admin/promos`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then(res => res.json())
         .then(res => setPromoList(res.data || []))
         .catch(() => setPromoList([]));
     }
-  }, [modalForm, apiUrl]);
+  }, [modalForm, apiBase]);
 
   const handleAdd = async () => {
     if (!formData.tenant_name) {
@@ -151,7 +153,7 @@ export default function QRCodeCrud() {
     try {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      const res = await fetch(`${apiUrl}/admin/qrcodes/generate`, {
+      const res = await fetch(`${apiBase}/admin/qrcodes/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +170,7 @@ export default function QRCodeCrud() {
         setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
         setModalForm(false);
         // fetch ulang data
-        const resList = await fetch(`${apiUrl}/admin/qrcodes`, {
+        const resList = await fetch(`${apiBase}/admin/qrcodes`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -189,8 +191,8 @@ export default function QRCodeCrud() {
               ]
                 .filter(Boolean)
                 .join(' | '),
-              voucher: item.voucher, // keep as object
-              promo: item.promo, // keep as object
+              voucher: item.voucher,
+              promo: item.promo,
               qr_code: item.qr_code || item.path,
               created_at: item.created_at,
             }))
@@ -240,28 +242,18 @@ export default function QRCodeCrud() {
     />
   );
 
-  // helper to build target URL
+  // helper to build target URL (untuk nilai QR yang dipreview)
   const buildTargetUrl = item => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     if (!item) return '';
 
-    console.log('=== QR GENERATION DEBUG ===');
-    console.log('Item:', item);
-
     if (item.promo) {
       const communityId = item.promo.community?.id || item.promo.community_id || 'default';
-      console.log('Promo Community ID:', communityId);
-      console.log('Promo ID:', item.promo.id);
-      const qrValue = `${origin}/app/komunitas/promo/detail_promo?promoId=${item.promo.id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
-      console.log('Generated QR Value:', qrValue);
-      return qrValue;
+      return `${origin}/app/komunitas/promo/detail_promo?promoId=${item.promo.id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
     }
     if (item.voucher) {
       const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-      console.log('Voucher ID:', id);
-      const qrValue = `${origin}/app/voucher/${id}?autoRegister=1&source=qr_scan`;
-      console.log('Generated QR Value:', qrValue);
-      return qrValue;
+      return `${origin}/app/voucher/${id}?autoRegister=1&source=qr_scan`;
     }
     return '';
   };
@@ -269,48 +261,45 @@ export default function QRCodeCrud() {
   // setiap selectedItem berubah, stabilkan qrUrl di state
   React.useEffect(() => {
     if (!selectedItem) return setQrUrl('');
-    const url = buildTargetUrl(selectedItem);
-    setQrUrl(url);
+    setQrUrl(buildTargetUrl(selectedItem));
     // reset ref biar clean
     qrCanvasRef.current = null;
   }, [selectedItem]);
 
-  // Download PNG: prioritas canvas ref; fallback konversi SVG -> PNG
-  const handleDownloadPng = () => {
-    // 1) Prioritas: canvas langsung dari <QRCodeCanvas ref>
-    const canvas = qrCanvasRef.current;
-    if (canvas && typeof canvas.toDataURL === 'function') {
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
-      link.click();
-      return;
-    }
+  // === Download PNG dari SERVER (bukan dari canvas) ===
+  const handleDownloadPngServer = async () => {
+    try {
+      const path = selectedItem?.qr_code || selectedItem?.path;
+      if (!path) {
+        alert('Path QR di server tidak ditemukan.');
+        return;
+      }
+      const fileUrl = `${apiBase}/storage/${path}`;
 
-    // 2) Fallback: kalau yang render SVG, konversi via canvas sementara
-    const container = qrContainerRef.current;
-    const svg = container?.querySelector('svg');
-    if (svg) {
-      const xml = new XMLSerializer().serializeToString(svg);
-      const svg64 = btoa(unescape(encodeURIComponent(xml)));
-      const img = new Image();
-      img.onload = () => {
-        const tmp = document.createElement('canvas');
-        tmp.width = img.width;
-        tmp.height = img.height;
-        const ctx = tmp.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const link = document.createElement('a');
-        link.href = tmp.toDataURL('image/png');
-        link.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
-        link.click();
-      };
-      img.crossOrigin = 'anonymous';
-      img.src = 'data:image/svg+xml;base64,' + svg64;
-      return;
-    }
+      // Hindari mixed-content: FE https, API http
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fileUrl.startsWith('http:')) {
+        alert('Gagal karena mixed-content (FE https, API http). Pakai https untuk API.');
+        return;
+      }
 
-    alert('QR belum siap untuk diunduh. Coba tutup-buka lagi modalnya, ya.');
+      const res = await fetch(fileUrl, { mode: 'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const blob = await res.blob(); // harusnya image/png (server kita simpan PNG)
+      const fileName = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
+      const objectUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      console.error('Download PNG server gagal:', e);
+      alert('Tidak bisa mengunduh PNG dari server. Cek URL /storage dan CORS server.');
+    }
   };
 
   return (
@@ -439,6 +428,7 @@ export default function QRCodeCrud() {
           <div className="flex flex-col items-center gap-4 p-6" ref={qrContainerRef}>
             {qrUrl ? (
               <>
+                {/* Preview QR untuk discan langsung */}
                 <QRCodeCanvas
                   ref={qrCanvasRef}
                   value={qrUrl}
@@ -462,12 +452,16 @@ export default function QRCodeCrud() {
                       'default'}
                   </div>
                 </div>
-                <ButtonComponent
-                  label="Download QR (PNG)"
-                  icon={faDownload}
-                  paint="primary"
-                  onClick={handleDownloadPng}
-                />
+
+                {/* Download via SERVER (PNG yang disimpan backend) */}
+                <div className="flex gap-2">
+                  <ButtonComponent
+                    label="Download QR (PNG • Server)"
+                    icon={faDownload}
+                    paint="primary"
+                    onClick={handleDownloadPngServer}
+                  />
+                </div>
               </>
             ) : (
               <div className="text-center text-lg text-gray-500 font-semibold">Menyiapkan QR…</div>
