@@ -23,6 +23,7 @@ export default function QRCodeCrud() {
   const [formData, setFormData] = useState({ voucher_id: '', promo_id: '', tenant_name: '' });
   const [voucherList, setVoucherList] = useState([]);
   const [promoList, setPromoList] = useState([]);
+  const [refreshToggle, setRefreshToggle] = useState(false);
 
   // container untuk render QR + ref langsung ke canvas (hanya untuk preview)
   const qrContainerRef = useRef(null);
@@ -188,35 +189,8 @@ export default function QRCodeCrud() {
       if (res.ok && result.qrcode) {
         setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
         setModalForm(false);
-        // fetch ulang data
-        const resList = await fetch(`${apiBase}/admin/qrcodes`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const resultList = await resList.json();
-        const dataArray = Array.isArray(resultList) ? resultList : resultList.data;
-        if (resList.ok && Array.isArray(dataArray)) {
-          setQrList(
-            dataArray.map((item) => ({
-              id: item.id,
-              tenant_name: item.tenant_name,
-              text: [
-                item.tenant_name,
-                item.voucher?.name || item.voucher?.kode || item.voucher?.code,
-                item.promo?.name || item.promo?.kode || item.promo?.code,
-              ]
-                .filter(Boolean)
-                .join(' | '),
-              voucher: item.voucher,
-              promo: item.promo,
-              qr_code: item.qr_code || item.path,
-              created_at: item.created_at,
-            }))
-          );
-        }
+        // trigger TableSupervisionComponent to refresh via setToRefresh prop
+        setRefreshToggle((s) => !s);
       } else {
         alert(result.message || 'Gagal membuat QR code');
       }
@@ -361,6 +335,7 @@ export default function QRCodeCrud() {
         customTopBar={topBarActions}
         noControlBar={false}
         searchable={true}
+        setToRefresh={refreshToggle}
         fetchControl={{
           path: 'admin/qrcodes',
           method: 'GET',
