@@ -24,7 +24,7 @@ const consumeNext = () => {
 
 export default function QrEntry() {
   const router = useRouter();
-  const [step, setStep] = useState('register'); // 'register' or 'verify'
+  const [step, setStep] = useState('register');
   const [userEmail, setUserEmail] = useState('');
 
   // Simpan tujuan awal saat masuk flow QR
