@@ -24,8 +24,12 @@ export default function QRCodeCrud() {
   const [voucherList, setVoucherList] = useState([]);
   const [promoList, setPromoList] = useState([]);
 
-  // ref kontainer QR di modal view (lebih aman daripada querySelector global)
+  // container untuk render QR + ref langsung ke canvas
   const qrContainerRef = useRef(null);
+  const qrCanvasRef = useRef(null);
+
+  // qrUrl disimpan di state supaya tidak re-render aneh
+  const [qrUrl, setQrUrl] = useState('');
 
   const columns = [
     {
@@ -52,7 +56,12 @@ export default function QRCodeCrud() {
       width: '120px',
       item: ({ qr_code }) =>
         qr_code ? (
-          <img src={`http://localhost:8000/storage/${qr_code}`} alt="QR" width={48} height={48} />
+          <img
+            src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/,'')}/storage/${qr_code}`}
+            alt="QR"
+            width={48}
+            height={48}
+          />
         ) : (
           '-'
         ),
@@ -102,7 +111,7 @@ export default function QRCodeCrud() {
           );
         }
       } catch (err) {
-        // bisa tambahkan alert jika gagal
+        console.error('Fetch qrcodes failed:', err);
       }
     };
     fetchData();
@@ -118,13 +127,15 @@ export default function QRCodeCrud() {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then(res => res.json())
-        .then(res => setVoucherList(res.data || []));
+        .then(res => setVoucherList(res.data || []))
+        .catch(() => setVoucherList([]));
       // Fetch promo
       fetch(`${apiUrl}/admin/promos`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then(res => res.json())
-        .then(res => setPromoList(res.data || []));
+        .then(res => setPromoList(res.data || []))
+        .catch(() => setPromoList([]));
     }
   }, [modalForm, apiUrl]);
 
@@ -189,11 +200,13 @@ export default function QRCodeCrud() {
         alert(result.message || 'Gagal membuat QR code');
       }
     } catch (err) {
+      console.error(err);
       alert('Gagal membuat QR code');
     }
   };
 
   const handleUpdate = () => {
+    // fungsi update FE-only (opsional), kamu bisa sambungkan ke API update bila perlu
     if (!formData.text) return;
     const qr_code_value = formData.text + (formData.voucher ? `|${formData.voucher}` : '');
     setQrList(
@@ -245,7 +258,6 @@ export default function QRCodeCrud() {
     }
     if (item.voucher) {
       const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-      // Voucher tidak memerlukan community_id karena bersifat global
       console.log('Voucher ID:', id);
       const qrValue = `${origin}/app/voucher/${id}?autoRegister=1&source=qr_scan`;
       console.log('Generated QR Value:', qrValue);
@@ -254,22 +266,51 @@ export default function QRCodeCrud() {
     return '';
   };
 
-  // Download PNG dari SVG dalam kontainer khusus
+  // setiap selectedItem berubah, stabilkan qrUrl di state
+  React.useEffect(() => {
+    if (!selectedItem) return setQrUrl('');
+    const url = buildTargetUrl(selectedItem);
+    setQrUrl(url);
+    // reset ref biar clean
+    qrCanvasRef.current = null;
+  }, [selectedItem]);
+
+  // Download PNG: prioritas canvas ref; fallback konversi SVG -> PNG
   const handleDownloadPng = () => {
-    const container = qrContainerRef.current;
-    const canvas = container?.querySelector('canvas');
-    if (!canvas) {
-      alert('Canvas QR tidak ditemukan.');
+    // 1) Prioritas: canvas langsung dari <QRCodeCanvas ref>
+    const canvas = qrCanvasRef.current;
+    if (canvas && typeof canvas.toDataURL === 'function') {
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
+      link.click();
       return;
     }
 
-    // simpan PNG
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png'); // hasil PNG base64
-    link.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // 2) Fallback: kalau yang render SVG, konversi via canvas sementara
+    const container = qrContainerRef.current;
+    const svg = container?.querySelector('svg');
+    if (svg) {
+      const xml = new XMLSerializer().serializeToString(svg);
+      const svg64 = btoa(unescape(encodeURIComponent(xml)));
+      const img = new Image();
+      img.onload = () => {
+        const tmp = document.createElement('canvas');
+        tmp.width = img.width;
+        tmp.height = img.height;
+        const ctx = tmp.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const link = document.createElement('a');
+        link.href = tmp.toDataURL('image/png');
+        link.download = `qr-${selectedItem?.tenant_name || selectedItem?.id || 'code'}.png`;
+        link.click();
+      };
+      img.crossOrigin = 'anonymous';
+      img.src = 'data:image/svg+xml;base64,' + svg64;
+      return;
+    }
+
+    alert('QR belum siap untuk diunduh. Coba tutup-buka lagi modalnya, ya.');
   };
 
   return (
@@ -293,15 +334,12 @@ export default function QRCodeCrud() {
             };
           },
           mapData: result => {
-            // Jika result sudah array, bungkus ke { data: [...] }
             if (Array.isArray(result)) {
               return { data: result, totalRow: result.length };
             }
-            // Jika result.data sudah ada, biarkan
             return result;
           },
         }}
-        // opsional: onRowClick untuk buka modalView
         onRowClick={item => {
           setSelectedItem(item);
           setModalView(true);
@@ -391,6 +429,7 @@ export default function QRCodeCrud() {
         onClose={() => {
           setModalView(false);
           setSelectedItem(null);
+          setQrUrl('');
         }}
         title="QR Code Event"
         size="md"
@@ -398,44 +437,41 @@ export default function QRCodeCrud() {
       >
         {selectedItem && (selectedItem.promo || selectedItem.voucher) ? (
           <div className="flex flex-col items-center gap-4 p-6" ref={qrContainerRef}>
-            {/* build url and use as QR value (not JSON) */}
-            {(() => {
-               const qrUrl = buildTargetUrl(selectedItem);
-                return (
-                  <>
-                    <QRCodeCanvas
-                      value={qrUrl}
-                      size={512}            // lebih tajam untuk cetak
-                      includeMargin={true}
-                      level="H"
-                      bgColor="#ffffff"
-                      fgColor="#0f172a"
-                    />
-
-                    <div className="text-center">
-                      <div className="font-bold text-primary text-lg">
-                        {selectedItem.promo
-                          ? `Promo: ${selectedItem.promo.name || selectedItem.promo.kode || selectedItem.promo.id}`
-                          : `Voucher: ${selectedItem.voucher.name || selectedItem.voucher.kode || selectedItem.voucher.id}`}
-                      </div>
-                      <div className="text-sm text-secondary mt-1">
-                        Community:{' '}
-                        {selectedItem.promo?.community_id ||
-                          selectedItem.voucher?.community?.id ||
-                          selectedItem.voucher?.community_id ||
-                          'default'}
-                      </div>
-                    </div>
-
-                    <ButtonComponent
-                      label="Download QR (PNG)"
-                      icon={faDownload}
-                      paint="primary"
-                      onClick={handleDownloadPng}
-                    />
-                  </>
-                );
-            })()}
+            {qrUrl ? (
+              <>
+                <QRCodeCanvas
+                  ref={qrCanvasRef}
+                  value={qrUrl}
+                  size={512}
+                  includeMargin={true}
+                  level="H"
+                  bgColor="#ffffff"
+                  fgColor="#0f172a"
+                />
+                <div className="text-center">
+                  <div className="font-bold text-primary text-lg">
+                    {selectedItem.promo
+                      ? `Promo: ${selectedItem.promo.name || selectedItem.promo.kode || selectedItem.promo.id}`
+                      : `Voucher: ${selectedItem.voucher.name || selectedItem.voucher.kode || selectedItem.voucher.id}`}
+                  </div>
+                  <div className="text-sm text-secondary mt-1">
+                    Community:{' '}
+                    {selectedItem.promo?.community_id ||
+                      selectedItem.voucher?.community?.id ||
+                      selectedItem.voucher?.community_id ||
+                      'default'}
+                  </div>
+                </div>
+                <ButtonComponent
+                  label="Download QR (PNG)"
+                  icon={faDownload}
+                  paint="primary"
+                  onClick={handleDownloadPng}
+                />
+              </>
+            ) : (
+              <div className="text-center text-lg text-gray-500 font-semibold">Menyiapkan QR…</div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 p-6">
