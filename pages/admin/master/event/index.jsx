@@ -16,6 +16,7 @@ export default function EventCrud() {
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [refreshToggle, setRefreshToggle] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
@@ -176,16 +177,8 @@ export default function EventCrud() {
       resetForm();
       setSelectedEvent(null);
 
-      // Refresh list
-      const refreshRes = await fetch(`${apiUrl}/admin/events`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const refreshResult = await refreshRes.json();
-      setEventList(Array.isArray(refreshResult.data) ? refreshResult.data : []);
+      // trigger TableSupervisionComponent untuk refetch data
+      setRefreshToggle(s => !s);
       
       // Show success message
       alert(selectedEvent ? 'Event berhasil diperbarui!' : 'Event berhasil ditambahkan!');
@@ -206,7 +199,9 @@ export default function EventCrud() {
         'Authorization': `Bearer ${token}`,
       },
     });
-    setEventList(eventList.filter(e => e.id !== selectedEvent.id));
+    setEventList(prev => prev.filter(e => e.id !== selectedEvent.id));
+    // trigger TableSupervisionComponent untuk refetch data
+    setRefreshToggle(s => !s);
     setModalDelete(false);
     setSelectedEvent(null);
   };
@@ -350,6 +345,7 @@ export default function EventCrud() {
         customTopBar={topBarActions}
         noControlBar={false}
         searchable={true}
+        setToRefresh={refreshToggle}
         fetchControl={{
           path: 'admin/events',
           method: 'GET',
