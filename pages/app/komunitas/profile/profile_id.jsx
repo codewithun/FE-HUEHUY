@@ -92,7 +92,6 @@ export default function CommunityProfile() {
 
         if (res.ok) {
           const json = await res.json().catch(() => null);
-          // adjust according to your backend response shape
           const profile =
             json?.data?.profile || json?.data || json?.profile || json || {};
           setUserData({
@@ -103,7 +102,7 @@ export default function CommunityProfile() {
           });
         }
       } catch {
-        // ignore
+        // noop
       } finally {
         setLoadingProfile(false);
       }
@@ -156,11 +155,9 @@ export default function CommunityProfile() {
     setMembershipLoading(true);
     try {
       // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      alert('Permintaan membership berhasil dikirim! Admin akan meninjau permintaan Anda.');
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // no alert — just close
       setShowMembershipModal(false);
-    } catch {
-      alert('Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setMembershipLoading(false);
     }
@@ -178,16 +175,18 @@ export default function CommunityProfile() {
           url: shareUrl
         });
       } catch (error) {
-        if (error.name !== 'AbortError') {
-          navigator.clipboard.writeText(shareUrl).then(() => {
-            alert('Link berhasil disalin!');
-          });
+        // silent fallback
+        if (error?.name !== 'AbortError') {
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+          } catch {}
         }
       }
     } else {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert('Link berhasil disalin!');
-      });
+      // silent fallback
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+      } catch {}
     }
   };
 
@@ -197,7 +196,7 @@ export default function CommunityProfile() {
 
   const confirmLeaveCommunity = async () => {
     if (!routerReady || !effectiveCommunityId) {
-      alert('ID komunitas tidak tersedia. Coba sebentar lagi atau reload halaman.');
+      // no alert, just bail
       return;
     }
     setLeaveLoading(true);
@@ -214,11 +213,11 @@ export default function CommunityProfile() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || `HTTP ${res.status}`);
+        // silently fail (no alert), re-enable button
+        return;
       }
 
-      // ==== Broadcast ke halaman lain/tab: turunkan members -1 & isJoined=false
+      // Broadcast ke halaman lain/tab: turunkan members -1 & isJoined=false
       try {
         localStorage.setItem(
           'community:membership',
@@ -229,16 +228,13 @@ export default function CommunityProfile() {
             at: Date.now()
           })
         );
-      } catch {
-        // noop
-      }
+      } catch {}
 
-      alert('Berhasil keluar komunitas');
+      // tutup modal & pergi ke halaman komunitas
       setShowLeaveConfirm(false);
-      router.replace('/app/komunitas');
-    } catch (e) {
-      console.error('Gagal keluar komunitas', e);
-      alert('Gagal keluar komunitas. Cek koneksi atau coba lagi.');
+      router.replace('/app/komunitas/komunitas');
+    } catch {
+      // silent
     } finally {
       setLeaveLoading(false);
     }
@@ -440,11 +436,11 @@ export default function CommunityProfile() {
                 <p className="text-slate-600 text-sm mb-4">Scan QR code ini untuk bergabung dengan komunitas</p>
 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const shareUrl = `${window.location.origin}/app/komunitas/join/${effectiveCommunityId}`;
-                    navigator.clipboard.writeText(shareUrl).then(() => {
-                      alert('Link berhasil disalin!');
-                    });
+                    try {
+                      await navigator.clipboard.writeText(shareUrl);
+                    } catch {}
                   }}
                   className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                 >
