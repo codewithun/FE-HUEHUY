@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import {
     faCheck,
     faChevronRight,
@@ -28,6 +29,8 @@ export default function CommunityProfile() {
     const [showMembershipModal, setShowMembershipModal] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
     const [membershipLoading, setMembershipLoading] = useState(false);
+    const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+    const [leaveLoading, setLeaveLoading] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
@@ -180,8 +183,45 @@ export default function CommunityProfile() {
     };
 
     const handleLeaveCommunity = () => {
-        // In real app, this would show confirmation modal and handle leaving community
-        alert('Fitur keluar komunitas akan ditampilkan di sini');
+        // buka modal konfirmasi
+        setShowLeaveConfirm(true);
+    };
+
+    const confirmLeaveCommunity = async () => {
+        if (!id) {
+            alert('ID komunitas tidak tersedia');
+            return;
+        }
+        setLeaveLoading(true);
+        try {
+            const encryptedToken = Cookies.get(token_cookie_name);
+            const token = encryptedToken ? Decrypt(encryptedToken) : null;
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers.Authorization = `Bearer ${token}`;
+
+            // Sesuaikan endpoint dengan backend Anda. Contoh: POST /communities/:id/leave
+            const base = apiUrl.replace(/\/$/, '');
+            const res = await fetch(`${base}/communities/${id}/leave`, {
+                method: 'POST',
+                headers,
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || `HTTP ${res.status}`);
+            }
+
+            // sukses: tutup modal, beri notifikasi, pindah/refresh halaman
+            alert('Berhasil keluar komunitas');
+            setShowLeaveConfirm(false);
+            // arahkan ke daftar komunitas atau refresh halaman
+            router.replace('/app/komunitas');
+        } catch (e) {
+            console.error('Gagal keluar komunitas', e);
+            alert('Gagal keluar komunitas. Cek koneksi atau coba lagi.');
+        } finally {
+            setLeaveLoading(false);
+        }
     };
 
     if (!isClient) {
@@ -414,6 +454,41 @@ export default function CommunityProfile() {
                             </div>
                         </div>
                     </div>
+                )}
+
+                {/* Leave confirmation modal */}
+                {showLeaveConfirm && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-neuro">
+                      <h3 className="text-lg font-bold mb-2">Keluar Komunitas</h3>
+                      <p className="text-sm text-slate-600 mb-4">
+                        Apakah Anda yakin ingin keluar dari komunitas ini? Anda akan kehilangan akses member.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowLeaveConfirm(false)}
+                          className="flex-1 bg-gray-100 text-slate-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200"
+                          disabled={leaveLoading}
+                        >
+                          Batal
+                        </button>
+                        <button
+                          onClick={confirmLeaveCommunity}
+                          className="flex-1 bg-red-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-700 flex items-center justify-center gap-2"
+                          disabled={leaveLoading}
+                        >
+                          {leaveLoading ? (
+                            <>
+                              <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                              Memproses...
+                            </>
+                          ) : (
+                            'Keluar'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 )}
             </div>
         </>
