@@ -47,6 +47,7 @@ export default function KomunitasDashboard() {
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedCommunity, setSelectedCommunity] = useState(null);
+  const [refreshToggle, setRefreshToggle] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -121,16 +122,8 @@ export default function KomunitasDashboard() {
     setFormData({ name: "", description: "", logo: "" });
     setSelectedCommunity(null);
 
-    // Refresh list
-    const res = await fetch(apiJoin("admin/communities"), {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const result = await res.json();
-    setCommunityList(Array.isArray(result.data) ? result.data : []);
+    // trigger TableSupervisionComponent to refetch
+    setRefreshToggle((s) => !s);
   };
 
   // Delete community
@@ -144,7 +137,8 @@ export default function KomunitasDashboard() {
         Authorization: `Bearer ${token}`,
       },
     });
-    setCommunityList(communityList.filter((c) => c.id !== selectedCommunity.id));
+    setCommunityList((prev) => prev.filter((c) => c.id !== selectedCommunity.id));
+    setRefreshToggle((s) => !s);
     setModalDelete(false);
     setSelectedCommunity(null);
   };
@@ -427,6 +421,7 @@ export default function KomunitasDashboard() {
         customTopBar={topBarActions}
         noControlBar={false}
         searchable={true}
+        setToRefresh={refreshToggle}
         fetchControl={{
           path: "admin/communities",
           method: "GET",

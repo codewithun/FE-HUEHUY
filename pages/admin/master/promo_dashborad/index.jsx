@@ -16,6 +16,7 @@ export default function PromoDashboard() {
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedPromo, setSelectedPromo] = useState(null);
+  const [refreshToggle, setRefreshToggle] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -116,16 +117,8 @@ export default function PromoDashboard() {
     setImageFile(null);
     setImagePreview(null);
 
-    // Refresh list
-    const res = await fetch(`${apiUrl}/admin/promos`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const result = await res.json();
-    setPromoList(Array.isArray(result.data) ? result.data : []);
+    // trigger TableSupervisionComponent to refetch
+    setRefreshToggle((s) => !s);
   };
 
   // Delete promo
@@ -139,7 +132,9 @@ export default function PromoDashboard() {
         Authorization: `Bearer ${token}`,
       },
     });
-    setPromoList(promoList.filter((p) => p.id !== selectedPromo.id));
+    // optimistic update + trigger table refresh
+    setPromoList((prev) => prev.filter((p) => p.id !== selectedPromo.id));
+    setRefreshToggle((s) => !s);
     setModalDelete(false);
     setSelectedPromo(null);
   };
@@ -271,6 +266,7 @@ export default function PromoDashboard() {
         customTopBar={topBarActions}
         noControlBar={false}
         searchable={true}
+        setToRefresh={refreshToggle}
         fetchControl={{
           path: "admin/promos",
           method: "GET",

@@ -36,7 +36,7 @@ export default function VoucherCrud() {
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
-
+  const [refreshToggle, setRefreshToggle] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -192,7 +192,8 @@ export default function VoucherCrud() {
 
       // Sukses
       resetForm();
-      await fetchVouchers();
+      // trigger TableSupervisionComponent untuk refresh
+      setRefreshToggle(s => !s);
       setModalForm(false);
     } catch {
       alert('Terjadi kesalahan jaringan');
@@ -228,7 +229,9 @@ export default function VoucherCrud() {
           ...authHeader(),
         },
       });
-      setVoucherList(voucherList.filter((v) => v.id !== selectedVoucher.id));
+      setVoucherList(prev => prev.filter((v) => v.id !== selectedVoucher.id));
+      // trigger TableSupervisionComponent untuk refresh
+      setRefreshToggle(s => !s);
     } finally {
       setModalDelete(false);
       setSelectedVoucher(null);
@@ -325,6 +328,7 @@ export default function VoucherCrud() {
         customTopBar={topBarActions}
         noControlBar={false}
         searchable={true}
+        setToRefresh={refreshToggle}
         fetchControl={{
           path: 'admin/vouchers', // hapus "api/" di sini supaya tidak menghasilkan "/api/api/..." saat komponen menambahkan prefix
           method: 'GET',
