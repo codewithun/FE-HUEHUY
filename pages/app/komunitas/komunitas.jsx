@@ -10,7 +10,7 @@ import Cookies from "js-cookie";
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
 import { token_cookie_name } from "../../../helpers";
 import { Decrypt } from "../../../helpers/encryption.helpers";
@@ -204,7 +204,8 @@ export default function Komunitas() {
     setIsClient(true);
   }, []);
 
-  const fetchCommunities = async () => {
+  /** Fetch communities (dibungkus useCallback supaya jadi stable dependency) */
+  const fetchCommunities = useCallback(async () => {
     setLoading(true);
     try {
       const list = await fetchCommunitiesWithMembership();
@@ -220,11 +221,52 @@ export default function Komunitas() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCommunities();
-  }, []);
+  }, [fetchCommunities]);
+
+  /** ====== SYNC lintas halaman/tab & saat balik fokus ====== */
+  useEffect(() => {
+    // Saat tab lain mengubah membership (emit via localStorage), kita update lokal
+    const onStorage = (e) => {
+      if (e.key !== 'community:membership' || !e.newValue) return;
+      try {
+        const data = JSON.parse(e.newValue);
+        const { id, action, delta } = data || {};
+        if (!id) return;
+
+        setCommunities(prev =>
+          prev.map(c => {
+            if (c.id !== Number(id)) return c;
+            const d = Number.isFinite(delta) ? delta : (action === 'join' ? +1 : -1);
+            const nextMembers = Math.max(0, (c.members || 0) + d);
+            return {
+              ...c,
+              isJoined: action === 'join',
+              members: nextMembers,
+            };
+          })
+        );
+      } catch {}
+    };
+
+    // Saat user balik ke tab ini → refetch biar pasti akurat
+    const onFocusOrVisible = () => {
+      if (!document.hidden) fetchCommunities();
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+    };
+  }, [fetchCommunities]);
 
   const filteredCommunities = useMemo(() => {
     let data = [...communities];
@@ -390,6 +432,18 @@ export default function Komunitas() {
                           setSelectedCommunity(c);
                           setShowJoinPopup(true);
                         }}
+                        // ====== Tambahkan updater agar parent bisa update state setelah join ======
+                        onApplyDelta={(id, joinOrLeave, delta) => {
+                          setCommunities(prev => prev.map(item => {
+                            if (item.id !== id) return item;
+                            const d = Number.isFinite(delta) ? delta : (joinOrLeave === 'join' ? +1 : -1);
+                            return {
+                              ...item,
+                              isJoined: joinOrLeave === 'join',
+                              members: Math.max(0, (item.members || 0) + d),
+                            };
+                          }));
+                        }}
                       />
                     ))
                   )}
@@ -409,12 +463,22 @@ export default function Komunitas() {
                 setShowJoinPopup(false);
                 setSelectedCommunity(null);
 
+                // Optimistic + update angka members
                 setCommunities(prev =>
-                  prev.map(c => (c.id === selectedCommunity.id ? { ...c, isJoined: true } : c))
+                  prev.map(c =>
+                    c.id === selectedCommunity.id
+                      ? { ...c, isJoined: true, members: Math.max(0, (c.members || 0) + 1) }
+                      : c
+                  )
                 );
                 setActiveTab('komunitasku');
+
+                // Broadcast ke tab/halaman lain
+                localStorage.setItem(
+                  'community:membership',
+                  JSON.stringify({ id: selectedCommunity.id, action: 'join', delta: +1, at: Date.now() })
+                );
               } catch (error) {
-                // boleh kamu ganti jadi toast
                 alert(error?.message || 'Gagal bergabung');
                 setShowJoinPopup(false);
                 setSelectedCommunity(null);
@@ -541,6 +605,7 @@ function CommunityCard({
   formatNumber,
   setActiveTab,
   onShowJoinPopup,
+  onApplyDelta, // <-- baru: biar parent bisa update angka secara konsisten
 }) {
   const [isJoined, setIsJoined] = useState(Boolean(community.isJoined));
   const [justJoined, setJustJoined] = useState(false);

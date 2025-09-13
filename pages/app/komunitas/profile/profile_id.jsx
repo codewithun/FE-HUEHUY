@@ -87,7 +87,7 @@ export default function CommunityProfile() {
 
         const res = await fetch(`${apiUrl.replace(/\/$/, '')}/account`, {
           method: 'GET',
-          headers,
+          headers
         });
 
         if (res.ok) {
@@ -99,14 +99,11 @@ export default function CommunityProfile() {
             name: profile?.name || profile?.full_name || userData.name,
             email: profile?.email || profile?.contact_email || userData.email,
             avatar: profile?.picture_source || profile?.avatar || userData.avatar,
-            promoCount: profile?.promoCount ?? userData.promoCount,
+            promoCount: profile?.promoCount ?? userData.promoCount
           });
-        } else {
-          // leave defaults on failure
-          // console.warn('fetch profile failed', res.status);
         }
-      } catch (e) {
-        // console.warn('fetch profile error', e);
+      } catch {
+        // ignore
       } finally {
         setLoadingProfile(false);
       }
@@ -129,29 +126,29 @@ export default function CommunityProfile() {
       title: 'Minta Menjadi Member (Bisa Memiliki Kubus)',
       icon: faUsers,
       action: () => setShowMembershipModal(true),
-      hasChevron: true,
+      hasChevron: true
     },
     {
       id: 'chat-admin',
       title: 'Chat Admin Komunitas',
       icon: faComments,
       action: () => router.push(`/app/komunitas/admin-chat/${effectiveCommunityId}`),
-      hasChevron: true,
+      hasChevron: true
     },
     {
       id: 'share-community',
       title: 'Bagikan Komunitas',
       icon: faShare,
       action: () => handleShare(),
-      hasChevron: true,
+      hasChevron: true
     },
     {
       id: 'qr-community',
       title: 'QR Komunitas',
       icon: faQrcode,
       action: () => router.push('/app/komunitas/scanner'),
-      hasChevron: true,
-    },
+      hasChevron: true
+    }
   ];
 
   // Handler functions
@@ -160,11 +157,9 @@ export default function CommunityProfile() {
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      alert(
-        'Permintaan membership berhasil dikirim! Admin akan meninjau permintaan Anda.'
-      );
+      alert('Permintaan membership berhasil dikirim! Admin akan meninjau permintaan Anda.');
       setShowMembershipModal(false);
-    } catch (error) {
+    } catch {
       alert('Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setMembershipLoading(false);
@@ -180,18 +175,16 @@ export default function CommunityProfile() {
         await navigator.share({
           title: `Komunitas ${communityData.name}`,
           text: shareText,
-          url: shareUrl,
+          url: shareUrl
         });
       } catch (error) {
         if (error.name !== 'AbortError') {
-          // Fallback to copy link if sharing fails
           navigator.clipboard.writeText(shareUrl).then(() => {
             alert('Link berhasil disalin!');
           });
         }
       }
     } else {
-      // Fallback for browsers that don't support Web Share API
       navigator.clipboard.writeText(shareUrl).then(() => {
         alert('Link berhasil disalin!');
       });
@@ -199,7 +192,6 @@ export default function CommunityProfile() {
   };
 
   const handleLeaveCommunity = () => {
-    // buka modal konfirmasi
     setShowLeaveConfirm(true);
   };
 
@@ -215,11 +207,10 @@ export default function CommunityProfile() {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      // Sesuaikan endpoint dengan backend Anda. Contoh: POST /communities/:id/leave
       const base = apiUrl.replace(/\/$/, '');
       const res = await fetch(`${base}/communities/${effectiveCommunityId}/leave`, {
         method: 'POST',
-        headers,
+        headers
       });
 
       if (!res.ok) {
@@ -227,10 +218,23 @@ export default function CommunityProfile() {
         throw new Error(err.message || `HTTP ${res.status}`);
       }
 
-      // sukses: tutup modal, beri notifikasi, pindah/refresh halaman
+      // ==== Broadcast ke halaman lain/tab: turunkan members -1 & isJoined=false
+      try {
+        localStorage.setItem(
+          'community:membership',
+          JSON.stringify({
+            id: Number(effectiveCommunityId),
+            action: 'leave',
+            delta: -1,
+            at: Date.now()
+          })
+        );
+      } catch {
+        // noop
+      }
+
       alert('Berhasil keluar komunitas');
       setShowLeaveConfirm(false);
-      // arahkan ke daftar komunitas atau refresh halaman
       router.replace('/app/komunitas');
     } catch (e) {
       console.error('Gagal keluar komunitas', e);
@@ -262,17 +266,13 @@ export default function CommunityProfile() {
                 <div className="flex items-center gap-4">
                   {loadingProfile ? (
                     <div className="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center">
-                      <FontAwesomeIcon
-                        icon={faSpinner}
-                        className="animate-spin text-gray-400"
-                      />
+                      <FontAwesomeIcon icon={faSpinner} className="animate-spin text-gray-400" />
                     </div>
                   ) : (
                     <div className="w-16 h-16 bg-white rounded-2xl overflow-hidden flex-shrink-0 shadow-neuro-in">
                       <Image
                         src={
-                          userData.avatar &&
-                          userData.avatar !== '/api/placeholder/80/80'
+                          userData.avatar && userData.avatar !== '/api/placeholder/80/80'
                             ? userData.avatar
                             : '/avatar.jpg'
                         }
@@ -328,20 +328,12 @@ export default function CommunityProfile() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shadow-neuro-in">
-                            <FontAwesomeIcon
-                              icon={item.icon}
-                              className="text-slate-400 text-lg"
-                            />
+                            <FontAwesomeIcon icon={item.icon} className="text-slate-400 text-lg" />
                           </div>
-                          <span className="font-medium text-slate-700">
-                            {item.title}
-                          </span>
+                          <span className="font-medium text-slate-700">{item.title}</span>
                         </div>
                         {item.hasChevron && (
-                          <FontAwesomeIcon
-                            icon={faChevronRight}
-                            className="text-slate-400 text-sm"
-                          />
+                          <FontAwesomeIcon icon={faChevronRight} className="text-slate-400 text-sm" />
                         )}
                       </div>
                     </div>
@@ -359,10 +351,7 @@ export default function CommunityProfile() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center shadow-neuro-in">
-                        <FontAwesomeIcon
-                          icon={faSignOutAlt}
-                          className="text-red-500 text-lg"
-                        />
+                        <FontAwesomeIcon icon={faSignOutAlt} className="text-red-500 text-lg" />
                       </div>
                       <span className="font-medium text-red-700">Keluar Komunitas</span>
                     </div>
@@ -383,13 +372,10 @@ export default function CommunityProfile() {
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FontAwesomeIcon icon={faUsers} className="text-blue-600 text-2xl" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2">
-                  Permintaan Membership
-                </h3>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Permintaan Membership</h3>
                 <p className="text-slate-600 text-sm">
-                  Apakah Anda yakin ingin mengajukan permintaan untuk menjadi member
-                  komunitas {communityData.name}? Sebagai member, Anda akan dapat
-                  memiliki kubus dan mendapat akses khusus.
+                  Apakah Anda yakin ingin mengajukan permintaan untuk menjadi member komunitas {communityData.name}?{' '}
+                  Sebagai member, Anda akan dapat memiliki kubus dan mendapat akses khusus.
                 </p>
               </div>
 
@@ -451,9 +437,7 @@ export default function CommunityProfile() {
                 </div>
 
                 <h4 className="font-bold text-slate-800 mb-2">{communityData.name}</h4>
-                <p className="text-slate-600 text-sm mb-4">
-                  Scan QR code ini untuk bergabung dengan komunitas
-                </p>
+                <p className="text-slate-600 text-sm mb-4">Scan QR code ini untuk bergabung dengan komunitas</p>
 
                 <button
                   onClick={() => {
@@ -478,8 +462,7 @@ export default function CommunityProfile() {
             <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-neuro">
               <h3 className="text-lg font-bold mb-2">Keluar Komunitas</h3>
               <p className="text-sm text-slate-600 mb-4">
-                Apakah Anda yakin ingin keluar dari komunitas ini? Anda akan
-                kehilangan akses member.
+                Apakah Anda yakin ingin keluar dari komunitas ini? Anda akan kehilangan akses member.
               </p>
               <div className="flex gap-3">
                 <button
