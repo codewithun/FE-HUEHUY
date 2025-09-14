@@ -199,8 +199,15 @@ export default function BuatAkun() {
             </div>
             <div className="text-center mt-2">
               Sudah memiliki akun?{' '}
-              <Link href="/">
-                <span href="" className="text-primary font-semibold underline">
+              <Link
+                href={{
+                  pathname: '/',
+                  query: router?.query?.next
+                    ? { next: String(router.query.next) }
+                    : {}
+                }}
+              >
+                <span className="text-primary font-semibold underline">
                   Login Saja
                 </span>
               </Link>
