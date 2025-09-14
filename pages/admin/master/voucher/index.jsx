@@ -54,6 +54,9 @@ const toDateInputValue = (raw) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// --- Stock label helper ---
+const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
+
 export default function VoucherCrud() {
   const [voucherList, setVoucherList] = useState([]);
   const [modalForm, setModalForm] = useState(false);
@@ -83,6 +86,18 @@ export default function VoucherCrud() {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : '';
     return { Authorization: `Bearer ${token}` };
+  };
+
+  // Label helpers untuk kolom Target
+  const getUserLabel = (id) => {
+    if (!id) return '';
+    const u = users.find((x) => String(x.id) === String(id));
+    return u?.name || u?.email || `User #${id}`;
+  };
+  const getCommunityLabel = (id) => {
+    if (!id) return '';
+    const c = communities.find((x) => String(x.id) === String(id));
+    return c?.name || `Community #${id}`;
   };
 
   // Fetch voucher list
@@ -323,14 +338,16 @@ export default function VoucherCrud() {
       selector: 'stock',
       label: 'Sisa Voucher',
       sortable: true,
-      item: ({ stock }) => stock,
+      // tampil "1 voucher", "5 voucher", dll.
+      item: ({ stock }) => <span>{formatStockVoucher(stock)}</span>,
     },
     {
       selector: 'target_type',
       label: 'Target',
+      // tampilkan nama user/community (bukan ID)
       item: ({ target_type, target_user_id, community_id }) => {
-        if (target_type === 'user') return `User #${target_user_id}`;
-        if (target_type === 'community') return `Community #${community_id}`;
+        if (target_type === 'user') return getUserLabel(target_user_id);
+        if (target_type === 'community') return getCommunityLabel(community_id);
         return 'Semua';
       },
     },
@@ -477,6 +494,7 @@ export default function VoucherCrud() {
               onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
               required
             />
+            <span className="text-xs text-gray-500">Tampilan di tabel: “{`{angka}`} voucher”.</span>
           </div>
 
           {/* Targeting */}
@@ -485,7 +503,9 @@ export default function VoucherCrud() {
             <select
               className="select select-bordered w-full"
               value={formData.target_type}
-              onChange={(e) => setFormData({ ...formData, target_type: e.target.value, target_user_id: '' })}
+              onChange={(e) =>
+                setFormData({ ...formData, target_type: e.target.value, target_user_id: '' })
+              }
             >
               <option value="all">Semua Pengguna</option>
               <option value="user">Pengguna Tertentu</option>
