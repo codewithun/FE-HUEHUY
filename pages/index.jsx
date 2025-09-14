@@ -17,6 +17,26 @@ import { get, post, token_cookie_name, useForm } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
 import { googleProvider } from '../helpers/firebase';
 
+const isSafeInternal = (url) => {
+  if (typeof window === 'undefined') return false;
+  try { return new URL(url, window.location.origin).origin === window.location.origin; }
+  catch { return false; }
+};
+const takeNext = (router) => {
+  const q = router?.query?.next ? String(router.query.next) : null;
+  const s = typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null;
+  return q || s || null;
+};
+const consumeNext = (router) => {
+  const raw = takeNext(router);
+  if (!raw) return null;
+  if (typeof window !== 'undefined') localStorage.removeItem('postAuthRedirect');
+  let url = String(raw);
+  try { url = decodeURIComponent(url); } catch { }
+  try { url = decodeURIComponent(url); } catch { }
+  return isSafeInternal(url) ? url : null;
+};
+
 export default function Login() {
   const router = useRouter();
   const [btnGoogleLoading, setBtnGoogleLoading] = useState(false);
@@ -51,9 +71,9 @@ export default function Login() {
       res?.need_verification === true;
 
     if (needVerify) {
-      const next = router?.query?.next ? String(router.query.next) : null;
-      const target = (rurl || `/verifikasi?email=${encodeURIComponent(email)}`)
-        + (next ? `&next=${encodeURIComponent(next)}` : '');
+      const next = consumeNext(router); // ambil dari ?next atau localStorage
+      const base = rurl || `/verifikasi?email=${encodeURIComponent(email)}`;
+      const target = next ? `${base}&next=${encodeURIComponent(next)}` : base;
       window.location.href = target;
       return;
     }
@@ -62,7 +82,8 @@ export default function Login() {
     const token = res?.data?.token || res?.token;
     if (token) {
       Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
-      setTimeout(() => { window.location.href = '/app'; }, 100);
+      const nextUrl = consumeNext(router);
+      setTimeout(() => { window.location.href = nextUrl || '/app'; }, 100);
       return;
     }
 
@@ -132,16 +153,16 @@ export default function Login() {
       const response = await loginFirebase(result.user.accessToken, true);
 
       if (response?.status === 200) {
-        // PERBAIKAN: Firebase login sukses berarti user sudah verified
-        // Langsung ke app tanpa cek verification lagi
+        const nextUrl = consumeNext(router);
         setTimeout(() => {
-          window.location.href = '/app';
+          window.location.href = nextUrl || '/app';
         }, 100);
       } else if (response?.status === 202) {
-        // Handle specific case for status 202 - butuh verifikasi
         const user = response?.data?.user || response?.user;
+        const next = consumeNext(router);
+        const base = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
         setTimeout(() => {
-          window.location.href = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
+          window.location.href = next ? `${base}&next=${encodeURIComponent(next)}` : base;
         }, 100);
         setBtnGoogleLoading(false);
       } else {
