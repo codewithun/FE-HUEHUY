@@ -52,7 +52,7 @@ export default function Save() {
       // Ambil data user-scoped (BUKAN admin/global)
       const [promoRes, voucherRes] = await Promise.allSettled([
         fetch(`${apiUrl}/user/promo-validations`, { headers, signal: controller.signal }),
-        fetch(`${apiUrl}/user/voucher-validations`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/vouchers/voucher-items`, { headers, signal: controller.signal }),
       ]);
 
       let allItems = [];
