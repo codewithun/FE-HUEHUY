@@ -14,7 +14,7 @@ export default function NotificationPage() {
   const [type, setType] = useState('merchant'); // 'hunter' | 'merchant'
   const [version, setVersion] = useState(0);    // cache-buster
   const [localItems, setLocalItems] = useState([]);
-  const [clearing, setClearing] = useState(false); // << loading utk tombol hapus semua
+  const [clearing, setClearing] = useState(false);
 
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}&v=${version}`,
@@ -66,7 +66,6 @@ export default function NotificationPage() {
         return;
       }
 
-      // Optimistic remove + re-fetch
       setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
       setVersion((v) => v + 1);
 
@@ -76,7 +75,6 @@ export default function NotificationPage() {
     }
   }
 
-  // === NEW: Hapus semua notifikasi pengguna ini (HARD DELETE) ===
   async function clearAllNotifications() {
     const ok = window.confirm(
       `Hapus semua notifikasi di tab "${type}"? Tindakan ini tidak bisa dibatalkan.`
@@ -86,14 +84,13 @@ export default function NotificationPage() {
     try {
       setClearing(true);
 
-      // pakai DELETE dan kirim filter sesuai tab aktif
       const res = await fetch(
         `${apiBase}/api/notification?type=${encodeURIComponent(type)}`,
         {
           method: 'DELETE',
           headers: {
             Accept: 'application/json',
-            ...authHeader(), // pastikan Authorization: Bearer <token>
+            ...authHeader(),
           },
         }
       );
@@ -108,16 +105,14 @@ export default function NotificationPage() {
         return;
       }
 
-      // Kosongkan list lokal & paksa re-fetch
       setLocalItems([]);
-      setVersion(v => v + 1);
+      setVersion((v) => v + 1);
     } catch (e) {
       alert('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
     } finally {
       setClearing(false);
     }
   }
-
 
   const cardMeta = (n) => {
     if (!n || typeof n !== 'object') {
@@ -150,7 +145,6 @@ export default function NotificationPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Tombol Hapus Semua */}
               <button
                 type="button"
                 onClick={clearAllNotifications}
@@ -163,7 +157,6 @@ export default function NotificationPage() {
                 {clearing ? 'Menghapus…' : 'Hapus semua'}
               </button>
 
-              {/* Icon bell */}
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
@@ -185,7 +178,7 @@ export default function NotificationPage() {
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
                 }`}
-                onClick={() => { setType('hunter'); setVersion(v => v + 1); }}
+                onClick={() => { setType('hunter'); setVersion((v) => v + 1); }}
               >
                 Hunter
               </button>
@@ -196,7 +189,7 @@ export default function NotificationPage() {
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
                 }`}
-                onClick={() => { setType('merchant'); setVersion(v => v + 1); }}
+                onClick={() => { setType('merchant'); setVersion((v) => v + 1); }}
               >
                 Merchant
               </button>
@@ -302,7 +295,7 @@ export default function NotificationPage() {
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5v-4z" />
-                      <circle cx={12} cy={7} r={4} />
+                      <circle cx="12" cy="7" r="4" />
                     </svg>
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-2">Belum ada notifikasi</h3>
