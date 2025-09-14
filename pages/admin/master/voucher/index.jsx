@@ -15,16 +15,13 @@ import { Decrypt } from '../../../../helpers/encryption.helpers';
 // --- Helper: normalize API base & image URL ---
 const getApiBase = () => {
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  // buang /api di env kalau ada, nanti kita tambahkan lagi
   return raw.replace(/\/api\/?$/, '');
 };
 
 const buildImageUrl = (raw) => {
   if (!raw) return null;
-  // absolute
-  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw; // absolute
   const base = getApiBase();
-  // normalisasi path storage
   let path = String(raw).replace(/^\/+/, '');
   path = path.replace(/^api\/storage\//, 'storage/');
   if (!/^storage\//.test(path)) path = `storage/${path}`;
@@ -57,7 +54,7 @@ const toDateInputValue = (raw) => {
 // --- Stock label helper ---
 const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
 
-export default function VoucherCrud() {
+function VoucherCrud() {
   const [voucherList, setVoucherList] = useState([]);
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
@@ -194,10 +191,7 @@ export default function VoucherCrud() {
     body.append('name', formData.name);
     if (formData.description) body.append('description', formData.description);
     if (formData.type) body.append('type', formData.type);
-
-    // formData.valid_until sudah dalam YYYY-MM-DD dari <input type="date">
     if (formData.valid_until) body.append('valid_until', formData.valid_until);
-
     if (formData.tenant_location) body.append('tenant_location', formData.tenant_location);
     body.append('stock', String(formData.stock ?? 0));
     body.append('code', formData.code);
@@ -207,7 +201,8 @@ export default function VoucherCrud() {
     if (formData.target_type === 'user' && formData.target_user_id) {
       body.append('target_user_id', formData.target_user_id);
     }
-    if (formData.community_id) {
+    // ✅ hanya kirim community_id kalau target_type = community
+    if (formData.target_type === 'community' && formData.community_id) {
       body.append('community_id', formData.community_id);
     }
 
@@ -240,9 +235,7 @@ export default function VoucherCrud() {
         return;
       }
 
-      // Sukses
       resetForm();
-      // trigger TableSupervisionComponent untuk refresh
       setRefreshToggle((s) => !s);
       setModalForm(false);
     } catch {
@@ -280,7 +273,6 @@ export default function VoucherCrud() {
         },
       });
       setVoucherList((prev) => prev.filter((v) => v.id !== selectedVoucher.id));
-      // trigger TableSupervisionComponent untuk refresh
       setRefreshToggle((s) => !s);
     } finally {
       setModalDelete(false);
@@ -296,13 +288,13 @@ export default function VoucherCrud() {
       description: voucher.description || '',
       image: voucher.image || '',
       type: voucher.type || '',
-      valid_until: toDateInputValue(voucher.valid_until) || '', // <= penting untuk input date
+      valid_until: toDateInputValue(voucher.valid_until) || '',
       tenant_location: voucher.tenant_location || '',
       stock: voucher.stock ?? 0,
       code: voucher.code || '',
-      community_id: voucher.community_id || '',
+      community_id: String(voucher.community_id ?? ''),
       target_type: voucher.target_type || 'all',
-      target_user_id: voucher.target_user_id || '',
+      target_user_id: String(voucher.target_user_id ?? ''),
     });
     setImageFile(null);
     setModalForm(true);
@@ -338,13 +330,11 @@ export default function VoucherCrud() {
       selector: 'stock',
       label: 'Sisa Voucher',
       sortable: true,
-      // tampil "1 voucher", "5 voucher", dll.
       item: ({ stock }) => <span>{formatStockVoucher(stock)}</span>,
     },
     {
       selector: 'target_type',
       label: 'Target',
-      // tampilkan nama user/community (bukan ID)
       item: ({ target_type, target_user_id, community_id }) => {
         if (target_type === 'user') return getUserLabel(target_user_id);
         if (target_type === 'community') return getCommunityLabel(community_id);
@@ -354,10 +344,8 @@ export default function VoucherCrud() {
     {
       selector: 'valid_until',
       label: 'Berlaku Sampai',
-      // tampil "14 September 2025"
       item: ({ valid_until }) => formatDateID(valid_until),
     },
-    // Aksi edit/hapus disediakan oleh TableSupervisionComponent kalau ada; kalau tidak, tambahkan di sini
   ];
 
   const topBarActions = (
@@ -503,9 +491,16 @@ export default function VoucherCrud() {
             <select
               className="select select-bordered w-full"
               value={formData.target_type}
-              onChange={(e) =>
-                setFormData({ ...formData, target_type: e.target.value, target_user_id: '' })
-              }
+              onChange={(e) => {
+                const next = e.target.value; // 'all' | 'user' | 'community'
+                setFormData((s) => ({
+                  ...s,
+                  target_type: next,
+                  target_user_id: '',
+                  // ✅ kosongkan community_id saat pindah ke non-community
+                  community_id: next === 'community' ? s.community_id : '',
+                }));
+              }}
             >
               <option value="all">Semua Pengguna</option>
               <option value="user">Pengguna Tertentu</option>
@@ -541,6 +536,7 @@ export default function VoucherCrud() {
               value={formData.community_id}
               onChange={(e) => setFormData({ ...formData, community_id: e.target.value })}
               required={formData.target_type === 'community'}
+              disabled={formData.target_type !== 'community'}
             >
               <option value="">Pilih Community</option>
               {communities.map((c) => (
@@ -625,3 +621,5 @@ export default function VoucherCrud() {
 VoucherCrud.getLayout = function getLayout(page) {
   return <AdminLayout>{page}</AdminLayout>;
 };
+
+export default VoucherCrud;
