@@ -31,6 +31,29 @@ const buildImageUrl = (raw) => {
   return `${base}/${path}`;
 };
 
+// --- Date helpers (ID) ---
+const formatDateID = (raw) => {
+  if (!raw) return '-';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return '-';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(d);
+};
+
+// Pastikan nilai cocok untuk <input type="date"> (YYYY-MM-DD)
+const toDateInputValue = (raw) => {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return '';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function VoucherCrud() {
   const [voucherList, setVoucherList] = useState([]);
   const [modalForm, setModalForm] = useState(false);
@@ -79,7 +102,10 @@ export default function VoucherCrud() {
     }
   };
 
-  useEffect(() => { fetchVouchers(); }, [apiBase]);
+  useEffect(() => {
+    fetchVouchers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBase]);
 
   // Fetch community list
   useEffect(() => {
@@ -98,6 +124,7 @@ export default function VoucherCrud() {
         setCommunities([]);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
   // Fetch users (buat target user)
@@ -117,6 +144,7 @@ export default function VoucherCrud() {
         setUsers([]);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
   // Upload image handler
@@ -151,7 +179,10 @@ export default function VoucherCrud() {
     body.append('name', formData.name);
     if (formData.description) body.append('description', formData.description);
     if (formData.type) body.append('type', formData.type);
+
+    // formData.valid_until sudah dalam YYYY-MM-DD dari <input type="date">
     if (formData.valid_until) body.append('valid_until', formData.valid_until);
+
     if (formData.tenant_location) body.append('tenant_location', formData.tenant_location);
     body.append('stock', String(formData.stock ?? 0));
     body.append('code', formData.code);
@@ -182,7 +213,11 @@ export default function VoucherCrud() {
 
       const resultText = await res.text();
       let result;
-      try { result = resultText ? JSON.parse(resultText) : {}; } catch { result = { raw: resultText }; }
+      try {
+        result = resultText ? JSON.parse(resultText) : {};
+      } catch {
+        result = { raw: resultText };
+      }
 
       if (!res.ok) {
         const msg = result?.message || 'server error';
@@ -193,7 +228,7 @@ export default function VoucherCrud() {
       // Sukses
       resetForm();
       // trigger TableSupervisionComponent untuk refresh
-      setRefreshToggle(s => !s);
+      setRefreshToggle((s) => !s);
       setModalForm(false);
     } catch {
       alert('Terjadi kesalahan jaringan');
@@ -229,9 +264,9 @@ export default function VoucherCrud() {
           ...authHeader(),
         },
       });
-      setVoucherList(prev => prev.filter((v) => v.id !== selectedVoucher.id));
+      setVoucherList((prev) => prev.filter((v) => v.id !== selectedVoucher.id));
       // trigger TableSupervisionComponent untuk refresh
-      setRefreshToggle(s => !s);
+      setRefreshToggle((s) => !s);
     } finally {
       setModalDelete(false);
       setSelectedVoucher(null);
@@ -246,7 +281,7 @@ export default function VoucherCrud() {
       description: voucher.description || '',
       image: voucher.image || '',
       type: voucher.type || '',
-      valid_until: voucher.valid_until || '',
+      valid_until: toDateInputValue(voucher.valid_until) || '', // <= penting untuk input date
       tenant_location: voucher.tenant_location || '',
       stock: voucher.stock ?? 0,
       code: voucher.code || '',
@@ -286,7 +321,7 @@ export default function VoucherCrud() {
     },
     {
       selector: 'stock',
-      label: 'Stock',
+      label: 'Sisa Voucher',
       sortable: true,
       item: ({ stock }) => stock,
     },
@@ -302,7 +337,8 @@ export default function VoucherCrud() {
     {
       selector: 'valid_until',
       label: 'Berlaku Sampai',
-      item: ({ valid_until }) => valid_until || '-',
+      // tampil "14 September 2025"
+      item: ({ valid_until }) => formatDateID(valid_until),
     },
     // Aksi edit/hapus disediakan oleh TableSupervisionComponent kalau ada; kalau tidak, tambahkan di sini
   ];
@@ -330,7 +366,7 @@ export default function VoucherCrud() {
         searchable={true}
         setToRefresh={refreshToggle}
         fetchControl={{
-          path: 'admin/vouchers', // hapus "api/" di sini supaya tidak menghasilkan "/api/api/..." saat komponen menambahkan prefix
+          path: 'admin/vouchers', // hapus "api/" supaya tidak jadi "/api/api/..."
           method: 'GET',
           headers: () => ({
             'Content-Type': 'application/json',
@@ -369,7 +405,7 @@ export default function VoucherCrud() {
               className="input input-bordered w-full"
               placeholder="Masukkan nama voucher"
               value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
           </div>
@@ -381,7 +417,7 @@ export default function VoucherCrud() {
               className="input input-bordered w-full"
               placeholder="Masukkan deskripsi"
               value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
 
@@ -392,7 +428,7 @@ export default function VoucherCrud() {
               className="input input-bordered w-full"
               placeholder="Masukkan kode unik voucher"
               value={formData.code}
-              onChange={e => setFormData({ ...formData, code: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               required
             />
             <span className="text-xs text-gray-500">Kode unik voucher, wajib diisi dan tidak boleh sama.</span>
@@ -405,7 +441,7 @@ export default function VoucherCrud() {
               className="input input-bordered w-full"
               placeholder="Masukkan tipe voucher"
               value={formData.type}
-              onChange={e => setFormData({ ...formData, type: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
             />
           </div>
 
@@ -415,8 +451,9 @@ export default function VoucherCrud() {
               type="date"
               className="input input-bordered w-full"
               value={formData.valid_until}
-              onChange={e => setFormData({ ...formData, valid_until: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
             />
+            <span className="text-xs text-gray-500">Ditampilkan sebagai “DD MMMM YYYY” di tabel.</span>
           </div>
 
           <div>
@@ -426,7 +463,7 @@ export default function VoucherCrud() {
               className="input input-bordered w-full"
               placeholder="Masukkan lokasi tenant"
               value={formData.tenant_location}
-              onChange={e => setFormData({ ...formData, tenant_location: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, tenant_location: e.target.value })}
             />
           </div>
 
@@ -437,7 +474,7 @@ export default function VoucherCrud() {
               className="input input-bordered w-full"
               placeholder="Masukkan stock"
               value={formData.stock}
-              onChange={e => setFormData({ ...formData, stock: Number(e.target.value) })}
+              onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
               required
             />
           </div>
@@ -448,7 +485,7 @@ export default function VoucherCrud() {
             <select
               className="select select-bordered w-full"
               value={formData.target_type}
-              onChange={e => setFormData({ ...formData, target_type: e.target.value, target_user_id: '' })}
+              onChange={(e) => setFormData({ ...formData, target_type: e.target.value, target_user_id: '' })}
             >
               <option value="all">Semua Pengguna</option>
               <option value="user">Pengguna Tertentu</option>
@@ -463,11 +500,11 @@ export default function VoucherCrud() {
               <select
                 className="select select-bordered w-full"
                 value={formData.target_user_id}
-                onChange={e => setFormData({ ...formData, target_user_id: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, target_user_id: e.target.value })}
                 required
               >
                 <option value="">Pilih Pengguna</option>
-                {users.map(u => (
+                {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name || u.email || `#${u.id}`}
                   </option>
@@ -482,7 +519,7 @@ export default function VoucherCrud() {
             <select
               className="select select-bordered w-full"
               value={formData.community_id}
-              onChange={e => setFormData({ ...formData, community_id: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, community_id: e.target.value })}
               required={formData.target_type === 'community'}
             >
               <option value="">Pilih Community</option>
