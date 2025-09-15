@@ -123,11 +123,13 @@ const DetailVoucherPage = () => {
       // In a real app, you'd get the current user ID from context/auth
       // For now, we'll use a dummy user ID or get from localStorage
       // prioritaskan token & user id asli
+      // Ambil token untuk Authorization
+      let token = null;
       let userId = null;
       try {
         const enc = Cookies.get(token_cookie_name);
         if (enc) {
-          const token = Decrypt(enc);
+          token = Decrypt(enc);
           const acct = await get({
             path: 'account',
             headers: { Authorization: `Bearer ${token}` }
@@ -138,6 +140,7 @@ const DetailVoucherPage = () => {
 
       const response = await post({
         path: `admin/vouchers/${voucher.id}/send-to-user`,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: userId ? { user_id: userId } : {}, // tetap kompatibel: kalau BE izinkan body kosong pakai auth
       });
 
