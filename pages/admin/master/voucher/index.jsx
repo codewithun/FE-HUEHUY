@@ -291,30 +291,129 @@ function VoucherCrud() {
     <>
       <TableSupervisionComponent
         title="Manajemen Voucher"
-        columnControl={{ custom: columns }}
-        customTopBar={topBarActions}
-        searchable
-        noControlBar={false}
-        setToRefresh={refreshToggle}
-        actionControl={{
-          except: ['detail', 'add'],
-          onEdit: (voucher) => {
-            setSelectedVoucher(voucher);
-            // formData di halaman ini tidak lagi menentukan UI; VoucherForm akan baca dari selectedVoucher via initialData
-            setModalForm(true);
-          },
-          onDelete: (voucher) => {
-            setSelectedVoucher(voucher);
-            setModalDelete(true);
-          },
-        }}
         fetchControl={{
           path: 'admin/vouchers',
-          includeHeaders: {
-            'Content-Type': 'application/json',
-            ...authHeader(),
+          includeHeaders: { 'Content-Type': 'application/json', ...authHeader() },
+        }}
+        // ====== FORM CREATE (Tambah Baru) ======
+        formControl={{
+          size: 'lg',
+          contentType: 'multipart/form-data', // penting utk FormData
+          custom: [
+            // Informasi Umum
+            { type: 'default', construction: { label: 'Nama Voucher', name: 'name', placeholder: 'Contoh: Diskon 20%', validations: { required: true } } },
+            { type: 'default', construction: { label: 'Kode Unik',    name: 'code', placeholder: 'HH-20OFF',        validations: { required: true } } },
+            { type: 'default', construction: { label: 'Deskripsi',     name: 'description', placeholder: 'Ketentuan singkat' } },
+
+            // Pengaturan & Periode
+            { type: 'default', construction: { label: 'Tipe',          name: 'type', placeholder: 'percentage/nominal/buy1get1' } },
+            { type: 'date',    construction: { label: 'Berlaku Sampai',name: 'valid_until', placeholder: 'YYYY-MM-DD' } },
+            { type: 'default', construction: { label: 'Lokasi Tenant', name: 'tenant_location', placeholder: 'Foodcourt Lt.2' } },
+            { type: 'number',  construction: { label: 'Stok',          name: 'stock', placeholder: '0', validations: { min: 0 } } },
+
+            // Target Penerima
+            { type: 'select',  construction: {
+                label: 'Target',
+                name: 'target_type',
+                options: [
+                  { label: 'Semua Pengguna', value: 'all' },
+                  { label: 'Pengguna Tertentu', value: 'user' },
+                  { label: 'Anggota Community', value: 'community' },
+                ],
+              },
+            },
+            { type: 'select',  construction: {
+                label: 'Pilih Pengguna (jika target=user)',
+                name: 'target_user_id',
+                options: users.map(u => ({ label: u.name || u.email || `#${u.id}`, value: String(u.id) })),
+              },
+            },
+            { type: 'select',  construction: {
+                label: 'Community (wajib jika target=community)',
+                name: 'community_id',
+                options: communities.map(c => ({ label: c.name, value: String(c.id) })),
+              },
+            },
+
+            // Media
+            { type: 'file',    construction: { label: 'Gambar', name: 'image' } },
+          ],
+          customDefaultValue: {
+            target_type: 'all',
+            stock: 0,
           },
         }}
+
+        // ====== FORM UPDATE (Edit) — SAMA PERSIS ======
+        formUpdateControl={{
+          size: 'lg',
+          contentType: 'multipart/form-data',
+          custom: [
+            // (isi sama persis seperti formControl.custom)
+            { type: 'default', construction: { label: 'Nama Voucher', name: 'name', placeholder: 'Contoh: Diskon 20%', validations: { required: true } } },
+            { type: 'default', construction: { label: 'Kode Unik',    name: 'code', placeholder: 'HH-20OFF',        validations: { required: true } } },
+            { type: 'default', construction: { label: 'Deskripsi',     name: 'description', placeholder: 'Ketentuan singkat' } },
+            { type: 'default', construction: { label: 'Tipe',          name: 'type', placeholder: 'percentage/nominal/buy1get1' } },
+            { type: 'date',    construction: { label: 'Berlaku Sampai',name: 'valid_until', placeholder: 'YYYY-MM-DD' } },
+            { type: 'default', construction: { label: 'Lokasi Tenant', name: 'tenant_location', placeholder: 'Foodcourt Lt.2' } },
+            { type: 'number',  construction: { label: 'Stok',          name: 'stock', placeholder: '0', validations: { min: 0 } } },
+            { type: 'select',  construction: {
+                label: 'Target',
+                name: 'target_type',
+                options: [
+                  { label: 'Semua Pengguna', value: 'all' },
+                  { label: 'Pengguna Tertentu', value: 'user' },
+                  { label: 'Anggota Community', value: 'community' },
+                ],
+              },
+            },
+            { type: 'select',  construction: {
+                label: 'Pilih Pengguna (jika target=user)',
+                name: 'target_user_id',
+                options: users.map(u => ({ label: u.name || u.email || `#${u.id}`, value: String(u.id) })),
+              },
+            },
+            { type: 'select',  construction: {
+                label: 'Community (wajib jika target=community)',
+                name: 'community_id',
+                options: communities.map(c => ({ label: c.name, value: String(c.id) })),
+              },
+            },
+            { type: 'file',    construction: { label: 'Gambar (opsional, biarkan kosong untuk pakai gambar lama)', name: 'image' } },
+          ],
+          // mapping nilai default saat EDIT
+          customDefaultValue: (row) => {
+            const toDate = (raw) => {
+              if (!raw) return '';
+              const d = new Date(raw);
+              if (isNaN(d.getTime())) return '';
+              const yyyy = d.getFullYear();
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              return `${yyyy}-${mm}-${dd}`;
+            };
+            return {
+              _method: 'PUT',              // penting buat Laravel
+              name: row?.name || '',
+              code: row?.code || '',
+              description: row?.description || '',
+              type: row?.type || '',
+              valid_until: toDate(row?.valid_until), // dari ISO → YYYY-MM-DD
+              tenant_location: row?.tenant_location || '',
+              stock: row?.stock ?? 0,
+              target_type: row?.target_type || 'all',
+              target_user_id: row?.target_user_id ? String(row.target_user_id) : '',
+              community_id: row?.community_id ? String(row.community_id) : '',
+              // JANGAN isi 'image' dgn path lama supaya field file kosong & UI gak jadi text path
+            };
+          },
+        }}
+
+        // kolom dll tetap punyamu…
+        columnControl={columnControl}
+        actionControl={actionControl}
+        noControlBar={noControlBar}
+        searchable
       />
 
       {/* Modal Tambah / Edit — UI sama karena 1 komponen */}
