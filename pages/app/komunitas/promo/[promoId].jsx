@@ -223,11 +223,11 @@ export default function PromoDetailUnified() {
   useEffect(() => {
     if (!router.isReady) return;
     if (!promoId || !communityId) return;
-    
+
     // Skip if this is QR entry flow (handled by separate effect)
     const autoRegister = router.query.autoRegister || router.query.source;
     if (autoRegister) return;
-    
+
     fetchPromoDetails();
   }, [router.isReady, promoId, communityId]); // Remove fetchPromoDetails from dependency array
 
@@ -238,9 +238,9 @@ export default function PromoDetailUnified() {
 
     try {
       setLoading(true);
-      
+
       console.log('Fetching promo details:', { promoId, communityId });
-      
+
       // Try community-specific endpoint first
       let response = await get({
         path: `communities/${communityId}/promos/${promoId}`
@@ -250,7 +250,7 @@ export default function PromoDetailUnified() {
 
       if (response?.status === 200 && response?.data?.data) {
         const data = response.data.data;
-        
+
         // Transform to our UI format
         const transformedData = {
           id: data.id,
@@ -280,7 +280,7 @@ export default function PromoDetailUnified() {
           },
           terms: 'TERM & CONDITIONS APPLY'
         };
-        
+
         console.log('Transformed promo data:', transformedData);
         setPromoData(transformedData);
         return transformedData;
@@ -321,12 +321,12 @@ export default function PromoDetailUnified() {
             },
             terms: 'TERM & CONDITIONS APPLY'
           };
-          
+
           setPromoData(transformedData);
           return transformedData;
         }
       }
-      
+
       return null;
     } catch (err) {
       console.error('Error fetching promo details:', err);
@@ -344,8 +344,8 @@ export default function PromoDetailUnified() {
 
       // Check if already claimed
       const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const alreadyClaimed = existingVouchers.some(v => 
-        String(v.ad?.id) === String(promoData.id) || 
+      const alreadyClaimed = existingVouchers.some(v =>
+        String(v.ad?.id) === String(promoData.id) ||
         String(v.id) === String(promoData.id)
       );
 
@@ -356,9 +356,9 @@ export default function PromoDetailUnified() {
             headers: {
               'Authorization': `Bearer ${token}`
             },
-            body: { 
+            body: {
               promo_id: promoData.id,
-              source: 'qr_scan' 
+              source: 'qr_scan'
             }
           });
 
@@ -385,9 +385,19 @@ export default function PromoDetailUnified() {
             };
             claimedVouchers.push(newPromoItem);
             localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
-            
+
             setIsAlreadyClaimed(true);
             setShowSuccessModal(true);
+          } else {
+            const msg = (response?.data?.message || response?.message || '').toLowerCase();
+            if (msg.includes('habis') || msg.includes('stok') || msg.includes('stock')) {
+              setErrorMessage('Maaf, stok promo sudah habis direbut.');
+              setShowErrorModal(true);
+            } else if (msg.includes('sudah') || msg.includes('already') || msg.includes('claimed')) {
+              setIsAlreadyClaimed(true);
+              setErrorMessage('Promo ini sudah pernah direbut pada akun lain.');
+              setShowErrorModal(true);
+            }
           }
         } catch (error) {
           console.warn('Auto claim failed:', error);
@@ -402,7 +412,7 @@ export default function PromoDetailUnified() {
   const checkUserVerificationStatus = useCallback(async (token) => {
     try {
       console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
-      
+
       let response = await get({
         path: 'account',
         headers: {
@@ -411,13 +421,13 @@ export default function PromoDetailUnified() {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response?.status === 200) {
         console.log('User verified and logged in, proceeding with auto register');
         handleAutoRegister(token);
         return;
       }
-      
+
       if (response?.status === 401 || response?.status === 404) {
         response = await get({
           path: 'account-unverified',
@@ -427,11 +437,11 @@ export default function PromoDetailUnified() {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (response?.status === 200) {
           const userData = response?.data?.data?.profile || response?.data?.profile;
           const emailVerified = userData?.email_verified_at || userData?.verified_at;
-          
+
           if (!emailVerified) {
             const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
             window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
@@ -442,15 +452,15 @@ export default function PromoDetailUnified() {
           }
         }
       }
-      
+
       if (response?.status === 401) {
         const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
         window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         return;
       }
-      
+
       handleAutoRegister(token);
-      
+
     } catch (err) {
       console.error('Error checking verification status:', err);
       const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
@@ -461,12 +471,12 @@ export default function PromoDetailUnified() {
   // NEW: Handle QR entry flow
   useEffect(() => {
     if (!router.isReady) return;
-    
+
     const autoRegister = router.query.autoRegister || router.query.source;
 
     if (autoRegister) {
       let token = null;
-      
+
       const encrypted = Cookies.get(token_cookie_name);
       if (encrypted) {
         try {
@@ -476,11 +486,11 @@ export default function PromoDetailUnified() {
           Cookies.remove(token_cookie_name);
         }
       }
-      
+
       if (!token) {
         token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       }
-      
+
       if (!token) {
         const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
         if (typeof window !== 'undefined') {
@@ -488,7 +498,7 @@ export default function PromoDetailUnified() {
         }
         return;
       }
-      
+
       checkUserVerificationStatus(token);
     }
   }, [router.isReady, router.query, promoId, communityId, checkUserVerificationStatus]);
@@ -497,7 +507,7 @@ export default function PromoDetailUnified() {
   const handleBack = () => {
     const { from } = router.query;
     const autoRegister = router.query.autoRegister || router.query.source;
-    
+
     if (autoRegister) {
       router.push('/app');
     } else if (from === 'saku') {
@@ -563,16 +573,16 @@ export default function PromoDetailUnified() {
 
   const handleClaimPromo = async () => {
     if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
-    
+
     setIsClaimedLoading(true);
     try {
       // Cek lagi untuk memastikan tidak ada duplikasi
       const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const isDuplicate = existingVouchers.some(v => 
-        String(v.ad?.id) === String(promoData.id) || 
+      const isDuplicate = existingVouchers.some(v =>
+        String(v.ad?.id) === String(promoData.id) ||
         String(v.id) === String(promoData.id)
       );
-      
+
       if (isDuplicate) {
         setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
         setShowErrorModal(true);
@@ -622,14 +632,20 @@ export default function PromoDetailUnified() {
       }
 
       if (!savedItem) {
-        // Jika gagal kirim ke server, tetap simpan local agar UX lancar
-        const fallbackCode = 'PROMO' + Date.now().toString().slice(-8);
-        savedItem = {
-          id: promoData.id,
-          code: fallbackCode,
-          expired_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          error: lastError || undefined,
-        };
+        const low = String(lastError || '').toLowerCase();
+        if (low.includes('habis') || low.includes('stok') || low.includes('stock')) {
+          setErrorMessage('Maaf, stok promo sudah habis.');
+          setShowErrorModal(true);
+          setIsAlreadyClaimed(false);
+          return;
+        }
+        if (low.includes('sudah') || low.includes('already') || low.includes('claimed') || low.includes('duplicate')) {
+          setIsAlreadyClaimed(true);
+          setErrorMessage('Promo ini sudah pernah direbut (mungkin di akun lain).');
+          setShowErrorModal(true);
+          return;
+        }
+        // kalau bukan case khusus di atas, pakai fallback local save
       }
 
       // Simpan ke localStorage untuk langsung muncul di Saku
@@ -850,13 +866,12 @@ export default function PromoDetailUnified() {
           <button
             onClick={handleClaimPromo}
             disabled={isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-              isAlreadyClaimed
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : isClaimedLoading
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isAlreadyClaimed
+              ? 'bg-gray-400 text-white cursor-not-allowed'
+              : isClaimedLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-            }`}
+              }`}
           >
             {isAlreadyClaimed ? (
               <div className="flex items-center justify-center">
