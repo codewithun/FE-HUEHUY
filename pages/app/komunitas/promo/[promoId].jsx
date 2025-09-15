@@ -1,820 +1,433 @@
-/* eslint-disable no-console */
-/* pages/.../[promoId].jsx */
-import {
-  faArrowLeft,
-  faCheckCircle,
-  faExclamationTriangle,
-  faMapMarkerAlt,
-  faPhone,
-  faShare,
-  faWifi,
-  faWifiSlash,
-} from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCheckCircle, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useState } from 'react';
-import { token_cookie_name } from '../../../../helpers';
-import { get, post } from '../../../../helpers/api.helpers';
-import { Decrypt } from '../../../../helpers/encryption.helpers';
+import { useEffect, useState, useCallback } from 'react';
+import { token_cookie_name } from '../../../helpers';
+import { get, post } from '../../../helpers/api.helpers';
+import { Decrypt } from '../../../helpers/encryption.helpers';
 
-export default function PromoDetailUnified() {
+const DetailVoucherPage = () => {
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [showOutOfStockModal, setShowOutOfStockModal] = useState(false);
+  const [showClaimedElsewhereModal, setShowClaimedElsewhereModal] = useState(false);
+
+  // ambil user id dari token (jika ada)
+  useEffect(() => {
+    (async () => {
+      try {
+        const enc = Cookies.get(token_cookie_name);
+        if (!enc) return;
+        const token = Decrypt(enc);
+        const res = await get({ path: 'account', headers: { Authorization: `Bearer ${token}` } });
+        const uid = res?.data?.data?.id || res?.data?.id || res?.data?.data?.profile?.id;
+        if (uid) setCurrentUserId(Number(uid));
+      } catch (_) { }
+    })();
+  }, []);
   const router = useRouter();
-  const { promoId, communityId } = router.query;
-  // --- ADD: resolveLegacyPromoId untuk QR lama ---
-  const resolveLegacyPromoId = useCallback(() => {
-    // Jika pakai URL lama: /promo/detail_promo?filter=123
-    if (promoId === 'detail_promo') {
-      return router.query.filter || router.query.id || null;
-    }
-    return promoId || null;
-  }, [promoId, router.query]);
-
-  // pakai ini untuk semua pemanggilan API
-  const effectivePromoId = resolveLegacyPromoId();
-  const [promoData, setPromoData] = useState(null);
+  const { id } = router.query;
+  const [voucher, setVoucher] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const [isClaimedLoading, setIsClaimedLoading] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
+  const [error, setError] = useState(null);
+  const [isClaimed, setIsClaimed] = useState(false);
+  const [claimLoading, setClaimLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
-  // Tambahkan state untuk cek apakah promo sudah direbut
-  const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
+  // Helper function to construct proper image URLs
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '/default-avatar.png';
 
-  // ====== Mock data lama dari [promoId].jsx (dipertahankan) ======
-  const getLegacyPromoData = (id) => {
-    const allPromos = {
-      1: {
-        id: 1,
-        title: "McDonald's - Burger Combo Flash Sale",
-        subtitle: 'Paket burger kombo dengan kentang dan minuman',
-        image: '/images/promo/burger-combo-flash.jpg',
-        merchant: {
-          name: "McDonald's Bandung",
-          logo: '/images/merchants/mcdonalds-logo.png',
-          rating: 4.5,
-          address: 'Jl. Merdeka No. 123, Bandung',
-          phone: '+62 22 1234567',
-        },
-        discount: '30%',
-        originalPrice: 45000,
-        discountedPrice: 31500,
-        category: 'Fast Food',
-        description:
-          'Nikmati burger combo spesial dengan diskon hingga 30%! Paket lengkap berisi burger beef, kentang goreng crispy, dan minuman soda pilihan. Cocok untuk makan siang atau malam bersama keluarga.',
-        terms: [
-          'Berlaku untuk pembelian di lokasi',
-          'Tidak dapat digabung dengan promo lain',
-          'Berlaku hingga 31 Agustus 2025',
-          'Maksimal 2 paket per customer',
-          'Hanya untuk member komunitas',
-        ],
-        validUntil: '31 Agustus 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Burger', 'Fast Food', 'Family', 'Combo'],
-        gallery: [
-          '/images/promo/burger-combo-flash.jpg',
-          '/images/promo/chicken-package.jpg',
-          '/images/promo/pizza-medium-deal.jpg',
-        ],
-      },
-      2: {
-        id: 2,
-        title: 'Chicken Star - Paket Ayam Special',
-        subtitle: 'Ayam crispy dengan nasi dan saus pilihan',
-        image: '/images/promo/chicken-package.jpg',
-        merchant: {
-          name: 'Chicken Star',
-          logo: '/images/merchants/chicken-star-logo.png',
-          rating: 4.3,
-          address: 'Jl. Sudirman No. 45, Bandung',
-          phone: '+62 22 7654321',
-        },
-        discount: '25%',
-        originalPrice: 35000,
-        discountedPrice: 26250,
-        category: 'Chicken',
-        description:
-          'Ayam crispy special dengan bumbu rahasia yang menggugah selera. Disajikan dengan nasi hangat dan pilihan saus pedas atau manis. Perfect untuk pecinta ayam crispy!',
-        terms: [
-          'Berlaku untuk dine-in dan take away',
-          'Promo khusus member komunitas',
-          'Berlaku setiap hari',
-          'Tidak berlaku untuk delivery',
-          'Berlaku hingga stok habis',
-        ],
-        validUntil: '30 September 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Chicken', 'Crispy', 'Rice', 'Spicy'],
-        gallery: [
-          '/images/promo/chicken-package.jpg',
-          '/images/promo/beef-sausage-chicken.jpg',
-          '/images/promo/burger-combo-flash.jpg',
-        ],
-      },
-      3: {
-        id: 3,
-        title: 'Pizza Hut - Medium Pizza Deal',
-        subtitle: 'Pizza medium dengan topping pilihan dan minuman',
-        image: '/images/promo/pizza-medium-deal.jpg',
-        merchant: {
-          name: 'Pizza Hut',
-          logo: '/images/merchants/pizza-hut-logo.png',
-          rating: 4.4,
-          address: 'Jl. Asia Afrika No. 67, Bandung',
-          phone: '+62 22 3456789',
-        },
-        discount: '35%',
-        originalPrice: 85000,
-        discountedPrice: 55250,
-        category: 'Pizza',
-        description:
-          'Pizza medium dengan berbagai pilihan topping favorit. Dari pepperoni, sausage, hingga vegetarian. Dilengkapi dengan minuman soda dan garlic bread. Perfect untuk sharing!',
-        terms: [
-          'Pilihan topping: Pepperoni, Sausage, Mushroom, Vegetarian',
-          'Termasuk 1 minuman soda',
-          'Berlaku untuk dine-in saja',
-          'Tidak dapat dibawa pulang',
-          'Reservasi direkomendasikan',
-        ],
-        validUntil: '15 September 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Pizza', 'Italian', 'Sharing', 'Drinks'],
-        gallery: [
-          '/images/promo/pizza-medium-deal.jpg',
-          '/images/promo/burger-combo-flash.jpg',
-          '/images/promo/brown-sugar-coffee.jpg',
-        ],
-      },
-      4: {
-        id: 4,
-        title: 'Bubble Tea House - Minuman Segar',
-        subtitle: 'Bubble tea dengan berbagai rasa dan topping',
-        image: '/images/promo/bubble-tea-discount.jpg',
-        merchant: {
-          name: 'Bubble Tea House',
-          logo: '/images/merchants/bubble-tea-house-logo.png',
-          rating: 4.6,
-          address: 'Jl. Braga No. 89, Bandung',
-          phone: '+62 22 9876543',
-        },
-        discount: '15%',
-        originalPrice: 25000,
-        discountedPrice: 21250,
-        category: 'Beverages',
-        description:
-          'Bubble tea premium dengan berbagai pilihan rasa mulai dari original, taro, matcha, hingga brown sugar. Topping bisa pilih pearl, jelly, atau pudding. Segar dan menyegarkan!',
-        terms: [
-          'Berlaku untuk semua varian',
-          'Pilihan topping gratis: pearl, jelly, pudding',
-          'Buy 2 get extra 5% discount',
-          'Berlaku untuk take away dan dine-in',
-          'Dapat dipesan via delivery',
-        ],
-        validUntil: '20 September 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Bubble Tea', 'Drinks', 'Sweet', 'Refreshing'],
-        gallery: [
-          '/images/promo/bubble-tea-discount.jpg',
-          '/images/promo/brown-sugar-coffee.jpg',
-          '/images/promo/chicken-package.jpg',
-        ],
-      },
-    };
+    // Sudah absolut? langsung balikin
+    if (/^https?:\/\//i.test(imagePath)) return imagePath;
 
-    return allPromos[parseInt(id)] || allPromos[1];
+    // Sudah root-relative? langsung pakai (opsional: prefix-kan base jika perlu)
+    if (imagePath.startsWith('/')) return imagePath;
+
+    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
+    const u = new URL(raw);                // aman untuk hostname & protokol
+    const origin = u.origin;               // contoh: https://api-159-223-48-146.nip.io
+
+    // Hapus path "/api" di akhir (hanya path, bukan subdomain)
+    // Misal: https://.../api → tetap origin yang sama, kita build path sendiri
+    const cleaned = `${origin}/storage/${String(imagePath).replace(/^storage\//, '')}`;
+
+    return cleaned;
   };
 
-  // Normalisasi: bentuk lama -> bentuk UI detail_promo
-  const normalizeToDetailShape = (src) => {
-    if (!src) return null;
-    return {
-      id: src.id,
-      title: src.title,
-      merchant: src.merchant?.name || 'Merchant',
-      image: src.image,
-      distance: src.distance || '3 KM',
-      location: src.merchant?.address || src.location || '',
-      coordinates: src.coordinates || '',
-      originalPrice: src.originalPrice ?? null,
-      discountPrice: src.discountedPrice ?? null,
-      discount: src.discount ?? null,
-      schedule: {
-        day: 'Everyday',
-        details: src.validUntil
-          ? `Berlaku hingga ${src.validUntil}`
-          : 'Berlaku',
-        time: '10:00 - 22:00',
-        timeDetails: 'Jam Berlaku Promo',
-      },
-      status: {
-        type: 'Offline',
-        description: 'Tipe Promo: 🌐 Online / 📍 Offline',
-      },
-      description: src.description || '',
-      seller: {
-        name: src.merchant?.name || 'Admin',
-        phone: src.merchant?.phone || '',
-      },
-      terms: 'TERM & CONDITIONS APPLY',
-    };
-  };
-
-  // HAPUS/UBAH effect legacy: hanya gunakan jika communityId tidak tersedia (fallback mock)
-  useEffect(() => {
-    if (!promoId) return;
-    // jika ada communityId, kita akan ambil dari API => jangan override dengan mock
-    if (typeof communityId !== 'undefined' && communityId !== null) return;
-
-    const legacy = getLegacyPromoData(promoId);
-    setPromoData(normalizeToDetailShape(legacy));
-    setLoading(false);
-  }, [promoId, communityId]);
-
-  // ADD: Effect to fetch promo details from API when both promoId and communityId are available
-  useEffect(() => {
-    if (!router.isReady) return;
-    if (!effectivePromoId || !communityId) return;
-
-    const autoRegister = router.query.autoRegister || router.query.source;
-    if (autoRegister) return;
-
-    fetchPromoDetails();
-  }, [router.isReady, effectivePromoId, communityId, fetchPromoDetails]);
-  // Remove fetchPromoDetails from dependency array
-
-  // Perkuat effect yang mem-fetch dari API
-  const fetchPromoDetails = useCallback(async () => {
-    if (!router.isReady) return null;
-    if (!effectivePromoId || !communityId) return null;
-
+  // --- MODIFIED: fetchVoucherDetails now returns fetched data (or null) ---
+  const fetchVoucherDetails = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      console.log('Fetching promo details:', {
-        promoId: effectivePromoId,
-        communityId,
+      const response = await get({
+        path: `admin/vouchers/${id}`
       });
-      // Try community-specific endpoint first
-      // Coba endpoint komunitas dulu
-      let response = await get({
-        path: `communities/${communityId}/promos/${effectivePromoId}`,
-      });
-
-      if (!(response?.status === 200 && response?.data?.data)) {
-        // Fallback ke public sekali saja
-        response = await get({ path: `promos/${effectivePromoId}/public` });
-      }
 
       if (response?.status === 200 && response?.data?.data) {
-        const data = response.data.data;
-        const transformedData = {
-          id: data.id,
-          title: data.title,
-          merchant: data.owner_name || 'Merchant',
-          image: data.image_url || data.image || '/default-avatar.png',
-          distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
-          location: data.location || '',
-          coordinates: '',
-          originalPrice: data.original_price || null,
-          discountPrice: data.discount_price || null,
-          discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
-          schedule: {
-            day: data.always_available ? 'Setiap Hari' : 'Weekday',
-            details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}` : 'Berlaku',
-            time: '10:00 - 22:00',
-            timeDetails: 'Jam Berlaku Promo',
-          },
-          status: {
-            type: data.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-          },
-          description: data.description || '',
-          seller: {
-            name: data.owner_name || 'Admin',
-            phone: data.owner_contact || '',
-          },
-          terms: 'TERM & CONDITIONS APPLY',
-        };
-        setPromoData(transformedData);
-        return transformedData;
+        const voucherData = response.data.data;
+        setVoucher(voucherData);
+
+        // Check if user already has this voucher (check voucher_items)
+        const userVoucherItems = Array.isArray(voucherData.voucher_items) ? voucherData.voucher_items : [];
+        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        // HANYA hitung voucher_items yang milik user saat ini
+        const serverClaimedByMe = currentUserId
+          ? userVoucherItems.some((vi) => Number(vi?.user_id) === Number(currentUserId))
+          : false;
+        const localClaimed = claimedVouchers.some(v => Number(v.voucher_id ?? v.id) === Number(voucherData.id));
+        setIsClaimed(!!serverClaimedByMe || !!localClaimed);
+
+        return voucherData;
+      } else if (response?.status === 404) {
+        setError('Voucher tidak ditemukan');
+        return null;
+      } else {
+        setError('Gagal memuat data voucher');
+        return null;
       }
-
-      return null;
-
-      return null;
     } catch (err) {
-      console.error('Error fetching promo details:', err);
+      setError('Terjadi kesalahan saat memuat voucher');
       return null;
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, communityId]);
+  }, [id, currentUserId]);
 
-  // NEW: Handle auto register after QR scan
-  const handleAutoRegister = useCallback(
-    async (token) => {
-      try {
-        const promoData = await fetchPromoDetails();
-        if (!promoData) return;
-
-        // Check if already claimed
-        const existingVouchers = JSON.parse(
-          localStorage.getItem('huehuy_vouchers') || '[]'
-        );
-        const alreadyClaimed = existingVouchers.some(
-          (v) =>
-            String(v.ad?.id) === String(promoData.id) ||
-            String(v.id) === String(promoData.id)
-        );
-
-        if (!alreadyClaimed) {
-          try {
-            const response = await post({
-              path: `admin/promos/${promoData.id}/items`,
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: {
-                promo_id: promoData.id,
-                source: 'qr_scan',
-              },
-            });
-
-            if (response?.status === 200) {
-              const claimedVouchers = JSON.parse(
-                localStorage.getItem('huehuy_vouchers') || '[]'
-              );
-              const newPromoItem = {
-                id: response.data.data.id,
-                promo_id: promoData.id,
-                code: response.data.data.code,
-                claimed_at: new Date().toISOString(),
-                expired_at: promoData.expires_at,
-                ad: {
-                  id: promoData.id,
-                  title: promoData.title,
-                  picture_source: promoData.image,
-                  status: 'active',
-                  cube: {
-                    code: `community-${communityId}`,
-                    user: {
-                      name: promoData.seller?.name || 'Admin',
-                      phone: promoData.seller?.phone || '',
-                    },
-                    corporate: null,
-                    tags: [
-                      {
-                        address: promoData.location,
-                        link: null,
-                        map_lat: null,
-                        map_lng: null,
-                      },
-                    ],
-                  },
-                },
-              };
-              claimedVouchers.push(newPromoItem);
-              localStorage.setItem(
-                'huehuy_vouchers',
-                JSON.stringify(claimedVouchers)
-              );
-
-              setIsAlreadyClaimed(true);
-              setShowSuccessModal(true);
-            } else {
-              const msg = (
-                response?.data?.message ||
-                response?.message ||
-                ''
-              ).toLowerCase();
-              if (
-                msg.includes('habis') ||
-                msg.includes('stok') ||
-                msg.includes('stock')
-              ) {
-                setErrorMessage('Maaf, stok promo sudah habis direbut.');
-                setShowErrorModal(true);
-              } else if (
-                msg.includes('sudah') ||
-                msg.includes('already') ||
-                msg.includes('claimed')
-              ) {
-                setIsAlreadyClaimed(true);
-                setErrorMessage(
-                  'Promo ini sudah pernah direbut pada akun lain.'
-                );
-                setShowErrorModal(true);
-              }
-            }
-          } catch (error) {
-            console.warn('Auto claim failed:', error);
-          }
-        }
-      } catch (error) {
-        console.warn('Auto register failed:', error);
-      }
-    },
-    [fetchPromoDetails, communityId]
-  );
-
-  // NEW: Check user verification status
-  const checkUserVerificationStatus = useCallback(
-    async (token) => {
-      try {
-        console.log(
-          'Checking verification status with token:',
-          token?.substring(0, 20) + '...'
-        );
-
-        let response = await get({
-          path: 'account',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response?.status === 200) {
-          console.log(
-            'User verified and logged in, proceeding with auto register'
-          );
-          handleAutoRegister(token);
-          return;
-        }
-
-        if (response?.status === 401 || response?.status === 404) {
-          response = await get({
-            path: 'account-unverified',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (response?.status === 200) {
-            const userData =
-              response?.data?.data?.profile || response?.data?.profile;
-            const emailVerified =
-              userData?.email_verified_at || userData?.verified_at;
-
-            if (!emailVerified) {
-              const next =
-                typeof window !== 'undefined'
-                  ? window.location.href
-                  : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-              window.location.href = `/verifikasi?next=${encodeURIComponent(
-                next
-              )}`;
-              return;
-            } else {
-              handleAutoRegister(token);
-              return;
-            }
-          }
-        }
-
-        if (response?.status === 401) {
-          const next =
-            typeof window !== 'undefined'
-              ? window.location.href
-              : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-          return;
-        }
-
-        handleAutoRegister(token);
-      } catch (err) {
-        console.error('Error checking verification status:', err);
-        const next =
-          typeof window !== 'undefined'
-            ? window.location.href
-            : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-      }
-    },
-    [promoId, communityId, handleAutoRegister]
-  );
-
-  // NEW: Handle QR entry flow
   useEffect(() => {
-    if (!router.isReady) return;
+    if (id) {
+      fetchVoucherDetails();
+    }
+  }, [id, fetchVoucherDetails]);
 
+  const handleBack = () => {
+    // Cek apakah ada parameter autoRegister
     const autoRegister = router.query.autoRegister || router.query.source;
 
     if (autoRegister) {
+      // Jika dari QR scan, redirect ke halaman utama app
+      router.push('/app');
+    } else {
+      // Normal back behavior
+      router.back();
+    }
+  };
+
+  const handleClaim = async () => {
+    if (!voucher || isClaimed) return;
+
+    setClaimLoading(true);
+    try {
+      // In a real app, you'd get the current user ID from context/auth
+      // For now, we'll use a dummy user ID or get from localStorage
+      // prioritaskan token & user id asli
+      let userId = null;
+      try {
+        const enc = Cookies.get(token_cookie_name);
+        if (enc) {
+          const token = Decrypt(enc);
+          const acct = await get({
+            path: 'account',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          userId = acct?.data?.data?.id || acct?.data?.id || acct?.data?.data?.profile?.id || null;
+        }
+      } catch (_) { }
+
+      const response = await post({
+        path: `admin/vouchers/${voucher.id}/send-to-user`,
+        body: userId ? { user_id: userId } : {}, // tetap kompatibel: kalau BE izinkan body kosong pakai auth
+      });
+
+      if (response?.status === 200) {
+        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        const newVoucherItem = {
+          id: response.data.data.id,
+          voucher_id: voucher.id,
+          user_id: currentUserId || null,
+          code: response.data.data.code,
+          claimed_at: new Date().toISOString(),
+          expired_at: voucher.valid_until,
+          validation_at: null,
+          voucher: voucher
+        };
+        claimedVouchers.push(newVoucherItem);
+        localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+
+        setIsClaimed(true);
+        setShowSuccessModal(true);
+      } else {
+        const msg = (response?.data?.message || response?.message || '').toLowerCase();
+        // mapping error → modal
+        if (
+          response?.status === 400 ||
+          response?.status === 409 ||
+          msg.includes('habis') || msg.includes('stock') || msg.includes('stok')
+        ) {
+          setShowOutOfStockModal(true);
+        } else if (
+          msg.includes('sudah diklaim') ||
+          msg.includes('already') ||
+          msg.includes('claimed')
+        ) {
+          setShowClaimedElsewhereModal(true);
+        } else {
+          setError('Gagal mengklaim voucher');
+        }
+      }
+
+    } catch (err) {
+      setError('Terjadi kesalahan saat mengklaim voucher');
+      // console.error('Error claiming voucher:', err);
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/app/saku');
+  };
+
+  // Fungsi untuk handle auto register setelah QR scan - DIPINDAH KE ATAS
+  const handleAutoRegister = useCallback(async (token) => {
+    try {
+      const voucherData = await fetchVoucherDetails();
+      if (!voucherData) return;
+
+      // Cek apakah user sudah punya voucher ini
+      const userVoucherItems = Array.isArray(voucherData.voucher_items) ? voucherData.voucher_items : [];
+      const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+
+      const serverClaimedByMe = currentUserId
+        ? userVoucherItems.some((vi) => Number(vi?.user_id) === Number(currentUserId))
+        : false;
+
+      const localClaimed = claimedVouchers.some(v => Number(v.voucher_id ?? v.id) === Number(voucherData.id));
+
+      const alreadyClaimed = serverClaimedByMe || localClaimed;
+
+      if (!alreadyClaimed) {
+        // Lakukan auto claim voucher
+        try {
+          const response = await post({
+            path: `admin/vouchers/${voucherData.id}/send-to-user`,
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: { source: 'qr_scan' }
+          });
+
+          if (response?.status === 200) {
+            // Simpan ke localStorage
+            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+            const newVoucherItem = {
+              id: response.data.data.id,
+              voucher_id: voucherData.id,
+              code: response.data.data.code,
+              claimed_at: new Date().toISOString(),
+              expired_at: voucherData.valid_until,
+              voucher: voucherData
+            };
+            claimedVouchers.push(newVoucherItem);
+            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+
+            setIsClaimed(true);
+            setShowSuccessModal(true);
+          }
+        } catch (error) {
+          // Silent error - user bisa manual claim
+        }
+      }
+    } catch (error) {
+      // Silent error
+    }
+  }, [fetchVoucherDetails]);
+
+  // Fungsi untuk cek status verifikasi - DEPENDENCY DIPERBAIKI
+  const checkUserVerificationStatus = useCallback(async (token) => {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
+
+      // Coba endpoint account dulu (untuk user yang sudah login dan terverifikasi)
+      let response = await get({
+        path: 'account',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // eslint-disable-next-line no-console
+      console.log('account response:', response?.status, response?.data);
+
+      if (response?.status === 200) {
+        // User sudah terverifikasi dan bisa akses, lakukan auto-register
+        // eslint-disable-next-line no-console
+        console.log('User verified and logged in, proceeding with auto register');
+        handleAutoRegister(token);
+        return;
+      }
+
+      // Jika account endpoint gagal (401/404), coba account-unverified
+      if (response?.status === 401 || response?.status === 404) {
+        // eslint-disable-next-line no-console
+        console.log('Trying account-unverified endpoint...');
+        response = await get({
+          path: 'account-unverified',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        // eslint-disable-next-line no-console
+        console.log('account-unverified response:', response?.status, response?.data);
+
+        if (response?.status === 200) {
+          // User belum terverifikasi, redirect ke verifikasi
+          const userData = response?.data?.data?.profile || response?.data?.profile;
+          const emailVerified = userData?.email_verified_at || userData?.verified_at;
+
+          if (!emailVerified) {
+            // eslint-disable-next-line no-console
+            console.log('User not verified, redirecting to verification');
+            const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+            window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+            return;
+          } else {
+            // Email sudah terverifikasi, lanjut auto register
+            // eslint-disable-next-line no-console
+            console.log('User email verified, proceeding with auto register');
+            handleAutoRegister(token);
+            return;
+          }
+        }
+      }
+
+      // Jika token tidak valid, redirect ke register
+      if (response?.status === 401) {
+        // eslint-disable-next-line no-console
+        console.log('Token invalid (401), redirecting to register');
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        return;
+      }
+
+      // Fallback: assume user is verified dan lanjut auto register
+      // eslint-disable-next-line no-console
+      console.log('Fallback: proceeding with auto register');
+      handleAutoRegister(token);
+
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error checking verification status:', err);
+      // Jika semua endpoint error, redirect ke login ulang
+      const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+      window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+    }
+  }, [id, handleAutoRegister]);
+
+  // --- MODIFIED: handle autoRegister / source param and login check ---
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    // accept both `autoRegister` or `source=qr`
+    const autoRegister = router.query.autoRegister || router.query.source;
+
+    if (autoRegister) {
+      // Coba ambil token dengan berbagai cara
       let token = null;
 
+      // 1. Coba dari cookie dengan decrypt
       const encrypted = Cookies.get(token_cookie_name);
       if (encrypted) {
         try {
           token = Decrypt(encrypted);
+          // eslint-disable-next-line no-console
+          console.log('Token from cookie:', token?.substring(0, 20) + '...');
         } catch (e) {
+          // eslint-disable-next-line no-console
           console.error('Failed to decrypt token:', e);
+          // Cookie corrupt, hapus
           Cookies.remove(token_cookie_name);
         }
       }
 
+      // 2. Fallback ke localStorage
       if (!token) {
-        token =
-          localStorage.getItem('auth_token') || localStorage.getItem('token');
+        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        if (token) {
+          // eslint-disable-next-line no-console
+          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
+        }
       }
 
+      // If user is not logged in -> redirect to create account
       if (!token) {
-        const next =
-          typeof window !== 'undefined'
-            ? window.location.href
-            : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
+        // eslint-disable-next-line no-console
+        console.log('No token found, redirecting to register');
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
         if (typeof window !== 'undefined') {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }
         return;
       }
 
+      // Token ada, cek status verifikasi user
+      // eslint-disable-next-line no-console
+      console.log('Token found, checking verification status...');
       checkUserVerificationStatus(token);
     }
-  }, [
-    router.isReady,
-    router.query,
-    promoId,
-    communityId,
-    checkUserVerificationStatus,
-  ]);
-
-  // MODIFIED: Update handleBack to support QR entry
-  const handleBack = () => {
-    const { from } = router.query;
-    const autoRegister = router.query.autoRegister || router.query.source;
-
-    if (autoRegister) {
-      router.push('/app');
-    } else if (from === 'saku') {
-      router.push('/app/saku');
-    } else if (communityId === 'promo-entry') {
-      router.push('/app');
-    } else if (communityId) {
-      router.push(`/app/komunitas/dashboard/${communityId}`);
-    } else {
-      router.push('/app');
-    }
-  };
-
-  // ====== Handlers ala detail_promo ======
-  const handleShare = () => setShowShareModal(true);
-  const handleReport = () => setShowReportModal(true);
-
-  const handleShareComplete = (platform) => {
-    if (!promoData) return;
-    const promoUrl = typeof window !== 'undefined' ? window.location.href : '';
-    const shareText =
-      `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` +
-      (promoData.discount ? ` Diskon ${promoData.discount}` : '');
-
-    switch (platform) {
-      case 'whatsapp':
-        window.open(
-          `https://wa.me/?text=${encodeURIComponent(
-            shareText + ' ' + promoUrl
-          )}`,
-          '_blank'
-        );
-        break;
-      case 'telegram':
-        window.open(
-          `https://t.me/share/url?url=${encodeURIComponent(
-            promoUrl
-          )}&text=${encodeURIComponent(shareText)}`,
-          '_blank'
-        );
-        break;
-      case 'facebook':
-        window.open(
-          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-            promoUrl
-          )}`,
-          '_blank'
-        );
-        break;
-      case 'twitter':
-        window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-            shareText
-          )}&url=${encodeURIComponent(promoUrl)}`,
-          '_blank'
-        );
-        break;
-      case 'copy':
-        navigator.clipboard.writeText(promoUrl);
-        const copyBtn = document.getElementById('copy-btn');
-        if (copyBtn) {
-          copyBtn.textContent = '✓ Link disalin!';
-          setTimeout(() => {
-            copyBtn.textContent = '📋 Salin Link';
-          }, 2000);
-        }
-        break;
-    }
-    setShowShareModal(false);
-  };
-
-  const submitReport = (reason) => {
-    const reports = JSON.parse(localStorage.getItem('promoReports') || '[]');
-    reports.push({
-      promoId: promoData.id,
-      reason,
-      reportedAt: new Date().toISOString(),
-      status: 'pending',
-    });
-    localStorage.setItem('promoReports', JSON.stringify(reports));
-    setShowReportModal(false);
-    setTimeout(() => {
-      setErrorMessage(
-        'Laporan Anda telah dikirim. Terima kasih atas perhatiannya!'
-      );
-      setShowErrorModal(true);
-    }, 300);
-  };
-
-  const handleClaimPromo = async () => {
-    if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
-
-    setIsClaimedLoading(true);
-    try {
-      // Cek lagi untuk memastikan tidak ada duplikasi
-      const existingVouchers = JSON.parse(
-        localStorage.getItem('huehuy_vouchers') || '[]'
-      );
-      const isDuplicate = existingVouchers.some(
-        (v) =>
-          String(v.ad?.id) === String(promoData.id) ||
-          String(v.id) === String(promoData.id)
-      );
-
-      if (isDuplicate) {
-        setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
-        setShowErrorModal(true);
-        return;
-      }
-
-      // Ambil token dari cookie
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-
-      // Siapkan endpoint Laravel sesuai controller
-      const apiUrl = (
-        process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
-      ).replace(/\/+$/, '');
-      const endpoints = [
-        `${apiUrl}/promos/${promoData.id}/items`,
-        `${apiUrl}/promo-items`,
-        `${apiUrl}/admin/promos/${promoData.id}/items`,
-        `${apiUrl}/admin/promo-items`,
-      ];
-      const headers = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      };
-      const payload = {
-        promo_id: promoData.id,
-        status: 'reserved',
-        expires_at: promoData.expires_at || null,
-      };
-
-      let savedItem = null;
-      let lastError = '';
-      for (const url of endpoints) {
-        try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload),
-          });
-          const txt = await res.text().catch(() => '');
-          let json = {};
-          try {
-            json = txt ? JSON.parse(txt) : {};
-          } catch (_) {
-            json = { raw: txt };
-          }
-
-          if (res.ok) {
-            savedItem = json?.data ?? json;
-            break;
-          }
-
-          if (res.status === 401) {
-            lastError = 'Sesi berakhir. Silakan login ulang.';
-            break;
-          }
-          if (res.status === 422 && json?.errors) {
-            lastError = Object.values(json.errors).flat().join(', ');
-            break;
-          }
-          lastError = json?.message || json?.error || `HTTP ${res.status}`;
-        } catch (e) {
-          lastError = e?.message || 'Network error';
-        }
-      }
-
-      if (!savedItem) {
-        const low = String(lastError || '').toLowerCase();
-        if (
-          low.includes('habis') ||
-          low.includes('stok') ||
-          low.includes('stock')
-        ) {
-          setErrorMessage('Maaf, stok promo sudah habis.');
-          setShowErrorModal(true);
-          setIsAlreadyClaimed(false);
-          return;
-        }
-        if (
-          low.includes('sudah') ||
-          low.includes('already') ||
-          low.includes('claimed') ||
-          low.includes('duplicate')
-        ) {
-          setIsAlreadyClaimed(true);
-          setErrorMessage(
-            'Promo ini sudah pernah direbut (mungkin di akun lain).'
-          );
-          setShowErrorModal(true);
-          return;
-        }
-        // kalau bukan case khusus di atas, pakai fallback local save
-      }
-
-      // Simpan ke localStorage untuk langsung muncul di Saku
-      const enriched = {
-        ...savedItem,
-        code: savedItem.code || savedItem?.voucher_item?.code,
-        claimed_at: new Date().toISOString(),
-        validation_at: null,
-        voucher_item: savedItem.voucher_item || null,
-        ad: {
-          id: promoData.id,
-          title: promoData.title,
-          picture_source: promoData.image,
-          status: 'active',
-          cube: {
-            code: `community-${communityId || 'unknown'}`,
-            user: {
-              name: promoData.seller?.name || 'Admin',
-              phone: promoData.seller?.phone || '',
-            },
-            corporate: null,
-            tags: [
-              {
-                address: promoData.location,
-                link: null,
-                map_lat: null,
-                map_lng: null,
-              },
-            ],
-          },
-        },
-      };
-      existingVouchers.push(enriched);
-      localStorage.setItem('huehuy_vouchers', JSON.stringify(existingVouchers));
-
-      setShowSuccessModal(true);
-    } catch (e) {
-      setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
-      setShowErrorModal(true);
-    } finally {
-      setIsClaimedLoading(false);
-    }
-  };
-
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    setTimeout(() => router.push('/app/saku'), 300);
-  };
+  }, [router.isReady, router.query, id, checkUserVerificationStatus]);
 
   if (loading) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-slate-600">Memuat detail promo...</p>
+          <p className="text-slate-600">Memuat detail voucher...</p>
         </div>
       </div>
     );
   }
 
-  if (!promoData) {
+  if (error) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
-          <p className="text-slate-600">Promo tidak ditemukan</p>
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FontAwesomeIcon icon={faCheckCircle} className="text-red-500 text-2xl" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Oops!</h3>
+          <p className="text-slate-600 mb-4">{error}</p>
+          <button
+            onClick={handleBack}
+            className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+          >
+            Kembali
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!voucher) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
+        <div className="text-center p-8">
+          <p className="text-slate-600">Voucher tidak ditemukan</p>
+          <button
+            onClick={handleBack}
+            className="mt-4 bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+          >
+            Kembali
+          </button>
         </div>
       </div>
     );
@@ -830,58 +443,41 @@ export default function PromoDetailUnified() {
           <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
         </div>
         <div className="flex items-center justify-between h-full relative z-10">
-          <button
-            onClick={handleBack}
-            className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-          >
-            <FontAwesomeIcon
-              icon={faArrowLeft}
-              className="text-white text-sm"
-            />
+          <button onClick={handleBack} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
+            <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
           </button>
           <div className="flex-1 text-center">
-            <h1 className="text-white font-bold text-sm">Iklan</h1>
+            <h1 className="text-white font-bold text-sm">Voucher</h1>
           </div>
-          <div className="flex space-x-1.5">
-            <button
-              onClick={handleShare}
-              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-            >
-              <FontAwesomeIcon icon={faShare} className="text-white text-sm" />
-            </button>
-            <button
-              onClick={handleReport}
-              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-            >
-              <FontAwesomeIcon
-                icon={faExclamationTriangle}
-                className="text-white text-sm"
-              />
-            </button>
-          </div>
+          <div className="w-8" />
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
 
       {/* Content */}
       <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
         <div className="lg:mx-auto lg:max-w-md">
-          {/* Hero */}
+          {/* Voucher Image */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] shadow-lg overflow-hidden border border-slate-100">
               <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
                 <div className="relative w-full h-full">
                   <Image
-                    src={promoData.image}
-                    alt={promoData.title}
+                    src={getImageUrl(voucher?.image)}
+                    alt={voucher?.name || 'Voucher'}
                     className="object-cover"
                     fill
                     sizes="(max-width: 768px) 100vw, 500px"
                     placeholder="blur"
                     blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
                     onError={() => {
-                      const img = document.querySelector(
-                        `img[alt="${promoData.title}"]`
-                      );
+                      const img = document.querySelector(`img[alt='${voucher?.name}']`);
                       if (img) img.src = '/default-avatar.png';
                     }}
                   />
@@ -890,196 +486,140 @@ export default function PromoDetailUnified() {
             </div>
           </div>
 
-          {/* Info cards */}
+          {/* Voucher Info */}
           <div className="mb-4">
             <div className="bg-primary rounded-[20px] p-4 shadow-lg">
-              <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                <div className="flex items-center">
-                  <FontAwesomeIcon
-                    icon={faMapMarkerAlt}
-                    className="text-white mr-2 text-sm"
-                  />
-                  <span className="text-sm font-semibold text-white">
-                    {promoData.distance}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs text-white opacity-80">
-                    Jarak Promo:
-                  </span>
-                  <div className="text-xs text-white opacity-70">
-                    {promoData.coordinates || '-'}
-                  </div>
-                </div>
-              </div>
-
               <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">
-                      {promoData.schedule.day}
-                    </span>
-                    <div className="text-xs text-white opacity-80">
-                      {promoData.schedule.details}
-                    </div>
+                    <span className="text-sm font-semibold text-white">Kode Voucher</span>
+                    <div className="text-xs text-white opacity-80">{voucher.code}</div>
                   </div>
                   <div className="text-right">
-                    <div className="bg-yellow-400 text-slate-800 px-3 py-1 rounded-[8px] text-sm font-semibold">
-                      {promoData.schedule.time}
-                    </div>
-                    <div className="text-xs text-white opacity-70 mt-1">
-                      {promoData.schedule.timeDetails}
-                    </div>
+                    <span className="text-xs text-white opacity-80">Stock</span>
+                    <div className="text-xs text-white opacity-70">{voucher.stock || 0}</div>
                   </div>
                 </div>
               </div>
-
-              <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+              <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon
-                      icon={
-                        promoData.status.type === 'Online'
-                          ? faWifi
-                          : faWifiSlash
-                      }
-                      className="mr-2 text-white text-sm"
-                    />
-                    <span className="text-sm font-semibold text-white">
-                      {promoData.status.type}
-                    </span>
+                  <div>
+                    <span className="text-sm font-semibold text-white">Tipe Delivery</span>
+                    <div className="text-xs text-white opacity-80">{voucher.delivery || 'manual'}</div>
                   </div>
-                  <span className="text-xs text-white opacity-70">
-                    {promoData.status.description}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-xs text-white opacity-80">Berlaku Hingga</span>
+                    <div className="text-xs text-white opacity-70">
+                      {voucher.valid_until ? new Date(voucher.valid_until).toLocaleDateString() : 'Tidak terbatas'}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Title + desc */}
+          {/* Voucher Title & Description */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
               <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
-                {promoData.title}
+                {voucher.name}
               </h2>
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">
-                {promoData.description}
+                {voucher.description || 'Tidak ada deskripsi'}
               </p>
+              {voucher.type && (
+                <div className="inline-block bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-medium">
+                  {voucher.type}
+                </div>
+              )}
+            </div>
+          </div>
 
-              {/* Harga ringkas */}
-              <div className="flex items-center justify-between bg-slate-50 p-3 rounded-[12px] mb-3">
-                <div className="text-sm text-slate-600">Harga Promo</div>
-                <div className="text-right">
-                  {promoData.discountPrice != null && (
-                    <div className="text-lg font-bold text-primary">
-                      Rp {Number(promoData.discountPrice).toLocaleString()}
-                    </div>
-                  )}
-                  {promoData.originalPrice != null && (
-                    <div className="text-xs text-slate-500 line-through">
-                      Rp {Number(promoData.originalPrice).toLocaleString()}
-                    </div>
-                  )}
+          {/* Location Info */}
+          {voucher.tenant_location && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Tenant</h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">{voucher.tenant_location}</p>
+                <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
+                  Rute
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Community Info */}
+          {voucher.community && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Komunitas</h4>
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-900 text-xs">Nama: {voucher.community.name || '-'}</p>
+                  <p className="text-xs text-slate-500">Deskripsi: {voucher.community.description || '-'}</p>
                 </div>
               </div>
-
-              <div className="text-left">
-                <button className="bg-primary text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:bg-opacity-90 transition-all">
-                  Selengkapnya
-                </button>
-              </div>
             </div>
-          </div>
-
-          {/* Lokasi */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                Lokasi Promo / Iklan
-              </h4>
-              <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                {promoData.location}
-              </p>
-              <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
-                <FontAwesomeIcon
-                  icon={faMapMarkerAlt}
-                  className="mr-2 text-sm"
-                />
-                Rute
-              </button>
-            </div>
-          </div>
-
-          {/* Kontak penjual */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                Penjual / Pemilik Iklan
-              </h4>
-              <div className="space-y-2">
-                <p className="font-semibold text-slate-900 text-xs">
-                  Nama: {promoData.seller?.name}
-                </p>
-                <p className="text-xs text-slate-500">
-                  No Hp/WA: {promoData.seller?.phone}
-                </p>
-                <button className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center">
-                  <FontAwesomeIcon icon={faPhone} className="text-sm" />
-                </button>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
-        <div className="lg:max-w-sm lg:mx-auto">
-          <button
-            onClick={handleClaimPromo}
-            disabled={isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isAlreadyClaimed
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : isClaimedLoading
+      {/* Bottom Button Bar */}
+      {!isClaimed && voucher.stock > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+          <div className="lg:max-w-sm lg:mx-auto">
+            <button
+              onClick={handleClaim}
+              disabled={claimLoading}
+              className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${claimLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-              }`}
-          >
-            {isAlreadyClaimed ? (
-              <div className="flex items-center justify-center">
-                <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                Sudah Direbut
-              </div>
-            ) : isClaimedLoading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Merebut Promo...
-              </div>
-            ) : (
-              'Rebut Promo Sekarang'
-            )}
-          </button>
+                }`}
+            >
+              {claimLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Mengklaim Voucher...
+                </div>
+              ) : (
+                'Klaim Voucher Sekarang'
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Already Claimed or Out of Stock */}
+      {(isClaimed || voucher.stock <= 0) && (
+        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+          <div className="lg:max-w-sm lg:mx-auto">
+            <div className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base text-center ${isClaimed
+              ? 'bg-green-100 text-green-700 border-2 border-green-200'
+              : 'bg-slate-100 text-slate-500 border-2 border-slate-200'
+              }`}>
+              {isClaimed ? (
+                <div className="flex items-center justify-center">
+                  <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                  Voucher Sudah Diklaim
+                </div>
+              ) : (
+                'Stock Voucher Habis'
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon
-                icon={faCheckCircle}
-                className="text-green-500 text-3xl"
-              />
+              <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-3xl" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
             <p className="text-slate-600 mb-6 leading-relaxed">
-              Promo{' '}
-              <span className="font-semibold text-primary">
-                {promoData?.title}
-              </span>{' '}
-              berhasil direbut dan masuk ke Saku Promo Anda!
+              Voucher berhasil diklaim dan masuk ke Saku Promo Anda!
             </p>
             <div className="space-y-3">
               <button
@@ -1099,23 +639,35 @@ export default function PromoDetailUnified() {
         </div>
       )}
 
-      {/* Error Modal */}
-      {showErrorModal && (
+      {showOutOfStockModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon
-                icon={faExclamationTriangle}
-                className="text-red-500 text-3xl"
-              />
+              <FontAwesomeIcon icon={faCheckCircle} className="text-red-500 text-3xl rotate-45" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Oops!</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">
-              {errorMessage}
-            </p>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Voucher Habis</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">Maaf, stok voucher ini sudah habis diklaim.</p>
             <button
-              onClick={() => setShowErrorModal(false)}
+              onClick={() => setShowOutOfStockModal(false)}
               className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
+            >
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showClaimedElsewhereModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+            <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FontAwesomeIcon icon={faCheckCircle} className="text-yellow-500 text-3xl" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Sudah Diklaim</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">Voucher ini sudah pernah diklaim pada akun lain.</p>
+            <button
+              onClick={() => setShowClaimedElsewhereModal(false)}
+              className="w-full bg-yellow-500 text-white py-3 rounded-[12px] font-semibold hover:bg-yellow-600 transition-all"
             >
               OK, Mengerti
             </button>
@@ -1123,160 +675,22 @@ export default function PromoDetailUnified() {
         </div>
       )}
 
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                Bagikan Promo
-              </h3>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleShareComplete('whatsapp')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-green-50 hover:border-green-300 transition-all"
-              >
-                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">WA</span>
-                </div>
-                <span className="text-xs text-slate-600">WhatsApp</span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('telegram')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
-              >
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">TG</span>
-                </div>
-                <span className="text-xs text-slate-600">Telegram</span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('facebook')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
-              >
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">FB</span>
-                </div>
-                <span className="text-xs text-slate-600">Facebook</span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('twitter')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
-              >
-                <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">TW</span>
-                </div>
-                <span className="text-xs text-slate-600">Twitter</span>
-              </button>
-              <button
-                id="copy-btn"
-                onClick={() => handleShareComplete('copy')}
-                className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">📋 Salin Link</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                Laporkan Promo
-              </h3>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <button
-                onClick={() => submitReport('Iklan tidak sesuai')}
-                className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
-              >
-                Iklan tidak sesuai
-              </button>
-              <button
-                onClick={() => submitReport('Penipuan / scam')}
-                className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
-              >
-                Penipuan / scam
-              </button>
-              <button
-                onClick={() => submitReport('Konten tidak pantas')}
-                className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
-              >
-                Konten tidak pantas
-              </button>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
-              >
-                Batal
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <style jsx>{`
         @keyframes bounce-in {
-          0% {
-            transform: scale(0.3);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.05);
-          }
-          70% {
-            transform: scale(0.9);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-        @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.05); }
+          70% { transform: scale(0.9); }
+          100% { transform: scale(1); opacity: 1; }
         }
         .animate-bounce-in {
           animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-
         @media (min-width: 1024px) {
-          .claim-button {
-            max-width: 320px;
-            margin: 0 auto;
-          }
-          .desktop-container {
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
-              0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          }
+          .desktop-container { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); }
         }
       `}</style>
     </div>
   );
-}
+};
+
+export default DetailVoucherPage;
