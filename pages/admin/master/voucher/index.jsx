@@ -350,16 +350,18 @@ function VoucherCrud() {
         searchable
         noControlBar={false}
         setToRefresh={refreshToggle}
-        // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
+        // 🔴 Nonaktifkan semua form otomatis dari TableSupervision
         actionControl={{ 
-          except: ['detail'],
-          // Add edit and delete handlers
-          onEdit: handleEdit,
+          except: ['detail', 'add', 'edit'], // Hapus add & edit otomatis
+          onEdit: handleEdit, // Gunakan handler custom
           onDelete: (voucher) => {
             setSelectedVoucher(voucher);
             setModalDelete(true);
           }
         }}
+        // 🔴 Hapus atau nonaktifkan formControl dan formUpdateControl
+        // formControl={null}
+        // formUpdateControl={null}
         fetchControl={{
           path: 'admin/vouchers',
           includeHeaders: {
