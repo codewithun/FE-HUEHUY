@@ -13,7 +13,6 @@ import { AdminLayout } from '../../../../components/construct.components/layout/
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import { useRouter } from 'next/router';
-import VoucherForm from '../../../../components/voucher/VoucherForm';
 
 /* -------------------- Helpers -------------------- */
 
@@ -46,17 +45,6 @@ const formatDateID = (raw) => {
   }).format(d);
 };
 
-// Untuk value <input type="date">
-const toDateInputValue = (raw) => {
-  if (!raw) return '';
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return '';
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
-
 const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
 
 /* -------------------- Page -------------------- */
@@ -65,26 +53,10 @@ function VoucherCrud() {
   const router = useRouter();
 
   const [voucherList, setVoucherList] = useState([]);
-  const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [refreshToggle, setRefreshToggle] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    image: '',
-    type: '',
-    valid_until: '',
-    tenant_location: '',
-    stock: 0,
-    code: '',
-    community_id: '',
-    target_type: 'all', // all | user | community
-    target_user_id: '',
-  });
-
-  const [imageFile, setImageFile] = useState(null);
   const [communities, setCommunities] = useState([]);
   const [users, setUsers] = useState([]);
 
@@ -106,7 +78,7 @@ function VoucherCrud() {
     return c?.name || `Community #${id}`;
   };
 
-  // Fetch vouchers
+  // Fetch vouchers (untuk state lokal: opsional)
   const fetchVouchers = async () => {
     try {
       const res = await fetch(`${apiBase}/api/admin/vouchers`, {
@@ -159,57 +131,6 @@ function VoucherCrud() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
-  // Upload image (hanya untuk local preview kalau kamu tetap pakai formData di halaman ini)
-  const handleImageChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
-      setFormData((s) => ({ ...s, image: '' }));
-    }
-  };
-
-  // Submit (create / update) — dipakai oleh VoucherForm via onSubmit
-  const submitVoucher = async (body) => {
-    const isUpdate = Boolean(selectedVoucher);
-    const url = isUpdate
-      ? `${apiBase}/api/admin/vouchers/${selectedVoucher.id}`
-      : `${apiBase}/api/admin/vouchers`;
-
-    const res = await fetch(url, { method: 'POST', headers: { ...authHeader() }, body });
-
-    if (!res.ok) {
-      let msg = 'server error';
-      try {
-        const j = await res.json();
-        msg = j?.message || msg;
-      } catch {}
-      alert('Gagal menyimpan voucher: ' + msg);
-      return;
-    }
-
-    resetForm();
-    setRefreshToggle((s) => !s);
-    setModalForm(false);
-    fetchVouchers();
-  };
-
-  const resetForm = () => {
-    setSelectedVoucher(null);
-    setFormData({
-      name: '',
-      description: '',
-      image: '',
-      type: '',
-      valid_until: '',
-      tenant_location: '',
-      stock: 0,
-      code: '',
-      community_id: '',
-      target_type: 'all',
-      target_user_id: '',
-    });
-    setImageFile(null);
-  };
-
   // Delete voucher
   const handleDelete = async () => {
     if (!selectedVoucher) return;
@@ -226,26 +147,26 @@ function VoucherCrud() {
     }
   };
 
-  /* --------- Tabel columns --------- */
+  /* --------- Kolom tabel (custom) --------- */
   const columns = [
     {
       selector: 'name',
       label: 'Nama Voucher',
       sortable: true,
-      item: ({ name }) => <span className="font-semibold">{name}</span>,
+      item: (row) => <span className="font-semibold">{row.name}</span>,
     },
     {
       selector: 'code',
       label: 'Kode',
       sortable: true,
-      item: ({ code }) => code || '-',
+      item: (row) => row.code || '-',
     },
     {
       selector: 'image',
       label: 'Gambar',
       width: '100px',
-      item: ({ image }) => {
-        const src = buildImageUrl(image);
+      item: (row) => {
+        const src = buildImageUrl(row.image);
         return src ? (
           <img src={src} alt="Voucher" width={48} height={48} />
         ) : (
@@ -257,35 +178,23 @@ function VoucherCrud() {
       selector: 'stock',
       label: 'Sisa Voucher',
       sortable: true,
-      item: ({ stock }) => <span>{formatStockVoucher(stock)}</span>,
+      item: (row) => <span>{formatStockVoucher(row.stock)}</span>,
     },
     {
       selector: 'target_type',
       label: 'Target',
-      item: ({ target_type, target_user_id, community_id }) => {
-        if (target_type === 'user') return getUserLabel(target_user_id);
-        if (target_type === 'community') return getCommunityLabel(community_id);
+      item: (row) => {
+        if (row.target_type === 'user') return getUserLabel(row.target_user_id);
+        if (row.target_type === 'community') return getCommunityLabel(row.community_id);
         return 'Semua';
       },
     },
     {
       selector: 'valid_until',
       label: 'Berlaku Sampai',
-      item: ({ valid_until }) => formatDateID(valid_until),
+      item: (row) => formatDateID(row.valid_until),
     },
   ];
-
-  const topBarActions = (
-    <ButtonComponent
-      label="Tambah Baru"
-      icon={faPlus}
-      paint="primary"
-      onClick={() => {
-        resetForm();
-        setModalForm(true);
-      }}
-    />
-  );
 
   return (
     <>
@@ -295,24 +204,25 @@ function VoucherCrud() {
           path: 'admin/vouchers',
           includeHeaders: { 'Content-Type': 'application/json', ...authHeader() },
         }}
-        // ====== FORM CREATE (Tambah Baru) ======
+
+        /* ====== FORM CREATE (Tambah Baru) ====== */
         formControl={{
           size: 'lg',
-          contentType: 'multipart/form-data', // penting utk FormData
+          contentType: 'multipart/form-data',
           custom: [
             // Informasi Umum
             { type: 'default', construction: { label: 'Nama Voucher', name: 'name', placeholder: 'Contoh: Diskon 20%', validations: { required: true } } },
-            { type: 'default', construction: { label: 'Kode Unik',    name: 'code', placeholder: 'HH-20OFF',        validations: { required: true } } },
-            { type: 'default', construction: { label: 'Deskripsi',     name: 'description', placeholder: 'Ketentuan singkat' } },
+            { type: 'default', construction: { label: 'Kode Unik', name: 'code', placeholder: 'HH-20OFF', validations: { required: true } } },
+            { type: 'default', construction: { label: 'Deskripsi', name: 'description', placeholder: 'Ketentuan singkat' } },
 
             // Pengaturan & Periode
-            { type: 'default', construction: { label: 'Tipe',          name: 'type', placeholder: 'percentage/nominal/buy1get1' } },
-            { type: 'date',    construction: { label: 'Berlaku Sampai',name: 'valid_until', placeholder: 'YYYY-MM-DD' } },
+            { type: 'default', construction: { label: 'Tipe', name: 'type', placeholder: 'percentage/nominal/buy1get1' } },
+            { type: 'date', construction: { label: 'Berlaku Sampai', name: 'valid_until', placeholder: 'YYYY-MM-DD' } },
             { type: 'default', construction: { label: 'Lokasi Tenant', name: 'tenant_location', placeholder: 'Foodcourt Lt.2' } },
-            { type: 'number',  construction: { label: 'Stok',          name: 'stock', placeholder: '0', validations: { min: 0 } } },
+            { type: 'number', construction: { label: 'Stok', name: 'stock', placeholder: '0', validations: { min: 0 } } },
 
             // Target Penerima
-            { type: 'select',  construction: {
+            { type: 'select', construction: {
                 label: 'Target',
                 name: 'target_type',
                 options: [
@@ -322,13 +232,13 @@ function VoucherCrud() {
                 ],
               },
             },
-            { type: 'select',  construction: {
+            { type: 'select', construction: {
                 label: 'Pilih Pengguna (jika target=user)',
                 name: 'target_user_id',
                 options: users.map(u => ({ label: u.name || u.email || `#${u.id}`, value: String(u.id) })),
               },
             },
-            { type: 'select',  construction: {
+            { type: 'select', construction: {
                 label: 'Community (wajib jika target=community)',
                 name: 'community_id',
                 options: communities.map(c => ({ label: c.name, value: String(c.id) })),
@@ -336,7 +246,7 @@ function VoucherCrud() {
             },
 
             // Media
-            { type: 'file',    construction: { label: 'Gambar', name: 'image' } },
+            { type: 'file', construction: { label: 'Gambar', name: 'image' } },
           ],
           customDefaultValue: {
             target_type: 'all',
@@ -344,20 +254,19 @@ function VoucherCrud() {
           },
         }}
 
-        // ====== FORM UPDATE (Edit) — SAMA PERSIS ======
+        /* ====== FORM UPDATE (Edit) — sama persis ====== */
         formUpdateControl={{
           size: 'lg',
           contentType: 'multipart/form-data',
           custom: [
-            // (isi sama persis seperti formControl.custom)
             { type: 'default', construction: { label: 'Nama Voucher', name: 'name', placeholder: 'Contoh: Diskon 20%', validations: { required: true } } },
-            { type: 'default', construction: { label: 'Kode Unik',    name: 'code', placeholder: 'HH-20OFF',        validations: { required: true } } },
-            { type: 'default', construction: { label: 'Deskripsi',     name: 'description', placeholder: 'Ketentuan singkat' } },
-            { type: 'default', construction: { label: 'Tipe',          name: 'type', placeholder: 'percentage/nominal/buy1get1' } },
-            { type: 'date',    construction: { label: 'Berlaku Sampai',name: 'valid_until', placeholder: 'YYYY-MM-DD' } },
+            { type: 'default', construction: { label: 'Kode Unik', name: 'code', placeholder: 'HH-20OFF', validations: { required: true } } },
+            { type: 'default', construction: { label: 'Deskripsi', name: 'description', placeholder: 'Ketentuan singkat' } },
+            { type: 'default', construction: { label: 'Tipe', name: 'type', placeholder: 'percentage/nominal/buy1get1' } },
+            { type: 'date', construction: { label: 'Berlaku Sampai', name: 'valid_until', placeholder: 'YYYY-MM-DD' } },
             { type: 'default', construction: { label: 'Lokasi Tenant', name: 'tenant_location', placeholder: 'Foodcourt Lt.2' } },
-            { type: 'number',  construction: { label: 'Stok',          name: 'stock', placeholder: '0', validations: { min: 0 } } },
-            { type: 'select',  construction: {
+            { type: 'number', construction: { label: 'Stok', name: 'stock', placeholder: '0', validations: { min: 0 } } },
+            { type: 'select', construction: {
                 label: 'Target',
                 name: 'target_type',
                 options: [
@@ -367,21 +276,20 @@ function VoucherCrud() {
                 ],
               },
             },
-            { type: 'select',  construction: {
+            { type: 'select', construction: {
                 label: 'Pilih Pengguna (jika target=user)',
                 name: 'target_user_id',
                 options: users.map(u => ({ label: u.name || u.email || `#${u.id}`, value: String(u.id) })),
               },
             },
-            { type: 'select',  construction: {
+            { type: 'select', construction: {
                 label: 'Community (wajib jika target=community)',
                 name: 'community_id',
                 options: communities.map(c => ({ label: c.name, value: String(c.id) })),
               },
             },
-            { type: 'file',    construction: { label: 'Gambar (opsional, biarkan kosong untuk pakai gambar lama)', name: 'image' } },
+            { type: 'file', construction: { label: 'Gambar (opsional, kosongkan untuk pakai gambar lama)', name: 'image' } },
           ],
-          // mapping nilai default saat EDIT
           customDefaultValue: (row) => {
             const toDate = (raw) => {
               if (!raw) return '';
@@ -393,58 +301,29 @@ function VoucherCrud() {
               return `${yyyy}-${mm}-${dd}`;
             };
             return {
-              _method: 'PUT',              // penting buat Laravel
+              _method: 'PUT',
               name: row?.name || '',
               code: row?.code || '',
               description: row?.description || '',
               type: row?.type || '',
-              valid_until: toDate(row?.valid_until), // dari ISO → YYYY-MM-DD
+              valid_until: toDate(row?.valid_until),
               tenant_location: row?.tenant_location || '',
               stock: row?.stock ?? 0,
               target_type: row?.target_type || 'all',
               target_user_id: row?.target_user_id ? String(row.target_user_id) : '',
               community_id: row?.community_id ? String(row.community_id) : '',
-              // JANGAN isi 'image' dgn path lama supaya field file kosong & UI gak jadi text path
+              // jangan isi 'image' dengan path lama
             };
           },
         }}
 
-        // kolom dll tetap punyamu…
-        columnControl={columnControl}
-        actionControl={actionControl}
-        noControlBar={noControlBar}
-        searchable
-      />
+        /* ====== Kolom custom untuk tampilan tabel ====== */
+        columnControl={{ custom: columns }}
 
-      {/* Modal Tambah / Edit — UI sama karena 1 komponen */}
-      <FloatingPageComponent
-        show={modalForm}
-        onClose={() => {
-          setModalForm(false);
-          resetForm();
-        }}
-        title="" // judul/badge dipindah ke VoucherForm agar konsisten
-        subtitle=""
-        size="lg"
-        className="bg-background"
-      >
-        <VoucherForm
-          mode={selectedVoucher ? 'edit' : 'create'}
-          initialData={
-            selectedVoucher
-              ? { ...selectedVoucher, valid_until: selectedVoucher.valid_until ? selectedVoucher.valid_until : '' }
-              : undefined
-          }
-          users={users}
-          communities={communities}
-          buildImageUrl={buildImageUrl}
-          onCancel={() => {
-            setModalForm(false);
-            resetForm();
-          }}
-          onSubmit={submitVoucher}
-        />
-      </FloatingPageComponent>
+        /* opsi lain */
+        searchable
+        setToRefresh={refreshToggle}
+      />
 
       {/* Modal Delete Confirmation */}
       <ModalConfirmComponent
