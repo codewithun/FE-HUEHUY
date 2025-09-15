@@ -12,6 +12,7 @@ import {
   faMagnifyingGlass,
   faMessage,
   faUsers,
+  faBell, // Tambahkan icon bell untuk notifikasi
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
@@ -189,6 +190,16 @@ export default function Index() {
                       <FontAwesomeIcon
                         icon={faMagnifyingGlass}
                         className="text__primary"
+                      />
+                    </div>
+                  </Link>
+
+                  {/* Button Notifikasi */}
+                  <Link href="/app/notifikasi">
+                    <div className="bg-white border border__primary p-4 rounded-[20px] flex justify-center items-center aspect-square">
+                      <FontAwesomeIcon
+                        icon={faBell}
+                        className="text__primary text-lg"
                       />
                     </div>
                   </Link>
