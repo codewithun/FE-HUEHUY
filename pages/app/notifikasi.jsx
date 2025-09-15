@@ -1,10 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useMemo, useState, useEffect } from 'react';
-import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
-import { useGet } from '../../helpers';
-import { DateFormatComponent } from '../../components/base.components';
+import { faCheckCircle, faExclamationTriangle, faTimesCircle } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../helpers';
+import React, { useEffect, useMemo, useState } from 'react';
+import { DateFormatComponent } from '../../components/base.components';
+import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
+import { token_cookie_name, useGet } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
@@ -15,6 +16,13 @@ export default function NotificationPage() {
   const [version, setVersion] = useState(0);    // cache-buster
   const [localItems, setLocalItems] = useState([]);
   const [clearing, setClearing] = useState(false);
+
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const path = useMemo(
     () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}&v=${version}`,
@@ -61,30 +69,28 @@ export default function NotificationPage() {
       try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
 
       if (!res.ok) {
-        const msg = json?.message || `HTTP ${res.status}`;
-        alert('Gagal klaim: ' + msg);
+        setModalMessage(json?.message || `HTTP ${res.status}`);
+        setShowErrorModal(true);
         return;
       }
 
       setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
       setVersion((v) => v + 1);
 
-      alert('Voucher berhasil diklaim! Cek di Saku.');
+      setModalMessage('Voucher berhasil diklaim! Cek di Saku.');
+      setShowSuccessModal(true);
     } catch (e) {
-      alert('Gagal klaim: ' + (e?.message || 'Network error'));
+      setModalMessage('Gagal klaim: ' + (e?.message || 'Network error'));
+      setShowErrorModal(true);
     }
   }
 
   async function clearAllNotifications() {
-    const ok = window.confirm(
-      `Hapus semua notifikasi di tab "${type}"? Tindakan ini tidak bisa dibatalkan.`
-    );
-    if (!ok) return;
-
-    try {
+    setModalMessage(`Hapus semua notifikasi di tab "${type}"? Tindakan ini tidak bisa dibatalkan.`);
+    setConfirmAction(() => () => {
       setClearing(true);
 
-      const res = await fetch(
+      fetch(
         `${apiBase}/api/notification?type=${encodeURIComponent(type)}`,
         {
           method: 'DELETE',
@@ -93,25 +99,26 @@ export default function NotificationPage() {
             ...authHeader(),
           },
         }
-      );
-
-      const text = await res.text();
-      let json = {};
-      try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
-
-      if (!res.ok) {
-        const msg = json?.message || `HTTP ${res.status}`;
-        alert('Gagal menghapus notifikasi: ' + msg);
-        return;
-      }
-
-      setLocalItems([]);
-      setVersion((v) => v + 1);
-    } catch (e) {
-      alert('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
-    } finally {
-      setClearing(false);
-    }
+      )
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.text();
+      })
+      .then((text) => {
+        setLocalItems([]);
+        setVersion((v) => v + 1);
+      })
+      .catch((e) => {
+        setModalMessage('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
+        setShowErrorModal(true);
+      })
+      .finally(() => {
+        setClearing(false);
+      });
+    });
+    setShowConfirmModal(true);
   }
 
   const cardMeta = (n) => {
@@ -147,7 +154,11 @@ export default function NotificationPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={clearAllNotifications}
+                onClick={() => {
+                  setModalMessage(`Hapus semua notifikasi di tab "${type}"? Tindakan ini tidak bisa dibatalkan.`);
+                  setConfirmAction(clearAllNotifications);
+                  setShowConfirmModal(true);
+                }}
                 disabled={clearing}
                 className={`px-3 py-2 rounded-lg text-sm font-semibold border border-white/40 text-white hover:bg-white/15 transition ${
                   clearing ? 'opacity-60 cursor-not-allowed' : ''
@@ -305,6 +316,71 @@ export default function NotificationPage() {
             </div>
           </div>
         </div>
+
+        {/* Modals */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-8 shadow-md">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <FontAwesomeIcon icon={faCheckCircle} className="w-8 h-8 text-green-600" />
+              </div>
+              <p className="text-green-600 font-medium">{modalMessage}</p>
+              <button
+                type="button"
+                onClick={() => setShowSuccessModal(false)}
+                className="px-3 py-2 rounded-lg text-sm font-semibold border border-green-400 text-green-600 hover:bg-green-100 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
+        {showErrorModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-8 shadow-md">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <FontAwesomeIcon icon={faExclamationTriangle} className="w-8 h-8 text-red-600" />
+              </div>
+              <p className="text-red-600 font-medium">{modalMessage}</p>
+              <button
+                type="button"
+                onClick={() => setShowErrorModal(false)}
+                className="px-3 py-2 rounded-lg text-sm font-semibold border border-red-400 text-red-600 hover:bg-red-100 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        )}
+        {showConfirmModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-8 shadow-md">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                <FontAwesomeIcon icon={faTimesCircle} className="w-8 h-8 text-yellow-600" />
+              </div>
+              <p className="text-yellow-600 font-medium">{modalMessage}</p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    confirmAction();
+                  }}
+                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-yellow-400 text-yellow-600 hover:bg-yellow-100 transition"
+                >
+                  Ya
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-100 transition"
+                >
+                  Tidak
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <BottomBarComponent active="notification" />
       </div>

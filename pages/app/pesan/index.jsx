@@ -1,10 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
+import { faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Link from 'next/link';
 import React, { useState } from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
 import { useGet } from '../../../helpers';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faGlobe } from '@fortawesome/free-solid-svg-icons';
-import Link from 'next/link';
 
 export default function Pesan() {
   const [type, setType] = useState('hunter');
@@ -20,11 +20,6 @@ export default function Pesan() {
         <div className="bg-primary w-full px-4 pt-4 pb-16">
           <div className="flex justify-between">
             <h2 className="text-white font-semibold text-lg">Pesan</h2>
-            <Link href="/app/notifikasi">
-              <div className="px-2">
-                <FontAwesomeIcon icon={faBell} className="text-white" />
-              </div>
-            </Link>
           </div>
         </div>
 
