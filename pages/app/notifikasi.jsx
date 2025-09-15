@@ -76,13 +76,12 @@ export default function NotificationPage() {
       if (!res.ok) {
         console.error('Claim failed:', { status: res.status, response: json }); // Debug log
         
-        // Try alternative endpoint if main one fails
-        if (res.status === 500 || res.status === 404) {
-          console.log('Trying alternative endpoint...'); // Debug log
-          return await tryAlternativeClaimEndpoint(voucherId, notificationId);
+        // Handle specific SQL truncation error
+        if (json?.message?.includes('Data too long for column')) {
+          setModalMessage('Terjadi kesalahan sistem. Tim teknis sedang memperbaiki masalah ini.');
+        } else {
+          setModalMessage(json?.message || `HTTP ${res.status}: ${text || 'Server error'}`);
         }
-        
-        setModalMessage(json?.message || `HTTP ${res.status}: ${text || 'Server error'}`);
         setShowErrorModal(true);
         return;
       }
@@ -95,50 +94,6 @@ export default function NotificationPage() {
     } catch (e) {
       console.error('Network error:', e); // Debug log
       setModalMessage('Gagal klaim: ' + (e?.message || 'Network error'));
-      setShowErrorModal(true);
-    }
-  }
-
-  // Alternative claim endpoint function
-  async function tryAlternativeClaimEndpoint(voucherId, notificationId) {
-    try {
-      console.log('Trying alternative voucher claim endpoint...'); // Debug log
-      
-      // Try voucher-items endpoint (similar to promo-items)
-      const res = await fetch(`${apiBase}/api/vouchers/voucher-items`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          ...authHeader(),
-        },
-        body: JSON.stringify({ 
-          voucher_id: voucherId,
-          notification_id: notificationId,
-          claim: true 
-        }),
-      });
-
-      const text = await res.text();
-      console.log('Alternative response:', res.status, text); // Debug log
-      
-      let json = {};
-      try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
-
-      if (!res.ok) {
-        setModalMessage(json?.message || `Gagal klaim voucher. Error: ${res.status}`);
-        setShowErrorModal(true);
-        return;
-      }
-
-      setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
-      setVersion((v) => v + 1);
-
-      setModalMessage('Voucher berhasil diklaim! Cek di Saku.');
-      setShowSuccessModal(true);
-    } catch (e) {
-      console.error('Alternative endpoint failed:', e); // Debug log
-      setModalMessage('Gagal klaim voucher: ' + (e?.message || 'Network error'));
       setShowErrorModal(true);
     }
   }
