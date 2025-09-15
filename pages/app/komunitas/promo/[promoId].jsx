@@ -4,9 +4,10 @@ import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useCallback } from 'react';
-import { token_cookie_name } from '../../../../helpers';
-import { get, post } from '../../../../helpers/api.helpers';
-import { Decrypt } from '../../../../helpers/encryption.helpers';
+// Perbaiki path - gunakan 5 level ke atas karena struktur: pages/app/komunitas/promo/[promoId].jsx
+import { token_cookie_name } from '../../../../../helpers';
+import { get, post } from '../../../../../helpers/api.helpers';
+import { Decrypt } from '../../../../../helpers/encryption.helpers';
 
 const DetailVoucherPage = () => {
   const [currentUserId, setCurrentUserId] = useState(null);

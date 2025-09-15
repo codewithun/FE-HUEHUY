@@ -1,13 +1,10 @@
-import {
-  faArrowLeft,
-  faCheckCircle,
-  faMapMarkerAlt,
-} from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCheckCircle, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState, useCallback } from 'react';
+// Perbaiki path import - tambah satu level lagi karena folder lebih dalam
 import { token_cookie_name } from '../../../../helpers';
 import { get, post } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
