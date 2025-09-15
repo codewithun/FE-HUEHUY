@@ -9,6 +9,23 @@ import { get, post } from '../../../helpers/api.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 
 const DetailVoucherPage = () => {
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [showOutOfStockModal, setShowOutOfStockModal] = useState(false);
+  const [showClaimedElsewhereModal, setShowClaimedElsewhereModal] = useState(false);
+
+  // ambil user id dari token (jika ada)
+  useEffect(() => {
+    (async () => {
+      try {
+        const enc = Cookies.get(token_cookie_name);
+        if (!enc) return;
+        const token = Decrypt(enc);
+        const res = await get({ path: 'account', headers: { Authorization: `Bearer ${token}` } });
+        const uid = res?.data?.data?.id || res?.data?.id || res?.data?.data?.profile?.id;
+        if (uid) setCurrentUserId(Number(uid));
+      } catch (_) { }
+    })();
+  }, []);
   const router = useRouter();
   const { id } = router.query;
   const [voucher, setVoucher] = useState(null);
@@ -44,7 +61,7 @@ const DetailVoucherPage = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await get({
         path: `admin/vouchers/${id}`
       });
@@ -52,13 +69,16 @@ const DetailVoucherPage = () => {
       if (response?.status === 200 && response?.data?.data) {
         const voucherData = response.data.data;
         setVoucher(voucherData);
-        
+
         // Check if user already has this voucher (check voucher_items)
-        const userVoucherItems = voucherData.voucher_items || [];
+        const userVoucherItems = Array.isArray(voucherData.voucher_items) ? voucherData.voucher_items : [];
         const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-        const isAlreadyClaimed = claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id)
-          || userVoucherItems.length > 0; // server-side info if available
-        setIsClaimed(isAlreadyClaimed);
+        // HANYA hitung voucher_items yang milik user saat ini
+        const serverClaimedByMe = currentUserId
+          ? userVoucherItems.some((vi) => Number(vi?.user_id) === Number(currentUserId))
+          : false;
+        const localClaimed = claimedVouchers.some(v => Number(v.voucher_id ?? v.id) === Number(voucherData.id));
+        setIsClaimed(!!serverClaimedByMe || !!localClaimed);
 
         return voucherData;
       } else if (response?.status === 404) {
@@ -74,7 +94,7 @@ const DetailVoucherPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, currentUserId]);
 
   useEffect(() => {
     if (id) {
@@ -85,7 +105,7 @@ const DetailVoucherPage = () => {
   const handleBack = () => {
     // Cek apakah ada parameter autoRegister
     const autoRegister = router.query.autoRegister || router.query.source;
-    
+
     if (autoRegister) {
       // Jika dari QR scan, redirect ke halaman utama app
       router.push('/app');
@@ -97,28 +117,36 @@ const DetailVoucherPage = () => {
 
   const handleClaim = async () => {
     if (!voucher || isClaimed) return;
-    
+
     setClaimLoading(true);
     try {
       // In a real app, you'd get the current user ID from context/auth
       // For now, we'll use a dummy user ID or get from localStorage
-      const userData = JSON.parse(localStorage.getItem('huehuy_user') || '{}');
-      const userId = userData.id || 1; // fallback to dummy ID
+      // prioritaskan token & user id asli
+      let userId = null;
+      try {
+        const enc = Cookies.get(token_cookie_name);
+        if (enc) {
+          const token = Decrypt(enc);
+          const acct = await get({
+            path: 'account',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          userId = acct?.data?.data?.id || acct?.data?.id || acct?.data?.data?.profile?.id || null;
+        }
+      } catch (_) { }
 
       const response = await post({
         path: `admin/vouchers/${voucher.id}/send-to-user`,
-        body: {
-          user_id: userId
-        }
+        body: userId ? { user_id: userId } : {}, // tetap kompatibel: kalau BE izinkan body kosong pakai auth
       });
 
       if (response?.status === 200) {
-        // Save to localStorage for offline access
         const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
         const newVoucherItem = {
           id: response.data.data.id,
           voucher_id: voucher.id,
-          user_id: userId,
+          user_id: currentUserId || null,
           code: response.data.data.code,
           claimed_at: new Date().toISOString(),
           expired_at: voucher.valid_until,
@@ -127,14 +155,29 @@ const DetailVoucherPage = () => {
         };
         claimedVouchers.push(newVoucherItem);
         localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
-        
+
         setIsClaimed(true);
         setShowSuccessModal(true);
-      } else if (response?.status === 400) {
-        setError(response.data.message || 'Stock voucher habis!');
       } else {
-        setError('Gagal mengklaim voucher');
+        const msg = (response?.data?.message || response?.message || '').toLowerCase();
+        // mapping error → modal
+        if (
+          response?.status === 400 ||
+          response?.status === 409 ||
+          msg.includes('habis') || msg.includes('stock') || msg.includes('stok')
+        ) {
+          setShowOutOfStockModal(true);
+        } else if (
+          msg.includes('sudah diklaim') ||
+          msg.includes('already') ||
+          msg.includes('claimed')
+        ) {
+          setShowClaimedElsewhereModal(true);
+        } else {
+          setError('Gagal mengklaim voucher');
+        }
       }
+
     } catch (err) {
       setError('Terjadi kesalahan saat mengklaim voucher');
       // console.error('Error claiming voucher:', err);
@@ -155,10 +198,16 @@ const DetailVoucherPage = () => {
       if (!voucherData) return;
 
       // Cek apakah user sudah punya voucher ini
-      const userVoucherItems = voucherData.voucher_items || [];
+      const userVoucherItems = Array.isArray(voucherData.voucher_items) ? voucherData.voucher_items : [];
       const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const alreadyClaimed = userVoucherItems.length > 0 || 
-                            claimedVouchers.some(v => v.voucher_id === voucherData.id || v.id === voucherData.id);
+
+      const serverClaimedByMe = currentUserId
+        ? userVoucherItems.some((vi) => Number(vi?.user_id) === Number(currentUserId))
+        : false;
+
+      const localClaimed = claimedVouchers.some(v => Number(v.voucher_id ?? v.id) === Number(voucherData.id));
+
+      const alreadyClaimed = serverClaimedByMe || localClaimed;
 
       if (!alreadyClaimed) {
         // Lakukan auto claim voucher
@@ -184,7 +233,7 @@ const DetailVoucherPage = () => {
             };
             claimedVouchers.push(newVoucherItem);
             localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
-            
+
             setIsClaimed(true);
             setShowSuccessModal(true);
           }
@@ -202,7 +251,7 @@ const DetailVoucherPage = () => {
     try {
       // eslint-disable-next-line no-console
       console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
-      
+
       // Coba endpoint account dulu (untuk user yang sudah login dan terverifikasi)
       let response = await get({
         path: 'account',
@@ -212,10 +261,10 @@ const DetailVoucherPage = () => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       // eslint-disable-next-line no-console
       console.log('account response:', response?.status, response?.data);
-      
+
       if (response?.status === 200) {
         // User sudah terverifikasi dan bisa akses, lakukan auto-register
         // eslint-disable-next-line no-console
@@ -223,7 +272,7 @@ const DetailVoucherPage = () => {
         handleAutoRegister(token);
         return;
       }
-      
+
       // Jika account endpoint gagal (401/404), coba account-unverified
       if (response?.status === 401 || response?.status === 404) {
         // eslint-disable-next-line no-console
@@ -236,15 +285,15 @@ const DetailVoucherPage = () => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         // eslint-disable-next-line no-console
         console.log('account-unverified response:', response?.status, response?.data);
-        
+
         if (response?.status === 200) {
           // User belum terverifikasi, redirect ke verifikasi
           const userData = response?.data?.data?.profile || response?.data?.profile;
           const emailVerified = userData?.email_verified_at || userData?.verified_at;
-          
+
           if (!emailVerified) {
             // eslint-disable-next-line no-console
             console.log('User not verified, redirecting to verification');
@@ -260,7 +309,7 @@ const DetailVoucherPage = () => {
           }
         }
       }
-      
+
       // Jika token tidak valid, redirect ke register
       if (response?.status === 401) {
         // eslint-disable-next-line no-console
@@ -269,12 +318,12 @@ const DetailVoucherPage = () => {
         window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         return;
       }
-      
+
       // Fallback: assume user is verified dan lanjut auto register
       // eslint-disable-next-line no-console
       console.log('Fallback: proceeding with auto register');
       handleAutoRegister(token);
-      
+
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Error checking verification status:', err);
@@ -287,14 +336,14 @@ const DetailVoucherPage = () => {
   // --- MODIFIED: handle autoRegister / source param and login check ---
   useEffect(() => {
     if (!router.isReady) return;
-    
+
     // accept both `autoRegister` or `source=qr`
     const autoRegister = router.query.autoRegister || router.query.source;
 
     if (autoRegister) {
       // Coba ambil token dengan berbagai cara
       let token = null;
-      
+
       // 1. Coba dari cookie dengan decrypt
       const encrypted = Cookies.get(token_cookie_name);
       if (encrypted) {
@@ -309,7 +358,7 @@ const DetailVoucherPage = () => {
           Cookies.remove(token_cookie_name);
         }
       }
-      
+
       // 2. Fallback ke localStorage
       if (!token) {
         token = localStorage.getItem('auth_token') || localStorage.getItem('token');
@@ -318,7 +367,7 @@ const DetailVoucherPage = () => {
           console.log('Token from localStorage:', token?.substring(0, 20) + '...');
         }
       }
-      
+
       // If user is not logged in -> redirect to create account
       if (!token) {
         // eslint-disable-next-line no-console
@@ -329,7 +378,7 @@ const DetailVoucherPage = () => {
         }
         return;
       }
-      
+
       // Token ada, cek status verifikasi user
       // eslint-disable-next-line no-console
       console.log('Token found, checking verification status...');
@@ -357,7 +406,7 @@ const DetailVoucherPage = () => {
           </div>
           <h3 className="text-lg font-semibold text-slate-900 mb-2">Oops!</h3>
           <p className="text-slate-600 mb-4">{error}</p>
-          <button 
+          <button
             onClick={handleBack}
             className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
           >
@@ -373,7 +422,7 @@ const DetailVoucherPage = () => {
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
           <p className="text-slate-600">Voucher tidak ditemukan</p>
-          <button 
+          <button
             onClick={handleBack}
             className="mt-4 bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
           >
@@ -419,8 +468,8 @@ const DetailVoucherPage = () => {
             <div className="bg-white rounded-[20px] shadow-lg overflow-hidden border border-slate-100">
               <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
                 <div className="relative w-full h-full">
-                  <Image 
-                    src={getImageUrl(voucher?.image)} 
+                  <Image
+                    src={getImageUrl(voucher?.image)}
                     alt={voucher?.name || 'Voucher'}
                     className="object-cover"
                     fill
@@ -519,14 +568,13 @@ const DetailVoucherPage = () => {
       {!isClaimed && voucher.stock > 0 && (
         <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
           <div className="lg:max-w-sm lg:mx-auto">
-            <button 
+            <button
               onClick={handleClaim}
               disabled={claimLoading}
-              className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${
-                claimLoading 
-                  ? 'bg-slate-400 text-white cursor-not-allowed' 
-                  : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-              }`}
+              className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${claimLoading
+                ? 'bg-slate-400 text-white cursor-not-allowed'
+                : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
+                }`}
             >
               {claimLoading ? (
                 <div className="flex items-center justify-center">
@@ -545,11 +593,10 @@ const DetailVoucherPage = () => {
       {(isClaimed || voucher.stock <= 0) && (
         <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
           <div className="lg:max-w-sm lg:mx-auto">
-            <div className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base text-center ${
-              isClaimed 
-                ? 'bg-green-100 text-green-700 border-2 border-green-200' 
-                : 'bg-slate-100 text-slate-500 border-2 border-slate-200'
-            }`}>
+            <div className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base text-center ${isClaimed
+              ? 'bg-green-100 text-green-700 border-2 border-green-200'
+              : 'bg-slate-100 text-slate-500 border-2 border-slate-200'
+              }`}>
               {isClaimed ? (
                 <div className="flex items-center justify-center">
                   <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
@@ -575,13 +622,13 @@ const DetailVoucherPage = () => {
               Voucher berhasil diklaim dan masuk ke Saku Promo Anda!
             </p>
             <div className="space-y-3">
-              <button 
+              <button
                 onClick={handleSuccessModalClose}
                 className="w-full bg-primary text-white py-3 rounded-[12px] font-semibold hover:bg-opacity-90 transition-all"
               >
                 Lihat Saku Promo
               </button>
-              <button 
+              <button
                 onClick={() => setShowSuccessModal(false)}
                 className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
               >
@@ -591,7 +638,43 @@ const DetailVoucherPage = () => {
           </div>
         </div>
       )}
-      
+
+      {showOutOfStockModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FontAwesomeIcon icon={faCheckCircle} className="text-red-500 text-3xl rotate-45" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Voucher Habis</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">Maaf, stok voucher ini sudah habis diklaim.</p>
+            <button
+              onClick={() => setShowOutOfStockModal(false)}
+              className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
+            >
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showClaimedElsewhereModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+            <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FontAwesomeIcon icon={faCheckCircle} className="text-yellow-500 text-3xl" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Sudah Diklaim</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">Voucher ini sudah pernah diklaim pada akun lain.</p>
+            <button
+              onClick={() => setShowClaimedElsewhereModal(false)}
+              className="w-full bg-yellow-500 text-white py-3 rounded-[12px] font-semibold hover:bg-yellow-600 transition-all"
+            >
+              OK, Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         @keyframes bounce-in {
           0% { transform: scale(0.3); opacity: 0; }
