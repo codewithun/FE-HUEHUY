@@ -41,24 +41,9 @@ export default function CommunityProfile() {
     if (router.isReady) setRouterReady(true);
   }, [router.isReady]);
 
-  // Demo community data (keep as-is)
-  const [communityData] = useState({
-    id: 1,
-    name: 'dbotanica Bandung',
-    description:
-      'Mall perbelanjaan standar dengan beragam toko pakaian, plus tempat makan kasual & bioskop.',
-    members: 1234,
-    category: 'Shopping',
-    isOwner: false,
-    isAdmin: true,
-    isJoined: true,
-    privacy: 'public',
-    activePromos: 8,
-    totalEvents: 3,
-    unreadMessages: 5,
-    isVerified: true,
-    avatar: '/api/placeholder/80/80',
-  });
+  // Real community data from API
+  const [communityData, setCommunityData] = useState(null);
+  const [loadingCommunity, setLoadingCommunity] = useState(true);
 
   // -------------------------
   // User profile from backend
@@ -72,6 +57,69 @@ export default function CommunityProfile() {
   const [loadingProfile, setLoadingProfile] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
+  // Ambil ID efektif dari query ('id' / 'communityId')
+  const effectiveCommunityId = useMemo(() => {
+    const take = (v) => (Array.isArray(v) ? v[0] : v || '');
+    const fromQuery = take(id) || take(idFromQueryAlt);
+    return fromQuery ? fromQuery.toString() : null;
+  }, [id, idFromQueryAlt]);
+
+  // Fetch community data from API
+  useEffect(() => {
+    const fetchCommunityData = async () => {
+      if (!effectiveCommunityId || !routerReady) return;
+      
+      try {
+        setLoadingCommunity(true);
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : '';
+        
+        // Handle API URL properly - remove /api if it exists, then add it back
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const apiBase = baseUrl.replace(/\/api\/?$/, '');
+        
+        const response = await fetch(`${apiBase}/api/communities/${effectiveCommunityId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const community = result.data || result;
+          
+          setCommunityData({
+            id: community.id,
+            name: community.name,
+            description: community.description ?? '',
+            members: community.members ?? 0,
+            category: community.category ?? 'Umum',
+            isOwner: false, // This would come from membership data
+            isAdmin: false, // This would come from membership data  
+            isJoined: true, // User is viewing profile, so they must be joined
+            privacy: community.privacy ?? 'public',
+            activePromos: community.activePromos ?? 0,
+            totalEvents: community.totalEvents ?? 0,
+            unreadMessages: 0, // This would come from chat/message API
+            isVerified: community.isVerified ?? community.is_verified ?? false,
+            avatar: community.logo ?? '/api/placeholder/80/80',
+          });
+        } else {
+          setCommunityData(null);
+        }
+      } catch (error) {
+        console.error('Error fetching community data:', error);
+        setCommunityData(null);
+      } finally {
+        setLoadingCommunity(false);
+      }
+    };
+
+    fetchCommunityData();
+  }, [effectiveCommunityId, routerReady]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -111,13 +159,6 @@ export default function CommunityProfile() {
     fetchProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isClient]);
-
-  // Ambil ID efektif dari query ('id' / 'communityId') atau fallback ke demo id
-  const effectiveCommunityId = useMemo(() => {
-    const take = (v) => (Array.isArray(v) ? v[0] : v || '');
-    const fromQuery = take(id) || take(idFromQueryAlt);
-    return (fromQuery || String(communityData.id)).toString();
-  }, [id, idFromQueryAlt, communityData.id]);
 
   const menuItems = [
     {
@@ -240,8 +281,39 @@ export default function CommunityProfile() {
     }
   };
 
-  if (!isClient) {
-    return null;
+  // Loading state
+  if (!isClient || !routerReady || loadingCommunity) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
+            <div className="text-white text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
+              <p className="mt-2 text-sm drop-shadow-neuro">
+                Loading komunitas...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Community not found
+  if (!communityData) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
+            <div className="text-white text-center">
+              <p className="mt-2 text-sm drop-shadow-neuro">
+                Komunitas tidak ditemukan
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

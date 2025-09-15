@@ -55,7 +55,7 @@ const CommunityBottomBar = ({ active, communityId }) => {
               </Link>
 
               {/* Profile */}
-              <Link href={`/app/komunitas/profile/profile_id`}>
+              <Link href={`/app/komunitas/profile/profile_id?communityId=${communityId}`}>
                 <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-lg ${
