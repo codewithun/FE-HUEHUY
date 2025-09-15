@@ -67,7 +67,7 @@ export default function Save() {
           const ad = it.promo || it.ad || {};
           const claimedAt   = it.created_at || it.claimed_at || it.validated_at || it.claimedAt || null;
           const expiredAt   = it.expires_at || it.expired_at || it.expiry || ad.valid_until || null;
-          const validatedAt = it.used_at || it.redeemed_at || it.validation_at || null;
+          const validatedAt = it.validated_at || it.used_at || it.redeemed_at || it.validation_at || null;
 
           const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
             .replace(/\/api\/?$/, '')
@@ -79,7 +79,7 @@ export default function Save() {
             code: it.code || it.qr || it.token || null,
             claimed_at: claimedAt,
             expired_at: expiredAt,
-            validation_at: validatedAt,
+            validated_at: validatedAt,
             voucher_item: null,
             voucher: null,
             ad: {
@@ -118,7 +118,7 @@ export default function Save() {
             code: it.code,
             claimed_at: it.created_at,
             expired_at: voucher.valid_until || null,
-            validation_at: it.used_at || null,
+            validated_at: it.validated_at || it.used_at || null,
             voucher_item: { id: it.id, code: it.code, user_id: it.user_id, voucher_id: it.voucher_id, used_at: it.used_at },
             voucher,
             ad: {
@@ -183,13 +183,28 @@ export default function Save() {
     const now = moment();
     const expired = moment(expiredAt);
     const duration = moment.duration(expired.diff(now));
-    const hours = Math.floor(duration.asHours());
-    const minutes = Math.floor(duration.asMinutes()) % 60;
-
-    if (hours < 0 || minutes < 0) return 'Sudah kedaluwarsa';
-    if (hours > 0) return `${hours} jam ${minutes} menit lagi`;
+    
+    if (duration.asMilliseconds() <= 0) return 'Sudah kedaluwarsa';
+    
+    const days = Math.floor(duration.asDays());
+    const hours = Math.floor(duration.asHours()) % 24;
+    
+    if (days > 0) {
+      if (days === 1) return '1 hari lagi';
+      if (days < 7) return `${days} hari lagi`;
+      const weeks = Math.floor(days / 7);
+      if (weeks === 1) return '1 minggu lagi';
+      if (weeks < 4) return `${weeks} minggu lagi`;
+      const months = Math.floor(days / 30);
+      return `${months} bulan lagi`;
+    }
+    
+    if (hours > 0) return `${hours} jam lagi`;
+    
+    const minutes = Math.floor(duration.asMinutes());
     if (minutes > 0) return `${minutes} menit lagi`;
-    return 'Sudah kedaluwarsa';
+    
+    return 'Segera berakhir';
   };
 
   const isRecentlyClaimed = (claimedAt) => {
@@ -207,7 +222,7 @@ export default function Save() {
         (voucher?.stock === undefined || voucher?.stock > 0) &&
         (!voucher?.valid_until || new Date(voucher.valid_until) > new Date());
 
-      if (item?.validation_at) {
+      if (item?.validated_at) {
         return (
           <div className="flex items-center gap-1">
             <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
@@ -236,7 +251,7 @@ export default function Save() {
       item?.ad?.status === 'available' ||
       (!item?.ad?.status && item?.ad?.id);
 
-    if (item?.validation_at) {
+    if (item?.validated_at) {
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
@@ -311,7 +326,7 @@ export default function Save() {
                     )}
 
                     {/* Badge Sudah Digunakan */}
-                    {item.validation_at && (
+                    {item.validated_at && (
                       <div className="mb-3">
                         <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
                           ✓ Sudah Digunakan
@@ -524,7 +539,7 @@ export default function Save() {
 
         {/* QR / Status */}
         <div className="px-4 pb-6">
-          {selected?.validation_at ? (
+          {selected?.validated_at ? (
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl py-8">
               <div className="text-center">
                 <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-4xl mb-3" />
