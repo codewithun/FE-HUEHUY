@@ -342,7 +342,7 @@ function VoucherCrud() {
         }}
       />
 
-      {/* Modal Form */}
+      {/* Modal Form — gaya disamakan dengan “Tambah Promo” */}
       <FloatingPageComponent
         show={modalForm}
         onClose={() => {
@@ -350,198 +350,243 @@ function VoucherCrud() {
           resetForm();
         }}
         title={selectedVoucher ? 'Ubah Voucher' : 'Tambah Voucher'}
-        size="md"
+        // subjudul/description biar konsisten sama “Tambah Promo”
+        subtitle="Masukkan data yang valid dan benar!"
+        size="lg"
         className="bg-background"
       >
-        <form className="flex flex-col gap-4 p-6" onSubmit={handleSubmit}>
-          <div>
-            <label className="font-semibold">Nama Voucher</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Masukkan nama voucher"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
+        {/* Badge mode di pojok, sama kayak promo */}
+        <div className="px-6 pt-4">
+          <span className={`badge ${selectedVoucher ? 'badge-warning' : 'badge-success'}`}>
+            {selectedVoucher ? 'Mode Ubah' : 'Mode Tambah'}
+          </span>
+        </div>
+
+        <form className="p-6">
+          {/* Section: Informasi Umum */}
+          <div className="mb-4">
+            <h3 className="text-base font-semibold">Informasi Umum</h3>
+            <p className="text-sm text-muted-foreground">
+              Nama, deskripsi, dan identitas voucher.
+            </p>
           </div>
 
-          <div>
-            <label className="font-semibold">Deskripsi</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Masukkan deskripsi"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Nama Voucher</span></label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Contoh: Diskon 20% Semua Menu"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+              <span className="text-xs text-gray-500 mt-1">Nama akan tampil di daftar voucher.</span>
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Kode Unik</span></label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Contoh: HH-20OFF"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                required
+              />
+              <span className="text-xs text-gray-500 mt-1">Wajib & tidak boleh duplikat.</span>
+            </div>
+
+            <div className="md:col-span-2 form-control">
+              <label className="label"><span className="label-text font-medium">Deskripsi</span></label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Tuliskan ketentuan singkat voucher"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="font-semibold">Kode Unik</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Masukkan kode unik voucher"
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-              required
-            />
-            <span className="text-xs text-gray-500">
-              Kode unik voucher, wajib diisi dan tidak boleh sama.
-            </span>
+          {/* Section: Pengaturan & Periode */}
+          <div className="mt-8 mb-4">
+            <h3 className="text-base font-semibold">Pengaturan & Periode</h3>
+            <p className="text-sm text-muted-foreground">Tipe, masa berlaku, lokasi, dan stok.</p>
           </div>
 
-          <div>
-            <label className="font-semibold">Tipe Voucher</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Masukkan tipe voucher"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Tipe Voucher</span></label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Contoh: percentage / nominal / buy1get1"
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              />
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Berlaku Sampai</span></label>
+              <input
+                type="date"
+                className="input input-bordered w-full"
+                value={formData.valid_until}
+                onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
+              />
+              <span className="text-xs text-gray-500 mt-1">Format input YYYY-MM-DD.</span>
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Lokasi Tenant</span></label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Contoh: Foodcourt Lantai 2"
+                value={formData.tenant_location}
+                onChange={(e) => setFormData({ ...formData, tenant_location: e.target.value })}
+              />
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Stok Voucher</span></label>
+              <div className="join w-full">
+                <input
+                  type="number"
+                  className="input input-bordered join-item w-full"
+                  min={0}
+                  value={formData.stock}
+                  onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
+                  required
+                />
+                <span className="btn btn-ghost join-item pointer-events-none">voucher</span>
+              </div>
+              <span className="text-xs text-gray-500 mt-1">Tampilan tabel: “{`{angka}`} voucher”.</span>
+            </div>
           </div>
 
-          <div>
-            <label className="font-semibold">Berlaku Sampai</label>
-            <input
-              type="date"
-              className="input input-bordered w-full"
-              value={formData.valid_until}
-              onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
-            />
-            <span className="text-xs text-gray-500">
-              Ditampilkan sebagai “DD MMMM YYYY” di tabel.
-            </span>
+          {/* Section: Target Penerima */}
+          <div className="mt-8 mb-4">
+            <h3 className="text-base font-semibold">Target Penerima</h3>
+            <p className="text-sm text-muted-foreground">Atur siapa yang berhak menerima voucher.</p>
           </div>
 
-          <div>
-            <label className="font-semibold">Lokasi Tenant</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Masukkan lokasi tenant"
-              value={formData.tenant_location}
-              onChange={(e) => setFormData({ ...formData, tenant_location: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="font-semibold">Stock</label>
-            <input
-              type="number"
-              className="input input-bordered w-full"
-              placeholder="Masukkan stock"
-              value={formData.stock}
-              onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
-              required
-            />
-            <span className="text-xs text-gray-500">
-              Tampilan di tabel: “{`{angka}`} voucher”.
-            </span>
-          </div>
-
-          {/* Targeting */}
-          <div>
-            <label className="font-semibold">Target Penerima</label>
-            <select
-              className="select select-bordered w-full"
-              value={formData.target_type}
-              onChange={(e) => {
-                const next = e.target.value; // 'all' | 'user' | 'community'
-                setFormData((s) => ({
-                  ...s,
-                  target_type: next,
-                  target_user_id: '',
-                  community_id: next === 'community' ? s.community_id : '',
-                }));
-              }}
-            >
-              <option value="all">Semua Pengguna</option>
-              <option value="user">Pengguna Tertentu</option>
-              <option value="community">Anggota Community</option>
-            </select>
-            <span className="text-xs text-gray-500">Pilih target penerima voucher.</span>
-          </div>
-
-          {formData.target_type === 'user' && (
-            <div>
-              <label className="font-semibold">Pilih Pengguna</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Target</span></label>
               <select
                 className="select select-bordered w-full"
-                value={formData.target_user_id}
-                onChange={(e) => setFormData({ ...formData, target_user_id: e.target.value })}
-                required
+                value={formData.target_type}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setFormData((s) => ({
+                    ...s,
+                    target_type: next,
+                    target_user_id: next === 'user' ? s.target_user_id : '',
+                    community_id: next === 'community' ? s.community_id : '',
+                  }));
+                }}
               >
-                <option value="">Pilih Pengguna</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email || `#${u.id}`}
-                  </option>
+                <option value="all">Semua Pengguna</option>
+                <option value="user">Pengguna Tertentu</option>
+                <option value="community">Anggota Community</option>
+              </select>
+            </div>
+
+            {formData.target_type === 'user' && (
+              <div className="form-control">
+                <label className="label"><span className="label-text font-medium">Pilih Pengguna</span></label>
+                <select
+                  className="select select-bordered w-full"
+                  value={formData.target_user_id}
+                  onChange={(e) => setFormData({ ...formData, target_user_id: e.target.value })}
+                  required
+                >
+                  <option value="">Pilih Pengguna</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.email || `#${u.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="form-control md:col-span-2">
+              <label className="label">
+                <span className="label-text font-medium">
+                  Community {formData.target_type === 'community' ? '(wajib)' : '(opsional)'}
+                </span>
+              </label>
+              <select
+                className="select select-bordered w-full"
+                value={formData.community_id}
+                onChange={(e) => setFormData({ ...formData, community_id: e.target.value })}
+                required={formData.target_type === 'community'}
+                disabled={formData.target_type !== 'community'}
+              >
+                <option value="">Pilih Community</option>
+                {communities.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <span className="text-xs text-gray-500">Voucher akan dikirim ke pengguna ini.</span>
             </div>
-          )}
-
-          <div>
-            <label className="font-semibold">
-              Community (opsional / wajib jika target=community)
-            </label>
-            <select
-              className="select select-bordered w-full"
-              value={formData.community_id}
-              onChange={(e) => setFormData({ ...formData, community_id: e.target.value })}
-              required={formData.target_type === 'community'}
-              disabled={formData.target_type !== 'community'}
-            >
-              <option value="">Pilih Community</option>
-              {communities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-gray-500">
-              Pilih community untuk voucher ini (wajib jika targetnya "community").
-            </span>
           </div>
 
-          <div>
-            <label className="font-semibold">Upload Gambar</label>
-            <input
-              type="file"
-              accept="image/*"
-              className="input input-bordered w-full"
-              onChange={handleImageChange}
-            />
-            {formData.image && !imageFile && (
-              <div className="mt-2">
-                <img
-                  src={buildImageUrl(formData.image) || formData.image}
-                  alt="Voucher"
-                  width={80}
-                  height={80}
-                  style={{ borderRadius: 8 }}
-                />
-              </div>
-            )}
-            {imageFile && (
-              <div className="mt-2">
-                <img
-                  src={URL.createObjectURL(imageFile)}
-                  alt="Preview"
-                  width={80}
-                  height={80}
-                  style={{ borderRadius: 8 }}
-                />
-              </div>
-            )}
-            <span className="text-xs text-gray-500">Upload gambar voucher (opsional).</span>
+          {/* Section: Media */}
+          <div className="mt-8 mb-4">
+            <h3 className="text-base font-semibold">Media</h3>
+            <p className="text-sm text-muted-foreground">Gambar voucher (opsional).</p>
           </div>
 
-          <div className="flex gap-2 justify-end mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Upload Gambar</span></label>
+              <input
+                type="file"
+                accept="image/*"
+                className="file-input file-input-bordered w-full"
+                onChange={handleImageChange}
+              />
+              <span className="text-xs text-gray-500 mt-1">
+                PNG/JPG. Jika tidak diubah saat edit, gambar lama dipertahankan.
+              </span>
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Preview</span></label>
+              <div className="flex items-center gap-3">
+                {/* preview lama */}
+                {formData.image && !imageFile && (
+                  <img
+                    src={buildImageUrl(formData.image) || formData.image}
+                    alt="Voucher"
+                    width={96}
+                    height={96}
+                    className="rounded-xl border"
+                  />
+                )}
+                {/* preview baru */}
+                {imageFile && (
+                  <img
+                    src={URL.createObjectURL(imageFile)}
+                    alt="Preview"
+                    width={96}
+                    height={96}
+                    className="rounded-xl border"
+                  />
+                )}
+                {!formData.image && !imageFile && (
+                  <span className="text-sm text-muted-foreground">Belum ada gambar</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="mt-10 flex justify-end gap-2">
             <ButtonComponent
               label="Batal"
               paint="secondary"
@@ -555,6 +600,7 @@ function VoucherCrud() {
               label={selectedVoucher ? 'Perbarui' : 'Simpan'}
               paint="primary"
               type="submit"
+              onClick={handleSubmit}
             />
           </div>
         </form>
