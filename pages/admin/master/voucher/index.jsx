@@ -260,6 +260,26 @@ function VoucherCrud() {
     }
   };
 
+  // Add this edit handler function
+  const handleEdit = (voucher) => {
+    setSelectedVoucher(voucher);
+    setFormData({
+      name: voucher.name || '',
+      description: voucher.description || '',
+      image: voucher.image || '',
+      type: voucher.type || '',
+      valid_until: toDateInputValue(voucher.valid_until),
+      tenant_location: voucher.tenant_location || '',
+      stock: voucher.stock || 0,
+      code: voucher.code || '',
+      community_id: voucher.community_id || '',
+      target_type: voucher.target_type || 'all',
+      target_user_id: voucher.target_user_id || '',
+    });
+    setImageFile(null); // Reset new image file
+    setModalForm(true);
+  };
+
   /* --------- Tabel columns --------- */
   const columns = [
     {
@@ -331,18 +351,23 @@ function VoucherCrud() {
         noControlBar={false}
         setToRefresh={refreshToggle}
         // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
-        actionControl={{ except: ['detail'] }}
-        // fetchControl untuk useGet internal
+        actionControl={{ 
+          except: ['detail'],
+          // Add edit and delete handlers
+          onEdit: handleEdit,
+          onDelete: (voucher) => {
+            setSelectedVoucher(voucher);
+            setModalDelete(true);
+          }
+        }}
         fetchControl={{
-          path: 'admin/vouchers', // jangan pakai prefix /api di sini
+          path: 'admin/vouchers',
           includeHeaders: {
             'Content-Type': 'application/json',
             ...authHeader(),
           },
         }}
       />
-
-      {/* Modal Form — gaya disamakan dengan “Tambah Promo” */}
       <FloatingPageComponent
         show={modalForm}
         onClose={() => {
@@ -350,7 +375,6 @@ function VoucherCrud() {
           resetForm();
         }}
         title={selectedVoucher ? 'Ubah Voucher' : 'Tambah Voucher'}
-        // subjudul/description biar konsisten sama “Tambah Promo”
         subtitle="Masukkan data yang valid dan benar!"
         size="lg"
         className="bg-background"
