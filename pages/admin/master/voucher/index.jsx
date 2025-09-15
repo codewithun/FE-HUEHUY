@@ -12,6 +12,7 @@ import {
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
+import { useRouter } from 'next/router';
 
 /* -------------------- Helpers -------------------- */
 
@@ -60,6 +61,8 @@ const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
 /* -------------------- Page -------------------- */
 
 function VoucherCrud() {
+  const router = useRouter();
+
   const [voucherList, setVoucherList] = useState([]);
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
@@ -260,26 +263,6 @@ function VoucherCrud() {
     }
   };
 
-  // Add this edit handler function
-  const handleEdit = (voucher) => {
-    setSelectedVoucher(voucher);
-    setFormData({
-      name: voucher.name || '',
-      description: voucher.description || '',
-      image: voucher.image || '',
-      type: voucher.type || '',
-      valid_until: toDateInputValue(voucher.valid_until),
-      tenant_location: voucher.tenant_location || '',
-      stock: voucher.stock || 0,
-      code: voucher.code || '',
-      community_id: voucher.community_id || '',
-      target_type: voucher.target_type || 'all',
-      target_user_id: voucher.target_user_id || '',
-    });
-    setImageFile(null); // Reset new image file
-    setModalForm(true);
-  };
-
   /* --------- Tabel columns --------- */
   const columns = [
     {
@@ -350,18 +333,18 @@ function VoucherCrud() {
         searchable
         noControlBar={false}
         setToRefresh={refreshToggle}
-        // 🔴 Nonaktifkan semua form otomatis dari TableSupervision
-        actionControl={{ 
-          except: ['detail', 'add', 'edit'], // Hapus add & edit otomatis
-          onEdit: handleEdit, // Gunakan handler custom
+        // Nonaktifkan "detail" & "add" bawaan, BIARKAN "edit" tampil lalu redirect ke page edit
+        actionControl={{
+          except: ['detail', 'add'],
+          onEdit: (voucher) => {
+            // arahkan ke halaman menueditvoucher dengan query id
+            router.push(`./menueditvoucher?id=${voucher?.id}`);
+          },
           onDelete: (voucher) => {
             setSelectedVoucher(voucher);
             setModalDelete(true);
-          }
+          },
         }}
-        // 🔴 Hapus atau nonaktifkan formControl dan formUpdateControl
-        // formControl={null}
-        // formUpdateControl={null}
         fetchControl={{
           path: 'admin/vouchers',
           includeHeaders: {
@@ -370,6 +353,8 @@ function VoucherCrud() {
           },
         }}
       />
+
+      {/* Modal Tambah Baru (create tetap di halaman ini) */}
       <FloatingPageComponent
         show={modalForm}
         onClose={() => {
