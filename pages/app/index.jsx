@@ -16,7 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Autoplay, Navigation } from 'swiper';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import {
@@ -113,6 +113,18 @@ export default function Index() {
     path: `account`,
   }, !apiReady); // PENTING: Delay request account sampai apiReady = true
 
+  // Tambahkan useGet untuk notifikasi
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [loadingNotif, codeNotif, dataNotif] = useGet({
+    path: `notification`,
+  }, !apiReady);
+
+  // Hitung jumlah notifikasi yang belum dibaca
+  const unreadNotificationCount = useMemo(() => {
+    if (!dataNotif?.data || !Array.isArray(dataNotif.data)) return 0;
+    return dataNotif.data.filter(item => !item.read_at).length;
+  }, [dataNotif]);
+
   // DEBUG: Log user data untuk debugging
   useEffect(() => {
     if (dataUser && !loadingUser) {
@@ -206,10 +218,12 @@ export default function Index() {
                         icon={faBell}
                         className="text__primary text-lg"
                       />
-                      {/* Badge notifikasi */}
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        16
-                      </span>
+                      {/* Badge notifikasi dinamis */}
+                      {unreadNotificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                        </span>
+                      )}
                     </div>
                   </Link>
 
