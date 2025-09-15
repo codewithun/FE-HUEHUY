@@ -422,6 +422,8 @@ export default function KomunitasDashboard() {
         noControlBar={false}
         searchable={true}
         setToRefresh={refreshToggle}
+        // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
+        actionControl={{ except: ['detail'] }}
         fetchControl={{
           path: "admin/communities",
           method: "GET",

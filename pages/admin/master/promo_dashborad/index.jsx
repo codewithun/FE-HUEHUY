@@ -267,6 +267,8 @@ export default function PromoDashboard() {
         noControlBar={false}
         searchable={true}
         setToRefresh={refreshToggle}
+        // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
+        actionControl={{ except: ['detail'] }}
         fetchControl={{
           path: "admin/promos",
           method: "GET",
