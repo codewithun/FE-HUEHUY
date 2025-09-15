@@ -337,8 +337,21 @@ function VoucherCrud() {
         actionControl={{
           except: ['detail', 'add'],
           onEdit: (voucher) => {
-            // arahkan ke halaman menueditvoucher dengan query id
-            router.push(`./menueditvoucher?id=${voucher?.id}`);
+            setSelectedVoucher(voucher);
+            setFormData({
+              name: voucher.name || '',
+              description: voucher.description || '',
+              image: voucher.image || '',
+              type: voucher.type || '',
+              valid_until: voucher.valid_until ? toDateInputValue(voucher.valid_until) : '',
+              tenant_location: voucher.tenant_location || '',
+              stock: voucher.stock ?? 0,
+              code: voucher.code || '',
+              community_id: voucher.community_id || '',
+              target_type: voucher.target_type || 'all',
+              target_user_id: voucher.target_user_id || '',
+            });
+            setModalForm(true);
           },
           onDelete: (voucher) => {
             setSelectedVoucher(voucher);
