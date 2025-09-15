@@ -183,10 +183,12 @@ export default function Index() {
 
             <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
               <div className="relative -top-5 px-4">
-                <div className="flex gap-3 items-center">
+                {/* Gabungkan search, notifikasi, dan pesan dalam satu container */}
+                <div className="bg-white border border__primary rounded-[20px] flex items-center overflow-hidden">
+                  {/* Search Section */}
                   <Link href="/app/cari" className="flex-1">
-                    <div className="w-full bg-white border border__primary px-6 py-4 rounded-[20px] flex justify-between items-center">
-                      <p>Mulai mencari promo disini...</p>
+                    <div className="px-6 py-4 flex justify-between items-center">
+                      <p className="text-gray-500">Mulai mencari promo ...</p>
                       <FontAwesomeIcon
                         icon={faMagnifyingGlass}
                         className="text__primary"
@@ -194,19 +196,29 @@ export default function Index() {
                     </div>
                   </Link>
 
+                  {/* Divider */}
+                  <div className="w-px h-8 bg-gray-200"></div>
+
                   {/* Button Notifikasi */}
                   <Link href="/app/notifikasi">
-                    <div className="bg-white border border__primary p-4 rounded-[20px] flex justify-center items-center aspect-square">
+                    <div className="px-4 py-4 flex justify-center items-center relative">
                       <FontAwesomeIcon
                         icon={faBell}
                         className="text__primary text-lg"
                       />
+                      {/* Badge notifikasi */}
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        16
+                      </span>
                     </div>
                   </Link>
 
+                  {/* Divider */}
+                  <div className="w-px h-8 bg-gray-200"></div>
+
                   {/* Button Pesan */}
                   <Link href="/app/pesan">
-                    <div className="bg-white border border__primary p-4 rounded-[20px] flex justify-center items-center aspect-square">
+                    <div className="px-4 py-4 flex justify-center items-center">
                       <FontAwesomeIcon
                         icon={faMessage}
                         className="text__primary text-lg"
