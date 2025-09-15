@@ -1,4 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
+/* eslint-disable no-console */
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -12,12 +13,15 @@ import { AdminLayout } from '../../../../components/construct.components/layout/
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
-// --- Helper: normalize API base & image URL ---
+/* -------------------- Helpers -------------------- */
+
+// Normalisasi base API (hapus trailing /api)
 const getApiBase = () => {
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   return raw.replace(/\/api\/?$/, '');
 };
 
+// Build URL gambar (support path relatif dari storage)
 const buildImageUrl = (raw) => {
   if (!raw) return null;
   if (/^https?:\/\//i.test(raw)) return raw; // absolute
@@ -28,7 +32,7 @@ const buildImageUrl = (raw) => {
   return `${base}/${path}`;
 };
 
-// --- Date helpers (ID) ---
+// Tanggal Indonesia
 const formatDateID = (raw) => {
   if (!raw) return '-';
   const d = new Date(raw);
@@ -40,7 +44,7 @@ const formatDateID = (raw) => {
   }).format(d);
 };
 
-// Pastikan nilai cocok untuk <input type="date"> (YYYY-MM-DD)
+// Untuk value <input type="date">
 const toDateInputValue = (raw) => {
   if (!raw) return '';
   const d = new Date(raw);
@@ -51,8 +55,9 @@ const toDateInputValue = (raw) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-// --- Stock label helper ---
 const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
+
+/* -------------------- Page -------------------- */
 
 function VoucherCrud() {
   const [voucherList, setVoucherList] = useState([]);
@@ -60,6 +65,7 @@ function VoucherCrud() {
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [refreshToggle, setRefreshToggle] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -70,8 +76,8 @@ function VoucherCrud() {
     stock: 0,
     code: '',
     community_id: '',
-    target_type: 'all',      // all | user | community
-    target_user_id: '',      // required if target_type === 'user'
+    target_type: 'all', // all | user | community
+    target_user_id: '',
   });
 
   const [imageFile, setImageFile] = useState(null);
@@ -80,12 +86,11 @@ function VoucherCrud() {
 
   const apiBase = useMemo(() => getApiBase(), []);
   const authHeader = () => {
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : '';
+    const enc = Cookies.get(token_cookie_name);
+    const token = enc ? Decrypt(enc) : '';
     return { Authorization: `Bearer ${token}` };
   };
 
-  // Label helpers untuk kolom Target
   const getUserLabel = (id) => {
     if (!id) return '';
     const u = users.find((x) => String(x.id) === String(id));
@@ -97,15 +102,12 @@ function VoucherCrud() {
     return c?.name || `Community #${id}`;
   };
 
-  // Fetch voucher list
+  // Fetch vouchers
   const fetchVouchers = async () => {
     try {
       const res = await fetch(`${apiBase}/api/admin/vouchers`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader(),
-        },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
       });
       const result = await res.json();
       setVoucherList(Array.isArray(result.data) ? result.data : []);
@@ -119,16 +121,13 @@ function VoucherCrud() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
-  // Fetch community list
+  // Fetch communities
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`${apiBase}/api/admin/communities`, {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeader(),
-          },
+          headers: { 'Content-Type': 'application/json', ...authHeader() },
         });
         const result = await res.json();
         setCommunities(Array.isArray(result.data) ? result.data : []);
@@ -139,16 +138,13 @@ function VoucherCrud() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
-  // Fetch users (buat target user)
+  // Fetch users
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`${apiBase}/api/admin/users`, {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeader(),
-          },
+          headers: { 'Content-Type': 'application/json', ...authHeader() },
         });
         const result = await res.json();
         setUsers(Array.isArray(result.data) ? result.data : []);
@@ -159,11 +155,10 @@ function VoucherCrud() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
-  // Upload image handler
+  // Upload image
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setImageFile(e.target.files[0]);
-      // kosongkan string image agar tidak terkirim sebagai text
       setFormData((s) => ({ ...s, image: '' }));
     }
   };
@@ -172,7 +167,6 @@ function VoucherCrud() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validasi client-side untuk target_type
     if (formData.target_type === 'user' && !formData.target_user_id) {
       alert('Pilih pengguna untuk target_type=user');
       return;
@@ -196,37 +190,25 @@ function VoucherCrud() {
     body.append('stock', String(formData.stock ?? 0));
     body.append('code', formData.code);
 
-    // targeting
     body.append('target_type', formData.target_type || 'all');
     if (formData.target_type === 'user' && formData.target_user_id) {
       body.append('target_user_id', formData.target_user_id);
     }
-    // ✅ hanya kirim community_id kalau target_type = community
     if (formData.target_type === 'community' && formData.community_id) {
       body.append('community_id', formData.community_id);
     }
 
-    if (imageFile) {
-      body.append('image', imageFile);
-    }
-
-    if (isUpdate) {
-      body.append('_method', 'PUT');
-    }
+    if (imageFile) body.append('image', imageFile);
+    if (isUpdate) body.append('_method', 'PUT');
 
     try {
-      const res = await fetch(url, {
-        method: 'POST', // selalu POST + spoof _method utk update
-        headers: { ...authHeader() },
-        body,
-      });
-
-      const resultText = await res.text();
+      const res = await fetch(url, { method: 'POST', headers: { ...authHeader() }, body });
+      const text = await res.text();
       let result;
       try {
-        result = resultText ? JSON.parse(resultText) : {};
+        result = text ? JSON.parse(text) : {};
       } catch {
-        result = { raw: resultText };
+        result = { raw: text };
       }
 
       if (!res.ok) {
@@ -238,6 +220,7 @@ function VoucherCrud() {
       resetForm();
       setRefreshToggle((s) => !s);
       setModalForm(false);
+      fetchVouchers();
     } catch {
       alert('Terjadi kesalahan jaringan');
     }
@@ -267,10 +250,7 @@ function VoucherCrud() {
     try {
       await fetch(`${apiBase}/api/admin/vouchers/${selectedVoucher.id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader(),
-        },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
       });
       setVoucherList((prev) => prev.filter((v) => v.id !== selectedVoucher.id));
       setRefreshToggle((s) => !s);
@@ -280,26 +260,7 @@ function VoucherCrud() {
     }
   };
 
-  // Open form for edit
-  const handleEdit = (voucher) => {
-    setSelectedVoucher(voucher);
-    setFormData({
-      name: voucher.name || '',
-      description: voucher.description || '',
-      image: voucher.image || '',
-      type: voucher.type || '',
-      valid_until: toDateInputValue(voucher.valid_until) || '',
-      tenant_location: voucher.tenant_location || '',
-      stock: voucher.stock ?? 0,
-      code: voucher.code || '',
-      community_id: String(voucher.community_id ?? ''),
-      target_type: voucher.target_type || 'all',
-      target_user_id: String(voucher.target_user_id ?? ''),
-    });
-    setImageFile(null);
-    setModalForm(true);
-  };
-
+  /* --------- Tabel columns --------- */
   const columns = [
     {
       selector: 'name',
@@ -364,30 +325,20 @@ function VoucherCrud() {
     <>
       <TableSupervisionComponent
         title="Manajemen Voucher"
-        data={voucherList}
         columnControl={{ custom: columns }}
         customTopBar={topBarActions}
+        searchable
         noControlBar={false}
-        searchable={true}
         setToRefresh={refreshToggle}
+        // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
+        actionControl={{ except: ['detail'] }}
+        // fetchControl untuk useGet internal
         fetchControl={{
-          path: 'admin/vouchers', // hapus "api/" supaya tidak jadi "/api/api/..."
-          method: 'GET',
-          headers: () => ({
+          path: 'admin/vouchers', // jangan pakai prefix /api di sini
+          includeHeaders: {
             'Content-Type': 'application/json',
             ...authHeader(),
-          }),
-          mapData: (result) => {
-            if (Array.isArray(result.data)) {
-              return { data: result.data, totalRow: result.total_row || result.data.length };
-            }
-            return { data: [], totalRow: 0 };
           },
-        }}
-        onEdit={handleEdit}
-        onDelete={(row) => {
-          setSelectedVoucher(row);
-          setModalDelete(true);
         }}
       />
 
@@ -436,7 +387,9 @@ function VoucherCrud() {
               onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               required
             />
-            <span className="text-xs text-gray-500">Kode unik voucher, wajib diisi dan tidak boleh sama.</span>
+            <span className="text-xs text-gray-500">
+              Kode unik voucher, wajib diisi dan tidak boleh sama.
+            </span>
           </div>
 
           <div>
@@ -458,7 +411,9 @@ function VoucherCrud() {
               value={formData.valid_until}
               onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
             />
-            <span className="text-xs text-gray-500">Ditampilkan sebagai “DD MMMM YYYY” di tabel.</span>
+            <span className="text-xs text-gray-500">
+              Ditampilkan sebagai “DD MMMM YYYY” di tabel.
+            </span>
           </div>
 
           <div>
@@ -482,7 +437,9 @@ function VoucherCrud() {
               onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
               required
             />
-            <span className="text-xs text-gray-500">Tampilan di tabel: “{`{angka}`} voucher”.</span>
+            <span className="text-xs text-gray-500">
+              Tampilan di tabel: “{`{angka}`} voucher”.
+            </span>
           </div>
 
           {/* Targeting */}
@@ -497,7 +454,6 @@ function VoucherCrud() {
                   ...s,
                   target_type: next,
                   target_user_id: '',
-                  // ✅ kosongkan community_id saat pindah ke non-community
                   community_id: next === 'community' ? s.community_id : '',
                 }));
               }}
@@ -530,7 +486,9 @@ function VoucherCrud() {
           )}
 
           <div>
-            <label className="font-semibold">Community (opsional / wajib jika target=community)</label>
+            <label className="font-semibold">
+              Community (opsional / wajib jika target=community)
+            </label>
             <select
               className="select select-bordered w-full"
               value={formData.community_id}
@@ -558,7 +516,6 @@ function VoucherCrud() {
               className="input input-bordered w-full"
               onChange={handleImageChange}
             />
-            {/* preview existing / new */}
             {formData.image && !imageFile && (
               <div className="mt-2">
                 <img
@@ -603,16 +560,15 @@ function VoucherCrud() {
         </form>
       </FloatingPageComponent>
 
-      {/* Modal Delete Confirmation */}
+      {/* Modal Delete Confirmation (pakai show + onSubmit) */}
       <ModalConfirmComponent
-        open={modalDelete}
+        title="Hapus Voucher"
+        show={modalDelete}
         onClose={() => {
           setModalDelete(false);
           setSelectedVoucher(null);
         }}
-        onConfirm={handleDelete}
-        title="Hapus Voucher"
-        message={`Apakah Anda yakin ingin menghapus voucher "${selectedVoucher?.code}"?`}
+        onSubmit={handleDelete}
       />
     </>
   );

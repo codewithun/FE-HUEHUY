@@ -336,6 +336,8 @@ export default function QRCodeCrud() {
         noControlBar={false}
         searchable={true}
         setToRefresh={refreshToggle}
+        // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
+        actionControl={{ except: ['detail'] }}
         fetchControl={{
           path: 'admin/qrcodes',
           method: 'GET',
@@ -354,6 +356,7 @@ export default function QRCodeCrud() {
             return result;
           },
         }}
+        // Keep your custom row click handler for the QR view modal
         onRowClick={(item) => {
           setSelectedItem(item);
           setModalView(true);
