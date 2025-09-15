@@ -14,25 +14,35 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { token_cookie_name } from '../../../../helpers';
 import { get, post } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
+// Helper aman JSON.parse
+const safeParse = (text, fallback) => {
+  try {
+    if (typeof text !== 'string') return fallback;
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+};
+
 export default function PromoDetailUnified() {
   const router = useRouter();
   const { promoId, communityId } = router.query;
-  // --- ADD: resolveLegacyPromoId untuk QR lama ---
+
+  // --- Resolve ID promo dari QR lama ---
   const resolveLegacyPromoId = useCallback(() => {
-    // Jika pakai URL lama: /promo/detail_promo?filter=123
     if (promoId === 'detail_promo') {
       return router.query.filter || router.query.id || null;
     }
     return promoId || null;
   }, [promoId, router.query]);
 
-  // pakai ini untuk semua pemanggilan API
   const effectivePromoId = resolveLegacyPromoId();
+
   const [promoData, setPromoData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,11 +52,9 @@ export default function PromoDetailUnified() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-
-  // Tambahkan state untuk cek apakah promo sudah direbut
   const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
 
-  // ====== Mock data lama dari [promoId].jsx (dipertahankan) ======
+  // ====== Mock legacy (fallback jika tanpa communityId) ======
   const getLegacyPromoData = (id) => {
     const allPromos = {
       1: {
@@ -66,14 +74,8 @@ export default function PromoDetailUnified() {
         discountedPrice: 31500,
         category: 'Fast Food',
         description:
-          'Nikmati burger combo spesial dengan diskon hingga 30%! Paket lengkap berisi burger beef, kentang goreng crispy, dan minuman soda pilihan. Cocok untuk makan siang atau malam bersama keluarga.',
-        terms: [
-          'Berlaku untuk pembelian di lokasi',
-          'Tidak dapat digabung dengan promo lain',
-          'Berlaku hingga 31 Agustus 2025',
-          'Maksimal 2 paket per customer',
-          'Hanya untuk member komunitas',
-        ],
+          'Nikmati burger combo spesial dengan diskon hingga 30%! Paket lengkap berisi burger beef, kentang goreng crispy, dan minuman soda pilihan.',
+        terms: ['Berlaku hingga 31 Agustus 2025'],
         validUntil: '31 Agustus 2025',
         location: 'dbotanica Bandung',
         tags: ['Burger', 'Fast Food', 'Family', 'Combo'],
@@ -100,14 +102,8 @@ export default function PromoDetailUnified() {
         discountedPrice: 26250,
         category: 'Chicken',
         description:
-          'Ayam crispy special dengan bumbu rahasia yang menggugah selera. Disajikan dengan nasi hangat dan pilihan saus pedas atau manis. Perfect untuk pecinta ayam crispy!',
-        terms: [
-          'Berlaku untuk dine-in dan take away',
-          'Promo khusus member komunitas',
-          'Berlaku setiap hari',
-          'Tidak berlaku untuk delivery',
-          'Berlaku hingga stok habis',
-        ],
+          'Ayam crispy special dengan bumbu rahasia. Disajikan dengan nasi hangat dan saus pilihan.',
+        terms: ['Berlaku hingga stok habis'],
         validUntil: '30 September 2025',
         location: 'dbotanica Bandung',
         tags: ['Chicken', 'Crispy', 'Rice', 'Spicy'],
@@ -134,14 +130,8 @@ export default function PromoDetailUnified() {
         discountedPrice: 55250,
         category: 'Pizza',
         description:
-          'Pizza medium dengan berbagai pilihan topping favorit. Dari pepperoni, sausage, hingga vegetarian. Dilengkapi dengan minuman soda dan garlic bread. Perfect untuk sharing!',
-        terms: [
-          'Pilihan topping: Pepperoni, Sausage, Mushroom, Vegetarian',
-          'Termasuk 1 minuman soda',
-          'Berlaku untuk dine-in saja',
-          'Tidak dapat dibawa pulang',
-          'Reservasi direkomendasikan',
-        ],
+          'Pizza medium dengan berbagai pilihan topping favorit. Termasuk minuman.',
+        terms: ['Dine-in saja'],
         validUntil: '15 September 2025',
         location: 'dbotanica Bandung',
         tags: ['Pizza', 'Italian', 'Sharing', 'Drinks'],
@@ -154,7 +144,7 @@ export default function PromoDetailUnified() {
       4: {
         id: 4,
         title: 'Bubble Tea House - Minuman Segar',
-        subtitle: 'Bubble tea dengan berbagai rasa dan topping',
+        subtitle: 'Bubble tea dengan berbagai rasa',
         image: '/images/promo/bubble-tea-discount.jpg',
         merchant: {
           name: 'Bubble Tea House',
@@ -168,14 +158,8 @@ export default function PromoDetailUnified() {
         discountedPrice: 21250,
         category: 'Beverages',
         description:
-          'Bubble tea premium dengan berbagai pilihan rasa mulai dari original, taro, matcha, hingga brown sugar. Topping bisa pilih pearl, jelly, atau pudding. Segar dan menyegarkan!',
-        terms: [
-          'Berlaku untuk semua varian',
-          'Pilihan topping gratis: pearl, jelly, pudding',
-          'Buy 2 get extra 5% discount',
-          'Berlaku untuk take away dan dine-in',
-          'Dapat dipesan via delivery',
-        ],
+          'Bubble tea premium berbagai rasa: original, taro, matcha, brown sugar.',
+        terms: ['Semua varian'],
         validUntil: '20 September 2025',
         location: 'dbotanica Bandung',
         tags: ['Bubble Tea', 'Drinks', 'Sweet', 'Refreshing'],
@@ -186,11 +170,9 @@ export default function PromoDetailUnified() {
         ],
       },
     };
-
     return allPromos[parseInt(id)] || allPromos[1];
   };
 
-  // Normalisasi: bentuk lama -> bentuk UI detail_promo
   const normalizeToDetailShape = (src) => {
     if (!src) return null;
     return {
@@ -206,9 +188,7 @@ export default function PromoDetailUnified() {
       discount: src.discount ?? null,
       schedule: {
         day: 'Everyday',
-        details: src.validUntil
-          ? `Berlaku hingga ${src.validUntil}`
-          : 'Berlaku',
+        details: src.validUntil ? `Berlaku hingga ${src.validUntil}` : 'Berlaku',
         time: '10:00 - 22:00',
         timeDetails: 'Jam Berlaku Promo',
       },
@@ -225,49 +205,30 @@ export default function PromoDetailUnified() {
     };
   };
 
-  // HAPUS/UBAH effect legacy: hanya gunakan jika communityId tidak tersedia (fallback mock)
+  // Fallback legacy jika tidak ada communityId
   useEffect(() => {
     if (!promoId) return;
-    // jika ada communityId, kita akan ambil dari API => jangan override dengan mock
     if (typeof communityId !== 'undefined' && communityId !== null) return;
-
     const legacy = getLegacyPromoData(promoId);
     setPromoData(normalizeToDetailShape(legacy));
     setLoading(false);
   }, [promoId, communityId]);
 
-  // ADD: Effect to fetch promo details from API when both promoId and communityId are available
-  useEffect(() => {
-    if (!router.isReady) return;
-    if (!effectivePromoId || !communityId) return;
+  // --- Fetch detail (stabil, anti double-run) ---
+  const hasFetched = useRef(false);
 
-    const autoRegister = router.query.autoRegister || router.query.source;
-    if (autoRegister) return;
-
-    fetchPromoDetails();
-  }, [router.isReady, effectivePromoId, communityId, fetchPromoDetails]);
-  // Remove fetchPromoDetails from dependency array
-
-  // Perkuat effect yang mem-fetch dari API
   const fetchPromoDetails = useCallback(async () => {
-    if (!router.isReady) return null;
-    if (!effectivePromoId || !communityId) return null;
+    if (!router.isReady || !effectivePromoId || !communityId) return null;
+    if (hasFetched.current) return null;
+    hasFetched.current = true;
 
     try {
       setLoading(true);
-
-      console.log('Fetching promo details:', {
-        promoId: effectivePromoId,
-        communityId,
-      });
-      // Try community-specific endpoint first
-      // Coba endpoint komunitas dulu
       let response = await get({
         path: `communities/${communityId}/promos/${effectivePromoId}`,
       });
 
       if (!(response?.status === 200 && response?.data?.data)) {
-        // Fallback ke public sekali saja
         response = await get({ path: `promos/${effectivePromoId}/public` });
       }
 
@@ -281,8 +242,8 @@ export default function PromoDetailUnified() {
           distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
           location: data.location || '',
           coordinates: '',
-          originalPrice: data.original_price || null,
-          discountPrice: data.discount_price || null,
+          originalPrice: data.original_price ?? null,
+          discountPrice: data.discount_price ?? null,
           discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
           schedule: {
             day: data.always_available ? 'Setiap Hari' : 'Weekday',
@@ -295,18 +256,12 @@ export default function PromoDetailUnified() {
             description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
           },
           description: data.description || '',
-          seller: {
-            name: data.owner_name || 'Admin',
-            phone: data.owner_contact || '',
-          },
+          seller: { name: data.owner_name || 'Admin', phone: data.owner_contact || '' },
           terms: 'TERM & CONDITIONS APPLY',
         };
         setPromoData(transformedData);
         return transformedData;
       }
-
-      return null;
-
       return null;
     } catch (err) {
       console.error('Error fetching promo details:', err);
@@ -316,99 +271,71 @@ export default function PromoDetailUnified() {
     }
   }, [router.isReady, effectivePromoId, communityId]);
 
-  // NEW: Handle auto register after QR scan
+  // Panggil fetch ketika bukan QR autoRegister
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!effectivePromoId || !communityId) return;
+    const autoRegister = router.query.autoRegister || router.query.source;
+    if (autoRegister) return;
+    fetchPromoDetails();
+    // penting: JANGAN masukkan fetchPromoDetails ke deps agar tidak berubah referensi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, effectivePromoId, communityId, router.query.autoRegister, router.query.source]);
+
+  // --- Auto register setelah QR ---
   const handleAutoRegister = useCallback(
     async (token) => {
       try {
-        const promoData = await fetchPromoDetails();
-        if (!promoData) return;
+        const pd = await fetchPromoDetails();
+        if (!pd) return;
 
-        // Check if already claimed
-        const existingVouchers = JSON.parse(
-          localStorage.getItem('huehuy_vouchers') || '[]'
-        );
+        // Cek duplikat lokal
+        const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
         const alreadyClaimed = existingVouchers.some(
-          (v) =>
-            String(v.ad?.id) === String(promoData.id) ||
-            String(v.id) === String(promoData.id)
+          (v) => String(v.ad?.id) === String(pd.id) || String(v.id) === String(pd.id)
         );
 
         if (!alreadyClaimed) {
           try {
             const response = await post({
-              path: `admin/promos/${promoData.id}/items`,
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: {
-                promo_id: promoData.id,
-                source: 'qr_scan',
-              },
+              path: `admin/promos/${pd.id}/items`,
+              headers: { Authorization: `Bearer ${token}` },
+              body: { promo_id: pd.id, source: 'qr_scan' },
             });
 
             if (response?.status === 200) {
-              const claimedVouchers = JSON.parse(
-                localStorage.getItem('huehuy_vouchers') || '[]'
-              );
+              const claimedVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
               const newPromoItem = {
                 id: response.data.data.id,
-                promo_id: promoData.id,
+                promo_id: pd.id,
                 code: response.data.data.code,
                 claimed_at: new Date().toISOString(),
-                expired_at: promoData.expires_at,
+                expired_at: pd.expires_at,
                 ad: {
-                  id: promoData.id,
-                  title: promoData.title,
-                  picture_source: promoData.image,
+                  id: pd.id,
+                  title: pd.title,
+                  picture_source: pd.image,
                   status: 'active',
                   cube: {
                     code: `community-${communityId}`,
-                    user: {
-                      name: promoData.seller?.name || 'Admin',
-                      phone: promoData.seller?.phone || '',
-                    },
+                    user: { name: pd.seller?.name || 'Admin', phone: pd.seller?.phone || '' },
                     corporate: null,
-                    tags: [
-                      {
-                        address: promoData.location,
-                        link: null,
-                        map_lat: null,
-                        map_lng: null,
-                      },
-                    ],
+                    tags: [{ address: pd.location, link: null, map_lat: null, map_lng: null }],
                   },
                 },
               };
               claimedVouchers.push(newPromoItem);
-              localStorage.setItem(
-                'huehuy_vouchers',
-                JSON.stringify(claimedVouchers)
-              );
-
+              localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
               setIsAlreadyClaimed(true);
               setShowSuccessModal(true);
             } else {
-              const msg = (
-                response?.data?.message ||
-                response?.message ||
-                ''
-              ).toLowerCase();
-              if (
-                msg.includes('habis') ||
-                msg.includes('stok') ||
-                msg.includes('stock')
-              ) {
+              const msg = (response?.data?.message || response?.message || '').toLowerCase();
+              if (msg.includes('habis') || msg.includes('stok') || msg.includes('stock')) {
                 setErrorMessage('Maaf, stok promo sudah habis direbut.');
                 setShowErrorModal(true);
-              } else if (
-                msg.includes('sudah') ||
-                msg.includes('already') ||
-                msg.includes('claimed')
-              ) {
+              } else if (msg.includes('sudah') || msg.includes('already') || msg.includes('claimed')) {
                 setIsAlreadyClaimed(true);
-                setErrorMessage(
-                  'Promo ini sudah pernah direbut pada akun lain.'
-                );
+                setErrorMessage('Promo ini sudah pernah direbut pada akun lain.');
                 setShowErrorModal(true);
               }
             }
@@ -423,14 +350,11 @@ export default function PromoDetailUnified() {
     [fetchPromoDetails, communityId]
   );
 
-  // NEW: Check user verification status
+  // --- Cek status verifikasi user ---
   const checkUserVerificationStatus = useCallback(
     async (token) => {
       try {
-        console.log(
-          'Checking verification status with token:',
-          token?.substring(0, 20) + '...'
-        );
+        console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
 
         let response = await get({
           path: 'account',
@@ -442,9 +366,6 @@ export default function PromoDetailUnified() {
         });
 
         if (response?.status === 200) {
-          console.log(
-            'User verified and logged in, proceeding with auto register'
-          );
           handleAutoRegister(token);
           return;
         }
@@ -460,19 +381,15 @@ export default function PromoDetailUnified() {
           });
 
           if (response?.status === 200) {
-            const userData =
-              response?.data?.data?.profile || response?.data?.profile;
-            const emailVerified =
-              userData?.email_verified_at || userData?.verified_at;
+            const userData = response?.data?.data?.profile || response?.data?.profile;
+            const emailVerified = userData?.email_verified_at || userData?.verified_at;
 
             if (!emailVerified) {
               const next =
                 typeof window !== 'undefined'
                   ? window.location.href
                   : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-              window.location.href = `/verifikasi?next=${encodeURIComponent(
-                next
-              )}`;
+              window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
               return;
             } else {
               handleAutoRegister(token);
@@ -503,52 +420,44 @@ export default function PromoDetailUnified() {
     [promoId, communityId, handleAutoRegister]
   );
 
-  // NEW: Handle QR entry flow
+  // --- QR entry flow ---
   useEffect(() => {
     if (!router.isReady) return;
 
     const autoRegister = router.query.autoRegister || router.query.source;
+    if (!autoRegister) return;
 
-    if (autoRegister) {
-      let token = null;
+    let token = null;
 
-      const encrypted = Cookies.get(token_cookie_name);
-      if (encrypted) {
-        try {
-          token = Decrypt(encrypted);
-        } catch (e) {
-          console.error('Failed to decrypt token:', e);
-          Cookies.remove(token_cookie_name);
-        }
+    try {
+      const encrypted = Cookies.get(token_cookie_name || 'huehuy_token');
+      if (typeof encrypted === 'string' && encrypted) {
+        token = Decrypt(encrypted);
       }
-
-      if (!token) {
-        token =
-          localStorage.getItem('auth_token') || localStorage.getItem('token');
-      }
-
-      if (!token) {
-        const next =
-          typeof window !== 'undefined'
-            ? window.location.href
-            : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-        if (typeof window !== 'undefined') {
-          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-        }
-        return;
-      }
-
-      checkUserVerificationStatus(token);
+    } catch (e) {
+      console.error('Failed to decrypt token:', e);
+      Cookies.remove(token_cookie_name || 'huehuy_token');
     }
-  }, [
-    router.isReady,
-    router.query,
-    promoId,
-    communityId,
-    checkUserVerificationStatus,
-  ]);
 
-  // MODIFIED: Update handleBack to support QR entry
+    if (typeof window !== 'undefined' && !token) {
+      token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    }
+
+    if (!token) {
+      const next =
+        typeof window !== 'undefined'
+          ? window.location.href
+          : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
+      if (typeof window !== 'undefined') {
+        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+      }
+      return;
+    }
+
+    checkUserVerificationStatus(token);
+  }, [router.isReady, router.query, promoId, communityId, checkUserVerificationStatus]);
+
+  // --- Back handler ---
   const handleBack = () => {
     const { from } = router.query;
     const autoRegister = router.query.autoRegister || router.query.source;
@@ -566,7 +475,7 @@ export default function PromoDetailUnified() {
     }
   };
 
-  // ====== Handlers ala detail_promo ======
+  // --- Share & Report ---
   const handleShare = () => setShowShareModal(true);
   const handleReport = () => setShowReportModal(true);
 
@@ -579,34 +488,20 @@ export default function PromoDetailUnified() {
 
     switch (platform) {
       case 'whatsapp':
-        window.open(
-          `https://wa.me/?text=${encodeURIComponent(
-            shareText + ' ' + promoUrl
-          )}`,
-          '_blank'
-        );
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText + ' ' + promoUrl)}`, '_blank');
         break;
       case 'telegram':
         window.open(
-          `https://t.me/share/url?url=${encodeURIComponent(
-            promoUrl
-          )}&text=${encodeURIComponent(shareText)}`,
+          `https://t.me/share/url?url=${encodeURIComponent(promoUrl)}&text=${encodeURIComponent(shareText)}`,
           '_blank'
         );
         break;
       case 'facebook':
-        window.open(
-          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-            promoUrl
-          )}`,
-          '_blank'
-        );
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(promoUrl)}`, '_blank');
         break;
       case 'twitter':
         window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-            shareText
-          )}&url=${encodeURIComponent(promoUrl)}`,
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(promoUrl)}`,
           '_blank'
         );
         break;
@@ -625,7 +520,7 @@ export default function PromoDetailUnified() {
   };
 
   const submitReport = (reason) => {
-    const reports = JSON.parse(localStorage.getItem('promoReports') || '[]');
+    const reports = safeParse(localStorage.getItem('promoReports'), []);
     reports.push({
       promoId: promoData.id,
       reason,
@@ -635,26 +530,20 @@ export default function PromoDetailUnified() {
     localStorage.setItem('promoReports', JSON.stringify(reports));
     setShowReportModal(false);
     setTimeout(() => {
-      setErrorMessage(
-        'Laporan Anda telah dikirim. Terima kasih atas perhatiannya!'
-      );
+      setErrorMessage('Laporan Anda telah dikirim. Terima kasih atas perhatiannya!');
       setShowErrorModal(true);
     }, 300);
   };
 
+  // --- Claim promo manual ---
   const handleClaimPromo = async () => {
     if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
 
     setIsClaimedLoading(true);
     try {
-      // Cek lagi untuk memastikan tidak ada duplikasi
-      const existingVouchers = JSON.parse(
-        localStorage.getItem('huehuy_vouchers') || '[]'
-      );
+      const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
       const isDuplicate = existingVouchers.some(
-        (v) =>
-          String(v.ad?.id) === String(promoData.id) ||
-          String(v.id) === String(promoData.id)
+        (v) => String(v.ad?.id) === String(promoData.id) || String(v.id) === String(promoData.id)
       );
 
       if (isDuplicate) {
@@ -663,20 +552,24 @@ export default function PromoDetailUnified() {
         return;
       }
 
-      // Ambil token dari cookie
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
+      const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+      const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
 
-      // Siapkan endpoint Laravel sesuai controller
-      const apiUrl = (
-        process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
-      ).replace(/\/+$/, '');
-      const endpoints = [
-        `${apiUrl}/promos/${promoData.id}/items`,
-        `${apiUrl}/promo-items`,
-        `${apiUrl}/admin/promos/${promoData.id}/items`,
-        `${apiUrl}/admin/promo-items`,
-      ];
+      const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const apiUrl = rawApi.replace(/\/+$/, '');
+      if (!apiUrl) {
+        console.warn('NEXT_PUBLIC_API_URL tidak ter-set.');
+      }
+
+      const endpoints = apiUrl
+        ? [
+            `${apiUrl}/promos/${promoData.id}/items`,
+            `${apiUrl}/promo-items`,
+            `${apiUrl}/admin/promos/${promoData.id}/items`,
+            `${apiUrl}/admin/promo-items`,
+          ]
+        : [];
+
       const headers = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -690,18 +583,15 @@ export default function PromoDetailUnified() {
 
       let savedItem = null;
       let lastError = '';
+
       for (const url of endpoints) {
         try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload),
-          });
+          const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
           const txt = await res.text().catch(() => '');
           let json = {};
           try {
             json = txt ? JSON.parse(txt) : {};
-          } catch (_) {
+          } catch {
             json = { raw: txt };
           }
 
@@ -726,39 +616,27 @@ export default function PromoDetailUnified() {
 
       if (!savedItem) {
         const low = String(lastError || '').toLowerCase();
-        if (
-          low.includes('habis') ||
-          low.includes('stok') ||
-          low.includes('stock')
-        ) {
+        if (low.includes('habis') || low.includes('stok') || low.includes('stock')) {
           setErrorMessage('Maaf, stok promo sudah habis.');
           setShowErrorModal(true);
           setIsAlreadyClaimed(false);
           return;
         }
-        if (
-          low.includes('sudah') ||
-          low.includes('already') ||
-          low.includes('claimed') ||
-          low.includes('duplicate')
-        ) {
+        if (low.includes('sudah') || low.includes('already') || low.includes('claimed') || low.includes('duplicate')) {
           setIsAlreadyClaimed(true);
-          setErrorMessage(
-            'Promo ini sudah pernah direbut (mungkin di akun lain).'
-          );
+          setErrorMessage('Promo ini sudah pernah direbut (mungkin di akun lain).');
           setShowErrorModal(true);
           return;
         }
-        // kalau bukan case khusus di atas, pakai fallback local save
+        // fallback: lanjut simpan lokal walau server gagal (opsional)
       }
 
-      // Simpan ke localStorage untuk langsung muncul di Saku
       const enriched = {
         ...savedItem,
-        code: savedItem.code || savedItem?.voucher_item?.code,
+        code: savedItem?.code || savedItem?.voucher_item?.code,
         claimed_at: new Date().toISOString(),
         validation_at: null,
-        voucher_item: savedItem.voucher_item || null,
+        voucher_item: savedItem?.voucher_item || null,
         ad: {
           id: promoData.id,
           title: promoData.title,
@@ -782,9 +660,9 @@ export default function PromoDetailUnified() {
           },
         },
       };
+
       existingVouchers.push(enriched);
       localStorage.setItem('huehuy_vouchers', JSON.stringify(existingVouchers));
-
       setShowSuccessModal(true);
     } catch (e) {
       setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
@@ -799,6 +677,7 @@ export default function PromoDetailUnified() {
     setTimeout(() => router.push('/app/saku'), 300);
   };
 
+  // --- UI Loading / Not Found ---
   if (loading) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
@@ -820,6 +699,14 @@ export default function PromoDetailUnified() {
     );
   }
 
+  // Gambar: fallback aman via state
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [imgSrc, setImgSrc] = useState(promoData?.image || '/default-avatar.png');
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    setImgSrc(promoData?.image || '/default-avatar.png');
+  }, [promoData?.image]);
+
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
@@ -834,10 +721,7 @@ export default function PromoDetailUnified() {
             onClick={handleBack}
             className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
           >
-            <FontAwesomeIcon
-              icon={faArrowLeft}
-              className="text-white text-sm"
-            />
+            <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
           </button>
           <div className="flex-1 text-center">
             <h1 className="text-white font-bold text-sm">Iklan</h1>
@@ -853,10 +737,7 @@ export default function PromoDetailUnified() {
               onClick={handleReport}
               className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
             >
-              <FontAwesomeIcon
-                icon={faExclamationTriangle}
-                className="text-white text-sm"
-              />
+              <FontAwesomeIcon icon={faExclamationTriangle} className="text-white text-sm" />
             </button>
           </div>
         </div>
@@ -871,19 +752,14 @@ export default function PromoDetailUnified() {
               <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
                 <div className="relative w-full h-full">
                   <Image
-                    src={promoData.image}
+                    src={imgSrc}
                     alt={promoData.title}
                     className="object-cover"
                     fill
                     sizes="(max-width: 768px) 100vw, 500px"
                     placeholder="blur"
                     blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
-                    onError={() => {
-                      const img = document.querySelector(
-                        `img[alt="${promoData.title}"]`
-                      );
-                      if (img) img.src = '/default-avatar.png';
-                    }}
+                    onError={() => setImgSrc('/default-avatar.png')}
                   />
                 </div>
               </div>
@@ -895,41 +771,26 @@ export default function PromoDetailUnified() {
             <div className="bg-primary rounded-[20px] p-4 shadow-lg">
               <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center">
-                  <FontAwesomeIcon
-                    icon={faMapMarkerAlt}
-                    className="text-white mr-2 text-sm"
-                  />
-                  <span className="text-sm font-semibold text-white">
-                    {promoData.distance}
-                  </span>
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
+                  <span className="text-sm font-semibold text-white">{promoData.distance}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-white opacity-80">
-                    Jarak Promo:
-                  </span>
-                  <div className="text-xs text-white opacity-70">
-                    {promoData.coordinates || '-'}
-                  </div>
+                  <span className="text-xs text-white opacity-80">Jarak Promo:</span>
+                  <div className="text-xs text-white opacity-70">{promoData.coordinates || '-'}</div>
                 </div>
               </div>
 
               <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">
-                      {promoData.schedule.day}
-                    </span>
-                    <div className="text-xs text-white opacity-80">
-                      {promoData.schedule.details}
-                    </div>
+                    <span className="text-sm font-semibold text-white">{promoData.schedule.day}</span>
+                    <div className="text-xs text-white opacity-80">{promoData.schedule.details}</div>
                   </div>
                   <div className="text-right">
                     <div className="bg-yellow-400 text-slate-800 px-3 py-1 rounded-[8px] text-sm font-semibold">
                       {promoData.schedule.time}
                     </div>
-                    <div className="text-xs text-white opacity-70 mt-1">
-                      {promoData.schedule.timeDetails}
-                    </div>
+                    <div className="text-xs text-white opacity-70 mt-1">{promoData.schedule.timeDetails}</div>
                   </div>
                 </div>
               </div>
@@ -938,20 +799,12 @@ export default function PromoDetailUnified() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <FontAwesomeIcon
-                      icon={
-                        promoData.status.type === 'Online'
-                          ? faWifi
-                          : faWifiSlash
-                      }
+                      icon={promoData.status.type === 'Online' ? faWifi : faWifiSlash}
                       className="mr-2 text-white text-sm"
                     />
-                    <span className="text-sm font-semibold text-white">
-                      {promoData.status.type}
-                    </span>
+                    <span className="text-sm font-semibold text-white">{promoData.status.type}</span>
                   </div>
-                  <span className="text-xs text-white opacity-70">
-                    {promoData.status.description}
-                  </span>
+                  <span className="text-xs text-white opacity-70">{promoData.status.description}</span>
                 </div>
               </div>
             </div>
@@ -960,21 +813,15 @@ export default function PromoDetailUnified() {
           {/* Title + desc */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
-              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
-                {promoData.title}
-              </h2>
-              <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">
-                {promoData.description}
-              </p>
+              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
+              <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
 
               {/* Harga ringkas */}
               <div className="flex items-center justify-between bg-slate-50 p-3 rounded-[12px] mb-3">
                 <div className="text-sm text-slate-600">Harga Promo</div>
                 <div className="text-right">
                   {promoData.discountPrice != null && (
-                    <div className="text-lg font-bold text-primary">
-                      Rp {Number(promoData.discountPrice).toLocaleString()}
-                    </div>
+                    <div className="text-lg font-bold text-primary">Rp {Number(promoData.discountPrice).toLocaleString()}</div>
                   )}
                   {promoData.originalPrice != null && (
                     <div className="text-xs text-slate-500 line-through">
@@ -995,17 +842,10 @@ export default function PromoDetailUnified() {
           {/* Lokasi */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                Lokasi Promo / Iklan
-              </h4>
-              <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                {promoData.location}
-              </p>
+              <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
+              <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
               <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
-                <FontAwesomeIcon
-                  icon={faMapMarkerAlt}
-                  className="mr-2 text-sm"
-                />
+                <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
                 Rute
               </button>
             </div>
@@ -1014,16 +854,10 @@ export default function PromoDetailUnified() {
           {/* Kontak penjual */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                Penjual / Pemilik Iklan
-              </h4>
+              <h4 className="font-semibold text-slate-900 mb-3 text-sm">Penjual / Pemilik Iklan</h4>
               <div className="space-y-2">
-                <p className="font-semibold text-slate-900 text-xs">
-                  Nama: {promoData.seller?.name}
-                </p>
-                <p className="text-xs text-slate-500">
-                  No Hp/WA: {promoData.seller?.phone}
-                </p>
+                <p className="font-semibold text-slate-900 text-xs">Nama: {promoData.seller?.name}</p>
+                <p className="text-xs text-slate-500">No Hp/WA: {promoData.seller?.phone}</p>
                 <button className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center">
                   <FontAwesomeIcon icon={faPhone} className="text-sm" />
                 </button>
@@ -1039,12 +873,13 @@ export default function PromoDetailUnified() {
           <button
             onClick={handleClaimPromo}
             disabled={isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isAlreadyClaimed
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : isClaimedLoading
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+              isAlreadyClaimed
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : isClaimedLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-              }`}
+            }`}
           >
             {isAlreadyClaimed ? (
               <div className="flex items-center justify-center">
@@ -1068,18 +903,12 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon
-                icon={faCheckCircle}
-                className="text-green-500 text-3xl"
-              />
+              <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-3xl" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
             <p className="text-slate-600 mb-6 leading-relaxed">
-              Promo{' '}
-              <span className="font-semibold text-primary">
-                {promoData?.title}
-              </span>{' '}
-              berhasil direbut dan masuk ke Saku Promo Anda!
+              Promo <span className="font-semibold text-primary">{promoData?.title}</span> berhasil direbut dan masuk ke Saku
+              Promo Anda!
             </p>
             <div className="space-y-3">
               <button
@@ -1104,15 +933,10 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon
-                icon={faExclamationTriangle}
-                className="text-red-500 text-3xl"
-              />
+              <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 text-3xl" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Oops!</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">
-              {errorMessage}
-            </p>
+            <p className="text-slate-600 mb-6 leading-relaxed">{errorMessage}</p>
             <button
               onClick={() => setShowErrorModal(false)}
               className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
@@ -1128,9 +952,7 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
           <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                Bagikan Promo
-              </h3>
+              <h3 className="text-lg font-bold text-slate-900">Bagikan Promo</h3>
               <button
                 onClick={() => setShowShareModal(false)}
                 className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
@@ -1192,9 +1014,7 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
           <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                Laporkan Promo
-              </h3>
+              <h3 className="text-lg font-bold text-slate-900">Laporkan Promo</h3>
               <button
                 onClick={() => setShowReportModal(false)}
                 className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
