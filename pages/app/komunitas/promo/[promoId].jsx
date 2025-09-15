@@ -27,8 +27,10 @@ const DetailVoucherPage = () => {
       } catch (_) { }
     })();
   }, []);
+  
   const router = useRouter();
-  const { id } = router.query;
+  // Perbaiki: gunakan promoId bukan id
+  const { promoId } = router.query;
   const [voucher, setVoucher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,8 +65,9 @@ const DetailVoucherPage = () => {
       setLoading(true);
       setError(null);
 
+      // Perbaiki: gunakan promoId
       const response = await get({
-        path: `admin/vouchers/${id}`
+        path: `admin/vouchers/${promoId}`
       });
 
       if (response?.status === 200 && response?.data?.data) {
@@ -95,13 +98,13 @@ const DetailVoucherPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, currentUserId]);
+  }, [promoId, currentUserId]); // Perbaiki: gunakan promoId
 
   useEffect(() => {
-    if (id) {
+    if (promoId) { // Perbaiki: gunakan promoId
       fetchVoucherDetails();
     }
-  }, [id, fetchVoucherDetails]);
+  }, [promoId, fetchVoucherDetails]); // Perbaiki: gunakan promoId
 
   const handleBack = () => {
     // Cek apakah ada parameter autoRegister
@@ -245,7 +248,7 @@ const DetailVoucherPage = () => {
     } catch (error) {
       // Silent error
     }
-  }, [fetchVoucherDetails]);
+  }, [fetchVoucherDetails, currentUserId]); // Tambahkan currentUserId
 
   // Fungsi untuk cek status verifikasi - DEPENDENCY DIPERBAIKI
   const checkUserVerificationStatus = useCallback(async (token) => {
@@ -298,7 +301,7 @@ const DetailVoucherPage = () => {
           if (!emailVerified) {
             // eslint-disable-next-line no-console
             console.log('User not verified, redirecting to verification');
-            const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+            const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}`;
             window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
             return;
           } else {
@@ -315,7 +318,7 @@ const DetailVoucherPage = () => {
       if (response?.status === 401) {
         // eslint-disable-next-line no-console
         console.log('Token invalid (401), redirecting to register');
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}`;
         window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         return;
       }
@@ -329,10 +332,10 @@ const DetailVoucherPage = () => {
       // eslint-disable-next-line no-console
       console.error('Error checking verification status:', err);
       // Jika semua endpoint error, redirect ke login ulang
-      const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+      const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}`;
       window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
     }
-  }, [id, handleAutoRegister]);
+  }, [promoId, handleAutoRegister]); // Perbaiki: gunakan promoId
 
   // --- MODIFIED: handle autoRegister / source param and login check ---
   useEffect(() => {
@@ -373,7 +376,7 @@ const DetailVoucherPage = () => {
       if (!token) {
         // eslint-disable-next-line no-console
         console.log('No token found, redirecting to register');
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}`;
         if (typeof window !== 'undefined') {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }
@@ -385,7 +388,7 @@ const DetailVoucherPage = () => {
       console.log('Token found, checking verification status...');
       checkUserVerificationStatus(token);
     }
-  }, [router.isReady, router.query, id, checkUserVerificationStatus]);
+  }, [router.isReady, router.query, promoId, checkUserVerificationStatus]); // Perbaiki: gunakan promoId
 
   if (loading) {
     return (
@@ -448,7 +451,7 @@ const DetailVoucherPage = () => {
             <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
           </button>
           <div className="flex-1 text-center">
-            <h1 className="text-white font-bold text-sm">Voucher</h1>
+            <h1 className="text-white font-bold text-sm">Promo</h1>
           </div>
           <div className="w-8" />
         </div>
@@ -471,7 +474,7 @@ const DetailVoucherPage = () => {
                 <div className="relative w-full h-full">
                   <Image
                     src={getImageUrl(voucher?.image)}
-                    alt={voucher?.name || 'Voucher'}
+                    alt={voucher?.name || 'Promo'}
                     className="object-cover"
                     fill
                     sizes="(max-width: 768px) 100vw, 500px"
@@ -493,7 +496,7 @@ const DetailVoucherPage = () => {
               <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">Kode Voucher</span>
+                    <span className="text-sm font-semibold text-white">Kode Promo</span>
                     <div className="text-xs text-white opacity-80">{voucher.code}</div>
                   </div>
                   <div className="text-right">
@@ -580,10 +583,10 @@ const DetailVoucherPage = () => {
               {claimLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Mengklaim Voucher...
+                  Mengklaim Promo...
                 </div>
               ) : (
-                'Klaim Voucher Sekarang'
+                'Klaim Promo Sekarang'
               )}
             </button>
           </div>
@@ -601,10 +604,10 @@ const DetailVoucherPage = () => {
               {isClaimed ? (
                 <div className="flex items-center justify-center">
                   <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                  Voucher Sudah Diklaim
+                  Promo Sudah Diklaim
                 </div>
               ) : (
-                'Stock Voucher Habis'
+                'Stock Promo Habis'
               )}
             </div>
           </div>
@@ -620,7 +623,7 @@ const DetailVoucherPage = () => {
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
             <p className="text-slate-600 mb-6 leading-relaxed">
-              Voucher berhasil diklaim dan masuk ke Saku Promo Anda!
+              Promo berhasil diklaim dan masuk ke Saku Promo Anda!
             </p>
             <div className="space-y-3">
               <button
@@ -646,8 +649,8 @@ const DetailVoucherPage = () => {
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FontAwesomeIcon icon={faCheckCircle} className="text-red-500 text-3xl rotate-45" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Voucher Habis</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">Maaf, stok voucher ini sudah habis diklaim.</p>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Promo Habis</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">Maaf, stok promo ini sudah habis diklaim.</p>
             <button
               onClick={() => setShowOutOfStockModal(false)}
               className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
@@ -665,7 +668,7 @@ const DetailVoucherPage = () => {
               <FontAwesomeIcon icon={faCheckCircle} className="text-yellow-500 text-3xl" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Sudah Diklaim</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">Voucher ini sudah pernah diklaim pada akun lain.</p>
+            <p className="text-slate-600 mb-6 leading-relaxed">Promo ini sudah pernah diklaim pada akun lain.</p>
             <button
               onClick={() => setShowClaimedElsewhereModal(false)}
               className="w-full bg-yellow-500 text-white py-3 rounded-[12px] font-semibold hover:bg-yellow-600 transition-all"
