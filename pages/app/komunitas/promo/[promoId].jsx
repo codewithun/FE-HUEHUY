@@ -261,16 +261,18 @@ export default function PromoDetailUnified() {
         communityId,
       });
       // Try community-specific endpoint first
+      // Coba endpoint komunitas dulu
       let response = await get({
         path: `communities/${communityId}/promos/${effectivePromoId}`,
       });
 
-      console.log('Community promo response:', response);
+      if (!(response?.status === 200 && response?.data?.data)) {
+        // Fallback ke public sekali saja
+        response = await get({ path: `promos/${effectivePromoId}/public` });
+      }
 
       if (response?.status === 200 && response?.data?.data) {
         const data = response.data.data;
-
-        // Transform to our UI format
         const transformedData = {
           id: data.id,
           title: data.title,
@@ -281,21 +283,16 @@ export default function PromoDetailUnified() {
           coordinates: '',
           originalPrice: data.original_price || null,
           discountPrice: data.discount_price || null,
-          discount: data.discount_percentage
-            ? `${data.discount_percentage}%`
-            : null,
+          discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
           schedule: {
             day: data.always_available ? 'Setiap Hari' : 'Weekday',
-            details: data.end_date
-              ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}`
-              : 'Berlaku',
+            details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}` : 'Berlaku',
             time: '10:00 - 22:00',
             timeDetails: 'Jam Berlaku Promo',
           },
           status: {
             type: data.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'
-              }`,
+            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
           },
           description: data.description || '',
           seller: {
@@ -304,61 +301,11 @@ export default function PromoDetailUnified() {
           },
           terms: 'TERM & CONDITIONS APPLY',
         };
-
-        console.log('Transformed promo data:', transformedData);
         setPromoData(transformedData);
         return transformedData;
-      } else {
-        // Fallback to public endpoint
-        console.log('Trying public promo endpoint as fallback');
-        response = await get({
-          path: `promos/${effectivePromoId}/public`,
-        });
-
-        if (response?.status === 200 && response?.data?.data) {
-          const data = response.data.data;
-          const transformedData = {
-            id: data.id,
-            title: data.title,
-            merchant: data.owner_name || 'Merchant',
-            image: data.image_url || data.image || '/default-avatar.png',
-            distance: data.promo_distance
-              ? `${data.promo_distance} KM`
-              : '3 KM',
-            location: data.location || '',
-            coordinates: '',
-            originalPrice: data.original_price || null,
-            discountPrice: data.discount_price || null,
-            discount: data.discount_percentage
-              ? `${data.discount_percentage}%`
-              : null,
-            schedule: {
-              day: data.always_available ? 'Setiap Hari' : 'Weekday',
-              details: data.end_date
-                ? `Berlaku hingga ${new Date(
-                  data.end_date
-                ).toLocaleDateString()}`
-                : 'Berlaku',
-              time: '10:00 - 22:00',
-              timeDetails: 'Jam Berlaku Promo',
-            },
-            status: {
-              type: data.promo_type === 'online' ? 'Online' : 'Offline',
-              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'
-                }`,
-            },
-            description: data.description || '',
-            seller: {
-              name: data.owner_name || 'Admin',
-              phone: data.owner_contact || '',
-            },
-            terms: 'TERM & CONDITIONS APPLY',
-          };
-
-          setPromoData(transformedData);
-          return transformedData;
-        }
       }
+
+      return null;
 
       return null;
     } catch (err) {

@@ -1,4 +1,8 @@
-import { faArrowLeft, faCheckCircle, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowLeft,
+  faCheckCircle,
+  faMapMarkerAlt,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
@@ -11,7 +15,8 @@ import { Decrypt } from '../../../helpers/encryption.helpers';
 const DetailVoucherPage = () => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [showOutOfStockModal, setShowOutOfStockModal] = useState(false);
-  const [showClaimedElsewhereModal, setShowClaimedElsewhereModal] = useState(false);
+  const [showClaimedElsewhereModal, setShowClaimedElsewhereModal] =
+    useState(false);
 
   // ambil user id dari token (jika ada)
   useEffect(() => {
@@ -20,8 +25,12 @@ const DetailVoucherPage = () => {
         const enc = Cookies.get(token_cookie_name);
         if (!enc) return;
         const token = Decrypt(enc);
-        const res = await get({ path: 'account', headers: { Authorization: `Bearer ${token}` } });
-        const uid = res?.data?.data?.id || res?.data?.id || res?.data?.data?.profile?.id;
+        const res = await get({
+          path: 'account',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const uid =
+          res?.data?.data?.id || res?.data?.id || res?.data?.data?.profile?.id;
         if (uid) setCurrentUserId(Number(uid));
       } catch (_) { }
     })();
@@ -46,12 +55,15 @@ const DetailVoucherPage = () => {
     if (imagePath.startsWith('/')) return imagePath;
 
     const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
-    const u = new URL(raw);                // aman untuk hostname & protokol
-    const origin = u.origin;               // contoh: https://api-159-223-48-146.nip.io
+    const u = new URL(raw); // aman untuk hostname & protokol
+    const origin = u.origin; // contoh: https://api-159-223-48-146.nip.io
 
     // Hapus path "/api" di akhir (hanya path, bukan subdomain)
     // Misal: https://.../api → tetap origin yang sama, kita build path sendiri
-    const cleaned = `${origin}/storage/${String(imagePath).replace(/^storage\//, '')}`;
+    const cleaned = `${origin}/storage/${String(imagePath).replace(
+      /^storage\//,
+      ''
+    )}`;
 
     return cleaned;
   };
@@ -62,39 +74,62 @@ const DetailVoucherPage = () => {
       setLoading(true);
       setError(null);
 
-      const response = await get({
-        path: `admin/vouchers/${id}`
-      });
+      // 1) coba public dulu (tidak perlu auth)
+      let response = await get({ path: `vouchers/${id}/public` });
+
+      // 2) kalau ada ?communityId=xxx di URL, coba versi komunitas
+      if (!(response?.status === 200 && response?.data?.data)) {
+        const communityId = router.query.communityId;
+        if (communityId) {
+          response = await get({
+            path: `communities/${communityId}/vouchers/${id}`,
+          });
+        }
+      }
+
+      // 3) terakhir baru fallback admin (opsional)
+      if (!(response?.status === 200 && response?.data?.data)) {
+        response = await get({ path: `admin/vouchers/${id}` });
+      }
 
       if (response?.status === 200 && response?.data?.data) {
         const voucherData = response.data.data;
         setVoucher(voucherData);
 
         // Check if user already has this voucher (check voucher_items)
-        const userVoucherItems = Array.isArray(voucherData.voucher_items) ? voucherData.voucher_items : [];
-        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-        // HANYA hitung voucher_items yang milik user saat ini
+        const userVoucherItems = Array.isArray(voucherData.voucher_items)
+          ? voucherData.voucher_items
+          : [];
+        const claimedVouchers = JSON.parse(
+          localStorage.getItem('huehuy_vouchers') || '[]'
+        );
+
         const serverClaimedByMe = currentUserId
-          ? userVoucherItems.some((vi) => Number(vi?.user_id) === Number(currentUserId))
+          ? userVoucherItems.some(
+            (vi) => Number(vi?.user_id) === Number(currentUserId)
+          )
           : false;
-        const localClaimed = claimedVouchers.some(v => Number(v.voucher_id ?? v.id) === Number(voucherData.id));
+        const localClaimed = claimedVouchers.some(
+          (v) => Number(v.voucher_id ?? v.id) === Number(voucherData.id)
+        );
         setIsClaimed(!!serverClaimedByMe || !!localClaimed);
 
         return voucherData;
-      } else if (response?.status === 404) {
-        setError('Voucher tidak ditemukan');
-        return null;
-      } else {
-        setError('Gagal memuat data voucher');
-        return null;
       }
+
+      setError(
+        response?.status === 404
+          ? 'Voucher tidak ditemukan'
+          : 'Gagal memuat data voucher'
+      );
+      return null;
     } catch (err) {
       setError('Terjadi kesalahan saat memuat voucher');
       return null;
     } finally {
       setLoading(false);
     }
-  }, [id, currentUserId]);
+  }, [id, currentUserId, router.query]);
 
   useEffect(() => {
     if (id) {
@@ -132,20 +167,26 @@ const DetailVoucherPage = () => {
           token = Decrypt(enc);
           const acct = await get({
             path: 'account',
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           });
-          userId = acct?.data?.data?.id || acct?.data?.id || acct?.data?.data?.profile?.id || null;
+          userId =
+            acct?.data?.data?.id ||
+            acct?.data?.id ||
+            acct?.data?.data?.profile?.id ||
+            null;
         }
       } catch (_) { }
 
       const response = await post({
-        path: `admin/vouchers/${voucher.id}/send-to-user`,
+        path: `vouchers/${voucher.id}/claim`,
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body: userId ? { user_id: userId } : {}, // tetap kompatibel: kalau BE izinkan body kosong pakai auth
+        body: userId ? { user_id: userId } : {}, // kalau controller tidak butuh body, boleh {}
       });
 
       if (response?.status === 200) {
-        const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        const claimedVouchers = JSON.parse(
+          localStorage.getItem('huehuy_vouchers') || '[]'
+        );
         const newVoucherItem = {
           id: response.data.data.id,
           voucher_id: voucher.id,
@@ -154,20 +195,29 @@ const DetailVoucherPage = () => {
           claimed_at: new Date().toISOString(),
           expired_at: voucher.valid_until,
           validation_at: null,
-          voucher: voucher
+          voucher: voucher,
         };
         claimedVouchers.push(newVoucherItem);
-        localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+        localStorage.setItem(
+          'huehuy_vouchers',
+          JSON.stringify(claimedVouchers)
+        );
 
         setIsClaimed(true);
         setShowSuccessModal(true);
       } else {
-        const msg = (response?.data?.message || response?.message || '').toLowerCase();
+        const msg = (
+          response?.data?.message ||
+          response?.message ||
+          ''
+        ).toLowerCase();
         // mapping error → modal
         if (
           response?.status === 400 ||
           response?.status === 409 ||
-          msg.includes('habis') || msg.includes('stock') || msg.includes('stok')
+          msg.includes('habis') ||
+          msg.includes('stock') ||
+          msg.includes('stok')
         ) {
           setShowOutOfStockModal(true);
         } else if (
@@ -180,7 +230,6 @@ const DetailVoucherPage = () => {
           setError('Gagal mengklaim voucher');
         }
       }
-
     } catch (err) {
       setError('Terjadi kesalahan saat mengklaim voucher');
       // console.error('Error claiming voucher:', err);
@@ -195,146 +244,184 @@ const DetailVoucherPage = () => {
   };
 
   // Fungsi untuk handle auto register setelah QR scan - DIPINDAH KE ATAS
-  const handleAutoRegister = useCallback(async (token) => {
-    try {
-      const voucherData = await fetchVoucherDetails();
-      if (!voucherData) return;
+  const handleAutoRegister = useCallback(
+    async (token) => {
+      try {
+        const voucherData = await fetchVoucherDetails();
+        if (!voucherData) return;
 
-      // Cek apakah user sudah punya voucher ini
-      const userVoucherItems = Array.isArray(voucherData.voucher_items) ? voucherData.voucher_items : [];
-      const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
+        // Cek apakah user sudah punya voucher ini
+        const userVoucherItems = Array.isArray(voucherData.voucher_items)
+          ? voucherData.voucher_items
+          : [];
+        const claimedVouchers = JSON.parse(
+          localStorage.getItem('huehuy_vouchers') || '[]'
+        );
 
-      const serverClaimedByMe = currentUserId
-        ? userVoucherItems.some((vi) => Number(vi?.user_id) === Number(currentUserId))
-        : false;
+        const serverClaimedByMe = currentUserId
+          ? userVoucherItems.some(
+            (vi) => Number(vi?.user_id) === Number(currentUserId)
+          )
+          : false;
 
-      const localClaimed = claimedVouchers.some(v => Number(v.voucher_id ?? v.id) === Number(voucherData.id));
+        const localClaimed = claimedVouchers.some(
+          (v) => Number(v.voucher_id ?? v.id) === Number(voucherData.id)
+        );
 
-      const alreadyClaimed = serverClaimedByMe || localClaimed;
+        const alreadyClaimed = serverClaimedByMe || localClaimed;
 
-      if (!alreadyClaimed) {
-        // Lakukan auto claim voucher
-        try {
-          const response = await post({
-            path: `admin/vouchers/${voucherData.id}/send-to-user`,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            body: { source: 'qr_scan' }
-          });
+        if (!alreadyClaimed) {
+          // Lakukan auto claim voucher
+          try {
+            const response = await post({
+              path: `vouchers/${voucherData.id}/claim`,
+              headers: { 'Authorization': `Bearer ${token}` },
+              body: { source: 'qr_scan' } // opsional
+            });
 
-          if (response?.status === 200) {
-            // Simpan ke localStorage
-            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-            const newVoucherItem = {
-              id: response.data.data.id,
-              voucher_id: voucherData.id,
-              code: response.data.data.code,
-              claimed_at: new Date().toISOString(),
-              expired_at: voucherData.valid_until,
-              voucher: voucherData
-            };
-            claimedVouchers.push(newVoucherItem);
-            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+            if (response?.status === 200) {
+              // Simpan ke localStorage
+              const claimedVouchers = JSON.parse(
+                localStorage.getItem('huehuy_vouchers') || '[]'
+              );
+              const newVoucherItem = {
+                id: response.data.data.id,
+                voucher_id: voucherData.id,
+                code: response.data.data.code,
+                claimed_at: new Date().toISOString(),
+                expired_at: voucherData.valid_until,
+                voucher: voucherData,
+              };
+              claimedVouchers.push(newVoucherItem);
+              localStorage.setItem(
+                'huehuy_vouchers',
+                JSON.stringify(claimedVouchers)
+              );
 
-            setIsClaimed(true);
-            setShowSuccessModal(true);
+              setIsClaimed(true);
+              setShowSuccessModal(true);
+            }
+          } catch (error) {
+            // Silent error - user bisa manual claim
           }
-        } catch (error) {
-          // Silent error - user bisa manual claim
         }
+      } catch (error) {
+        // Silent error
       }
-    } catch (error) {
-      // Silent error
-    }
-  }, [fetchVoucherDetails]);
+    },
+    [fetchVoucherDetails]
+  );
 
   // Fungsi untuk cek status verifikasi - DEPENDENCY DIPERBAIKI
-  const checkUserVerificationStatus = useCallback(async (token) => {
-    try {
-      // eslint-disable-next-line no-console
-      console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
-
-      // Coba endpoint account dulu (untuk user yang sudah login dan terverifikasi)
-      let response = await get({
-        path: 'account',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // eslint-disable-next-line no-console
-      console.log('account response:', response?.status, response?.data);
-
-      if (response?.status === 200) {
-        // User sudah terverifikasi dan bisa akses, lakukan auto-register
+  const checkUserVerificationStatus = useCallback(
+    async (token) => {
+      try {
         // eslint-disable-next-line no-console
-        console.log('User verified and logged in, proceeding with auto register');
-        handleAutoRegister(token);
-        return;
-      }
+        console.log(
+          'Checking verification status with token:',
+          token?.substring(0, 20) + '...'
+        );
 
-      // Jika account endpoint gagal (401/404), coba account-unverified
-      if (response?.status === 401 || response?.status === 404) {
-        // eslint-disable-next-line no-console
-        console.log('Trying account-unverified endpoint...');
-        response = await get({
-          path: 'account-unverified',
+        // Coba endpoint account dulu (untuk user yang sudah login dan terverifikasi)
+        let response = await get({
+          path: 'account',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
         });
 
         // eslint-disable-next-line no-console
-        console.log('account-unverified response:', response?.status, response?.data);
+        console.log('account response:', response?.status, response?.data);
 
         if (response?.status === 200) {
-          // User belum terverifikasi, redirect ke verifikasi
-          const userData = response?.data?.data?.profile || response?.data?.profile;
-          const emailVerified = userData?.email_verified_at || userData?.verified_at;
+          // User sudah terverifikasi dan bisa akses, lakukan auto-register
+          // eslint-disable-next-line no-console
+          console.log(
+            'User verified and logged in, proceeding with auto register'
+          );
+          handleAutoRegister(token);
+          return;
+        }
 
-          if (!emailVerified) {
-            // eslint-disable-next-line no-console
-            console.log('User not verified, redirecting to verification');
-            const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-            window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
-            return;
-          } else {
-            // Email sudah terverifikasi, lanjut auto register
-            // eslint-disable-next-line no-console
-            console.log('User email verified, proceeding with auto register');
-            handleAutoRegister(token);
-            return;
+        // Jika account endpoint gagal (401/404), coba account-unverified
+        if (response?.status === 401 || response?.status === 404) {
+          // eslint-disable-next-line no-console
+          console.log('Trying account-unverified endpoint...');
+          response = await get({
+            path: 'account-unverified',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+          });
+
+          // eslint-disable-next-line no-console
+          console.log(
+            'account-unverified response:',
+            response?.status,
+            response?.data
+          );
+
+          if (response?.status === 200) {
+            // User belum terverifikasi, redirect ke verifikasi
+            const userData =
+              response?.data?.data?.profile || response?.data?.profile;
+            const emailVerified =
+              userData?.email_verified_at || userData?.verified_at;
+
+            if (!emailVerified) {
+              // eslint-disable-next-line no-console
+              console.log('User not verified, redirecting to verification');
+              const next =
+                typeof window !== 'undefined'
+                  ? window.location.href
+                  : `/app/voucher/${id}`;
+              window.location.href = `/verifikasi?next=${encodeURIComponent(
+                next
+              )}`;
+              return;
+            } else {
+              // Email sudah terverifikasi, lanjut auto register
+              // eslint-disable-next-line no-console
+              console.log('User email verified, proceeding with auto register');
+              handleAutoRegister(token);
+              return;
+            }
           }
         }
-      }
 
-      // Jika token tidak valid, redirect ke register
-      if (response?.status === 401) {
+        // Jika token tidak valid, redirect ke register
+        if (response?.status === 401) {
+          // eslint-disable-next-line no-console
+          console.log('Token invalid (401), redirecting to register');
+          const next =
+            typeof window !== 'undefined'
+              ? window.location.href
+              : `/app/voucher/${id}`;
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+          return;
+        }
+
+        // Fallback: assume user is verified dan lanjut auto register
         // eslint-disable-next-line no-console
-        console.log('Token invalid (401), redirecting to register');
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        console.log('Fallback: proceeding with auto register');
+        handleAutoRegister(token);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error checking verification status:', err);
+        // Jika semua endpoint error, redirect ke login ulang
+        const next =
+          typeof window !== 'undefined'
+            ? window.location.href
+            : `/app/voucher/${id}`;
         window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-        return;
       }
-
-      // Fallback: assume user is verified dan lanjut auto register
-      // eslint-disable-next-line no-console
-      console.log('Fallback: proceeding with auto register');
-      handleAutoRegister(token);
-
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error checking verification status:', err);
-      // Jika semua endpoint error, redirect ke login ulang
-      const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
-      window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-    }
-  }, [id, handleAutoRegister]);
+    },
+    [id, handleAutoRegister]
+  );
 
   // --- MODIFIED: handle autoRegister / source param and login check ---
   useEffect(() => {
@@ -364,10 +451,14 @@ const DetailVoucherPage = () => {
 
       // 2. Fallback ke localStorage
       if (!token) {
-        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        token =
+          localStorage.getItem('auth_token') || localStorage.getItem('token');
         if (token) {
           // eslint-disable-next-line no-console
-          console.log('Token from localStorage:', token?.substring(0, 20) + '...');
+          console.log(
+            'Token from localStorage:',
+            token?.substring(0, 20) + '...'
+          );
         }
       }
 
@@ -375,7 +466,10 @@ const DetailVoucherPage = () => {
       if (!token) {
         // eslint-disable-next-line no-console
         console.log('No token found, redirecting to register');
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/voucher/${id}`;
+        const next =
+          typeof window !== 'undefined'
+            ? window.location.href
+            : `/app/voucher/${id}`;
         if (typeof window !== 'undefined') {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }
@@ -405,7 +499,10 @@ const DetailVoucherPage = () => {
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FontAwesomeIcon icon={faCheckCircle} className="text-red-500 text-2xl" />
+            <FontAwesomeIcon
+              icon={faCheckCircle}
+              className="text-red-500 text-2xl"
+            />
           </div>
           <h3 className="text-lg font-semibold text-slate-900 mb-2">Oops!</h3>
           <p className="text-slate-600 mb-4">{error}</p>
@@ -446,8 +543,14 @@ const DetailVoucherPage = () => {
           <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
         </div>
         <div className="flex items-center justify-between h-full relative z-10">
-          <button onClick={handleBack} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
-            <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
+          <button
+            onClick={handleBack}
+            className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+          >
+            <FontAwesomeIcon
+              icon={faArrowLeft}
+              className="text-white text-sm"
+            />
           </button>
           <div className="flex-1 text-center">
             <h1 className="text-white font-bold text-sm">Voucher</h1>
@@ -480,7 +583,9 @@ const DetailVoucherPage = () => {
                     placeholder="blur"
                     blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
                     onError={() => {
-                      const img = document.querySelector(`img[alt='${voucher?.name}']`);
+                      const img = document.querySelector(
+                        `img[alt='${voucher?.name}']`
+                      );
                       if (img) img.src = '/default-avatar.png';
                     }}
                   />
@@ -495,25 +600,39 @@ const DetailVoucherPage = () => {
               <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">Kode Voucher</span>
-                    <div className="text-xs text-white opacity-80">{voucher.code}</div>
+                    <span className="text-sm font-semibold text-white">
+                      Kode Voucher
+                    </span>
+                    <div className="text-xs text-white opacity-80">
+                      {voucher.code}
+                    </div>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-white opacity-80">Stock</span>
-                    <div className="text-xs text-white opacity-70">{voucher.stock || 0}</div>
+                    <div className="text-xs text-white opacity-70">
+                      {voucher.stock || 0}
+                    </div>
                   </div>
                 </div>
               </div>
               <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">Tipe Delivery</span>
-                    <div className="text-xs text-white opacity-80">{voucher.delivery || 'manual'}</div>
+                    <span className="text-sm font-semibold text-white">
+                      Tipe Delivery
+                    </span>
+                    <div className="text-xs text-white opacity-80">
+                      {voucher.delivery || 'manual'}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs text-white opacity-80">Berlaku Hingga</span>
+                    <span className="text-xs text-white opacity-80">
+                      Berlaku Hingga
+                    </span>
                     <div className="text-xs text-white opacity-70">
-                      {voucher.valid_until ? new Date(voucher.valid_until).toLocaleDateString() : 'Tidak terbatas'}
+                      {voucher.valid_until
+                        ? new Date(voucher.valid_until).toLocaleDateString()
+                        : 'Tidak terbatas'}
                     </div>
                   </div>
                 </div>
@@ -542,10 +661,17 @@ const DetailVoucherPage = () => {
           {voucher.tenant_location && (
             <div className="mb-4">
               <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Tenant</h4>
-                <p className="text-slate-600 text-xs leading-relaxed mb-3">{voucher.tenant_location}</p>
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Lokasi Tenant
+                </h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                  {voucher.tenant_location}
+                </p>
                 <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
+                  <FontAwesomeIcon
+                    icon={faMapMarkerAlt}
+                    className="mr-2 text-sm"
+                  />
                   Rute
                 </button>
               </div>
@@ -556,10 +682,16 @@ const DetailVoucherPage = () => {
           {voucher.community && (
             <div className="mb-4">
               <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Komunitas</h4>
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Komunitas
+                </h4>
                 <div className="space-y-2">
-                  <p className="font-semibold text-slate-900 text-xs">Nama: {voucher.community.name || '-'}</p>
-                  <p className="text-xs text-slate-500">Deskripsi: {voucher.community.description || '-'}</p>
+                  <p className="font-semibold text-slate-900 text-xs">
+                    Nama: {voucher.community.name || '-'}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Deskripsi: {voucher.community.description || '-'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -575,8 +707,8 @@ const DetailVoucherPage = () => {
               onClick={handleClaim}
               disabled={claimLoading}
               className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] lg:max-w-sm lg:mx-auto ${claimLoading
-                ? 'bg-slate-400 text-white cursor-not-allowed'
-                : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
+                  ? 'bg-slate-400 text-white cursor-not-allowed'
+                  : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
                 }`}
             >
               {claimLoading ? (
@@ -596,10 +728,12 @@ const DetailVoucherPage = () => {
       {(isClaimed || voucher.stock <= 0) && (
         <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
           <div className="lg:max-w-sm lg:mx-auto">
-            <div className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base text-center ${isClaimed
-              ? 'bg-green-100 text-green-700 border-2 border-green-200'
-              : 'bg-slate-100 text-slate-500 border-2 border-slate-200'
-              }`}>
+            <div
+              className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base text-center ${isClaimed
+                  ? 'bg-green-100 text-green-700 border-2 border-green-200'
+                  : 'bg-slate-100 text-slate-500 border-2 border-slate-200'
+                }`}
+            >
               {isClaimed ? (
                 <div className="flex items-center justify-center">
                   <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
@@ -618,7 +752,10 @@ const DetailVoucherPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-3xl" />
+              <FontAwesomeIcon
+                icon={faCheckCircle}
+                className="text-green-500 text-3xl"
+              />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
             <p className="text-slate-600 mb-6 leading-relaxed">
@@ -646,10 +783,17 @@ const DetailVoucherPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faCheckCircle} className="text-red-500 text-3xl rotate-45" />
+              <FontAwesomeIcon
+                icon={faCheckCircle}
+                className="text-red-500 text-3xl rotate-45"
+              />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Voucher Habis</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">Maaf, stok voucher ini sudah habis diklaim.</p>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">
+              Voucher Habis
+            </h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              Maaf, stok voucher ini sudah habis diklaim.
+            </p>
             <button
               onClick={() => setShowOutOfStockModal(false)}
               className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
@@ -664,10 +808,17 @@ const DetailVoucherPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faCheckCircle} className="text-yellow-500 text-3xl" />
+              <FontAwesomeIcon
+                icon={faCheckCircle}
+                className="text-yellow-500 text-3xl"
+              />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Sudah Diklaim</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">Voucher ini sudah pernah diklaim pada akun lain.</p>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">
+              Sudah Diklaim
+            </h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              Voucher ini sudah pernah diklaim pada akun lain.
+            </p>
             <button
               onClick={() => setShowClaimedElsewhereModal(false)}
               className="w-full bg-yellow-500 text-white py-3 rounded-[12px] font-semibold hover:bg-yellow-600 transition-all"
@@ -680,16 +831,29 @@ const DetailVoucherPage = () => {
 
       <style jsx>{`
         @keyframes bounce-in {
-          0% { transform: scale(0.3); opacity: 0; }
-          50% { transform: scale(1.05); }
-          70% { transform: scale(0.9); }
-          100% { transform: scale(1); opacity: 1; }
+          0% {
+            transform: scale(0.3);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.05);
+          }
+          70% {
+            transform: scale(0.9);
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
         }
         .animate-bounce-in {
           animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         @media (min-width: 1024px) {
-          .desktop-container { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); }
+          .desktop-container {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+              0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          }
         }
       `}</style>
     </div>
