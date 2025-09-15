@@ -35,11 +35,16 @@ export default function PromoDetailUnified() {
 
   // --- Resolve ID promo dari QR lama ---
   const resolveLegacyPromoId = useCallback(() => {
-    if (promoId === 'detail_promo') {
-      return router.query.filter || router.query.id || null;
-    }
-    return promoId || null;
-  }, [promoId, router.query]);
+  if (promoId === 'detail_promo') {
+    return (
+      router.query.filter ||
+      router.query.id ||
+      router.query.promoId ||
+      null
+    );
+  }
+  return promoId || null;
+}, [promoId, router.query]);
 
   const effectivePromoId = resolveLegacyPromoId();
 
