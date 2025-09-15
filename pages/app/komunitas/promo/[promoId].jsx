@@ -8,20 +8,31 @@ import {
   faPhone,
   faShare,
   faWifi,
-  faWifiSlash
+  faWifiSlash,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Cookies from "js-cookie";
+import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
-import { token_cookie_name } from "../../../../helpers";
+import { token_cookie_name } from '../../../../helpers';
 import { get, post } from '../../../../helpers/api.helpers';
-import { Decrypt } from "../../../../helpers/encryption.helpers";
+import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 export default function PromoDetailUnified() {
   const router = useRouter();
   const { promoId, communityId } = router.query;
+  // --- ADD: resolveLegacyPromoId untuk QR lama ---
+  const resolveLegacyPromoId = useCallback(() => {
+    // Jika pakai URL lama: /promo/detail_promo?filter=123
+    if (promoId === 'detail_promo') {
+      return router.query.filter || router.query.id || null;
+    }
+    return promoId || null;
+  }, [promoId, router.query]);
+
+  // pakai ini untuk semua pemanggilan API
+  const effectivePromoId = resolveLegacyPromoId();
   const [promoData, setPromoData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,135 +52,139 @@ export default function PromoDetailUnified() {
       1: {
         id: 1,
         title: "McDonald's - Burger Combo Flash Sale",
-        subtitle: "Paket burger kombo dengan kentang dan minuman",
+        subtitle: 'Paket burger kombo dengan kentang dan minuman',
         image: '/images/promo/burger-combo-flash.jpg',
         merchant: {
           name: "McDonald's Bandung",
           logo: '/images/merchants/mcdonalds-logo.png',
           rating: 4.5,
-          address: "Jl. Merdeka No. 123, Bandung",
-          phone: "+62 22 1234567"
+          address: 'Jl. Merdeka No. 123, Bandung',
+          phone: '+62 22 1234567',
         },
-        discount: "30%",
+        discount: '30%',
         originalPrice: 45000,
         discountedPrice: 31500,
-        category: "Fast Food",
-        description: "Nikmati burger combo spesial dengan diskon hingga 30%! Paket lengkap berisi burger beef, kentang goreng crispy, dan minuman soda pilihan. Cocok untuk makan siang atau malam bersama keluarga.",
+        category: 'Fast Food',
+        description:
+          'Nikmati burger combo spesial dengan diskon hingga 30%! Paket lengkap berisi burger beef, kentang goreng crispy, dan minuman soda pilihan. Cocok untuk makan siang atau malam bersama keluarga.',
         terms: [
-          "Berlaku untuk pembelian di lokasi",
-          "Tidak dapat digabung dengan promo lain",
-          "Berlaku hingga 31 Agustus 2025",
-          "Maksimal 2 paket per customer",
-          "Hanya untuk member komunitas"
+          'Berlaku untuk pembelian di lokasi',
+          'Tidak dapat digabung dengan promo lain',
+          'Berlaku hingga 31 Agustus 2025',
+          'Maksimal 2 paket per customer',
+          'Hanya untuk member komunitas',
         ],
-        validUntil: "31 Agustus 2025",
-        location: "dbotanica Bandung",
-        tags: ["Burger", "Fast Food", "Family", "Combo"],
+        validUntil: '31 Agustus 2025',
+        location: 'dbotanica Bandung',
+        tags: ['Burger', 'Fast Food', 'Family', 'Combo'],
         gallery: [
           '/images/promo/burger-combo-flash.jpg',
           '/images/promo/chicken-package.jpg',
-          '/images/promo/pizza-medium-deal.jpg'
-        ]
+          '/images/promo/pizza-medium-deal.jpg',
+        ],
       },
       2: {
         id: 2,
-        title: "Chicken Star - Paket Ayam Special",
-        subtitle: "Ayam crispy dengan nasi dan saus pilihan",
+        title: 'Chicken Star - Paket Ayam Special',
+        subtitle: 'Ayam crispy dengan nasi dan saus pilihan',
         image: '/images/promo/chicken-package.jpg',
         merchant: {
-          name: "Chicken Star",
+          name: 'Chicken Star',
           logo: '/images/merchants/chicken-star-logo.png',
           rating: 4.3,
-          address: "Jl. Sudirman No. 45, Bandung",
-          phone: "+62 22 7654321"
+          address: 'Jl. Sudirman No. 45, Bandung',
+          phone: '+62 22 7654321',
         },
-        discount: "25%",
+        discount: '25%',
         originalPrice: 35000,
         discountedPrice: 26250,
-        category: "Chicken",
-        description: "Ayam crispy special dengan bumbu rahasia yang menggugah selera. Disajikan dengan nasi hangat dan pilihan saus pedas atau manis. Perfect untuk pecinta ayam crispy!",
+        category: 'Chicken',
+        description:
+          'Ayam crispy special dengan bumbu rahasia yang menggugah selera. Disajikan dengan nasi hangat dan pilihan saus pedas atau manis. Perfect untuk pecinta ayam crispy!',
         terms: [
-          "Berlaku untuk dine-in dan take away",
-          "Promo khusus member komunitas",
-          "Berlaku setiap hari",
-          "Tidak berlaku untuk delivery",
-          "Berlaku hingga stok habis"
+          'Berlaku untuk dine-in dan take away',
+          'Promo khusus member komunitas',
+          'Berlaku setiap hari',
+          'Tidak berlaku untuk delivery',
+          'Berlaku hingga stok habis',
         ],
-        validUntil: "30 September 2025",
-        location: "dbotanica Bandung",
-        tags: ["Chicken", "Crispy", "Rice", "Spicy"],
+        validUntil: '30 September 2025',
+        location: 'dbotanica Bandung',
+        tags: ['Chicken', 'Crispy', 'Rice', 'Spicy'],
         gallery: [
           '/images/promo/chicken-package.jpg',
           '/images/promo/beef-sausage-chicken.jpg',
-          '/images/promo/burger-combo-flash.jpg'
-        ]
+          '/images/promo/burger-combo-flash.jpg',
+        ],
       },
       3: {
         id: 3,
-        title: "Pizza Hut - Medium Pizza Deal",
-        subtitle: "Pizza medium dengan topping pilihan dan minuman",
+        title: 'Pizza Hut - Medium Pizza Deal',
+        subtitle: 'Pizza medium dengan topping pilihan dan minuman',
         image: '/images/promo/pizza-medium-deal.jpg',
         merchant: {
-          name: "Pizza Hut",
+          name: 'Pizza Hut',
           logo: '/images/merchants/pizza-hut-logo.png',
           rating: 4.4,
-          address: "Jl. Asia Afrika No. 67, Bandung",
-          phone: "+62 22 3456789"
+          address: 'Jl. Asia Afrika No. 67, Bandung',
+          phone: '+62 22 3456789',
         },
-        discount: "35%",
+        discount: '35%',
         originalPrice: 85000,
         discountedPrice: 55250,
-        category: "Pizza",
-        description: "Pizza medium dengan berbagai pilihan topping favorit. Dari pepperoni, sausage, hingga vegetarian. Dilengkapi dengan minuman soda dan garlic bread. Perfect untuk sharing!",
+        category: 'Pizza',
+        description:
+          'Pizza medium dengan berbagai pilihan topping favorit. Dari pepperoni, sausage, hingga vegetarian. Dilengkapi dengan minuman soda dan garlic bread. Perfect untuk sharing!',
         terms: [
-          "Pilihan topping: Pepperoni, Sausage, Mushroom, Vegetarian",
-          "Termasuk 1 minuman soda",
-          "Berlaku untuk dine-in saja",
-          "Tidak dapat dibawa pulang",
-          "Reservasi direkomendasikan"
+          'Pilihan topping: Pepperoni, Sausage, Mushroom, Vegetarian',
+          'Termasuk 1 minuman soda',
+          'Berlaku untuk dine-in saja',
+          'Tidak dapat dibawa pulang',
+          'Reservasi direkomendasikan',
         ],
-        validUntil: "15 September 2025",
-        location: "dbotanica Bandung",
-        tags: ["Pizza", "Italian", "Sharing", "Drinks"],
+        validUntil: '15 September 2025',
+        location: 'dbotanica Bandung',
+        tags: ['Pizza', 'Italian', 'Sharing', 'Drinks'],
         gallery: [
           '/images/promo/pizza-medium-deal.jpg',
           '/images/promo/burger-combo-flash.jpg',
-          '/images/promo/brown-sugar-coffee.jpg'
-        ]
+          '/images/promo/brown-sugar-coffee.jpg',
+        ],
       },
       4: {
         id: 4,
-        title: "Bubble Tea House - Minuman Segar",
-        subtitle: "Bubble tea dengan berbagai rasa dan topping",
+        title: 'Bubble Tea House - Minuman Segar',
+        subtitle: 'Bubble tea dengan berbagai rasa dan topping',
         image: '/images/promo/bubble-tea-discount.jpg',
         merchant: {
-          name: "Bubble Tea House",
+          name: 'Bubble Tea House',
           logo: '/images/merchants/bubble-tea-house-logo.png',
           rating: 4.6,
-          address: "Jl. Braga No. 89, Bandung",
-          phone: "+62 22 9876543"
+          address: 'Jl. Braga No. 89, Bandung',
+          phone: '+62 22 9876543',
         },
-        discount: "15%",
+        discount: '15%',
         originalPrice: 25000,
         discountedPrice: 21250,
-        category: "Beverages",
-        description: "Bubble tea premium dengan berbagai pilihan rasa mulai dari original, taro, matcha, hingga brown sugar. Topping bisa pilih pearl, jelly, atau pudding. Segar dan menyegarkan!",
+        category: 'Beverages',
+        description:
+          'Bubble tea premium dengan berbagai pilihan rasa mulai dari original, taro, matcha, hingga brown sugar. Topping bisa pilih pearl, jelly, atau pudding. Segar dan menyegarkan!',
         terms: [
-          "Berlaku untuk semua varian",
-          "Pilihan topping gratis: pearl, jelly, pudding",
-          "Buy 2 get extra 5% discount",
-          "Berlaku untuk take away dan dine-in",
-          "Dapat dipesan via delivery"
+          'Berlaku untuk semua varian',
+          'Pilihan topping gratis: pearl, jelly, pudding',
+          'Buy 2 get extra 5% discount',
+          'Berlaku untuk take away dan dine-in',
+          'Dapat dipesan via delivery',
         ],
-        validUntil: "20 September 2025",
-        location: "dbotanica Bandung",
-        tags: ["Bubble Tea", "Drinks", "Sweet", "Refreshing"],
+        validUntil: '20 September 2025',
+        location: 'dbotanica Bandung',
+        tags: ['Bubble Tea', 'Drinks', 'Sweet', 'Refreshing'],
         gallery: [
           '/images/promo/bubble-tea-discount.jpg',
           '/images/promo/brown-sugar-coffee.jpg',
-          '/images/promo/chicken-package.jpg'
-        ]
-      }
+          '/images/promo/chicken-package.jpg',
+        ],
+      },
     };
 
     return allPromos[parseInt(id)] || allPromos[1];
@@ -191,20 +206,22 @@ export default function PromoDetailUnified() {
       discount: src.discount ?? null,
       schedule: {
         day: 'Everyday',
-        details: src.validUntil ? `Berlaku hingga ${src.validUntil}` : 'Berlaku',
+        details: src.validUntil
+          ? `Berlaku hingga ${src.validUntil}`
+          : 'Berlaku',
         time: '10:00 - 22:00',
-        timeDetails: 'Jam Berlaku Promo'
+        timeDetails: 'Jam Berlaku Promo',
       },
       status: {
         type: 'Offline',
-        description: 'Tipe Promo: 🌐 Online / 📍 Offline'
+        description: 'Tipe Promo: 🌐 Online / 📍 Offline',
       },
       description: src.description || '',
       seller: {
         name: src.merchant?.name || 'Admin',
-        phone: src.merchant?.phone || ''
+        phone: src.merchant?.phone || '',
       },
-      terms: 'TERM & CONDITIONS APPLY'
+      terms: 'TERM & CONDITIONS APPLY',
     };
   };
 
@@ -222,28 +239,30 @@ export default function PromoDetailUnified() {
   // ADD: Effect to fetch promo details from API when both promoId and communityId are available
   useEffect(() => {
     if (!router.isReady) return;
-    if (!promoId || !communityId) return;
+    if (!effectivePromoId || !communityId) return;
 
-    // Skip if this is QR entry flow (handled by separate effect)
     const autoRegister = router.query.autoRegister || router.query.source;
     if (autoRegister) return;
 
     fetchPromoDetails();
-  }, [router.isReady, promoId, communityId]); // Remove fetchPromoDetails from dependency array
+  }, [router.isReady, effectivePromoId, communityId, fetchPromoDetails]);
+  // Remove fetchPromoDetails from dependency array
 
   // Perkuat effect yang mem-fetch dari API
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady) return null;
-    if (!promoId || !communityId) return null;
+    if (!effectivePromoId || !communityId) return null;
 
     try {
       setLoading(true);
 
-      console.log('Fetching promo details:', { promoId, communityId });
-
+      console.log('Fetching promo details:', {
+        promoId: effectivePromoId,
+        communityId,
+      });
       // Try community-specific endpoint first
       let response = await get({
-        path: `communities/${communityId}/promos/${promoId}`
+        path: `communities/${communityId}/promos/${effectivePromoId}`,
       });
 
       console.log('Community promo response:', response);
@@ -262,23 +281,28 @@ export default function PromoDetailUnified() {
           coordinates: '',
           originalPrice: data.original_price || null,
           discountPrice: data.discount_price || null,
-          discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
+          discount: data.discount_percentage
+            ? `${data.discount_percentage}%`
+            : null,
           schedule: {
             day: data.always_available ? 'Setiap Hari' : 'Weekday',
-            details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}` : 'Berlaku',
+            details: data.end_date
+              ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}`
+              : 'Berlaku',
             time: '10:00 - 22:00',
-            timeDetails: 'Jam Berlaku Promo'
+            timeDetails: 'Jam Berlaku Promo',
           },
           status: {
             type: data.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
+            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'
+              }`,
           },
           description: data.description || '',
           seller: {
             name: data.owner_name || 'Admin',
-            phone: data.owner_contact || ''
+            phone: data.owner_contact || '',
           },
-          terms: 'TERM & CONDITIONS APPLY'
+          terms: 'TERM & CONDITIONS APPLY',
         };
 
         console.log('Transformed promo data:', transformedData);
@@ -288,7 +312,7 @@ export default function PromoDetailUnified() {
         // Fallback to public endpoint
         console.log('Trying public promo endpoint as fallback');
         response = await get({
-          path: `promos/${promoId}/public`
+          path: `promos/${effectivePromoId}/public`,
         });
 
         if (response?.status === 200 && response?.data?.data) {
@@ -298,28 +322,37 @@ export default function PromoDetailUnified() {
             title: data.title,
             merchant: data.owner_name || 'Merchant',
             image: data.image_url || data.image || '/default-avatar.png',
-            distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
+            distance: data.promo_distance
+              ? `${data.promo_distance} KM`
+              : '3 KM',
             location: data.location || '',
             coordinates: '',
             originalPrice: data.original_price || null,
             discountPrice: data.discount_price || null,
-            discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
+            discount: data.discount_percentage
+              ? `${data.discount_percentage}%`
+              : null,
             schedule: {
               day: data.always_available ? 'Setiap Hari' : 'Weekday',
-              details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}` : 'Berlaku',
+              details: data.end_date
+                ? `Berlaku hingga ${new Date(
+                  data.end_date
+                ).toLocaleDateString()}`
+                : 'Berlaku',
               time: '10:00 - 22:00',
-              timeDetails: 'Jam Berlaku Promo'
+              timeDetails: 'Jam Berlaku Promo',
             },
             status: {
               type: data.promo_type === 'online' ? 'Online' : 'Offline',
-              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`
+              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'
+                }`,
             },
             description: data.description || '',
             seller: {
               name: data.owner_name || 'Admin',
-              phone: data.owner_contact || ''
+              phone: data.owner_contact || '',
             },
-            terms: 'TERM & CONDITIONS APPLY'
+            terms: 'TERM & CONDITIONS APPLY',
           };
 
           setPromoData(transformedData);
@@ -334,139 +367,194 @@ export default function PromoDetailUnified() {
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, promoId, communityId]);
+  }, [router.isReady, effectivePromoId, communityId]);
 
   // NEW: Handle auto register after QR scan
-  const handleAutoRegister = useCallback(async (token) => {
-    try {
-      const promoData = await fetchPromoDetails();
-      if (!promoData) return;
+  const handleAutoRegister = useCallback(
+    async (token) => {
+      try {
+        const promoData = await fetchPromoDetails();
+        if (!promoData) return;
 
-      // Check if already claimed
-      const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const alreadyClaimed = existingVouchers.some(v =>
-        String(v.ad?.id) === String(promoData.id) ||
-        String(v.id) === String(promoData.id)
-      );
+        // Check if already claimed
+        const existingVouchers = JSON.parse(
+          localStorage.getItem('huehuy_vouchers') || '[]'
+        );
+        const alreadyClaimed = existingVouchers.some(
+          (v) =>
+            String(v.ad?.id) === String(promoData.id) ||
+            String(v.id) === String(promoData.id)
+        );
 
-      if (!alreadyClaimed) {
-        try {
-          const response = await post({
-            path: `admin/promos/${promoData.id}/items`,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            body: {
-              promo_id: promoData.id,
-              source: 'qr_scan'
-            }
-          });
+        if (!alreadyClaimed) {
+          try {
+            const response = await post({
+              path: `admin/promos/${promoData.id}/items`,
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              body: {
+                promo_id: promoData.id,
+                source: 'qr_scan',
+              },
+            });
 
-          if (response?.status === 200) {
-            const claimedVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-            const newPromoItem = {
-              id: response.data.data.id,
-              promo_id: promoData.id,
-              code: response.data.data.code,
-              claimed_at: new Date().toISOString(),
-              expired_at: promoData.expires_at,
-              ad: {
-                id: promoData.id,
-                title: promoData.title,
-                picture_source: promoData.image,
-                status: 'active',
-                cube: {
-                  code: `community-${communityId}`,
-                  user: { name: promoData.seller?.name || 'Admin', phone: promoData.seller?.phone || '' },
-                  corporate: null,
-                  tags: [{ address: promoData.location, link: null, map_lat: null, map_lng: null }],
+            if (response?.status === 200) {
+              const claimedVouchers = JSON.parse(
+                localStorage.getItem('huehuy_vouchers') || '[]'
+              );
+              const newPromoItem = {
+                id: response.data.data.id,
+                promo_id: promoData.id,
+                code: response.data.data.code,
+                claimed_at: new Date().toISOString(),
+                expired_at: promoData.expires_at,
+                ad: {
+                  id: promoData.id,
+                  title: promoData.title,
+                  picture_source: promoData.image,
+                  status: 'active',
+                  cube: {
+                    code: `community-${communityId}`,
+                    user: {
+                      name: promoData.seller?.name || 'Admin',
+                      phone: promoData.seller?.phone || '',
+                    },
+                    corporate: null,
+                    tags: [
+                      {
+                        address: promoData.location,
+                        link: null,
+                        map_lat: null,
+                        map_lng: null,
+                      },
+                    ],
+                  },
                 },
-              }
-            };
-            claimedVouchers.push(newPromoItem);
-            localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
+              };
+              claimedVouchers.push(newPromoItem);
+              localStorage.setItem(
+                'huehuy_vouchers',
+                JSON.stringify(claimedVouchers)
+              );
 
-            setIsAlreadyClaimed(true);
-            setShowSuccessModal(true);
-          } else {
-            const msg = (response?.data?.message || response?.message || '').toLowerCase();
-            if (msg.includes('habis') || msg.includes('stok') || msg.includes('stock')) {
-              setErrorMessage('Maaf, stok promo sudah habis direbut.');
-              setShowErrorModal(true);
-            } else if (msg.includes('sudah') || msg.includes('already') || msg.includes('claimed')) {
               setIsAlreadyClaimed(true);
-              setErrorMessage('Promo ini sudah pernah direbut pada akun lain.');
-              setShowErrorModal(true);
+              setShowSuccessModal(true);
+            } else {
+              const msg = (
+                response?.data?.message ||
+                response?.message ||
+                ''
+              ).toLowerCase();
+              if (
+                msg.includes('habis') ||
+                msg.includes('stok') ||
+                msg.includes('stock')
+              ) {
+                setErrorMessage('Maaf, stok promo sudah habis direbut.');
+                setShowErrorModal(true);
+              } else if (
+                msg.includes('sudah') ||
+                msg.includes('already') ||
+                msg.includes('claimed')
+              ) {
+                setIsAlreadyClaimed(true);
+                setErrorMessage(
+                  'Promo ini sudah pernah direbut pada akun lain.'
+                );
+                setShowErrorModal(true);
+              }
             }
+          } catch (error) {
+            console.warn('Auto claim failed:', error);
           }
-        } catch (error) {
-          console.warn('Auto claim failed:', error);
         }
+      } catch (error) {
+        console.warn('Auto register failed:', error);
       }
-    } catch (error) {
-      console.warn('Auto register failed:', error);
-    }
-  }, [fetchPromoDetails, communityId]);
+    },
+    [fetchPromoDetails, communityId]
+  );
 
   // NEW: Check user verification status
-  const checkUserVerificationStatus = useCallback(async (token) => {
-    try {
-      console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
+  const checkUserVerificationStatus = useCallback(
+    async (token) => {
+      try {
+        console.log(
+          'Checking verification status with token:',
+          token?.substring(0, 20) + '...'
+        );
 
-      let response = await get({
-        path: 'account',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response?.status === 200) {
-        console.log('User verified and logged in, proceeding with auto register');
-        handleAutoRegister(token);
-        return;
-      }
-
-      if (response?.status === 401 || response?.status === 404) {
-        response = await get({
-          path: 'account-unverified',
+        let response = await get({
+          path: 'account',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
         });
 
         if (response?.status === 200) {
-          const userData = response?.data?.data?.profile || response?.data?.profile;
-          const emailVerified = userData?.email_verified_at || userData?.verified_at;
+          console.log(
+            'User verified and logged in, proceeding with auto register'
+          );
+          handleAutoRegister(token);
+          return;
+        }
 
-          if (!emailVerified) {
-            const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-            window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
-            return;
-          } else {
-            handleAutoRegister(token);
-            return;
+        if (response?.status === 401 || response?.status === 404) {
+          response = await get({
+            path: 'account-unverified',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response?.status === 200) {
+            const userData =
+              response?.data?.data?.profile || response?.data?.profile;
+            const emailVerified =
+              userData?.email_verified_at || userData?.verified_at;
+
+            if (!emailVerified) {
+              const next =
+                typeof window !== 'undefined'
+                  ? window.location.href
+                  : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
+              window.location.href = `/verifikasi?next=${encodeURIComponent(
+                next
+              )}`;
+              return;
+            } else {
+              handleAutoRegister(token);
+              return;
+            }
           }
         }
-      }
 
-      if (response?.status === 401) {
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
+        if (response?.status === 401) {
+          const next =
+            typeof window !== 'undefined'
+              ? window.location.href
+              : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+          return;
+        }
+
+        handleAutoRegister(token);
+      } catch (err) {
+        console.error('Error checking verification status:', err);
+        const next =
+          typeof window !== 'undefined'
+            ? window.location.href
+            : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
         window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-        return;
       }
-
-      handleAutoRegister(token);
-
-    } catch (err) {
-      console.error('Error checking verification status:', err);
-      const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-      window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
-    }
-  }, [promoId, communityId, handleAutoRegister]);
+    },
+    [promoId, communityId, handleAutoRegister]
+  );
 
   // NEW: Handle QR entry flow
   useEffect(() => {
@@ -488,11 +576,15 @@ export default function PromoDetailUnified() {
       }
 
       if (!token) {
-        token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        token =
+          localStorage.getItem('auth_token') || localStorage.getItem('token');
       }
 
       if (!token) {
-        const next = typeof window !== 'undefined' ? window.location.href : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
+        const next =
+          typeof window !== 'undefined'
+            ? window.location.href
+            : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
         if (typeof window !== 'undefined') {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }
@@ -501,7 +593,13 @@ export default function PromoDetailUnified() {
 
       checkUserVerificationStatus(token);
     }
-  }, [router.isReady, router.query, promoId, communityId, checkUserVerificationStatus]);
+  }, [
+    router.isReady,
+    router.query,
+    promoId,
+    communityId,
+    checkUserVerificationStatus,
+  ]);
 
   // MODIFIED: Update handleBack to support QR entry
   const handleBack = () => {
@@ -528,27 +626,51 @@ export default function PromoDetailUnified() {
   const handleShareComplete = (platform) => {
     if (!promoData) return;
     const promoUrl = typeof window !== 'undefined' ? window.location.href : '';
-    const shareText = `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` + (promoData.discount ? ` Diskon ${promoData.discount}` : '');
+    const shareText =
+      `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` +
+      (promoData.discount ? ` Diskon ${promoData.discount}` : '');
 
     switch (platform) {
       case 'whatsapp':
-        window.open(`https://wa.me/?text=${encodeURIComponent(shareText + ' ' + promoUrl)}`, '_blank');
+        window.open(
+          `https://wa.me/?text=${encodeURIComponent(
+            shareText + ' ' + promoUrl
+          )}`,
+          '_blank'
+        );
         break;
       case 'telegram':
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(promoUrl)}&text=${encodeURIComponent(shareText)}`, '_blank');
+        window.open(
+          `https://t.me/share/url?url=${encodeURIComponent(
+            promoUrl
+          )}&text=${encodeURIComponent(shareText)}`,
+          '_blank'
+        );
         break;
       case 'facebook':
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(promoUrl)}`, '_blank');
+        window.open(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+            promoUrl
+          )}`,
+          '_blank'
+        );
         break;
       case 'twitter':
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(promoUrl)}`, '_blank');
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+            shareText
+          )}&url=${encodeURIComponent(promoUrl)}`,
+          '_blank'
+        );
         break;
       case 'copy':
         navigator.clipboard.writeText(promoUrl);
         const copyBtn = document.getElementById('copy-btn');
         if (copyBtn) {
           copyBtn.textContent = '✓ Link disalin!';
-          setTimeout(() => { copyBtn.textContent = '📋 Salin Link'; }, 2000);
+          setTimeout(() => {
+            copyBtn.textContent = '📋 Salin Link';
+          }, 2000);
         }
         break;
     }
@@ -561,12 +683,14 @@ export default function PromoDetailUnified() {
       promoId: promoData.id,
       reason,
       reportedAt: new Date().toISOString(),
-      status: 'pending'
+      status: 'pending',
     });
     localStorage.setItem('promoReports', JSON.stringify(reports));
     setShowReportModal(false);
     setTimeout(() => {
-      setErrorMessage('Laporan Anda telah dikirim. Terima kasih atas perhatiannya!');
+      setErrorMessage(
+        'Laporan Anda telah dikirim. Terima kasih atas perhatiannya!'
+      );
       setShowErrorModal(true);
     }, 300);
   };
@@ -577,10 +701,13 @@ export default function PromoDetailUnified() {
     setIsClaimedLoading(true);
     try {
       // Cek lagi untuk memastikan tidak ada duplikasi
-      const existingVouchers = JSON.parse(localStorage.getItem('huehuy_vouchers') || '[]');
-      const isDuplicate = existingVouchers.some(v =>
-        String(v.ad?.id) === String(promoData.id) ||
-        String(v.id) === String(promoData.id)
+      const existingVouchers = JSON.parse(
+        localStorage.getItem('huehuy_vouchers') || '[]'
+      );
+      const isDuplicate = existingVouchers.some(
+        (v) =>
+          String(v.ad?.id) === String(promoData.id) ||
+          String(v.id) === String(promoData.id)
       );
 
       if (isDuplicate) {
@@ -594,7 +721,9 @@ export default function PromoDetailUnified() {
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
 
       // Siapkan endpoint Laravel sesuai controller
-      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
+      const apiUrl = (
+        process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+      ).replace(/\/+$/, '');
       const endpoints = [
         `${apiUrl}/promos/${promoData.id}/items`,
         `${apiUrl}/promo-items`,
@@ -616,15 +745,32 @@ export default function PromoDetailUnified() {
       let lastError = '';
       for (const url of endpoints) {
         try {
-          const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+          const res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+          });
           const txt = await res.text().catch(() => '');
           let json = {};
-          try { json = txt ? JSON.parse(txt) : {}; } catch (_) { json = { raw: txt }; }
+          try {
+            json = txt ? JSON.parse(txt) : {};
+          } catch (_) {
+            json = { raw: txt };
+          }
 
-          if (res.ok) { savedItem = json?.data ?? json; break; }
+          if (res.ok) {
+            savedItem = json?.data ?? json;
+            break;
+          }
 
-          if (res.status === 401) { lastError = 'Sesi berakhir. Silakan login ulang.'; break; }
-          if (res.status === 422 && json?.errors) { lastError = Object.values(json.errors).flat().join(', '); break; }
+          if (res.status === 401) {
+            lastError = 'Sesi berakhir. Silakan login ulang.';
+            break;
+          }
+          if (res.status === 422 && json?.errors) {
+            lastError = Object.values(json.errors).flat().join(', ');
+            break;
+          }
           lastError = json?.message || json?.error || `HTTP ${res.status}`;
         } catch (e) {
           lastError = e?.message || 'Network error';
@@ -633,15 +779,26 @@ export default function PromoDetailUnified() {
 
       if (!savedItem) {
         const low = String(lastError || '').toLowerCase();
-        if (low.includes('habis') || low.includes('stok') || low.includes('stock')) {
+        if (
+          low.includes('habis') ||
+          low.includes('stok') ||
+          low.includes('stock')
+        ) {
           setErrorMessage('Maaf, stok promo sudah habis.');
           setShowErrorModal(true);
           setIsAlreadyClaimed(false);
           return;
         }
-        if (low.includes('sudah') || low.includes('already') || low.includes('claimed') || low.includes('duplicate')) {
+        if (
+          low.includes('sudah') ||
+          low.includes('already') ||
+          low.includes('claimed') ||
+          low.includes('duplicate')
+        ) {
           setIsAlreadyClaimed(true);
-          setErrorMessage('Promo ini sudah pernah direbut (mungkin di akun lain).');
+          setErrorMessage(
+            'Promo ini sudah pernah direbut (mungkin di akun lain).'
+          );
           setShowErrorModal(true);
           return;
         }
@@ -662,9 +819,19 @@ export default function PromoDetailUnified() {
           status: 'active',
           cube: {
             code: `community-${communityId || 'unknown'}`,
-            user: { name: promoData.seller?.name || 'Admin', phone: promoData.seller?.phone || '' },
+            user: {
+              name: promoData.seller?.name || 'Admin',
+              phone: promoData.seller?.phone || '',
+            },
             corporate: null,
-            tags: [{ address: promoData.location, link: null, map_lat: null, map_lng: null }],
+            tags: [
+              {
+                address: promoData.location,
+                link: null,
+                map_lat: null,
+                map_lng: null,
+              },
+            ],
           },
         },
       };
@@ -716,18 +883,33 @@ export default function PromoDetailUnified() {
           <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
         </div>
         <div className="flex items-center justify-between h-full relative z-10">
-          <button onClick={handleBack} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
-            <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
+          <button
+            onClick={handleBack}
+            className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+          >
+            <FontAwesomeIcon
+              icon={faArrowLeft}
+              className="text-white text-sm"
+            />
           </button>
           <div className="flex-1 text-center">
             <h1 className="text-white font-bold text-sm">Iklan</h1>
           </div>
           <div className="flex space-x-1.5">
-            <button onClick={handleShare} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
+            <button
+              onClick={handleShare}
+              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+            >
               <FontAwesomeIcon icon={faShare} className="text-white text-sm" />
             </button>
-            <button onClick={handleReport} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
-              <FontAwesomeIcon icon={faExclamationTriangle} className="text-white text-sm" />
+            <button
+              onClick={handleReport}
+              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+            >
+              <FontAwesomeIcon
+                icon={faExclamationTriangle}
+                className="text-white text-sm"
+              />
             </button>
           </div>
         </div>
@@ -750,7 +932,9 @@ export default function PromoDetailUnified() {
                     placeholder="blur"
                     blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
                     onError={() => {
-                      const img = document.querySelector(`img[alt="${promoData.title}"]`);
+                      const img = document.querySelector(
+                        `img[alt="${promoData.title}"]`
+                      );
                       if (img) img.src = '/default-avatar.png';
                     }}
                   />
@@ -764,26 +948,41 @@ export default function PromoDetailUnified() {
             <div className="bg-primary rounded-[20px] p-4 shadow-lg">
               <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
-                  <span className="text-sm font-semibold text-white">{promoData.distance}</span>
+                  <FontAwesomeIcon
+                    icon={faMapMarkerAlt}
+                    className="text-white mr-2 text-sm"
+                  />
+                  <span className="text-sm font-semibold text-white">
+                    {promoData.distance}
+                  </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-white opacity-80">Jarak Promo:</span>
-                  <div className="text-xs text-white opacity-70">{promoData.coordinates || '-'}</div>
+                  <span className="text-xs text-white opacity-80">
+                    Jarak Promo:
+                  </span>
+                  <div className="text-xs text-white opacity-70">
+                    {promoData.coordinates || '-'}
+                  </div>
                 </div>
               </div>
 
               <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">{promoData.schedule.day}</span>
-                    <div className="text-xs text-white opacity-80">{promoData.schedule.details}</div>
+                    <span className="text-sm font-semibold text-white">
+                      {promoData.schedule.day}
+                    </span>
+                    <div className="text-xs text-white opacity-80">
+                      {promoData.schedule.details}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="bg-yellow-400 text-slate-800 px-3 py-1 rounded-[8px] text-sm font-semibold">
                       {promoData.schedule.time}
                     </div>
-                    <div className="text-xs text-white opacity-70 mt-1">{promoData.schedule.timeDetails}</div>
+                    <div className="text-xs text-white opacity-70 mt-1">
+                      {promoData.schedule.timeDetails}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -791,10 +990,21 @@ export default function PromoDetailUnified() {
               <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <FontAwesomeIcon icon={promoData.status.type === 'Online' ? faWifi : faWifiSlash} className="mr-2 text-white text-sm" />
-                    <span className="text-sm font-semibold text-white">{promoData.status.type}</span>
+                    <FontAwesomeIcon
+                      icon={
+                        promoData.status.type === 'Online'
+                          ? faWifi
+                          : faWifiSlash
+                      }
+                      className="mr-2 text-white text-sm"
+                    />
+                    <span className="text-sm font-semibold text-white">
+                      {promoData.status.type}
+                    </span>
                   </div>
-                  <span className="text-xs text-white opacity-70">{promoData.status.description}</span>
+                  <span className="text-xs text-white opacity-70">
+                    {promoData.status.description}
+                  </span>
                 </div>
               </div>
             </div>
@@ -803,8 +1013,12 @@ export default function PromoDetailUnified() {
           {/* Title + desc */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
-              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
-              <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
+              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
+                {promoData.title}
+              </h2>
+              <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">
+                {promoData.description}
+              </p>
 
               {/* Harga ringkas */}
               <div className="flex items-center justify-between bg-slate-50 p-3 rounded-[12px] mb-3">
@@ -834,10 +1048,17 @@ export default function PromoDetailUnified() {
           {/* Lokasi */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
-              <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
+              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                Lokasi Promo / Iklan
+              </h4>
+              <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                {promoData.location}
+              </p>
               <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
-                <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
+                <FontAwesomeIcon
+                  icon={faMapMarkerAlt}
+                  className="mr-2 text-sm"
+                />
                 Rute
               </button>
             </div>
@@ -846,17 +1067,22 @@ export default function PromoDetailUnified() {
           {/* Kontak penjual */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">Penjual / Pemilik Iklan</h4>
+              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                Penjual / Pemilik Iklan
+              </h4>
               <div className="space-y-2">
-                <p className="font-semibold text-slate-900 text-xs">Nama: {promoData.seller?.name}</p>
-                <p className="text-xs text-slate-500">No Hp/WA: {promoData.seller?.phone}</p>
+                <p className="font-semibold text-slate-900 text-xs">
+                  Nama: {promoData.seller?.name}
+                </p>
+                <p className="text-xs text-slate-500">
+                  No Hp/WA: {promoData.seller?.phone}
+                </p>
                 <button className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center">
                   <FontAwesomeIcon icon={faPhone} className="text-sm" />
                 </button>
               </div>
             </div>
           </div>
-
         </div>
       </div>
 
@@ -895,17 +1121,30 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-3xl" />
+              <FontAwesomeIcon
+                icon={faCheckCircle}
+                className="text-green-500 text-3xl"
+              />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
             <p className="text-slate-600 mb-6 leading-relaxed">
-              Promo <span className="font-semibold text-primary">{promoData?.title}</span> berhasil direbut dan masuk ke Saku Promo Anda!
+              Promo{' '}
+              <span className="font-semibold text-primary">
+                {promoData?.title}
+              </span>{' '}
+              berhasil direbut dan masuk ke Saku Promo Anda!
             </p>
             <div className="space-y-3">
-              <button onClick={handleSuccessModalClose} className="w-full bg-primary text-white py-3 rounded-[12px] font-semibold hover:bg-opacity-90 transition-all">
+              <button
+                onClick={handleSuccessModalClose}
+                className="w-full bg-primary text-white py-3 rounded-[12px] font-semibold hover:bg-opacity-90 transition-all"
+              >
                 Lihat Saku Promo
               </button>
-              <button onClick={() => setShowSuccessModal(false)} className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all">
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
+              >
                 Tetap di Halaman Ini
               </button>
             </div>
@@ -918,11 +1157,19 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 text-3xl" />
+              <FontAwesomeIcon
+                icon={faExclamationTriangle}
+                className="text-red-500 text-3xl"
+              />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Oops!</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">{errorMessage}</p>
-            <button onClick={() => setShowErrorModal(false)} className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all">
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              {errorMessage}
+            </p>
+            <button
+              onClick={() => setShowErrorModal(false)}
+              className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
+            >
               OK, Mengerti
             </button>
           </div>
@@ -934,27 +1181,58 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
           <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Bagikan Promo</h3>
-              <button onClick={() => setShowShareModal(false)} className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all">✕</button>
+              <h3 className="text-lg font-bold text-slate-900">
+                Bagikan Promo
+              </h3>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
+              >
+                ✕
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => handleShareComplete('whatsapp')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-green-50 hover:border-green-300 transition-all">
-                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">WA</span></div>
+              <button
+                onClick={() => handleShareComplete('whatsapp')}
+                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-green-50 hover:border-green-300 transition-all"
+              >
+                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
+                  <span className="text-white font-bold text-sm">WA</span>
+                </div>
                 <span className="text-xs text-slate-600">WhatsApp</span>
               </button>
-              <button onClick={() => handleShareComplete('telegram')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all">
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">TG</span></div>
+              <button
+                onClick={() => handleShareComplete('telegram')}
+                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+              >
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
+                  <span className="text-white font-bold text-sm">TG</span>
+                </div>
                 <span className="text-xs text-slate-600">Telegram</span>
               </button>
-              <button onClick={() => handleShareComplete('facebook')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all">
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">FB</span></div>
+              <button
+                onClick={() => handleShareComplete('facebook')}
+                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+              >
+                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
+                  <span className="text-white font-bold text-sm">FB</span>
+                </div>
                 <span className="text-xs text-slate-600">Facebook</span>
               </button>
-              <button onClick={() => handleShareComplete('twitter')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all">
-                <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">TW</span></div>
+              <button
+                onClick={() => handleShareComplete('twitter')}
+                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
+              >
+                <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
+                  <span className="text-white font-bold text-sm">TW</span>
+                </div>
                 <span className="text-xs text-slate-600">Twitter</span>
               </button>
-              <button id="copy-btn" onClick={() => handleShareComplete('copy')} className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all">
+              <button
+                id="copy-btn"
+                onClick={() => handleShareComplete('copy')}
+                className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+              >
                 <span className="text-sm text-slate-700">📋 Salin Link</span>
               </button>
             </div>
@@ -967,20 +1245,39 @@ export default function PromoDetailUnified() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
           <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Laporkan Promo</h3>
-              <button onClick={() => setShowReportModal(false)} className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all">✕</button>
+              <h3 className="text-lg font-bold text-slate-900">
+                Laporkan Promo
+              </h3>
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
+              >
+                ✕
+              </button>
             </div>
             <div className="space-y-3">
-              <button onClick={() => submitReport('Iklan tidak sesuai')} className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all">
+              <button
+                onClick={() => submitReport('Iklan tidak sesuai')}
+                className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
+              >
                 Iklan tidak sesuai
               </button>
-              <button onClick={() => submitReport('Penipuan / scam')} className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all">
+              <button
+                onClick={() => submitReport('Penipuan / scam')}
+                className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
+              >
                 Penipuan / scam
               </button>
-              <button onClick={() => submitReport('Konten tidak pantas')} className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all">
+              <button
+                onClick={() => submitReport('Konten tidak pantas')}
+                className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
+              >
                 Konten tidak pantas
               </button>
-              <button onClick={() => setShowReportModal(false)} className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
+              >
                 Batal
               </button>
             </div>
@@ -990,22 +1287,46 @@ export default function PromoDetailUnified() {
 
       <style jsx>{`
         @keyframes bounce-in {
-          0% { transform: scale(0.3); opacity: 0; }
-          50% { transform: scale(1.05); }
-          70% { transform: scale(0.9); }
-          100% { transform: scale(1); opacity: 1; }
+          0% {
+            transform: scale(0.3);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.05);
+          }
+          70% {
+            transform: scale(0.9);
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
         }
         @keyframes slide-up {
-          from { transform: translateY(100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
         }
-        .animate-bounce-in { animation: bounce-in 0.6s cubic-bezier(0.68,-0.55,0.265,1.55); }
-        .animate-slide-up { animation: slide-up 0.3s ease-out; }
+        .animate-bounce-in {
+          animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
 
         @media (min-width: 1024px) {
-          .claim-button { max-width: 320px; margin: 0 auto; }
+          .claim-button {
+            max-width: 320px;
+            margin: 0 auto;
+          }
           .desktop-container {
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+              0 10px 10px -5px rgba(0, 0, 0, 0.04);
           }
         }
       `}</style>
