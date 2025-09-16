@@ -34,17 +34,39 @@ export default function PromoDetailUnified() {
   const { promoId, communityId } = router.query;
 
   // --- Resolve ID promo dari QR lama ---
-  const resolveLegacyPromoId = useCallback(() => {
-    if (promoId === 'detail_promo') {
-      return (
-        router.query.filter ||
-        router.query.id ||
-        router.query.promoId ||
-        null
-      );
+  // helper aman ambil query string dari URL sebenarnya
+  const getFromSearch = (key) => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const url = new URL(router.asPath, window.location.origin);
+      const v = url.searchParams.get(key);
+      return v && String(v).trim() !== '' ? v : null;
+    } catch {
+      return null;
     }
-    return promoId || null;
-  }, [promoId, router.query]);
+  };
+
+  const resolveLegacyPromoId = useCallback(() => {
+    // Kalau route param normal (bukan 'detail_promo'), pakai itu
+    if (promoId && promoId !== 'detail_promo') return String(promoId);
+
+    // Legacy URL: /promo/detail_promo?... → ambil dari query string asli
+    const qsFilter = getFromSearch('filter');     // dukung versi lama ?filter=123
+    const qsPromo = getFromSearch('promoId');    // dukung ?promoId=1
+    const qsId = getFromSearch('id');         // dukung ?id=1
+
+    const candidate =
+      qsFilter ||
+      qsPromo ||
+      qsId ||
+      router.query.filter ||
+      router.query.id ||
+      null;
+
+    // Pastikan tidak mengembalikan 'detail_promo' lagi
+    if (!candidate || String(candidate).toLowerCase() === 'detail_promo') return null;
+    return String(candidate);
+  }, [promoId, router.asPath, router.query.filter, router.query.id]);
 
   const effectivePromoId = resolveLegacyPromoId();
 
@@ -212,12 +234,12 @@ export default function PromoDetailUnified() {
 
   // Fallback legacy jika tidak ada communityId
   useEffect(() => {
-    if (!promoId) return;
+    if (!effectivePromoId) return;
     if (typeof communityId !== 'undefined' && communityId !== null) return;
-    const legacy = getLegacyPromoData(promoId);
+    const legacy = getLegacyPromoData(effectivePromoId);
     setPromoData(normalizeToDetailShape(legacy));
     setLoading(false);
-  }, [promoId, communityId]);
+  }, [effectivePromoId, communityId]);
 
   // --- Fetch detail (stabil, anti double-run) ---
   const hasFetched = useRef(false);
