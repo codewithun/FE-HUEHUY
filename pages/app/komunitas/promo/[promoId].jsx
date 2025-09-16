@@ -52,15 +52,15 @@ export default function PromoDetailUnified() {
 
     // Legacy URL: /promo/detail_promo?... → ambil dari query string asli
     const qsFilter = getFromSearch('filter');     // dukung versi lama ?filter=123
-    const qsPromo = getFromSearch('promoId');    // dukung ?promoId=1
-    const qsId = getFromSearch('id');         // dukung ?id=1
+    const qsPromo  = getFromSearch('promoId');    // dukung ?promoId=1
+    const qsId     = getFromSearch('id');         // dukung ?id=1
 
     const candidate =
       qsFilter ||
-      qsPromo ||
-      qsId ||
+      qsPromo  ||
+      qsId     ||
       router.query.filter ||
-      router.query.id ||
+      router.query.id     ||
       null;
 
     // Pastikan tidak mengembalikan 'detail_promo' lagi
@@ -80,6 +80,12 @@ export default function PromoDetailUnified() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
+
+  // ==== Hook gambar harus di atas (hindari React error #310) ====
+  const [imgSrc, setImgSrc] = useState(promoData?.image || '/default-avatar.png');
+  useEffect(() => {
+    setImgSrc(promoData?.image || '/default-avatar.png');
+  }, [promoData?.image]);
 
   // ====== Mock legacy (fallback jika tanpa communityId) ======
   const getLegacyPromoData = (id) => {
@@ -251,6 +257,7 @@ export default function PromoDetailUnified() {
 
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady || !effectivePromoId || !communityId) return null;
+    if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null; // hard guard
     if (hasFetched.current) return null;
     hasFetched.current = true;
 
@@ -614,11 +621,11 @@ export default function PromoDetailUnified() {
 
       const endpoints = apiUrl
         ? [
-          `${apiUrl}/promos/${promoData.id}/items`,
-          `${apiUrl}/promo-items`,
-          `${apiUrl}/admin/promos/${promoData.id}/items`,
-          `${apiUrl}/admin/promo-items`,
-        ]
+            `${apiUrl}/promos/${promoData.id}/items`,
+            `${apiUrl}/promo-items`,
+            `${apiUrl}/admin/promos/${promoData.id}/items`,
+            `${apiUrl}/admin/promo-items`,
+          ]
         : [];
 
       const headers = {
@@ -749,14 +756,6 @@ export default function PromoDetailUnified() {
       </div>
     );
   }
-
-  // Gambar: fallback aman via state
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [imgSrc, setImgSrc] = useState(promoData?.image || '/default-avatar.png');
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useEffect(() => {
-    setImgSrc(promoData?.image || '/default-avatar.png');
-  }, [promoData?.image]);
 
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
@@ -924,12 +923,13 @@ export default function PromoDetailUnified() {
           <button
             onClick={handleClaimPromo}
             disabled={isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isAlreadyClaimed
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : isClaimedLoading
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+              isAlreadyClaimed
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : isClaimedLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-              }`}
+            }`}
           >
             {isAlreadyClaimed ? (
               <div className="flex items-center justify-center">
