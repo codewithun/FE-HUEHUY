@@ -538,7 +538,7 @@ export default function PromoDetailUnified() {
     checkUserVerificationStatus(token);
   }, [router.isReady, autoRegister, promoId, communityId, checkUserVerificationStatus, hasTriedAuth]);
 
-  // --- Back handler ---
+  // Back handler
   const handleBack = () => {
     const { from } = router.query;
 
