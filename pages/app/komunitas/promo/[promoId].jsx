@@ -14,7 +14,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { token_cookie_name } from '../../../../helpers';
 import { get, post } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
@@ -34,17 +34,39 @@ export default function PromoDetailUnified() {
   const { promoId, communityId } = router.query;
 
   // --- Resolve ID promo dari QR lama ---
-  const resolveLegacyPromoId = useCallback(() => {
-    if (promoId === 'detail_promo') {
-      return (
-        router.query.filter ||
-        router.query.id ||
-        router.query.promoId ||
-        null
-      );
+  // helper aman ambil query string dari URL sebenarnya
+  const getFromSearch = useCallback((key) => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const url = new URL(router.asPath, window.location.origin);
+      const v = url.searchParams.get(key);
+      return v && String(v).trim() !== '' ? v : null;
+    } catch {
+      return null;
     }
-    return promoId || null;
-  }, [promoId, router.query]);
+  }, [router.asPath]);
+
+  const resolveLegacyPromoId = useCallback(() => {
+    // Kalau route param normal (bukan 'detail_promo'), pakai itu
+    if (promoId && promoId !== 'detail_promo') return String(promoId);
+
+    // Legacy URL: /promo/detail_promo?... → ambil dari query string asli
+    const qsFilter = getFromSearch('filter');     // dukung versi lama ?filter=123
+    const qsPromo  = getFromSearch('promoId');    // dukung ?promoId=1
+    const qsId     = getFromSearch('id');         // dukung ?id=1
+
+    const candidate =
+      qsFilter ||
+      qsPromo  ||
+      qsId     ||
+      router.query.filter ||
+      router.query.id     ||
+      null;
+
+    // Pastikan tidak mengembalikan 'detail_promo' lagi
+    if (!candidate || String(candidate).toLowerCase() === 'detail_promo') return null;
+    return String(candidate);
+  }, [promoId, router.query.filter, router.query.id, getFromSearch]);
 
   const effectivePromoId = resolveLegacyPromoId();
 
@@ -58,6 +80,19 @@ export default function PromoDetailUnified() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
+
+  // ==== Hook gambar harus di atas (hindari React error #310) ====
+  const [imgSrc, setImgSrc] = useState(promoData?.image || '/default-avatar.png');
+  useEffect(() => {
+    setImgSrc(promoData?.image || '/default-avatar.png');
+  }, [promoData?.image]);
+
+  // Clean up on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      setHasTriedAuth(false);
+    };
+  }, []);
 
   // ====== Mock legacy (fallback jika tanpa communityId) ======
   const getLegacyPromoData = (id) => {
@@ -212,12 +247,12 @@ export default function PromoDetailUnified() {
 
   // Fallback legacy jika tidak ada communityId
   useEffect(() => {
-    if (!promoId) return;
+    if (!effectivePromoId) return;
     if (typeof communityId !== 'undefined' && communityId !== null) return;
-    const legacy = getLegacyPromoData(promoId);
+    const legacy = getLegacyPromoData(effectivePromoId);
     setPromoData(normalizeToDetailShape(legacy));
     setLoading(false);
-  }, [promoId, communityId]);
+  }, [effectivePromoId, communityId]);
 
   // --- Fetch detail (stabil, anti double-run) ---
   const hasFetched = useRef(false);
@@ -229,6 +264,7 @@ export default function PromoDetailUnified() {
 
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady || !effectivePromoId || !communityId) return null;
+    if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null; // hard guard
     if (hasFetched.current) return null;
     hasFetched.current = true;
 
@@ -285,17 +321,19 @@ export default function PromoDetailUnified() {
   useEffect(() => {
     if (!router.isReady) return;
     if (!effectivePromoId || !communityId) return;
-    const autoRegister = router.query.autoRegister || router.query.source;
     if (autoRegister) return;
     fetchPromoDetails();
     // penting: JANGAN masukkan fetchPromoDetails ke deps agar tidak berubah referensi
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, effectivePromoId, communityId, router.query.autoRegister, router.query.source]);
+  }, [router.isReady, effectivePromoId, communityId, autoRegister]);
 
   // --- Auto register setelah QR ---
   const handleAutoRegister = useCallback(
     async (token) => {
       try {
+        // Reset hasTriedAuth setelah mendapat token valid
+        setHasTriedAuth(false);
+        
         const pd = await fetchPromoDetails();
         if (!pd) return;
 
@@ -399,7 +437,10 @@ export default function PromoDetailUnified() {
                 typeof window !== 'undefined'
                   ? window.location.href
                   : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-              window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+              // Add delay to prevent immediate redirect loops
+              setTimeout(() => {
+                window.location.href = `/verifikasi?next=${encodeURIComponent(next)}`;
+              }, 100);
               return;
             } else {
               handleAutoRegister(token);
@@ -413,7 +454,10 @@ export default function PromoDetailUnified() {
             typeof window !== 'undefined'
               ? window.location.href
               : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+          // Add delay to prevent immediate redirect loops
+          setTimeout(() => {
+            window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+          }, 100);
           return;
         }
 
@@ -424,7 +468,10 @@ export default function PromoDetailUnified() {
           typeof window !== 'undefined'
             ? window.location.href
             : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
-        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        // Add delay to prevent immediate redirect loops
+        setTimeout(() => {
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        }, 100);
       }
     },
     [promoId, communityId, handleAutoRegister]
@@ -433,27 +480,27 @@ export default function PromoDetailUnified() {
   // --- Retry fetch khusus alur QR (saat param sudah siap) ---
   useEffect(() => {
     if (!router.isReady) return;
-    const autoRegister = router.query.autoRegister || router.query.source;
     if (!autoRegister) return;
 
     if (effectivePromoId && communityId && !hasFetched.current) {
       // panggil fetch ketika semua param sudah lengkap
       fetchPromoDetails();
     }
-  }, [
-    router.isReady,
-    router.query.autoRegister,
-    router.query.source,
-    effectivePromoId,
-    communityId,
-    // JANGAN masukkan fetchPromoDetails ke deps agar referensinya tidak berubah
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, autoRegister, effectivePromoId, communityId]);
+
+  // State untuk mencegah multiple redirects
+  const [hasTriedAuth, setHasTriedAuth] = useState(false);
+  
+  // Extract autoRegister state using useMemo to prevent unnecessary re-renders
+  const autoRegister = useMemo(() => {
+    return router.query.autoRegister || router.query.source;
+  }, [router.query.autoRegister, router.query.source]);
 
   // --- QR entry flow ---
   useEffect(() => {
     if (!router.isReady) return;
-
-    const autoRegister = router.query.autoRegister || router.query.source;
+    if (hasTriedAuth) return; // Prevent multiple auth attempts
     if (!autoRegister) return;
 
     let token = null;
@@ -472,24 +519,28 @@ export default function PromoDetailUnified() {
       token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     }
 
+    setHasTriedAuth(true); // Mark that we've tried auth
+
     if (!token) {
       const next =
         typeof window !== 'undefined'
           ? window.location.href
           : `/app/komunitas/promo/${promoId}?communityId=${communityId}`;
       if (typeof window !== 'undefined') {
-        window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        // Use setTimeout to prevent immediate redirect loops
+        setTimeout(() => {
+          window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
+        }, 100);
       }
       return;
     }
 
     checkUserVerificationStatus(token);
-  }, [router.isReady, router.query, promoId, communityId, checkUserVerificationStatus]);
+  }, [router.isReady, autoRegister, promoId, communityId, checkUserVerificationStatus, hasTriedAuth]);
 
-  // --- Back handler ---
+  // Back handler
   const handleBack = () => {
     const { from } = router.query;
-    const autoRegister = router.query.autoRegister || router.query.source;
 
     if (autoRegister) {
       router.push('/app');
@@ -592,11 +643,11 @@ export default function PromoDetailUnified() {
 
       const endpoints = apiUrl
         ? [
-          `${apiUrl}/promos/${promoData.id}/items`,
-          `${apiUrl}/promo-items`,
-          `${apiUrl}/admin/promos/${promoData.id}/items`,
-          `${apiUrl}/admin/promo-items`,
-        ]
+            `${apiUrl}/promos/${promoData.id}/items`,
+            `${apiUrl}/promo-items`,
+            `${apiUrl}/admin/promos/${promoData.id}/items`,
+            `${apiUrl}/admin/promo-items`,
+          ]
         : [];
 
       const headers = {
@@ -727,14 +778,6 @@ export default function PromoDetailUnified() {
       </div>
     );
   }
-
-  // Gambar: fallback aman via state
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [imgSrc, setImgSrc] = useState(promoData?.image || '/default-avatar.png');
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useEffect(() => {
-    setImgSrc(promoData?.image || '/default-avatar.png');
-  }, [promoData?.image]);
 
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
@@ -902,12 +945,13 @@ export default function PromoDetailUnified() {
           <button
             onClick={handleClaimPromo}
             disabled={isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isAlreadyClaimed
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : isClaimedLoading
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+              isAlreadyClaimed
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : isClaimedLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-              }`}
+            }`}
           >
             {isAlreadyClaimed ? (
               <div className="flex items-center justify-center">

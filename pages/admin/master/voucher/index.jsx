@@ -1,16 +1,17 @@
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable no-console */
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
+import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ButtonComponent,
-  FloatingPageComponent,
+  InputComponent,
+  InputImageComponent,
   ModalConfirmComponent,
+  SelectComponent,
   TableSupervisionComponent,
+  TextareaComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
-import VoucherForm from '../../../../components/voucher/VoucherForm';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
@@ -47,7 +48,6 @@ const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
 /* -------------------- Page -------------------- */
 
 function VoucherCrud() {
-  const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [refreshToggle, setRefreshToggle] = useState(false);
@@ -116,43 +116,6 @@ function VoucherCrud() {
     fetchUsers();
   }, [apiBase, authHeader]);
 
-  const submitVoucher = async (body) => {
-    try {
-      const isUpdate = Boolean(selectedVoucher);
-      const url = isUpdate
-        ? `${apiBase}/api/admin/vouchers/${selectedVoucher.id}`
-        : `${apiBase}/api/admin/vouchers`;
-
-      const res = await fetch(url, { 
-        method: 'POST', 
-        headers: { ...authHeader() }, 
-        body 
-      });
-
-      if (!res.ok) {
-        let msg = 'Server error';
-        try {
-          const j = await res.json();
-          msg = j?.message || msg;
-        } catch (parseError) {
-          console.error('Error parsing response:', parseError);
-        }
-        alert('Gagal menyimpan voucher: ' + msg);
-        return;
-      }
-
-      resetForm();
-      setRefreshToggle((s) => !s);
-      setModalForm(false);
-    } catch (error) {
-      console.error('Error submitting voucher:', error);
-      alert('Gagal menyimpan voucher: Network error');
-    }
-  };
-
-  const resetForm = () => {
-    setSelectedVoucher(null);
-  };
 
   const handleDelete = async () => {
     if (!selectedVoucher) return;
@@ -198,17 +161,16 @@ function VoucherCrud() {
       item: ({ image }) => {
         const src = buildImageUrl(image);
         return src ? (
-          <img 
+          <Image 
             src={src} 
             alt="Voucher" 
+            width={48}
+            height={48}
             className="w-12 h-12 object-cover rounded-lg"
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
           />
         ) : (
           <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
-            <span className="text-gray-400 text-xs">No Image</span>
+            <span className="text-xs text-gray-500">No Image</span>
           </div>
         );
       },
@@ -243,17 +205,7 @@ function VoucherCrud() {
     },
   ], [getUserLabel, getCommunityLabel]);
 
-  const topBarActions = (
-    <ButtonComponent
-      label="Tambah Voucher"
-      icon={faPlus}
-      paint="primary"
-      onClick={() => {
-        resetForm();
-        setModalForm(true);
-      }}
-    />
-  );
+  const topBarActions = null;
 
   return (
     <>
@@ -265,10 +217,12 @@ function VoucherCrud() {
         noControlBar={false}
         setToRefresh={refreshToggle}
         actionControl={{
-          except: ['detail', 'add'],
+          except: ['detail'],
+          onAdd: () => {
+            setSelectedVoucher(null);
+          },
           onEdit: (voucher) => {
             setSelectedVoucher(voucher);
-            setModalForm(true);
           },
           onDelete: (voucher) => {
             setSelectedVoucher(voucher);
@@ -282,39 +236,173 @@ function VoucherCrud() {
             ...authHeader(),
           },
         }}
-      />
-
-      <FloatingPageComponent
-        show={modalForm}
-        onClose={() => {
-          setModalForm(false);
-          resetForm();
+        formControl={{
+          contentType: 'multipart/form-data',
+          transformData: (data) => {
+            // normalisasi target_type
+            const tt = data.target_type || 'all';
+          
+            // bersihkan community_id
+            const cid = data.community_id;
+            const emptyish = cid === '' || cid === undefined || cid === null || cid === 'null' || cid === 'undefined';
+          
+            if (tt !== 'community' || emptyish) {
+              // jangan kirim sama sekali
+              delete data.community_id;
+            } else {
+              // pastikan bentuk string angka
+              data.community_id = String(cid);
+            }
+          
+            // bersihkan target_user_id kalau bukan user
+            if (tt !== 'user') {
+              delete data.target_user_id;
+            }
+          
+            return data;
+          },
+          custom: [
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="name"
+                  label="Nama Voucher"
+                  placeholder="Contoh: Diskon 20% Semua Menu"
+                  {...formControl('name')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="code"
+                  label="Kode Unik"
+                  placeholder="Contoh: HH-20OFF"
+                  {...formControl('code')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <TextareaComponent
+                  name="description"
+                  label="Deskripsi"
+                  placeholder="Tuliskan ketentuan singkat voucher"
+                  {...formControl('description')}
+                  rows={3}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputImageComponent
+                  name="image"
+                  label="Gambar Voucher"
+                  {...formControl('image')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="type"
+                  label="Tipe Voucher"
+                  placeholder="Contoh: percentage / nominal / buy1get1"
+                  {...formControl('type')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  type="date"
+                  name="valid_until"
+                  label="Berlaku Sampai"
+                  {...formControl('valid_until')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="tenant_location"
+                  label="Lokasi Tenant"
+                  placeholder="Contoh: Foodcourt Lantai 2"
+                  {...formControl('tenant_location')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  type="number"
+                  name="stock"
+                  label="Stok Voucher"
+                  placeholder="Jumlah voucher tersedia"
+                  {...formControl('stock')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <SelectComponent
+                  name="target_type"
+                  label="Target Penerima"
+                  {...formControl('target_type')}
+                  options={[
+                    { label: 'Semua Pengguna', value: 'all' },
+                    { label: 'Pengguna Tertentu', value: 'user' },
+                    { label: 'Anggota Community', value: 'community' },
+                  ]}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl, values }) => {
+                const targetType = values.find((i) => i.name === 'target_type')?.value;
+                return targetType === 'user' ? (
+                  <SelectComponent
+                    name="target_user_id"
+                    label="Pilih Pengguna"
+                    placeholder="Pilih pengguna..."
+                    {...formControl('target_user_id')}
+                    options={users.map((u) => ({
+                      label: u.name || u.email || `#${u.id}`,
+                      value: u.id,
+                    }))}
+                  />
+                ) : null;
+              },
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <SelectComponent
+                  name="community_id"
+                  label="Community (opsional)"
+                  placeholder="Pilih community..."
+                  {...formControl('community_id')}
+                  clearable={true}
+                  options={communities.map((c) => ({
+                    label: c.name,
+                    value: c.id,
+                  }))}
+                />
+              ),
+            },
+          ],
         }}
-        title=""
-        subtitle=""
-        size="lg"
-        className="bg-background"
-      >
-        <VoucherForm
-          mode={selectedVoucher ? 'edit' : 'create'}
-          initialData={
-            selectedVoucher
-              ? { 
-                  ...selectedVoucher, 
-                  valid_until: selectedVoucher.valid_until || '' 
-                }
-              : undefined
-          }
-          users={users}
-          communities={communities}
-          buildImageUrl={buildImageUrl}
-          onCancel={() => {
-            setModalForm(false);
-            resetForm();
-          }}
-          onSubmit={submitVoucher}
-        />
-      </FloatingPageComponent>
+      />
 
       <ModalConfirmComponent
         title="Hapus Voucher"

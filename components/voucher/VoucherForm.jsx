@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable no-console */
 import React, { useEffect, useState } from 'react';
+import InputImageComponent from '../base.components/input/InputImage.component';
 
 const toDateInputValue = (raw) => {
   if (!raw) return '';
@@ -52,10 +53,11 @@ export default function VoucherForm({
   const badgeText = mode === 'edit' ? 'Mode Ubah' : 'Mode Tambah';
   const submitText = mode === 'edit' ? 'Perbarui' : 'Simpan';
 
-  const handleImageChange = (e) => {
-    const f = e.target.files?.[0];
-    setImageFile(f || null);
-    if (f) setFormData((s) => ({ ...s, image: '' }));
+  const handleImageChange = (file) => {
+    setImageFile(file || null);
+    if (file) {
+      setFormData((s) => ({ ...s, image: '' }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -83,8 +85,11 @@ export default function VoucherForm({
     if (formData.target_type === 'user' && formData.target_user_id) {
       body.append('target_user_id', String(formData.target_user_id));
     }
-    if (formData.target_type === 'community' && formData.community_id) {
-      body.append('community_id', String(formData.community_id));
+    if (formData.target_type === 'community') {
+      const cid = Number(formData.community_id);
+      if (Number.isInteger(cid) && cid > 0) {
+        body.append('community_id', String(cid));
+      }
     }
 
     if (imageFile) body.append('image', imageFile);
@@ -150,6 +155,26 @@ export default function VoucherForm({
           </div>
         </div>
 
+        {/* Media */}
+        <div className="mt-8 mb-4">
+          <h3 className="text-base font-semibold">Media</h3>
+          <p className="text-sm text-muted-foreground">Gambar voucher (opsional).</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="form-control">
+            <InputImageComponent
+              name="image"
+              label="Gambar Voucher"
+              value={imageFile || (formData.image && !imageFile ? buildImageUrl(formData.image) : '')}
+              onChange={handleImageChange}
+            />
+            <span className="text-xs text-gray-500 mt-1">
+              PNG/JPG. Jika tidak diubah saat edit, gambar lama dipertahankan.
+            </span>
+          </div>
+        </div>
+
         {/* Pengaturan & Periode */}
         <div className="mt-8 mb-4">
           <h3 className="text-base font-semibold">Pengaturan & Periode</h3>
@@ -203,7 +228,7 @@ export default function VoucherForm({
               />
               <span className="btn btn-ghost join-item pointer-events-none">voucher</span>
             </div>
-            <span className="text-xs text-gray-500 mt-1">Tampilan tabel: “{`{angka}`} voucher”.</span>
+            <span className="text-xs text-gray-500 mt-1">Tampilan tabel: "{`{angka}`} voucher".</span>
           </div>
         </div>
 
@@ -225,7 +250,7 @@ export default function VoucherForm({
                   ...s,
                   target_type: next,
                   target_user_id: next === 'user' ? s.target_user_id : '',
-                  community_id: next === 'community' ? s.community_id : '',
+                  community_id: next === 'community' ? s.community_id : '', // kosongkan kalau bukan community
                 }));
               }}
             >
@@ -272,54 +297,6 @@ export default function VoucherForm({
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          </div>
-        </div>
-
-        {/* Media */}
-        <div className="mt-8 mb-4">
-          <h3 className="text-base font-semibold">Media</h3>
-          <p className="text-sm text-muted-foreground">Gambar voucher (opsional).</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="form-control">
-            <label className="label"><span className="label-text font-medium">Upload Gambar</span></label>
-            <input
-              type="file"
-              accept="image/*"
-              className="file-input file-input-bordered w-full"
-              onChange={handleImageChange}
-            />
-            <span className="text-xs text-gray-500 mt-1">
-              PNG/JPG. Jika tidak diubah saat edit, gambar lama dipertahankan.
-            </span>
-          </div>
-
-          <div className="form-control">
-            <label className="label"><span className="label-text font-medium">Preview</span></label>
-            <div className="flex items-center gap-3">
-              {formData.image && !imageFile && (
-                <img
-                  src={buildImageUrl ? (buildImageUrl(formData.image) || '') : ''}
-                  alt="Voucher"
-                  width={96}
-                  height={96}
-                  className="rounded-xl border"
-                />
-              )}
-              {imageFile && (
-                <img
-                  src={URL.createObjectURL(imageFile)}
-                  alt="Preview"
-                  width={96}
-                  height={96}
-                  className="rounded-xl border"
-                />
-              )}
-              {!formData.image && !imageFile && (
-                <span className="text-sm text-muted-foreground">Belum ada gambar</span>
-              )}
-            </div>
           </div>
         </div>
 
