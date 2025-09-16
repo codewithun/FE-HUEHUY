@@ -2,7 +2,7 @@
 /* eslint-disable no-console */
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ButtonComponent,
   FloatingPageComponent,
@@ -10,23 +10,20 @@ import {
   TableSupervisionComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
+import VoucherForm from '../../../../components/voucher/VoucherForm';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
-import { useRouter } from 'next/router';
-import VoucherForm from '../../../../components/voucher/VoucherForm';
 
 /* -------------------- Helpers -------------------- */
 
-// Normalisasi base API (hapus trailing /api)
 const getApiBase = () => {
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   return raw.replace(/\/api\/?$/, '');
 };
 
-// Build URL gambar (support path relatif dari storage)
 const buildImageUrl = (raw) => {
   if (!raw) return null;
-  if (/^https?:\/\//i.test(raw)) return raw; // absolute
+  if (/^https?:\/\//i.test(raw)) return raw;
   const base = getApiBase();
   let path = String(raw).replace(/^\/+/, '');
   path = path.replace(/^api\/storage\//, 'storage/');
@@ -34,7 +31,6 @@ const buildImageUrl = (raw) => {
   return `${base}/${path}`;
 };
 
-// Tanggal Indonesia
 const formatDateID = (raw) => {
   if (!raw) return '-';
   const d = new Date(raw);
@@ -46,199 +42,154 @@ const formatDateID = (raw) => {
   }).format(d);
 };
 
-// Untuk value <input type="date">
-const toDateInputValue = (raw) => {
-  if (!raw) return '';
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return '';
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
-
 const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
 
 /* -------------------- Page -------------------- */
 
 function VoucherCrud() {
-  const router = useRouter();
-
-  const [voucherList, setVoucherList] = useState([]);
   const [modalForm, setModalForm] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [refreshToggle, setRefreshToggle] = useState(false);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    image: '',
-    type: '',
-    valid_until: '',
-    tenant_location: '',
-    stock: 0,
-    code: '',
-    community_id: '',
-    target_type: 'all', // all | user | community
-    target_user_id: '',
-  });
-
-  const [imageFile, setImageFile] = useState(null);
   const [communities, setCommunities] = useState([]);
   const [users, setUsers] = useState([]);
 
   const apiBase = useMemo(() => getApiBase(), []);
-  const authHeader = () => {
+  
+  const authHeader = useCallback(() => {
     const enc = Cookies.get(token_cookie_name);
     const token = enc ? Decrypt(enc) : '';
     return { Authorization: `Bearer ${token}` };
-  };
+  }, []);
 
-  const getUserLabel = (id) => {
+  const getUserLabel = useCallback((id) => {
     if (!id) return '';
     const u = users.find((x) => String(x.id) === String(id));
     return u?.name || u?.email || `User #${id}`;
-  };
-  const getCommunityLabel = (id) => {
+  }, [users]);
+
+  const getCommunityLabel = useCallback((id) => {
     if (!id) return '';
     const c = communities.find((x) => String(x.id) === String(id));
     return c?.name || `Community #${id}`;
-  };
-
-  // Fetch vouchers
-  const fetchVouchers = async () => {
-    try {
-      const res = await fetch(`${apiBase}/api/admin/vouchers`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json', ...authHeader() },
-      });
-      const result = await res.json();
-      setVoucherList(Array.isArray(result.data) ? result.data : []);
-    } catch {
-      setVoucherList([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchVouchers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBase]);
+  }, [communities]);
 
   // Fetch communities
   useEffect(() => {
-    (async () => {
+    const fetchCommunities = async () => {
       try {
         const res = await fetch(`${apiBase}/api/admin/communities`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json', ...authHeader() },
         });
-        const result = await res.json();
-        setCommunities(Array.isArray(result.data) ? result.data : []);
-      } catch {
+        if (res.ok) {
+          const result = await res.json();
+          setCommunities(Array.isArray(result.data) ? result.data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching communities:', error);
         setCommunities([]);
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBase]);
+    };
+
+    fetchCommunities();
+  }, [apiBase, authHeader]);
 
   // Fetch users
   useEffect(() => {
-    (async () => {
+    const fetchUsers = async () => {
       try {
         const res = await fetch(`${apiBase}/api/admin/users`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json', ...authHeader() },
         });
-        const result = await res.json();
-        setUsers(Array.isArray(result.data) ? result.data : []);
-      } catch {
+        if (res.ok) {
+          const result = await res.json();
+          setUsers(Array.isArray(result.data) ? result.data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
         setUsers([]);
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBase]);
+    };
 
-  // Upload image (hanya untuk local preview kalau kamu tetap pakai formData di halaman ini)
-  const handleImageChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
-      setFormData((s) => ({ ...s, image: '' }));
-    }
-  };
+    fetchUsers();
+  }, [apiBase, authHeader]);
 
-  // Submit (create / update) — dipakai oleh VoucherForm via onSubmit
   const submitVoucher = async (body) => {
-    const isUpdate = Boolean(selectedVoucher);
-    const url = isUpdate
-      ? `${apiBase}/api/admin/vouchers/${selectedVoucher.id}`
-      : `${apiBase}/api/admin/vouchers`;
+    try {
+      const isUpdate = Boolean(selectedVoucher);
+      const url = isUpdate
+        ? `${apiBase}/api/admin/vouchers/${selectedVoucher.id}`
+        : `${apiBase}/api/admin/vouchers`;
 
-    const res = await fetch(url, { method: 'POST', headers: { ...authHeader() }, body });
+      const res = await fetch(url, { 
+        method: 'POST', 
+        headers: { ...authHeader() }, 
+        body 
+      });
 
-    if (!res.ok) {
-      let msg = 'server error';
-      try {
-        const j = await res.json();
-        msg = j?.message || msg;
-      } catch {}
-      alert('Gagal menyimpan voucher: ' + msg);
-      return;
+      if (!res.ok) {
+        let msg = 'Server error';
+        try {
+          const j = await res.json();
+          msg = j?.message || msg;
+        } catch (parseError) {
+          console.error('Error parsing response:', parseError);
+        }
+        alert('Gagal menyimpan voucher: ' + msg);
+        return;
+      }
+
+      resetForm();
+      setRefreshToggle((s) => !s);
+      setModalForm(false);
+    } catch (error) {
+      console.error('Error submitting voucher:', error);
+      alert('Gagal menyimpan voucher: Network error');
     }
-
-    resetForm();
-    setRefreshToggle((s) => !s);
-    setModalForm(false);
-    fetchVouchers();
   };
 
   const resetForm = () => {
     setSelectedVoucher(null);
-    setFormData({
-      name: '',
-      description: '',
-      image: '',
-      type: '',
-      valid_until: '',
-      tenant_location: '',
-      stock: 0,
-      code: '',
-      community_id: '',
-      target_type: 'all',
-      target_user_id: '',
-    });
-    setImageFile(null);
   };
 
-  // Delete voucher
   const handleDelete = async () => {
     if (!selectedVoucher) return;
+    
     try {
-      await fetch(`${apiBase}/api/admin/vouchers/${selectedVoucher.id}`, {
+      const res = await fetch(`${apiBase}/api/admin/vouchers/${selectedVoucher.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
       });
-      setVoucherList((prev) => prev.filter((v) => v.id !== selectedVoucher.id));
-      setRefreshToggle((s) => !s);
+
+      if (res.ok) {
+        setRefreshToggle((s) => !s);
+        alert('Voucher berhasil dihapus');
+      } else {
+        alert('Gagal menghapus voucher');
+      }
+    } catch (error) {
+      console.error('Error deleting voucher:', error);
+      alert('Gagal menghapus voucher: Network error');
     } finally {
       setModalDelete(false);
       setSelectedVoucher(null);
     }
   };
 
-  /* --------- Tabel columns --------- */
-  const columns = [
+  const columns = useMemo(() => [
     {
       selector: 'name',
       label: 'Nama Voucher',
       sortable: true,
-      item: ({ name }) => <span className="font-semibold">{name}</span>,
+      item: ({ name }) => <span className="font-semibold">{name || '-'}</span>,
     },
     {
       selector: 'code',
       label: 'Kode',
       sortable: true,
-      item: ({ code }) => code || '-',
+      item: ({ code }) => <span className="font-mono text-sm">{code || '-'}</span>,
     },
     {
       selector: 'image',
@@ -247,9 +198,18 @@ function VoucherCrud() {
       item: ({ image }) => {
         const src = buildImageUrl(image);
         return src ? (
-          <img src={src} alt="Voucher" width={48} height={48} />
+          <img 
+            src={src} 
+            alt="Voucher" 
+            className="w-12 h-12 object-cover rounded-lg"
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
         ) : (
-          <span className="text-gray-400">-</span>
+          <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+            <span className="text-gray-400 text-xs">No Image</span>
+          </div>
         );
       },
     },
@@ -257,7 +217,13 @@ function VoucherCrud() {
       selector: 'stock',
       label: 'Sisa Voucher',
       sortable: true,
-      item: ({ stock }) => <span>{formatStockVoucher(stock)}</span>,
+      item: ({ stock }) => (
+        <span className={`px-2 py-1 rounded-full text-xs ${
+          Number(stock) > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {formatStockVoucher(stock)}
+        </span>
+      ),
     },
     {
       selector: 'target_type',
@@ -271,13 +237,15 @@ function VoucherCrud() {
     {
       selector: 'valid_until',
       label: 'Berlaku Sampai',
-      item: ({ valid_until }) => formatDateID(valid_until),
+      item: ({ valid_until }) => (
+        <span className="text-sm">{formatDateID(valid_until)}</span>
+      ),
     },
-  ];
+  ], [getUserLabel, getCommunityLabel]);
 
   const topBarActions = (
     <ButtonComponent
-      label="Tambah Baru"
+      label="Tambah Voucher"
       icon={faPlus}
       paint="primary"
       onClick={() => {
@@ -300,7 +268,6 @@ function VoucherCrud() {
           except: ['detail', 'add'],
           onEdit: (voucher) => {
             setSelectedVoucher(voucher);
-            // formData di halaman ini tidak lagi menentukan UI; VoucherForm akan baca dari selectedVoucher via initialData
             setModalForm(true);
           },
           onDelete: (voucher) => {
@@ -317,14 +284,13 @@ function VoucherCrud() {
         }}
       />
 
-      {/* Modal Tambah / Edit — UI sama karena 1 komponen */}
       <FloatingPageComponent
         show={modalForm}
         onClose={() => {
           setModalForm(false);
           resetForm();
         }}
-        title="" // judul/badge dipindah ke VoucherForm agar konsisten
+        title=""
         subtitle=""
         size="lg"
         className="bg-background"
@@ -333,7 +299,10 @@ function VoucherCrud() {
           mode={selectedVoucher ? 'edit' : 'create'}
           initialData={
             selectedVoucher
-              ? { ...selectedVoucher, valid_until: selectedVoucher.valid_until ? selectedVoucher.valid_until : '' }
+              ? { 
+                  ...selectedVoucher, 
+                  valid_until: selectedVoucher.valid_until || '' 
+                }
               : undefined
           }
           users={users}
@@ -347,7 +316,6 @@ function VoucherCrud() {
         />
       </FloatingPageComponent>
 
-      {/* Modal Delete Confirmation */}
       <ModalConfirmComponent
         title="Hapus Voucher"
         show={modalDelete}
@@ -356,7 +324,14 @@ function VoucherCrud() {
           setSelectedVoucher(null);
         }}
         onSubmit={handleDelete}
-      />
+      >
+        <p className="text-gray-600 mb-4">
+          Apakah Anda yakin ingin menghapus voucher "{selectedVoucher?.name}"?
+        </p>
+        <p className="text-sm text-red-600">
+          Tindakan ini tidak dapat dibatalkan.
+        </p>
+      </ModalConfirmComponent>
     </>
   );
 }

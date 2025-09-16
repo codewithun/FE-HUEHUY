@@ -35,16 +35,16 @@ export default function PromoDetailUnified() {
 
   // --- Resolve ID promo dari QR lama ---
   const resolveLegacyPromoId = useCallback(() => {
-  if (promoId === 'detail_promo') {
-    return (
-      router.query.filter ||
-      router.query.id ||
-      router.query.promoId ||
-      null
-    );
-  }
-  return promoId || null;
-}, [promoId, router.query]);
+    if (promoId === 'detail_promo') {
+      return (
+        router.query.filter ||
+        router.query.id ||
+        router.query.promoId ||
+        null
+      );
+    }
+    return promoId || null;
+  }, [promoId, router.query]);
 
   const effectivePromoId = resolveLegacyPromoId();
 
@@ -221,6 +221,11 @@ export default function PromoDetailUnified() {
 
   // --- Fetch detail (stabil, anti double-run) ---
   const hasFetched = useRef(false);
+
+  // izinkan fetch ulang kalau ID komunitas/Promo berubah
+  useEffect(() => {
+    hasFetched.current = false;
+  }, [effectivePromoId, communityId]);
 
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady || !effectivePromoId || !communityId) return null;
@@ -425,6 +430,25 @@ export default function PromoDetailUnified() {
     [promoId, communityId, handleAutoRegister]
   );
 
+  // --- Retry fetch khusus alur QR (saat param sudah siap) ---
+  useEffect(() => {
+    if (!router.isReady) return;
+    const autoRegister = router.query.autoRegister || router.query.source;
+    if (!autoRegister) return;
+
+    if (effectivePromoId && communityId && !hasFetched.current) {
+      // panggil fetch ketika semua param sudah lengkap
+      fetchPromoDetails();
+    }
+  }, [
+    router.isReady,
+    router.query.autoRegister,
+    router.query.source,
+    effectivePromoId,
+    communityId,
+    // JANGAN masukkan fetchPromoDetails ke deps agar referensinya tidak berubah
+  ]);
+
   // --- QR entry flow ---
   useEffect(() => {
     if (!router.isReady) return;
@@ -568,11 +592,11 @@ export default function PromoDetailUnified() {
 
       const endpoints = apiUrl
         ? [
-            `${apiUrl}/promos/${promoData.id}/items`,
-            `${apiUrl}/promo-items`,
-            `${apiUrl}/admin/promos/${promoData.id}/items`,
-            `${apiUrl}/admin/promo-items`,
-          ]
+          `${apiUrl}/promos/${promoData.id}/items`,
+          `${apiUrl}/promo-items`,
+          `${apiUrl}/admin/promos/${promoData.id}/items`,
+          `${apiUrl}/admin/promo-items`,
+        ]
         : [];
 
       const headers = {
@@ -878,13 +902,12 @@ export default function PromoDetailUnified() {
           <button
             onClick={handleClaimPromo}
             disabled={isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-              isAlreadyClaimed
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : isClaimedLoading
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isAlreadyClaimed
+              ? 'bg-gray-400 text-white cursor-not-allowed'
+              : isClaimedLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-            }`}
+              }`}
           >
             {isAlreadyClaimed ? (
               <div className="flex items-center justify-center">
