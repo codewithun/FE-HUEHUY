@@ -28,8 +28,8 @@ import {
   inputTimeProps,
   SelectComponent,
   selectProps,
+  InputImageComponent,
 } from '../input';
-import InputImageComponent from '../input/InputImage.component';
 import { ModalConfirmComponent } from '../modal';
 import { formSupervisionProps } from './form-supervision.props';
 import { textaeraProps } from '../input/props/textarea.props';
