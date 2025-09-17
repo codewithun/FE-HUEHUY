@@ -799,8 +799,8 @@ const DetailVoucherPage = () => {
         </div>
       )}
 
-      {/* Already Claimed or Out of Stock */}
-      {(isClaimed || voucher.stock <= 0) && (
+      {/* Already Claimed atau Out of Stock - tapi prioritaskan claimed status */}
+      {(isClaimed || (!isClaimed && voucher.stock <= 0)) && (
         <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
           <div className="lg:max-w-sm lg:mx-auto">
             <div
