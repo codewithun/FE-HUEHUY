@@ -298,15 +298,17 @@ const DetailVoucherPage = () => {
             });
 
             if (response?.status === 200) {
-              // Voucher berhasil di-claim via API
+              // Voucher berhasil di-claim via API - set success dan jangan cek stok lagi
               setIsClaimed(true);
               setShowSuccessModal(true);
+              return; // PENTING: keluar dari function saat berhasil
             } else {
               // Handle error responses
               const msg = (response?.data?.message || response?.message || '').toLowerCase();
               
               if (msg.includes('sudah diklaim') || msg.includes('already') || msg.includes('claimed')) {
                 setIsClaimed(true); // Set as claimed jika sudah ada di server
+                return; // Keluar dari function
               } else if (
                 response?.status === 400 ||
                 response?.status === 409 ||
@@ -316,6 +318,7 @@ const DetailVoucherPage = () => {
               ) {
                 // Stok habis - jangan set claimed dan tampilkan modal
                 setShowOutOfStockModal(true);
+                return; // Keluar dari function
               }
               // Untuk error lain, biarkan user coba manual claim
             }
