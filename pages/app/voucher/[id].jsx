@@ -270,14 +270,14 @@ const DetailVoucherPage = () => {
     router.push('/app/saku');
   };
 
-  // Fungsi untuk handle auto register setelah QR scan - DIPINDAH KE ATAS
+  // Fungsi untuk handle auto register setelah QR scan - HANYA CEK STATUS, TIDAK AUTO CLAIM
   const handleAutoRegister = useCallback(
-    async (token) => {
+    async () => {
       try {
         const voucherData = await fetchVoucherDetails();
         if (!voucherData) return;
 
-        // Cek apakah user sudah punya voucher ini (hanya dari API server)
+        // Hanya cek status claimed dari API server, TIDAK auto claim
         const userVoucherItems = Array.isArray(voucherData.voucher_items)
           ? voucherData.voucher_items
           : [];
@@ -288,48 +288,12 @@ const DetailVoucherPage = () => {
           )
           : false;
 
-        if (!serverClaimedByMe) {
-          // Lakukan auto claim voucher hanya jika belum pernah di-claim di server
-          try {
-            const response = await post({
-              path: `vouchers/${voucherData.id}/claim`,
-              headers: { 'Authorization': `Bearer ${token}` },
-              body: { source: 'qr_scan' } // opsional
-            });
-
-            if (response?.status === 200) {
-              // Voucher berhasil di-claim via API - set success dan jangan cek stok lagi
-              setIsClaimed(true);
-              setShowSuccessModal(true);
-              return; // PENTING: keluar dari function saat berhasil
-            } else {
-              // Handle error responses
-              const msg = (response?.data?.message || response?.message || '').toLowerCase();
-              
-              if (msg.includes('sudah diklaim') || msg.includes('already') || msg.includes('claimed')) {
-                setIsClaimed(true); // Set as claimed jika sudah ada di server
-                return; // Keluar dari function
-              } else if (
-                response?.status === 400 ||
-                response?.status === 409 ||
-                msg.includes('habis') ||
-                msg.includes('stock') ||
-                msg.includes('stok')
-              ) {
-                // Stok habis - jangan set claimed dan tampilkan modal
-                setShowOutOfStockModal(true);
-                return; // Keluar dari function
-              }
-              // Untuk error lain, biarkan user coba manual claim
-            }
-          } catch (error) {
-            // Silent error - user bisa manual claim
-            // console.warn('Auto claim failed:', error);
-          }
-        } else {
-          // Sudah di-claim di server
+        if (serverClaimedByMe) {
+          // Jika sudah diklaim, set status claimed saja
           setIsClaimed(true);
         }
+        
+        // TIDAK melakukan auto claim - biarkan user klik tombol manual
       } catch (error) {
         // Silent error
       }
@@ -366,7 +330,7 @@ const DetailVoucherPage = () => {
           console.log(
             'User verified and logged in, proceeding with auto register'
           );
-          handleAutoRegister(token);
+          handleAutoRegister();
           return;
         }
 
@@ -412,7 +376,7 @@ const DetailVoucherPage = () => {
               // Email sudah terverifikasi, lanjut auto register
               // eslint-disable-next-line no-console
               console.log('User email verified, proceeding with auto register');
-              handleAutoRegister(token);
+              handleAutoRegister();
               return;
             }
           }
@@ -433,7 +397,7 @@ const DetailVoucherPage = () => {
         // Fallback: assume user is verified dan lanjut auto register
         // eslint-disable-next-line no-console
         console.log('Fallback: proceeding with auto register');
-        handleAutoRegister(token);
+        handleAutoRegister();
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('Error checking verification status:', err);
