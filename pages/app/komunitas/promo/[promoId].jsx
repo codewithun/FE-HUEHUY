@@ -70,6 +70,11 @@ export default function PromoDetailUnified() {
 
   const effectivePromoId = resolveLegacyPromoId();
 
+  // Extract autoRegister state using useMemo to prevent unnecessary re-renders
+  const autoRegister = useMemo(() => {
+    return router.query.autoRegister || router.query.source;
+  }, [router.query.autoRegister, router.query.source]);
+
   const [promoData, setPromoData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -491,11 +496,6 @@ export default function PromoDetailUnified() {
 
   // State untuk mencegah multiple redirects
   const [hasTriedAuth, setHasTriedAuth] = useState(false);
-  
-  // Extract autoRegister state using useMemo to prevent unnecessary re-renders
-  const autoRegister = useMemo(() => {
-    return router.query.autoRegister || router.query.source;
-  }, [router.query.autoRegister, router.query.source]);
 
   // --- QR entry flow ---
   useEffect(() => {
