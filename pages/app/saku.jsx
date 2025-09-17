@@ -577,71 +577,33 @@ export default function Save() {
                   <div className="text-center">
                     <div className="mb-4">
                       <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
-                        {selected?.voucher_item?.code ? 'Kode Voucher' : 'QR Code'}
+                        QR Code Voucher
                       </span>
                     </div>
 
-                    {selected?.voucher_item?.code ? (
-                      <>
-                        <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                          <QRCodeSVG
-                            value={selected?.voucher_item?.code}
-                            size={180}
-                            bgColor="#f8fafc"
-                            fgColor="#0f172a"
-                            level="H"
-                            includeMargin={true}
-                            className="mx-auto rounded-lg"
-                          />
-                        </div>
-                        <h4 className="text-2xl font-bold text-slate-800 mb-4">{selected?.voucher_item?.code}</h4>
-                      </>
-                    ) : (
-                      <>
-                        <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                          <QRCodeSVG
-                            value={selected?.code}
-                            size={180}
-                            bgColor="#f8fafc"
-                            fgColor="#0f172a"
-                            className="mx-auto rounded-lg"
-                          />
-                        </div>
-                        <div className="text-xl font-bold text-slate-600 mb-4">{selected?.code}</div>
-                      </>
-                    )}
-
-                    <div className="space-y-3">
-                      <button
-                        className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
-                        onClick={() => {
-                          // no-alert versi: tinggal trigger validasi flow-mu di sini
-                          console.log('QR siap untuk divalidasi.');
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                        Validasi Voucher
-                      </button>
-                      
-                      {/* Tombol Lihat Detail Voucher */}
-                      <button
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200"
-                        onClick={() => {
-                          const voucherId = selected?.voucher?.id || selected?.ad?.id;
-                          const communityId = selected?.voucher?.community?.id || selected?.ad?.cube?.community_id;
-                          
-                          if (voucherId) {
-                            const detailUrl = communityId 
-                              ? `/app/voucher/${voucherId}?communityId=${communityId}&from=saku`
-                              : `/app/voucher/${voucherId}?from=saku`;
-                            router.push(detailUrl);
-                          }
-                        }}
-                      >
-                        📋 Lihat Detail Voucher
-                      </button>
+                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                      <QRCodeSVG
+                        value={selected?.voucher_item?.code || selected?.code || 'NO_CODE'}
+                        size={180}
+                        bgColor="#f8fafc"
+                        fgColor="#0f172a"
+                        level="H"
+                        includeMargin={true}
+                        className="mx-auto rounded-lg"
+                      />
                     </div>
-                    <p className="text-slate-500 text-xs mt-3">Tunjukkan kode ini kepada merchant</p>
+
+                    {/* Tombol Menu Validasi */}
+                    <button
+                      className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+                      onClick={() => {
+                        router.push('/app/validasi');
+                      }}
+                    >
+                      📱 Buka Menu Validasi
+                    </button>
+                    
+                    <p className="text-slate-500 text-xs mt-3">Gunakan menu validasi untuk memproses voucher ini</p>
                   </div>
                 </div>
               );
