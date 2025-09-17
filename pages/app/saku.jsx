@@ -35,6 +35,13 @@ export default function Save() {
   const [selected, setSelected] = useState(null);
   const [data, setData] = useState({ data: [] });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // State untuk validasi
+  const [validationCode, setValidationCode] = useState('');
+  const [validationLoading, setValidationLoading] = useState(false);
+  const [showValidationSuccess, setShowValidationSuccess] = useState(false);
+  const [showValidationFailed, setShowValidationFailed] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
 
   // Ambil data saku: HANYA untuk user saat ini
   const fetchData = useCallback(async () => {
@@ -275,6 +282,80 @@ export default function Save() {
         <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded-full text-xs">Belum divalidasi</span>
       </div>
     );
+  };
+
+  // Fungsi submit validasi
+  const submitValidation = async (validationCode, voucherCode) => {
+    if (!validationCode || validationCode.trim() === '') {
+      setValidationMessage('Masukkan kode validasi terlebih dahulu');
+      setShowValidationFailed(true);
+      return;
+    }
+
+    setValidationLoading(true);
+    
+    try {
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : null;
+
+      if (!token) {
+        setValidationMessage('Sesi login telah berakhir. Silakan login kembali.');
+        setShowValidationFailed(true);
+        setValidationLoading(false);
+        return;
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+
+      // Try voucher validation first
+      let res = await fetch(`${apiUrl.replace('/api', '')}/vouchers/validate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          code: voucherCode || validationCode,
+        }),
+      });
+
+      let result = await res.json().catch(() => null);
+      let itemType = 'voucher';
+
+      // If voucher validation fails, try promo validation
+      if (!res.ok) {
+        res = await fetch(`${apiUrl.replace('/api', '')}/promos/validate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            code: voucherCode || validationCode,
+          }),
+        });
+
+        result = await res.json().catch(() => null);
+        itemType = 'promo';
+      }
+
+      if (res.ok) {
+        setValidationMessage(`${itemType === 'promo' ? 'Promo' : 'Voucher'} berhasil divalidasi!`);
+        setShowValidationSuccess(true);
+        setValidationCode('');
+        // Refresh data setelah validasi berhasil
+        setTimeout(() => {
+          setRefreshTrigger(p => p + 1);
+        }, 1000);
+      } else {
+        const errorMsg = result?.message || 'Kode tidak valid atau sudah digunakan';
+        setValidationMessage(errorMsg);
+        setShowValidationFailed(true);
+      }
+    } catch (err) {
+      console.error('Validation error:', err);
+      setValidationMessage('Terjadi kesalahan. Silakan coba lagi.');
+      setShowValidationFailed(true);
+    } finally {
+      setValidationLoading(false);
+    }
   };
 
   return (
@@ -602,37 +683,32 @@ export default function Save() {
                         <input
                           type="text"
                           placeholder="Masukkan kode validasi..."
+                          value={validationCode}
+                          onChange={(e) => setValidationCode(e.target.value)}
                           className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
-                          onChange={(e) => {
-                            // Store validation code in state atau bisa langsung validate
-                            const validationCode = e.target.value;
-                            if (validationCode.length > 0) {
-                              e.target.dataset.code = validationCode;
-                            }
-                          }}
+                          disabled={validationLoading}
                         />
                       </div>
                       
                       <button
-                        className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
-                        onClick={(e) => {
-                          const input = e.target.parentElement.querySelector('input');
-                          const validationCode = input?.value;
-                          
-                          if (!validationCode || validationCode.trim() === '') {
-                            alert('Masukkan kode validasi terlebih dahulu');
-                            return;
-                          }
-                          
-                          // Validasi voucher dengan kode
-                          console.log('Validating voucher with code:', validationCode);
-                          alert(`Memvalidasi voucher dengan kode: ${validationCode}`);
-                          
-                          // TODO: Integrate dengan API validasi
-                          // submitValidation(validationCode, selected?.voucher_item?.code || selected?.code);
+                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 ${
+                          validationLoading 
+                            ? 'bg-slate-400 text-white cursor-not-allowed' 
+                            : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
+                        }`}
+                        onClick={() => {
+                          submitValidation(validationCode, selected?.voucher_item?.code || selected?.code);
                         }}
+                        disabled={validationLoading}
                       >
-                        Validasi Voucher
+                        {validationLoading ? (
+                          <div className="flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                            Memvalidasi...
+                          </div>
+                        ) : (
+                          '✓ Validasi Voucher'
+                        )}
                       </button>
                     </div>
                     
@@ -670,6 +746,84 @@ export default function Save() {
           )}
         </div>
       </BottomSheetComponent>
+
+      {/* Modal Validasi Berhasil */}
+      {showValidationSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FontAwesomeIcon
+                icon={faCheckCircle}
+                className="text-green-500 text-3xl"
+              />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Validasi Berhasil!</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              {validationMessage}
+            </p>
+            <button
+              onClick={() => {
+                setShowValidationSuccess(false);
+                setModalValidation(false);
+                setSelected(null);
+                setValidationCode('');
+              }}
+              className="w-full bg-green-500 text-white py-3 rounded-[12px] font-semibold hover:bg-green-600 transition-all"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Validasi Gagal */}
+      {showValidationFailed && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FontAwesomeIcon
+                icon={faTimesCircle}
+                className="text-red-500 text-3xl"
+              />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Validasi Gagal</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              {validationMessage}
+            </p>
+            <button
+              onClick={() => {
+                setShowValidationFailed(false);
+                setValidationCode('');
+              }}
+              className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes bounce-in {
+          0% {
+            transform: scale(0.3);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.05);
+          }
+          70% {
+            transform: scale(0.9);
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        .animate-bounce-in {
+          animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+      `}</style>
     </>
   );
 }
