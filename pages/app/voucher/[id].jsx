@@ -74,22 +74,42 @@ const DetailVoucherPage = () => {
       setLoading(true);
       setError(null);
 
-      // 1) coba public dulu (tidak perlu auth)
-      let response = await get({ path: `vouchers/${id}/public` });
+      // 1) coba public dulu (tidak perlu auth) - dengan error handling yang lebih baik
+      let response = null;
+      try {
+        response = await get({ 
+          path: `vouchers/${id}/public`,
+          // Pastikan tidak ada parameter filter yang kosong
+        });
+      } catch (publicErr) {
+        // eslint-disable-next-line no-console
+        console.log('Public endpoint failed:', publicErr);
+        // Lanjut ke endpoint lain
+      }
 
       // 2) kalau ada ?communityId=xxx di URL, coba versi komunitas
       if (!(response?.status === 200 && response?.data?.data)) {
         const communityId = router.query.communityId;
         if (communityId) {
-          response = await get({
-            path: `communities/${communityId}/vouchers/${id}`,
-          });
+          try {
+            response = await get({
+              path: `communities/${communityId}/vouchers/${id}`,
+            });
+          } catch (communityErr) {
+            // eslint-disable-next-line no-console
+            console.log('Community endpoint failed:', communityErr);
+          }
         }
       }
 
       // 3) terakhir baru fallback admin (opsional)
       if (!(response?.status === 200 && response?.data?.data)) {
-        response = await get({ path: `admin/vouchers/${id}` });
+        try {
+          response = await get({ path: `admin/vouchers/${id}` });
+        } catch (adminErr) {
+          // eslint-disable-next-line no-console
+          console.log('Admin endpoint failed:', adminErr);
+        }
       }
 
       if (response?.status === 200 && response?.data?.data) {
@@ -109,6 +129,8 @@ const DetailVoucherPage = () => {
       );
       return null;
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error in fetchVoucherDetails:', err);
       setError('Terjadi kesalahan saat memuat voucher');
       return null;
     } finally {
@@ -228,16 +250,26 @@ const DetailVoucherPage = () => {
         body: userId ? { user_id: userId } : {}, // kalau controller tidak butuh body, boleh {}
       });
 
-      if (response?.status === 200) {
+      // Debug logging untuk melihat response
+      // eslint-disable-next-line no-console
+      console.log('Claim response:', response);
+
+      if (response?.status === 200 || response?.status === 201) {
         // Voucher berhasil di-claim via API
         setIsClaimed(true);
         setShowSuccessModal(true);
-      } else {
+      } else if (response?.status >= 400) {
+        // Handle berbagai error status
         const msg = (
           response?.data?.message ||
           response?.message ||
+          response?.data?.error ||
           ''
         ).toLowerCase();
+        
+        // eslint-disable-next-line no-console
+        console.log('Error response:', response?.status, msg);
+        
         // mapping error → modal
         if (
           response?.status === 400 ||
@@ -254,8 +286,62 @@ const DetailVoucherPage = () => {
         ) {
           setShowClaimedElsewhereModal(true);
         } else {
-          setError('Gagal mengklaim voucher');
+          setError(`Gagal mengklaim voucher: ${response?.data?.message || response?.message || 'Error tidak diketahui'}`);
         }
+      } else {
+        // Status tidak jelas, cek apakah voucher sebenarnya sudah diklaim
+        // eslint-disable-next-line no-console
+        console.log('Unclear response status, checking if voucher was actually claimed');
+        
+        // Tunggu sebentar lalu cek status dari API
+        setTimeout(async () => {
+          try {
+            // Gunakan endpoint yang lebih reliable dan tambahkan error handling
+            const checkUrls = [
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
+            ];
+
+            let serverClaimedByMe = false;
+            const headers = {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`,
+            };
+
+            for (const url of checkUrls) {
+              try {
+                const response = await fetch(url, { headers });
+                if (response.ok) {
+                  const data = await response.json();
+                  const items = Array.isArray(data) ? data : (data?.data || []);
+                  
+                  const apiClaimed = items.some(item => {
+                    const itemVoucherId = item.voucher?.id || item.voucher_id;
+                    return String(itemVoucherId) === String(voucher.id);
+                  });
+
+                  if (apiClaimed) {
+                    serverClaimedByMe = true;
+                    break;
+                  }
+                }
+              } catch (fetchErr) {
+                // Continue to next URL if this one fails
+              }
+            }
+            
+            if (serverClaimedByMe) {
+              // Ternyata voucher sudah diklaim di server
+              setIsClaimed(true);
+              setShowSuccessModal(true);
+            } else {
+              setError('Gagal mengklaim voucher, silakan coba lagi');
+            }
+          } catch (checkErr) {
+            setError('Gagal mengklaim voucher, silakan coba lagi');
+          }
+        }, 1000); // Tunggu 1 detik
       }
     } catch (err) {
       setError('Terjadi kesalahan saat mengklaim voucher');
