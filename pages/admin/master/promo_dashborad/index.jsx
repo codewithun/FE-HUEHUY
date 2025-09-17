@@ -1,534 +1,615 @@
-import React, { useState, useEffect } from "react";
+/* eslint-disable no-console */
 import Cookies from "js-cookie";
-import { token_cookie_name } from "../../../../helpers";
-import { Decrypt } from "../../../../helpers/encryption.helpers";
-import { faPlus, faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ButtonComponent,
-  TableSupervisionComponent,
-  FloatingPageComponent,
+  InputComponent,
+  InputImageComponent,
   ModalConfirmComponent,
+  SelectComponent,
+  TableSupervisionComponent,
+  TextareaComponent,
 } from "../../../../components/base.components";
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
+import { token_cookie_name } from "../../../../helpers";
+import { Decrypt } from "../../../../helpers/encryption.helpers";
 
-export default function PromoDashboard() {
-  const [promoList, setPromoList] = useState([]);
-  const [modalForm, setModalForm] = useState(false);
+/* -------------------- Helpers -------------------- */
+
+const getApiBase = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  return raw.replace(/\/api\/?$/, '');
+};
+
+const buildImageUrl = (raw) => {
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = getApiBase();
+  let path = String(raw).replace(/^\/+/, '');
+  path = path.replace(/^api\/storage\//, 'storage/');
+  if (!/^storage\//.test(path)) path = `storage/${path}`;
+  return `${base}/${path}`;
+};
+
+const formatDateID = (raw) => {
+  if (!raw) return '-';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return '-';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(d);
+};
+
+/* -------------------- Page -------------------- */
+
+function PromoDashboard() {
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedPromo, setSelectedPromo] = useState(null);
   const [refreshToggle, setRefreshToggle] = useState(false);
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    detail: "",
-    promo_distance: 0,
-    start_date: "",
-    end_date: "",
-    always_available: false,
-    stock: 0,
-    promo_type: "offline",
-    location: "",
-    owner_name: "",
-    owner_contact: "",
-    code: "", // tambahkan ini
-  });
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [communities, setCommunities] = useState([]);
+  const [communitiesLoading, setCommunitiesLoading] = useState(true);
+  const [formError, setFormError] = useState(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiBase = useMemo(() => getApiBase(), []);
+  
+  const authHeader = useCallback(() => {
+    const enc = Cookies.get(token_cookie_name);
+    const token = enc ? Decrypt(enc) : '';
+    return { Authorization: `Bearer ${token}` };
+  }, []);
 
-  // Fetch promo list
+  // Fetch communities for dropdown
   useEffect(() => {
-    const fetchData = async () => {
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : "";
+    const fetchCommunities = async () => {
+      setCommunitiesLoading(true);
+      setFormError(null);
+      
       try {
-        const res = await fetch(`${apiUrl}/admin/promos`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+        console.log('Fetching communities from:', `${apiBase}/api/admin/communities`);
+        
+        const res = await fetch(`${apiBase}/api/admin/communities`, {
+          method: 'GET',
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Accept': 'application/json',
+            ...authHeader() 
           },
         });
-        const result = await res.json();
-        setPromoList(Array.isArray(result.data) ? result.data : []);
-      } catch (err) {
-        setPromoList([]);
+        
+        console.log('Communities fetch response status:', res.status);
+        
+        if (res.ok) {
+          const result = await res.json();
+          console.log('Communities fetch result:', result);
+          
+          // Handle different possible response structures
+          let communitiesData = [];
+          
+          if (result.success && Array.isArray(result.data)) {
+            communitiesData = result.data;
+          } else if (Array.isArray(result.data)) {
+            communitiesData = result.data;
+          } else if (Array.isArray(result)) {
+            communitiesData = result;
+          } else if (result.communities && Array.isArray(result.communities)) {
+            communitiesData = result.communities;
+          }
+          
+          setCommunities(communitiesData);
+          console.log('Communities loaded:', communitiesData);
+          
+          if (communitiesData.length === 0) {
+            console.warn('No communities found in response');
+          }
+        } else {
+          const errorText = await res.text();
+          console.error('Failed to fetch communities:', res.status, errorText);
+          setFormError(`Failed to fetch communities: ${res.status}`);
+          setCommunities([]);
+        }
+      } catch (error) {
+        console.error('Error fetching communities:', error);
+        setFormError(`Network error: ${error.message}`);
+        setCommunities([]);
+      } finally {
+        setCommunitiesLoading(false);
       }
     };
-    fetchData();
-  }, [apiUrl]);
 
-  // Add or update promo (send as multipart/form-data)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    const method = selectedPromo ? "PUT" : "POST";
-    const url = selectedPromo
-      ? `${apiUrl}/admin/promos/${selectedPromo.id}`
-      : `${apiUrl}/admin/promos`;
+    fetchCommunities();
+  }, [apiBase, authHeader]);
 
-    // Build FormData
-    const fd = new FormData();
-    fd.set("title", formData.title);
-    fd.set("description", formData.description);
-    fd.set("detail", formData.detail ?? "");
-    fd.set("promo_distance", String(formData.promo_distance ?? 0));
-    fd.set("start_date", formData.start_date ?? "");
-    fd.set("end_date", formData.end_date ?? "");
-    fd.set("always_available", formData.always_available ? "1" : "0");
-    fd.set("stock", String(formData.stock ?? 0));
-    fd.set("promo_type", formData.promo_type);
-    fd.set("location", formData.location ?? "");
-    fd.set("owner_name", formData.owner_name);
-    fd.set("owner_contact", formData.owner_contact);
-    fd.set("code", formData.code ?? ""); // tambahkan ini
-    if (imageFile) {
-      fd.append("image", imageFile);
-    }
-
-    await fetch(url, {
-      method,
-      headers: {
-        // Do NOT set Content-Type when sending FormData
-        Authorization: `Bearer ${token}`,
-      },
-      body: fd,
-    });
-
-    setModalForm(false);
-    setFormData({
-      title: "",
-      description: "",
-      detail: "",
-      promo_distance: 0,
-      start_date: "",
-      end_date: "",
-      always_available: false,
-      stock: 0,
-      promo_type: "offline",
-      location: "",
-      owner_name: "",
-      owner_contact: "",
-      code: "", // tambahkan ini di semua reset formData
-    });
-    setSelectedPromo(null);
-    setImageFile(null);
-    setImagePreview(null);
-
-    // trigger TableSupervisionComponent to refetch
-    setRefreshToggle((s) => !s);
-  };
-
-  // Delete promo
   const handleDelete = async () => {
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    await fetch(`${apiUrl}/admin/promos/${selectedPromo.id}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    // optimistic update + trigger table refresh
-    setPromoList((prev) => prev.filter((p) => p.id !== selectedPromo.id));
-    setRefreshToggle((s) => !s);
-    setModalDelete(false);
-    setSelectedPromo(null);
+    if (!selectedPromo) return;
+    
+    try {
+      const res = await fetch(`${apiBase}/api/admin/promos/${selectedPromo.id}`, {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...authHeader() 
+        },
+      });
+
+      if (res.ok) {
+        setRefreshToggle((s) => !s);
+        alert('Promo berhasil dihapus');
+      } else {
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        alert(`Gagal menghapus promo: ${errorData.message || res.status}`);
+      }
+    } catch (error) {
+      console.error('Error deleting promo:', error);
+      alert('Gagal menghapus promo: Network error');
+    } finally {
+      setModalDelete(false);
+      setSelectedPromo(null);
+    }
   };
 
-  // Open form for edit (set preview to current image if any)
-  const handleEdit = (promo) => {
-    setSelectedPromo(promo);
-    setFormData({
-      title: promo.title || "",
-      description: promo.description || "",
-      detail: promo.detail || "",
-      promo_distance: promo.promo_distance || 0,
-      start_date: promo.start_date || "",
-      end_date: promo.end_date || "",
-      always_available: !!promo.always_available,
-      stock: promo.stock || 0,
-      promo_type: promo.promo_type || "offline",
-      location: promo.location || "",
-      owner_name: promo.owner_name || "",
-      owner_contact: promo.owner_contact || "",
-      code: promo.code || "", // tambahkan ini
-    });
-    setImageFile(null);
-    setImagePreview(promo.image ? `${apiUrl.replace(/\/+$/,'')}/storage/${promo.image}` : null);
-    setModalForm(true);
-  };
-
-  const columns = [
+  const columns = useMemo(() => [
     {
-      selector: "title",
-      label: "Judul Promo",
+      selector: 'title',
+      label: 'Judul Promo',
       sortable: true,
-      item: ({ title }) => <span className="font-semibold">{title}</span>,
+      item: ({ title }) => <span className="font-semibold">{title || '-'}</span>,
     },
     {
-      selector: "code",
-      label: "Kode Promo",
-      item: ({ code }) => code || "-",
+      selector: 'code',
+      label: 'Kode',
+      sortable: true,
+      item: ({ code }) => <span className="font-mono text-sm">{code || '-'}</span>,
     },
     {
-      selector: "description",
-      label: "Deskripsi",
-      item: ({ description }) => description || "-",
+      selector: 'image',
+      label: 'Gambar',
+      width: '100px',
+      item: ({ image }) => {
+        const src = buildImageUrl(image);
+        return src ? (
+          <Image 
+            src={src} 
+            alt="Promo" 
+            width={48}
+            height={48}
+            className="w-12 h-12 object-cover rounded-lg"
+          />
+        ) : (
+          <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+            <span className="text-xs text-gray-500">No Image</span>
+          </div>
+        );
+      },
     },
     {
-      selector: "promo_distance",
-      label: "Jarak Promo (KM)",
-      item: ({ promo_distance }) => promo_distance,
+      selector: 'stock',
+      label: 'Sisa Stock',
+      sortable: true,
+      item: ({ stock }) => (
+        <span className={`px-2 py-1 rounded-full text-xs ${
+          Number(stock) > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {Number(stock ?? 0)} promo
+        </span>
+      ),
     },
     {
-      selector: "start_date",
-      label: "Mulai",
-      item: ({ start_date }) => start_date,
+      selector: 'promo_type',
+      label: 'Tipe',
+      item: ({ promo_type }) => (
+        <span className="capitalize">{promo_type || 'offline'}</span>
+      ),
     },
     {
-      selector: "end_date",
-      label: "Berakhir",
-      item: ({ end_date }) => end_date,
+      selector: 'community_id',
+      label: 'Community',
+      item: ({ community_id, community }) => {
+        // Display community name if available in the promo data
+        if (community?.name) {
+          return <span className="text-sm">{community.name}</span>;
+        }
+        // Fallback to find community by ID
+        const foundCommunity = communities.find(c => c.id == community_id);
+        return (
+          <span className="text-sm">
+            {foundCommunity?.name || foundCommunity?.title || `ID: ${community_id || '-'}`}
+          </span>
+        );
+      },
     },
     {
-      selector: "always_available",
-      label: "Selalu Tersedia",
-      item: ({ always_available }) => (always_available ? "Ya" : "Tidak"),
+      selector: 'end_date',
+      label: 'Berakhir',
+      item: ({ end_date }) => (
+        <span className="text-sm">{formatDateID(end_date)}</span>
+      ),
     },
-    {
-      selector: "stock",
-      label: "Stock",
-      item: ({ stock }) => stock,
-    },
-    {
-      selector: "promo_type",
-      label: "Tipe Promo",
-      item: ({ promo_type }) =>
-        promo_type === "online" ? "Online" : "Offline",
-    },
-    {
-      selector: "location",
-      label: "Lokasi Promo",
-      item: ({ location }) => location,
-    },
-    {
-      selector: "owner_name",
-      label: "Pemilik Iklan",
-      item: ({ owner_name }) => owner_name,
-    },
-    {
-      selector: "owner_contact",
-      label: "Kontak Pemilik",
-      item: ({ owner_contact }) => owner_contact,
-    },
-  
-  ];
+  ], [communities]);
 
-  const topBarActions = (
-    <ButtonComponent
-      label="Tambah Promo"
-      icon={faPlus}
-      paint="primary"
-      onClick={() => {
-        setSelectedPromo(null);
-        setFormData({
-          title: "",
-          description: "",
-          detail: "",
-          promo_distance: 0,
-          start_date: "",
-          end_date: "",
-          always_available: false,
-          stock: 0,
-          promo_type: "offline",
-          location: "",
-          owner_name: "",
-          owner_contact: "",
-          code: "", // tambahkan ini
-        });
-        setImageFile(null);
-        setImagePreview(null);
-        setModalForm(true);
-      }}
-    />
-  );
+  const validateFormData = useCallback((data, mode) => {
+    const errors = [];
+    
+    // Required field validation
+    if (!data.title?.trim()) errors.push('Judul promo wajib diisi');
+    if (!data.description?.trim()) errors.push('Deskripsi wajib diisi');
+    if (!data.owner_name?.trim()) errors.push('Nama pemilik wajib diisi');
+    if (!data.owner_contact?.trim()) errors.push('Kontak pemilik wajib diisi');
+    if (!data.promo_type) errors.push('Tipe promo wajib dipilih');
+    if (!data.community_id && mode === 'create') errors.push('Community wajib dipilih');
+    
+    // Date validation
+    if (data.start_date && data.end_date) {
+      const startDate = new Date(data.start_date);
+      const endDate = new Date(data.end_date);
+      if (endDate < startDate) {
+        errors.push('Tanggal berakhir harus setelah tanggal mulai');
+      }
+    }
+    
+    return errors;
+  }, []);
+
+  const topBarActions = formError ? (
+    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+      <strong>Error:</strong> {formError}
+    </div>
+  ) : null;
 
   return (
     <>
       <TableSupervisionComponent
         title="Manajemen Promo"
-        data={promoList}
         columnControl={{ custom: columns }}
         customTopBar={topBarActions}
+        searchable
         noControlBar={false}
-        searchable={true}
         setToRefresh={refreshToggle}
-        // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
-        actionControl={{ except: ['detail'] }}
+        actionControl={{
+          except: ['detail'],
+          onAdd: () => {
+            setSelectedPromo(null);
+          },
+          onEdit: (promo) => {
+            setSelectedPromo(promo);
+          },
+          onDelete: (promo) => {
+            setSelectedPromo(promo);
+            setModalDelete(true);
+          },
+        }}
         fetchControl={{
-          path: "admin/promos",
-          method: "GET",
-          headers: () => {
-            const encryptedToken = Cookies.get(token_cookie_name);
-            const token = encryptedToken ? Decrypt(encryptedToken) : "";
-            return {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            };
+          path: 'admin/promos',
+          includeHeaders: {
+            ...authHeader(),
           },
-          mapData: (result) => {
-            if (Array.isArray(result.data)) {
-              return {
-                data: result.data,
-                totalRow: result.total_row || result.data.length,
-              };
+          onError: (error) => {
+            console.error('API Error:', error);
+            setFormError(error.message || 'Terjadi kesalahan');
+          },
+        }}
+        formControl={{
+          contentType: 'multipart/form-data',
+          transformData: (data, mode, originalData) => {
+            console.log('Transform data called:', { data, mode, originalData });
+            console.log('Available communities:', communities);
+            
+            // Validate first
+            const validationErrors = validateFormData(data, mode);
+            if (validationErrors.length > 0) {
+              console.error('Validation errors:', validationErrors);
+              throw new Error(validationErrors.join(', '));
             }
-            return { data: [], totalRow: 0 };
+            
+            const formData = new FormData();
+            
+            // Get community_id with proper fallback
+            let communityId = data.community_id;
+            if (mode === 'edit' && !communityId && originalData) {
+              communityId = originalData.community_id;
+            }
+            
+            // Ensure communityId is properly converted
+            if (communityId) {
+              communityId = String(communityId);
+            }
+            
+            console.log('Community ID used:', communityId, 'Mode:', mode);
+            console.log('Original community_id:', data.community_id);
+            
+            // Required fields - only append if there's a value
+            if (data.title?.trim()) formData.append('title', data.title.trim());
+            if (data.description?.trim()) formData.append('description', data.description.trim());
+            if (data.owner_name?.trim()) formData.append('owner_name', data.owner_name.trim());
+            if (data.owner_contact?.trim()) formData.append('owner_contact', data.owner_contact.trim());
+            if (data.promo_type) formData.append('promo_type', data.promo_type);
+            
+            // Community ID - required for all modes
+            if (communityId) {
+              formData.append('community_id', communityId);
+            } else if (mode === 'create') {
+              console.error('community_id is required for create mode');
+              throw new Error('Community ID is required');
+            }
+            
+            // Optional text fields
+            if (data.detail?.trim()) formData.append('detail', data.detail.trim());
+            if (data.code?.trim()) formData.append('code', data.code.trim());
+            if (data.location?.trim()) formData.append('location', data.location.trim());
+            if (data.start_date) formData.append('start_date', data.start_date);
+            if (data.end_date) formData.append('end_date', data.end_date);
+            
+            // Numeric fields - convert to proper values
+            const promoDistance = parseFloat(data.promo_distance) || 0;
+            const stock = parseInt(data.stock) || 0;
+            
+            formData.append('promo_distance', String(promoDistance));
+            formData.append('stock', String(stock));
+            
+            // Boolean field - ensure proper conversion
+            const alwaysAvailable = Boolean(data.always_available);
+            formData.append('always_available', alwaysAvailable ? '1' : '0');
+            
+            // Image file - only append if it's a File object
+            if (data.image instanceof File) {
+              formData.append('image', data.image);
+            }
+            
+            // Method override for edit mode
+            if (mode === 'edit') {
+              formData.append('_method', 'PUT');
+            }
+            
+            // Debug logging
+            console.log('Final FormData entries:');
+            for (let [key, value] of formData.entries()) {
+              console.log(`${key}:`, value);
+            }
+            
+            return formData;
           },
+          custom: [
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="title"
+                  label="Judul Promo *"
+                  placeholder="Contoh: Diskon 50% Semua Menu"
+                  required
+                  {...formControl('title')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="code"
+                  label="Kode Promo"
+                  placeholder="Contoh: PROMO50OFF"
+                  {...formControl('code')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <TextareaComponent
+                  name="description"
+                  label="Deskripsi Singkat *"
+                  placeholder="Tuliskan deskripsi singkat promo"
+                  required
+                  {...formControl('description')}
+                  rows={2}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <TextareaComponent
+                  name="detail"
+                  label="Detail Promo"
+                  placeholder="Tuliskan detail lengkap promo, syarat dan ketentuan"
+                  {...formControl('detail')}
+                  rows={3}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputImageComponent
+                  name="image"
+                  label="Gambar Promo"
+                  aspect="16/9"
+                  {...formControl('image')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <SelectComponent
+                  name="promo_type"
+                  label="Tipe Promo *"
+                  required
+                  {...formControl('promo_type')}
+                  options={[
+                    { label: 'Offline', value: 'offline' },
+                    { label: 'Online', value: 'online' },
+                  ]}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  type="number"
+                  name="promo_distance"
+                  label="Jarak Promo (KM)"
+                  placeholder="Contoh: 5"
+                  step="0.1"
+                  min="0"
+                  {...formControl('promo_distance')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  type="date"
+                  name="start_date"
+                  label="Tanggal Mulai"
+                  {...formControl('start_date')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  type="date"
+                  name="end_date"
+                  label="Tanggal Berakhir"
+                  {...formControl('end_date')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="location"
+                  label="Lokasi Promo"
+                  placeholder="Contoh: Mall Central Park Lt. 2"
+                  {...formControl('location')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  type="number"
+                  name="stock"
+                  label="Stok Promo"
+                  placeholder="Jumlah promo tersedia"
+                  min="0"
+                  {...formControl('stock')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="owner_name"
+                  label="Nama Pemilik *"
+                  placeholder="Contoh: PT. Restaurant ABC"
+                  required
+                  {...formControl('owner_name')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <InputComponent
+                  name="owner_contact"
+                  label="Kontak Pemilik *"
+                  placeholder="Contoh: 08123456789 atau email@domain.com"
+                  required
+                  {...formControl('owner_contact')}
+                />
+              ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                console.log('Community options in render:', communities);
+                console.log('FormControl value:', formControl('community_id').value);
+                
+                const communityOptions = communities.map((c) => ({
+                  label: c.name || c.title || `Community ${c.id}`,
+                  value: String(c.id),
+                }));
+                
+                return (
+                  <div className="form-control w-full">
+                    <SelectComponent
+                      name="community_id"
+                      label="Community *"
+                      placeholder={
+                        communitiesLoading 
+                          ? "Loading communities..." 
+                          : communities.length === 0 
+                            ? "No communities available"
+                            : "Pilih community..."
+                      }
+                      required
+                      {...formControl('community_id')}
+                      options={communityOptions}
+                      disabled={communitiesLoading || communities.length === 0}
+                    />
+                    {communities.length === 0 && !communitiesLoading && (
+                      <div className="label">
+                        <span className="label-text-alt text-warning">
+                          No communities found. Please create communities first.
+                        </span>
+                      </div>
+                    )}
+                    {formError && (
+                      <div className="label">
+                        <span className="label-text-alt text-error">
+                          {formError}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              },
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <div className="form-control">
+                  <label className="label cursor-pointer justify-start gap-2">
+                    <input
+                      type="checkbox"
+                      className="checkbox"
+                      {...formControl('always_available')}
+                    />
+                    <span className="label-text">Selalu Tersedia (tidak terbatas waktu)</span>
+                  </label>
+                </div>
+              ),
+            },
+          ],
         }}
       />
 
-      {/* Modal Form */}
-      <FloatingPageComponent
-        show={modalForm}
-        onClose={() => {
-          setModalForm(false);
-          setSelectedPromo(null);
-          setFormData({
-            title: "",
-            description: "",
-            detail: "",
-            promo_distance: 0,
-            start_date: "",
-            end_date: "",
-            always_available: false,
-            stock: 0,
-            promo_type: "offline",
-            location: "",
-            owner_name: "",
-            owner_contact: "",
-            code: "", // tambahkan ini
-          });
-          setImageFile(null);
-          setImagePreview(null);
-        }}
-        title={selectedPromo ? "Ubah Promo" : "Tambah Promo"}
-        size="md"
-        className="bg-background"
-      >
-        <form className="flex flex-col gap-4 p-6" onSubmit={handleSubmit}>
-          <div>
-            <label className="font-semibold">Judul Promo</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Deskripsi Singkat</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              required
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Isi Deskripsi</label>
-            <textarea
-              className="textarea textarea-bordered w-full"
-              value={formData.detail}
-              onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Jarak Promo (KM)</label>
-            <input
-              type="number"
-              className="input input-bordered w-full"
-              value={formData.promo_distance}
-              onChange={(e) =>
-                setFormData({ ...formData, promo_distance: Number(e.target.value) })
-              }
-              required
-            />
-          </div>
-          <div className="flex gap-2">
-            <div>
-              <label className="font-semibold">Tanggal Mulai</label>
-              <input
-                type="date"
-                className="input input-bordered w-full"
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <label className="font-semibold">Tanggal Berakhir</label>
-              <input
-                type="date"
-                className="input input-bordered w-full"
-                value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-          <div>
-            <label className="font-semibold">Selalu Tersedia</label>
-            <input
-              type="checkbox"
-              checked={formData.always_available}
-              onChange={(e) => setFormData({ ...formData, always_available: e.target.checked })}
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Stock Promo</label>
-            <input
-              type="number"
-              className="input input-bordered w-full"
-              value={formData.stock}
-              onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
-              required
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Tipe Promo</label>
-            <select
-              className="select select-bordered w-full"
-              value={formData.promo_type}
-              onChange={(e) => setFormData({ ...formData, promo_type: e.target.value })}
-            >
-              <option value="offline">Offline</option>
-              <option value="online">Online</option>
-            </select>
-          </div>
-          <div>
-            <label className="font-semibold">Lokasi Promo</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Nama Pemilik Iklan</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={formData.owner_name}
-              onChange={(e) => setFormData({ ...formData, owner_name: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Kontak Pemilik Iklan</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={formData.owner_contact}
-              onChange={(e) => setFormData({ ...formData, owner_contact: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="font-semibold">Kode Promo (Opsional, unik)</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-              placeholder="Biarkan kosong untuk generate otomatis"
-            />
-          </div>
-
-          {/* Image upload */}
-          <div>
-            <label className="font-semibold">Gambar Promo</label>
-            <input
-              type="file"
-              accept="image/*"
-              className="file-input file-input-bordered w-full"
-              onChange={(e) => {
-                const file = e.target.files?.[0] || null;
-                setImageFile(file);
-                setImagePreview(file ? URL.createObjectURL(file) : (selectedPromo?.image ? `${apiUrl.replace(/\/+$/,'')}/storage/${selectedPromo.image}` : null));
-              }}
-            />
-            {imagePreview && (
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="h-24 mt-2 object-cover rounded"
-              />
-            )}
-            {!imagePreview && selectedPromo?.image && (
-              <p className="text-xs text-gray-500 mt-1">
-                Gambar saat ini dipertahankan jika tidak diganti.
-              </p>
-            )}
-          </div>
-
-          <div className="flex gap-2 justify-end mt-4">
-            <ButtonComponent
-              label="Batal"
-              paint="secondary"
-              variant="outline"
-              onClick={() => {
-                setModalForm(false);
-                setSelectedPromo(null);
-                setFormData({
-                  title: "",
-                  description: "",
-                  detail: "",
-                  promo_distance: 0,
-                  start_date: "",
-                  end_date: "",
-                  always_available: false,
-                  stock: 0,
-                  promo_type: "offline",
-                  location: "",
-                  owner_name: "",
-                  owner_contact: "",
-                  code: "", // tambahkan ini
-                });
-                setImageFile(null);
-                setImagePreview(null);
-              }}
-            />
-            <ButtonComponent
-              label={selectedPromo ? "Perbarui" : "Simpan"}
-              paint="primary"
-              type="submit"
-            />
-          </div>
-        </form>
-      </FloatingPageComponent>
-
-      {/* Modal Delete Confirmation */}
       <ModalConfirmComponent
-        open={modalDelete}
+        title="Hapus Promo"
+        show={modalDelete}
         onClose={() => {
           setModalDelete(false);
           setSelectedPromo(null);
         }}
-        onConfirm={handleDelete}
-        title="Hapus Promo"
-        message={`Apakah Anda yakin ingin menghapus promo "${selectedPromo?.title}"?`}
-      />
+        onSubmit={handleDelete}
+      >
+        <p className="text-gray-600 mb-4">
+          Apakah Anda yakin ingin menghapus promo &quot;{selectedPromo?.title}&quot;?
+        </p>
+        <p className="text-sm text-red-600">
+          Tindakan ini tidak dapat dibatalkan.
+        </p>
+      </ModalConfirmComponent>
     </>
   );
 }
@@ -536,3 +617,5 @@ export default function PromoDashboard() {
 PromoDashboard.getLayout = function getLayout(page) {
   return <AdminLayout>{page}</AdminLayout>;
 };
+
+export default PromoDashboard;
