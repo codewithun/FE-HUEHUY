@@ -16,7 +16,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { token_cookie_name } from '../../../../helpers';
-import { get, post } from '../../../../helpers/api.helpers';
+import { get } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 export default function PromoDetailUnified() {
@@ -430,48 +430,17 @@ export default function PromoDetailUnified() {
                 }
               }
             } catch (err) {
-              console.warn('Error checking API for claimed status:', err);
+              // Silent error checking API
             }
           }
 
           if (alreadyClaimed) {
             setIsAlreadyClaimed(true);
-            setErrorMessage('Promo ini sudah pernah direbut pada akun ini.');
-            setShowErrorModal(true);
-            return;
           }
+          
+          // TIDAK melakukan auto claim - biarkan user klik tombol manual
         } catch (checkError) {
           // Silent error checking claimed status
-        }
-
-        // Attempt to claim promo via API
-        try {
-          const response = await post({
-            path: `admin/promos/${pd.id}/items`,
-            headers: { Authorization: `Bearer ${token}` },
-            body: { promo_id: pd.id, source: 'qr_scan' },
-          });
-
-          if (response?.status === 200) {
-            // Promo successfully claimed via API - set success dan keluar
-            setIsAlreadyClaimed(true);
-            setShowSuccessModal(true);
-            return; // PENTING: keluar dari function saat berhasil
-          } else {
-            const msg = (response?.data?.message || response?.message || '').toLowerCase();
-            if (msg.includes('habis') || msg.includes('stok') || msg.includes('stock')) {
-              setErrorMessage('Maaf, stok promo sudah habis direbut.');
-              setShowErrorModal(true);
-              return; // Keluar dari function
-            } else if (msg.includes('sudah') || msg.includes('already') || msg.includes('claimed')) {
-              setIsAlreadyClaimed(true);
-              setErrorMessage('Promo ini sudah pernah direbut sebelumnya.');
-              setShowErrorModal(true);
-              return; // Keluar dari function
-            }
-          }
-        } catch (error) {
-          console.warn('Auto claim failed:', error);
         }
       } catch (error) {
         console.warn('Auto register failed:', error);
