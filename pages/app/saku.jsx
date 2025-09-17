@@ -597,7 +597,12 @@ export default function Save() {
                     <button
                       className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
                       onClick={() => {
-                        router.push('/app/validasi');
+                        // Tutup modal dulu, baru navigasi tanpa membawa kode
+                        setModalValidation(false);
+                        setSelected(null);
+                        setTimeout(() => {
+                          router.push('/app/validasi');
+                        }, 100);
                       }}
                     >
                       📱 Buka Menu Validasi
