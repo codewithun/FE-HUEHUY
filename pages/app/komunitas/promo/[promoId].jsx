@@ -821,8 +821,68 @@ export default function PromoDetailUnified() {
       setIsAlreadyClaimed(true);
       setShowSuccessModal(true);
     } catch (e) {
-      setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
-      setShowErrorModal(true);
+      // Jika error claim, cek apakah promo sebenarnya sudah diklaim
+      // eslint-disable-next-line no-console
+      console.log('Claim error, checking if promo was actually claimed:', e);
+      
+      // Tunggu sebentar lalu cek status dari API
+      setTimeout(async () => {
+        try {
+          const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+          const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
+          
+          if (currentUserToken) {
+            const checkUrls = [
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
+            ];
+
+            let alreadyClaimed = false;
+            const headers = {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Authorization: `Bearer ${currentUserToken}`,
+            };
+
+            for (const url of checkUrls) {
+              try {
+                const response = await fetch(url, { headers });
+                if (response.ok) {
+                  const data = await response.json();
+                  const items = Array.isArray(data) ? data : (data?.data || []);
+                  
+                  const apiClaimed = items.some(item => {
+                    const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
+                    return String(itemPromoId) === String(promoData.id);
+                  });
+
+                  if (apiClaimed) {
+                    alreadyClaimed = true;
+                    break;
+                  }
+                }
+              } catch (fetchErr) {
+                // Continue to next URL if this one fails
+              }
+            }
+            
+            if (alreadyClaimed) {
+              // Ternyata promo sudah diklaim di server
+              setIsAlreadyClaimed(true);
+              setShowSuccessModal(true);
+            } else {
+              setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
+              setShowErrorModal(true);
+            }
+          } else {
+            setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
+            setShowErrorModal(true);
+          }
+        } catch (checkErr) {
+          setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
+          setShowErrorModal(true);
+        }
+      }, 1000); // Tunggu 1 detik
     } finally {
       setIsClaimedLoading(false);
     }
