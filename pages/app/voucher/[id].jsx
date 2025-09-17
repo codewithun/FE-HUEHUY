@@ -818,16 +818,6 @@ const DetailVoucherPage = () => {
                 'Stock Voucher Habis'
               )}
             </div>
-            
-            {/* Tombol Validasi untuk voucher yang sudah diklaim */}
-            {isClaimed && (
-              <button
-                onClick={() => router.push('/app/validasi')}
-                className="w-full mt-3 py-3 lg:py-2.5 rounded-[12px] lg:rounded-lg font-semibold text-base lg:text-sm bg-blue-600 text-white hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                🎫 Validasi Voucher
-              </button>
-            )}
           </div>
         </div>
       )}
