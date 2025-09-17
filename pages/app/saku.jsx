@@ -555,19 +555,18 @@ export default function Save() {
           ) : selected?.type === 'voucher' || selected?.voucher ? (
             (() => {
               const voucher = selected?.voucher || selected?.ad;
-              const isVoucherActive =
-                (voucher?.stock === undefined || voucher?.stock > 0) &&
-                (!voucher?.valid_until || new Date(voucher.valid_until) > new Date());
+              
+              // Untuk voucher yang sudah diklaim, SELALU bisa diakses terlepas dari stok
+              // Hanya cek expired date, bukan stok
+              const isVoucherExpired = voucher?.valid_until && new Date(voucher.valid_until) < new Date();
 
-              if (!isVoucherActive) {
+              if (isVoucherExpired) {
                 return (
                   <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
                     <div className="text-center">
                       <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />
                       <div className="font-bold text-red-700 text-lg">Voucher Tidak Tersedia</div>
-                      <p className="text-red-600 text-sm mt-1">
-                        {voucher?.stock !== undefined && voucher?.stock <= 0 ? 'Stok habis' : 'Voucher kedaluwarsa'}
-                      </p>
+                      <p className="text-red-600 text-sm mt-1">Voucher kedaluwarsa</p>
                     </div>
                   </div>
                 );
@@ -612,16 +611,36 @@ export default function Save() {
                       </>
                     )}
 
-                    <button
-                      className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
-                      onClick={() => {
-                        // no-alert versi: tinggal trigger validasi flow-mu di sini
-                        console.log('QR siap untuk divalidasi.');
-                      }}
-                    >
-                      <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                      Validasi Voucher
-                    </button>
+                    <div className="space-y-3">
+                      <button
+                        className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+                        onClick={() => {
+                          // no-alert versi: tinggal trigger validasi flow-mu di sini
+                          console.log('QR siap untuk divalidasi.');
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                        Validasi Voucher
+                      </button>
+                      
+                      {/* Tombol Lihat Detail Voucher */}
+                      <button
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200"
+                        onClick={() => {
+                          const voucherId = selected?.voucher?.id || selected?.ad?.id;
+                          const communityId = selected?.voucher?.community?.id || selected?.ad?.cube?.community_id;
+                          
+                          if (voucherId) {
+                            const detailUrl = communityId 
+                              ? `/app/voucher/${voucherId}?communityId=${communityId}&from=saku`
+                              : `/app/voucher/${voucherId}?from=saku`;
+                            router.push(detailUrl);
+                          }
+                        }}
+                      >
+                        📋 Lihat Detail Voucher
+                      </button>
+                    </div>
                     <p className="text-slate-500 text-xs mt-3">Tunjukkan kode ini kepada merchant</p>
                   </div>
                 </div>
