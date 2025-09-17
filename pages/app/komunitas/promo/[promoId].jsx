@@ -390,6 +390,13 @@ export default function PromoDetailUnified() {
   // --- Auto register setelah QR ---
   const handleAutoRegister = useCallback(
     async (token) => {
+      // Prevent multiple simultaneous calls
+      if (handleAutoRegister.isRunning) {
+        return;
+      }
+      
+      handleAutoRegister.isRunning = true;
+      
       try {
         // Reset hasTriedAuth setelah mendapat token valid
         setHasTriedAuth(false);
@@ -443,7 +450,9 @@ export default function PromoDetailUnified() {
           // Silent error checking claimed status
         }
       } catch (error) {
-        console.warn('Auto register failed:', error);
+        // Silent error for auto register
+      } finally {
+        handleAutoRegister.isRunning = false;
       }
     },
     [fetchPromoDetails] // Removed communityId as it's not used in the function
@@ -609,6 +618,7 @@ export default function PromoDetailUnified() {
 
       // Prevent potential session issues by not making additional API calls during navigation
       if (autoRegister) {
+        // Jika dari QR scan, selalu ke home
         router.push('/app');
       } else if (from === 'saku') {
         router.push('/app/saku');
@@ -617,6 +627,7 @@ export default function PromoDetailUnified() {
       } else if (communityId) {
         router.push(`/app/komunitas/dashboard/${communityId}`);
       } else {
+        // Default ke home untuk menghindari session expired
         router.push('/app');
       }
     } catch (error) {
@@ -683,7 +694,14 @@ export default function PromoDetailUnified() {
   const handleClaimPromo = async () => {
     if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
 
+    // Prevent multiple simultaneous calls
+    if (handleClaimPromo.isRunning) {
+      return;
+    }
+    
+    handleClaimPromo.isRunning = true;
     setIsClaimedLoading(true);
+    
     try {
       const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
       const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
@@ -691,73 +709,56 @@ export default function PromoDetailUnified() {
       if (!token) {
         setErrorMessage('Sesi login telah berakhir. Silakan login kembali.');
         setShowErrorModal(true);
-        setIsClaimedLoading(false);
         return;
       }
 
-      // Check claimed status dari API terlebih dahulu
+      // Single check for claimed status - reduce API calls
       const headers = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         Authorization: `Bearer ${token}`,
       };
 
-      const checkUrls = [
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
-      ];
+      // Check only primary endpoint first
+      try {
+        const checkUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`;
+        const response = await fetch(checkUrl, { headers });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const items = Array.isArray(data) ? data : (data?.data || []);
+          
+          const apiClaimed = items.some(item => {
+            const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
+            return String(itemPromoId) === String(promoData.id);
+          });
 
-      // Check if already claimed via API
-      let isDuplicate = false;
-      for (const url of checkUrls) {
-        try {
-          const response = await fetch(url, { headers });
-          if (response.ok) {
-            const data = await response.json();
-            const items = Array.isArray(data) ? data : (data?.data || []);
-            
-            const apiClaimed = items.some(item => {
-              const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
-              return String(itemPromoId) === String(promoData.id);
-            });
-
-            if (apiClaimed) {
-              isDuplicate = true;
-              break;
-            }
+          if (apiClaimed) {
+            setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
+            setShowErrorModal(true);
+            return;
           }
-        } catch (err) {
-          console.warn('Error checking API for claimed status:', err);
         }
-      }
-
-      if (isDuplicate) {
-        setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
-        setShowErrorModal(true);
-        setIsClaimedLoading(false);
-        return;
+      } catch (checkErr) {
+        // Continue to claim if check fails
+        console.warn('Error checking claimed status:', checkErr);
       }
 
       const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
       const apiUrl = rawApi.replace(/\/+$/, '');
-      if (!apiUrl) {
-        console.warn('NEXT_PUBLIC_API_URL tidak ter-set.');
-      }
 
-      const endpoints = apiUrl
-        ? [
-            `${apiUrl}/promos/${promoData.id}/items`,
-            `${apiUrl}/promo-items`,
-            `${apiUrl}/admin/promos/${promoData.id}/items`,
-            `${apiUrl}/admin/promo-items`,
-          ]
-        : [];
+      // Try primary endpoint first, then fallback
+      const endpoints = [
+        `${apiUrl}/promos/${promoData.id}/items`,
+        `${apiUrl}/admin/promos/${promoData.id}/items`
+      ];
 
       const claimHeaders = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
+      
       const payload = {
         promo_id: promoData.id,
         status: 'reserved',
@@ -767,9 +768,17 @@ export default function PromoDetailUnified() {
       let savedItem = null;
       let lastError = '';
 
-      for (const url of endpoints) {
+      // Try endpoints one by one with delay to prevent rate limiting
+      for (let i = 0; i < endpoints.length; i++) {
+        const url = endpoints[i];
+        
         try {
-          const res = await fetch(url, { method: 'POST', headers: claimHeaders, body: JSON.stringify(payload) });
+          const res = await fetch(url, { 
+            method: 'POST', 
+            headers: claimHeaders, 
+            body: JSON.stringify(payload) 
+          });
+          
           const txt = await res.text().catch(() => '');
           let json = {};
           try {
@@ -787,13 +796,31 @@ export default function PromoDetailUnified() {
             lastError = 'Sesi berakhir. Silakan login ulang.';
             break;
           }
+          
+          if (res.status === 429) {
+            lastError = 'Terlalu banyak percobaan. Silakan tunggu sebentar.';
+            break;
+          }
+          
           if (res.status === 422 && json?.errors) {
             lastError = Object.values(json.errors).flat().join(', ');
             break;
           }
+          
           lastError = json?.message || json?.error || `HTTP ${res.status}`;
+          
+          // Add small delay between attempts to prevent rate limiting
+          if (i < endpoints.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
         } catch (e) {
           lastError = e?.message || 'Network error';
+          
+          // Add delay on network error too
+          if (i < endpoints.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
         }
       }
 
@@ -811,7 +838,12 @@ export default function PromoDetailUnified() {
           setShowErrorModal(true);
           return;
         }
-        // Jika gagal claim via API, tampilkan error
+        if (low.includes('too many') || low.includes('attempts') || low.includes('rate limit')) {
+          setErrorMessage('Terlalu banyak percobaan. Silakan tunggu sebentar dan coba lagi.');
+          setShowErrorModal(true);
+          return;
+        }
+        
         setErrorMessage(lastError || 'Gagal merebut promo. Silakan coba lagi.');
         setShowErrorModal(true);
         return;
@@ -820,71 +852,14 @@ export default function PromoDetailUnified() {
       // Promo successfully claimed via API
       setIsAlreadyClaimed(true);
       setShowSuccessModal(true);
-    } catch (e) {
-      // Jika error claim, cek apakah promo sebenarnya sudah diklaim
-      // eslint-disable-next-line no-console
-      console.log('Claim error, checking if promo was actually claimed:', e);
       
-      // Tunggu sebentar lalu cek status dari API
-      setTimeout(async () => {
-        try {
-          const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
-          const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
-          
-          if (currentUserToken) {
-            const checkUrls = [
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
-            ];
-
-            let alreadyClaimed = false;
-            const headers = {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-              Authorization: `Bearer ${currentUserToken}`,
-            };
-
-            for (const url of checkUrls) {
-              try {
-                const response = await fetch(url, { headers });
-                if (response.ok) {
-                  const data = await response.json();
-                  const items = Array.isArray(data) ? data : (data?.data || []);
-                  
-                  const apiClaimed = items.some(item => {
-                    const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
-                    return String(itemPromoId) === String(promoData.id);
-                  });
-
-                  if (apiClaimed) {
-                    alreadyClaimed = true;
-                    break;
-                  }
-                }
-              } catch (fetchErr) {
-                // Continue to next URL if this one fails
-              }
-            }
-            
-            if (alreadyClaimed) {
-              // Ternyata promo sudah diklaim di server
-              setIsAlreadyClaimed(true);
-              setShowSuccessModal(true);
-            } else {
-              setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
-              setShowErrorModal(true);
-            }
-          } else {
-            setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
-            setShowErrorModal(true);
-          }
-        } catch (checkErr) {
-          setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
-          setShowErrorModal(true);
-        }
-      }, 1000); // Tunggu 1 detik
+    } catch (e) {
+      console.error('Claim error:', e);
+      setErrorMessage('Terjadi kesalahan. Silakan coba lagi.');
+      setShowErrorModal(true);
     } finally {
       setIsClaimedLoading(false);
+      handleClaimPromo.isRunning = false;
     }
   };
 
