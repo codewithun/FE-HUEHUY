@@ -29,16 +29,6 @@ import { Decrypt } from '../../helpers/encryption.helpers';
 // Pastikan apiUrl selalu mengarah ke /api
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
-// Helper aman JSON.parse
-const safeParse = (text, fallback) => {
-  try {
-    if (typeof text !== 'string') return fallback;
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-};
-
 export default function Save() {
   const router = useRouter();
   const [modalValidation, setModalValidation] = useState(false);
@@ -158,45 +148,8 @@ export default function Save() {
         allItems = allItems.concat(mapped);
       }
 
-      // === LOCALSTORAGE VOUCHERS (untuk data yang disimpan lokal) ===
-      if (typeof window !== 'undefined') {
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
-        const storedUserToken = localStorage.getItem('huehuy_user_token');
-        
-        // Jika token berbeda, bersihkan localStorage (ganti akun)
-        if (storedUserToken && storedUserToken !== currentUserToken) {
-          localStorage.removeItem('huehuy_vouchers');
-          localStorage.removeItem('promoReports');
-          localStorage.setItem('huehuy_user_token', currentUserToken);
-        } else if (currentUserToken) {
-          // Simpan token user saat ini jika belum ada
-          localStorage.setItem('huehuy_user_token', currentUserToken);
-        }
-        
-        const localVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
-        
-        const localMapped = localVouchers
-          .filter(item => item && item.ad) // pastikan data valid
-          .map(item => ({
-            id: item.id || `local-${item.ad?.id || Math.random()}`,
-            type: 'promo',
-            code: item.code || item.voucher_item?.code || null,
-            claimed_at: item.claimed_at,
-            expired_at: item.expired_at || item.ad?.expires_at,
-            validated_at: item.validated_at || item.validation_at,
-            voucher_item: item.voucher_item,
-            voucher: null,
-            ad: item.ad,
-            isLocal: true // flag untuk membedakan data lokal
-          }));
-
-        // Hindari duplikasi: cek apakah promo ID sudah ada di data API
-        const existingIds = new Set(allItems.map(item => String(item.ad?.id)));
-        const filteredLocal = localMapped.filter(item => !existingIds.has(String(item.ad?.id)));
-        
-        allItems = allItems.concat(filteredLocal);
-      }
+      // === HANYA DARI API SERVER ===
+      // Tidak menggunakan localStorage untuk data yang konsisten secara online
 
       // Urutkan terbaru dulu
       allItems.sort((a, b) => new Date(b.claimed_at || 0) - new Date(a.claimed_at || 0));
@@ -213,23 +166,16 @@ export default function Save() {
     fetchData();
   }, [fetchData, refreshTrigger]);
 
-  // Auto-refresh saat focus & route change & localStorage change
+  // Auto-refresh saat focus & route change (tanpa localStorage)
   useEffect(() => {
     const handleFocus = () => setRefreshTrigger((p) => p + 1);
     const handleRouteChange = () => setRefreshTrigger((p) => p + 1);
-    const handleStorageChange = (e) => {
-      if (e.key === 'huehuy_vouchers') {
-        setRefreshTrigger((p) => p + 1);
-      }
-    };
 
     window.addEventListener('focus', handleFocus);
-    window.addEventListener('storage', handleStorageChange);
     router.events.on('routeChangeComplete', handleRouteChange);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('storage', handleStorageChange);
       router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, [router.events]);
