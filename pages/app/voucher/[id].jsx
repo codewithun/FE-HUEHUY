@@ -96,23 +96,18 @@ const DetailVoucherPage = () => {
         const voucherData = response.data.data;
         setVoucher(voucherData);
 
-        // Check if user already has this voucher (check voucher_items)
+        // Check if user already has this voucher (hanya dari API server)
         const userVoucherItems = Array.isArray(voucherData.voucher_items)
           ? voucherData.voucher_items
           : [];
-        const claimedVouchers = JSON.parse(
-          localStorage.getItem('huehuy_vouchers') || '[]'
-        );
 
         const serverClaimedByMe = currentUserId
           ? userVoucherItems.some(
             (vi) => Number(vi?.user_id) === Number(currentUserId)
           )
           : false;
-        const localClaimed = claimedVouchers.some(
-          (v) => Number(v.voucher_id ?? v.id) === Number(voucherData.id)
-        );
-        setIsClaimed(!!serverClaimedByMe || !!localClaimed);
+        
+        setIsClaimed(!!serverClaimedByMe);
 
         return voucherData;
       }
@@ -129,7 +124,38 @@ const DetailVoucherPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, currentUserId, router.query]);
+  }, [id, currentUserId, router.query.communityId]); // Lebih spesifik daripada router.query
+
+  // Check claimed status secara real-time dari API
+  useEffect(() => {
+    const checkClaimedStatus = async () => {
+      if (!voucher?.id || !currentUserId) return;
+      
+      try {
+        // Check dari API untuk memastikan status terkini
+        const response = await get({ 
+          path: `vouchers/${voucher.id}/public` 
+        });
+        
+        if (response?.status === 200 && response?.data?.data) {
+          const voucherData = response.data.data;
+          const userVoucherItems = Array.isArray(voucherData.voucher_items)
+            ? voucherData.voucher_items
+            : [];
+
+          const serverClaimedByMe = userVoucherItems.some(
+            (vi) => Number(vi?.user_id) === Number(currentUserId)
+          );
+          
+          setIsClaimed(!!serverClaimedByMe);
+        }
+      } catch (error) {
+        // Silent error
+      }
+    };
+
+    checkClaimedStatus();
+  }, [voucher?.id, currentUserId]);
 
   useEffect(() => {
     if (id) {
@@ -184,25 +210,7 @@ const DetailVoucherPage = () => {
       });
 
       if (response?.status === 200) {
-        const claimedVouchers = JSON.parse(
-          localStorage.getItem('huehuy_vouchers') || '[]'
-        );
-        const newVoucherItem = {
-          id: response.data.data.id,
-          voucher_id: voucher.id,
-          user_id: currentUserId || null,
-          code: response.data.data.code,
-          claimed_at: new Date().toISOString(),
-          expired_at: voucher.valid_until,
-          validation_at: null,
-          voucher: voucher,
-        };
-        claimedVouchers.push(newVoucherItem);
-        localStorage.setItem(
-          'huehuy_vouchers',
-          JSON.stringify(claimedVouchers)
-        );
-
+        // Voucher berhasil di-claim via API
         setIsClaimed(true);
         setShowSuccessModal(true);
       } else {
@@ -250,13 +258,10 @@ const DetailVoucherPage = () => {
         const voucherData = await fetchVoucherDetails();
         if (!voucherData) return;
 
-        // Cek apakah user sudah punya voucher ini
+        // Cek apakah user sudah punya voucher ini (hanya dari API server)
         const userVoucherItems = Array.isArray(voucherData.voucher_items)
           ? voucherData.voucher_items
           : [];
-        const claimedVouchers = JSON.parse(
-          localStorage.getItem('huehuy_vouchers') || '[]'
-        );
 
         const serverClaimedByMe = currentUserId
           ? userVoucherItems.some(
@@ -264,14 +269,8 @@ const DetailVoucherPage = () => {
           )
           : false;
 
-        const localClaimed = claimedVouchers.some(
-          (v) => Number(v.voucher_id ?? v.id) === Number(voucherData.id)
-        );
-
-        const alreadyClaimed = serverClaimedByMe || localClaimed;
-
-        if (!alreadyClaimed) {
-          // Lakukan auto claim voucher
+        if (!serverClaimedByMe) {
+          // Lakukan auto claim voucher hanya jika belum pernah di-claim di server
           try {
             const response = await post({
               path: `vouchers/${voucherData.id}/claim`,
@@ -280,36 +279,29 @@ const DetailVoucherPage = () => {
             });
 
             if (response?.status === 200) {
-              // Simpan ke localStorage
-              const claimedVouchers = JSON.parse(
-                localStorage.getItem('huehuy_vouchers') || '[]'
-              );
-              const newVoucherItem = {
-                id: response.data.data.id,
-                voucher_id: voucherData.id,
-                code: response.data.data.code,
-                claimed_at: new Date().toISOString(),
-                expired_at: voucherData.valid_until,
-                voucher: voucherData,
-              };
-              claimedVouchers.push(newVoucherItem);
-              localStorage.setItem(
-                'huehuy_vouchers',
-                JSON.stringify(claimedVouchers)
-              );
-
+              // Voucher berhasil di-claim via API
               setIsClaimed(true);
               setShowSuccessModal(true);
+            } else {
+              // Handle error responses
+              const msg = (response?.data?.message || response?.message || '').toLowerCase();
+              if (msg.includes('sudah diklaim') || msg.includes('already') || msg.includes('claimed')) {
+                setIsClaimed(true); // Set as claimed jika sudah ada di server
+              }
             }
           } catch (error) {
             // Silent error - user bisa manual claim
+            // console.warn('Auto claim failed:', error);
           }
+        } else {
+          // Sudah di-claim di server
+          setIsClaimed(true);
         }
       } catch (error) {
         // Silent error
       }
     },
-    [fetchVoucherDetails]
+    [fetchVoucherDetails, currentUserId]
   );
 
   // Fungsi untuk cek status verifikasi - DEPENDENCY DIPERBAIKI
