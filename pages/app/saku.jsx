@@ -160,6 +160,20 @@ export default function Save() {
 
       // === LOCALSTORAGE VOUCHERS (untuk data yang disimpan lokal) ===
       if (typeof window !== 'undefined') {
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
+        const storedUserToken = localStorage.getItem('huehuy_user_token');
+        
+        // Jika token berbeda, bersihkan localStorage (ganti akun)
+        if (storedUserToken && storedUserToken !== currentUserToken) {
+          localStorage.removeItem('huehuy_vouchers');
+          localStorage.removeItem('promoReports');
+          localStorage.setItem('huehuy_user_token', currentUserToken);
+        } else if (currentUserToken) {
+          // Simpan token user saat ini jika belum ada
+          localStorage.setItem('huehuy_user_token', currentUserToken);
+        }
+        
         const localVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
         
         const localMapped = localVouchers

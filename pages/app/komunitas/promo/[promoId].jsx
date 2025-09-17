@@ -99,6 +99,41 @@ export default function PromoDetailUnified() {
     };
   }, []);
 
+  // Cek status claimed dari localStorage saat promo data berubah
+  useEffect(() => {
+    if (!promoData?.id) return;
+    
+    try {
+      const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+      const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
+      const storedUserToken = localStorage.getItem('huehuy_user_token');
+      
+      // Jika token berbeda, bersihkan localStorage (ganti akun)
+      if (storedUserToken && storedUserToken !== currentUserToken) {
+        localStorage.removeItem('huehuy_vouchers');
+        localStorage.removeItem('promoReports');
+        localStorage.setItem('huehuy_user_token', currentUserToken);
+        setIsAlreadyClaimed(false);
+        return;
+      }
+      
+      // Simpan token user saat ini jika belum ada
+      if (currentUserToken) {
+        localStorage.setItem('huehuy_user_token', currentUserToken);
+      }
+      
+      const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
+      const alreadyClaimed = existingVouchers.some(
+        (v) => String(v.ad?.id) === String(promoData.id) || String(v.id) === String(promoData.id)
+      );
+      
+      setIsAlreadyClaimed(alreadyClaimed);
+    } catch (error) {
+      console.error('Error checking claimed status:', error);
+      setIsAlreadyClaimed(false);
+    }
+  }, [promoData?.id]);
+
   // Check if promo is already claimed when promoData changes
   useEffect(() => {
     if (!promoData) return;
@@ -405,8 +440,21 @@ export default function PromoDetailUnified() {
         const pd = await fetchPromoDetails();
         if (!pd) return;
 
-        // Cek duplikat lokal
+        // Cek duplikat lokal dengan validasi user token
         const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
+        const currentUserToken = token;
+        const storedUserToken = localStorage.getItem('huehuy_user_token');
+        
+        // Jika token berbeda, bersihkan localStorage (ganti akun)
+        if (storedUserToken && storedUserToken !== currentUserToken) {
+          localStorage.removeItem('huehuy_vouchers');
+          localStorage.removeItem('promoReports');
+          existingVouchers.length = 0; // clear array
+        }
+        
+        // Simpan token user saat ini
+        localStorage.setItem('huehuy_user_token', currentUserToken);
+        
         const alreadyClaimed = existingVouchers.some(
           (v) => String(v.ad?.id) === String(pd.id) || String(v.id) === String(pd.id)
         );
@@ -684,7 +732,22 @@ export default function PromoDetailUnified() {
 
     setIsClaimedLoading(true);
     try {
+      const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+      const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
+      
       const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
+      const storedUserToken = localStorage.getItem('huehuy_user_token');
+      
+      // Jika token berbeda, bersihkan localStorage (ganti akun)
+      if (storedUserToken && storedUserToken !== token) {
+        localStorage.removeItem('huehuy_vouchers');
+        localStorage.removeItem('promoReports');
+        existingVouchers.length = 0; // clear array
+      }
+      
+      // Simpan token user saat ini
+      localStorage.setItem('huehuy_user_token', token);
+      
       const isDuplicate = existingVouchers.some(
         (v) => String(v.ad?.id) === String(promoData.id) || String(v.id) === String(promoData.id)
       );
@@ -692,11 +755,9 @@ export default function PromoDetailUnified() {
       if (isDuplicate) {
         setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
         setShowErrorModal(true);
+        setIsClaimedLoading(false);
         return;
       }
-
-      const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
-      const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
 
       const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
       const apiUrl = rawApi.replace(/\/+$/, '');
