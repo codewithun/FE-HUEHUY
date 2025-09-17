@@ -593,22 +593,50 @@ export default function Save() {
                       />
                     </div>
 
-                    {/* Tombol Menu Validasi */}
-                    <button
-                      className="w-full bg-gradient-to-r from-primary to-primary/90 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
-                      onClick={() => {
-                        // Tutup modal dulu, baru navigasi tanpa membawa kode
-                        setModalValidation(false);
-                        setSelected(null);
-                        setTimeout(() => {
-                          router.push('/app/validasi');
-                        }, 100);
-                      }}
-                    >
-                      📱 Buka Menu Validasi
-                    </button>
+                    {/* Input Kode Validasi & Tombol */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Masukkan Kode Validasi
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Masukkan kode validasi..."
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
+                          onChange={(e) => {
+                            // Store validation code in state atau bisa langsung validate
+                            const validationCode = e.target.value;
+                            if (validationCode.length > 0) {
+                              e.target.dataset.code = validationCode;
+                            }
+                          }}
+                        />
+                      </div>
+                      
+                      <button
+                        className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
+                        onClick={(e) => {
+                          const input = e.target.parentElement.querySelector('input');
+                          const validationCode = input?.value;
+                          
+                          if (!validationCode || validationCode.trim() === '') {
+                            alert('Masukkan kode validasi terlebih dahulu');
+                            return;
+                          }
+                          
+                          // Validasi voucher dengan kode
+                          console.log('Validating voucher with code:', validationCode);
+                          alert(`Memvalidasi voucher dengan kode: ${validationCode}`);
+                          
+                          // TODO: Integrate dengan API validasi
+                          // submitValidation(validationCode, selected?.voucher_item?.code || selected?.code);
+                        }}
+                      >
+                        Validasi Voucher
+                      </button>
+                    </div>
                     
-                    <p className="text-slate-500 text-xs mt-3">Gunakan menu validasi untuk memproses voucher ini</p>
+                    <p className="text-slate-500 text-xs mt-3">Masukkan kode validasi untuk memproses voucher ini</p>
                   </div>
                 </div>
               );

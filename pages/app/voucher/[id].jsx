@@ -676,10 +676,10 @@ const DetailVoucherPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-sm font-semibold text-white">
-                      Kode Voucher
+                      Tipe Delivery
                     </span>
                     <div className="text-xs text-white opacity-80">
-                      {voucher.code}
+                      {voucher.delivery || 'manual'}
                     </div>
                   </div>
                   <div className="text-right">
@@ -694,21 +694,16 @@ const DetailVoucherPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-sm font-semibold text-white">
-                      Tipe Delivery
-                    </span>
-                    <div className="text-xs text-white opacity-80">
-                      {voucher.delivery || 'manual'}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-white opacity-80">
                       Berlaku Hingga
                     </span>
-                    <div className="text-xs text-white opacity-70">
+                    <div className="text-xs text-white opacity-80">
                       {voucher.valid_until
                         ? new Date(voucher.valid_until).toLocaleDateString()
                         : 'Tidak terbatas'}
                     </div>
+                  </div>
+                  <div className="text-right">
+                    {/* Placeholder untuk balance layout */}
                   </div>
                 </div>
               </div>
