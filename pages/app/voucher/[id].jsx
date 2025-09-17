@@ -96,18 +96,8 @@ const DetailVoucherPage = () => {
         const voucherData = response.data.data;
         setVoucher(voucherData);
 
-        // Check if user already has this voucher (hanya dari API server)
-        const userVoucherItems = Array.isArray(voucherData.voucher_items)
-          ? voucherData.voucher_items
-          : [];
-
-        const serverClaimedByMe = currentUserId
-          ? userVoucherItems.some(
-            (vi) => Number(vi?.user_id) === Number(currentUserId)
-          )
-          : false;
-        
-        setIsClaimed(!!serverClaimedByMe);
+        // Status claimed akan dicek oleh useEffect terpisah yang konsisten dengan promo
+        // Jadi kita tidak set isClaimed di sini
 
         return voucherData;
       }
@@ -124,33 +114,62 @@ const DetailVoucherPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, currentUserId, router.query.communityId]); // Lebih spesifik daripada router.query
+  }, [id, router.query.communityId]); // currentUserId tidak perlu karena tidak digunakan dalam function
 
-  // Check claimed status secara real-time dari API
+  // Check claimed status dari API yang sama seperti promo
   useEffect(() => {
     const checkClaimedStatus = async () => {
       if (!voucher?.id || !currentUserId) return;
       
       try {
-        // Check dari API untuk memastikan status terkini
-        const response = await get({ 
-          path: `vouchers/${voucher.id}/public` 
-        });
+        const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+        const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
         
-        if (response?.status === 200 && response?.data?.data) {
-          const voucherData = response.data.data;
-          const userVoucherItems = Array.isArray(voucherData.voucher_items)
-            ? voucherData.voucher_items
-            : [];
-
-          const serverClaimedByMe = userVoucherItems.some(
-            (vi) => Number(vi?.user_id) === Number(currentUserId)
-          );
-          
-          setIsClaimed(!!serverClaimedByMe);
+        if (!currentUserToken) {
+          setIsClaimed(false);
+          return;
         }
+        
+        // Check API untuk status claimed seperti di promo
+        const headers = {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${currentUserToken}`,
+        };
+
+        const apiUrls = [
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
+        ];
+
+        let alreadyClaimed = false;
+
+        for (const url of apiUrls) {
+          try {
+            const response = await fetch(url, { headers });
+            if (response.ok) {
+              const data = await response.json();
+              const items = Array.isArray(data) ? data : (data?.data || []);
+              
+              const apiClaimed = items.some(item => {
+                const itemVoucherId = item.voucher?.id || item.voucher_id;
+                return String(itemVoucherId) === String(voucher.id);
+              });
+
+              if (apiClaimed) {
+                alreadyClaimed = true;
+                break;
+              }
+            }
+          } catch (err) {
+            // Silent error checking API
+          }
+        }
+        
+        setIsClaimed(alreadyClaimed);
       } catch (error) {
-        // Silent error
+        // Silent error checking claimed status
+        setIsClaimed(false);
       }
     };
 
