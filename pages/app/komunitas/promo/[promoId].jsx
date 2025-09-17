@@ -99,6 +99,69 @@ export default function PromoDetailUnified() {
     };
   }, []);
 
+  // Check if promo is already claimed when promoData changes
+  useEffect(() => {
+    if (!promoData) return;
+
+    const checkClaimedStatus = async () => {
+      try {
+        // Check localStorage first
+        const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
+        const localClaimed = existingVouchers.some(
+          (v) => String(v.ad?.id) === String(promoData.id) || String(v.id) === String(promoData.id)
+        );
+
+        if (localClaimed) {
+          setIsAlreadyClaimed(true);
+          return;
+        }
+
+        // Check API if not found locally
+        const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+        const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
+        
+        if (!token) return;
+
+        const headers = {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        };
+
+        const apiUrls = [
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
+        ];
+
+        for (const url of apiUrls) {
+          try {
+            const response = await fetch(url, { headers });
+            if (response.ok) {
+              const data = await response.json();
+              const items = Array.isArray(data) ? data : (data?.data || []);
+              
+              const apiClaimed = items.some(item => {
+                const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
+                return String(itemPromoId) === String(promoData.id);
+              });
+
+              if (apiClaimed) {
+                setIsAlreadyClaimed(true);
+                return;
+              }
+            }
+          } catch (err) {
+            console.warn('Error checking API for claimed status:', err);
+          }
+        }
+      } catch (err) {
+        console.warn('Error checking claimed status:', err);
+      }
+    };
+
+    checkClaimedStatus();
+  }, [promoData]);
+
   // ====== Mock legacy (fallback jika tanpa communityId) ======
   const getLegacyPromoData = (id) => {
     const allPromos = {

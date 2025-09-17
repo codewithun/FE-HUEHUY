@@ -29,6 +29,16 @@ import { Decrypt } from '../../helpers/encryption.helpers';
 // Pastikan apiUrl selalu mengarah ke /api
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
+// Helper aman JSON.parse
+const safeParse = (text, fallback) => {
+  try {
+    if (typeof text !== 'string') return fallback;
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+};
+
 export default function Save() {
   const router = useRouter();
   const [modalValidation, setModalValidation] = useState(false);
@@ -148,6 +158,32 @@ export default function Save() {
         allItems = allItems.concat(mapped);
       }
 
+      // === LOCALSTORAGE VOUCHERS (untuk data yang disimpan lokal) ===
+      if (typeof window !== 'undefined') {
+        const localVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
+        
+        const localMapped = localVouchers
+          .filter(item => item && item.ad) // pastikan data valid
+          .map(item => ({
+            id: item.id || `local-${item.ad?.id || Math.random()}`,
+            type: 'promo',
+            code: item.code || item.voucher_item?.code || null,
+            claimed_at: item.claimed_at,
+            expired_at: item.expired_at || item.ad?.expires_at,
+            validated_at: item.validated_at || item.validation_at,
+            voucher_item: item.voucher_item,
+            voucher: null,
+            ad: item.ad,
+            isLocal: true // flag untuk membedakan data lokal
+          }));
+
+        // Hindari duplikasi: cek apakah promo ID sudah ada di data API
+        const existingIds = new Set(allItems.map(item => String(item.ad?.id)));
+        const filteredLocal = localMapped.filter(item => !existingIds.has(String(item.ad?.id)));
+        
+        allItems = allItems.concat(filteredLocal);
+      }
+
       // Urutkan terbaru dulu
       allItems.sort((a, b) => new Date(b.claimed_at || 0) - new Date(a.claimed_at || 0));
       setData({ data: allItems });
@@ -157,22 +193,29 @@ export default function Save() {
     }
 
     return () => controller.abort();
-  }, [refreshTrigger]);
+  }, []); // Hapus refreshTrigger dari dependency
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refreshTrigger]);
 
-  // Auto-refresh saat focus & route change
+  // Auto-refresh saat focus & route change & localStorage change
   useEffect(() => {
     const handleFocus = () => setRefreshTrigger((p) => p + 1);
     const handleRouteChange = () => setRefreshTrigger((p) => p + 1);
+    const handleStorageChange = (e) => {
+      if (e.key === 'huehuy_vouchers') {
+        setRefreshTrigger((p) => p + 1);
+      }
+    };
 
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorageChange);
     router.events.on('routeChangeComplete', handleRouteChange);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorageChange);
       router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, [router.events]);
@@ -460,7 +503,7 @@ export default function Save() {
                     : `/app/komunitas/promo/${selected?.ad?.id}?communityId=${selected?.ad?.cube?.community_id || 1}&from=saku`
                 }
               >
-                <div className="flex items-center gap-1 text-sm text-primary font-medium bg-primary/10 px-3 py-2 rounded-full text-xs hover:bg-primary/20 transition-colors">
+                <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors">
                   Detail
                   <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
                 </div>
