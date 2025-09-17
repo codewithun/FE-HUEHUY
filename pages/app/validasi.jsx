@@ -22,7 +22,7 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function Validasi() {
   const router = useRouter();
-  const { profile, loading, error, fetchProfile } = useUserContext();
+  const { profile, loading, fetchProfile } = useUserContext();
   
   const [code, setCode] = useState('');
   const [modalSuccess, setModalSuccess] = useState(false);
@@ -38,6 +38,18 @@ export default function Validasi() {
       fetchProfile();
     }
   }, [profile, loading, fetchProfile]);
+
+  // Clear kode saat halaman dimuat untuk memastikan input kosong
+  useEffect(() => {
+    setCode('');
+  }, []);
+
+  // Clear kode saat router ready untuk mencegah auto-fill dari sumber manapun
+  useEffect(() => {
+    if (router.isReady) {
+      setCode('');
+    }
+  }, [router.isReady]);
 
   const isManagerTenant = profile?.role_id === 6;
 
