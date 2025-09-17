@@ -441,7 +441,7 @@ export default function PromoDetailUnified() {
             return;
           }
         } catch (checkError) {
-          console.warn('Error checking claimed status:', checkError);
+          // Silent error checking claimed status
         }
 
         // Attempt to claim promo via API
@@ -453,18 +453,21 @@ export default function PromoDetailUnified() {
           });
 
           if (response?.status === 200) {
-            // Promo successfully claimed via API
+            // Promo successfully claimed via API - set success dan keluar
             setIsAlreadyClaimed(true);
             setShowSuccessModal(true);
+            return; // PENTING: keluar dari function saat berhasil
           } else {
             const msg = (response?.data?.message || response?.message || '').toLowerCase();
             if (msg.includes('habis') || msg.includes('stok') || msg.includes('stock')) {
               setErrorMessage('Maaf, stok promo sudah habis direbut.');
               setShowErrorModal(true);
+              return; // Keluar dari function
             } else if (msg.includes('sudah') || msg.includes('already') || msg.includes('claimed')) {
               setIsAlreadyClaimed(true);
               setErrorMessage('Promo ini sudah pernah direbut sebelumnya.');
               setShowErrorModal(true);
+              return; // Keluar dari function
             }
           }
         } catch (error) {
