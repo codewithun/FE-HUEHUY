@@ -19,16 +19,6 @@ import { token_cookie_name } from '../../../../helpers';
 import { get, post } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
-// Helper aman JSON.parse
-const safeParse = (text, fallback) => {
-  try {
-    if (typeof text !== 'string') return fallback;
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-};
-
 export default function PromoDetailUnified() {
   const router = useRouter();
   const { promoId, communityId } = router.query;
@@ -96,77 +86,41 @@ export default function PromoDetailUnified() {
   useEffect(() => {
     return () => {
       setHasTriedAuth(false);
+      // Clear any running flags to prevent memory leaks
+      if (checkUserVerificationStatus.isRunning) {
+        checkUserVerificationStatus.isRunning = false;
+      }
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // checkUserVerificationStatus excluded to prevent re-renders
 
-  // Cek status claimed dari localStorage saat promo data berubah
+  // Cek status claimed dari API saat promo data berubah
   useEffect(() => {
     if (!promoData?.id) return;
     
-    try {
-      const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
-      const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
-      const storedUserToken = localStorage.getItem('huehuy_user_token');
-      
-      // Jika token berbeda, bersihkan localStorage (ganti akun)
-      if (storedUserToken && storedUserToken !== currentUserToken) {
-        localStorage.removeItem('huehuy_vouchers');
-        localStorage.removeItem('promoReports');
-        localStorage.setItem('huehuy_user_token', currentUserToken);
-        setIsAlreadyClaimed(false);
-        return;
-      }
-      
-      // Simpan token user saat ini jika belum ada
-      if (currentUserToken) {
-        localStorage.setItem('huehuy_user_token', currentUserToken);
-      }
-      
-      const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
-      const alreadyClaimed = existingVouchers.some(
-        (v) => String(v.ad?.id) === String(promoData.id) || String(v.id) === String(promoData.id)
-      );
-      
-      setIsAlreadyClaimed(alreadyClaimed);
-    } catch (error) {
-      console.error('Error checking claimed status:', error);
-      setIsAlreadyClaimed(false);
-    }
-  }, [promoData?.id]);
-
-  // Check if promo is already claimed when promoData changes
-  useEffect(() => {
-    if (!promoData) return;
-
     const checkClaimedStatus = async () => {
       try {
-        // Check localStorage first
-        const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
-        const localClaimed = existingVouchers.some(
-          (v) => String(v.ad?.id) === String(promoData.id) || String(v.id) === String(promoData.id)
-        );
-
-        if (localClaimed) {
-          setIsAlreadyClaimed(true);
+        const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+        const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
+        
+        if (!currentUserToken) {
+          setIsAlreadyClaimed(false);
           return;
         }
-
-        // Check API if not found locally
-        const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
-        const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
         
-        if (!token) return;
-
+        // Check API untuk status claimed
         const headers = {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentUserToken}`,
         };
 
         const apiUrls = [
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
         ];
+
+        let alreadyClaimed = false;
 
         for (const url of apiUrls) {
           try {
@@ -181,21 +135,24 @@ export default function PromoDetailUnified() {
               });
 
               if (apiClaimed) {
-                setIsAlreadyClaimed(true);
-                return;
+                alreadyClaimed = true;
+                break;
               }
             }
           } catch (err) {
             console.warn('Error checking API for claimed status:', err);
           }
         }
-      } catch (err) {
-        console.warn('Error checking claimed status:', err);
+        
+        setIsAlreadyClaimed(alreadyClaimed);
+      } catch (error) {
+        console.error('Error checking claimed status:', error);
+        setIsAlreadyClaimed(false);
       }
     };
 
     checkClaimedStatus();
-  }, [promoData]);
+  }, [promoData?.id]);
 
   // ====== Mock legacy (fallback jika tanpa communityId) ======
   const getLegacyPromoData = (id) => {
@@ -440,83 +397,97 @@ export default function PromoDetailUnified() {
         const pd = await fetchPromoDetails();
         if (!pd) return;
 
-        // Cek duplikat lokal dengan validasi user token
-        const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
-        const currentUserToken = token;
-        const storedUserToken = localStorage.getItem('huehuy_user_token');
-        
-        // Jika token berbeda, bersihkan localStorage (ganti akun)
-        if (storedUserToken && storedUserToken !== currentUserToken) {
-          localStorage.removeItem('huehuy_vouchers');
-          localStorage.removeItem('promoReports');
-          existingVouchers.length = 0; // clear array
-        }
-        
-        // Simpan token user saat ini
-        localStorage.setItem('huehuy_user_token', currentUserToken);
-        
-        const alreadyClaimed = existingVouchers.some(
-          (v) => String(v.ad?.id) === String(pd.id) || String(v.id) === String(pd.id)
-        );
+        // Cek duplikat dari API server, bukan localStorage
+        try {
+          const headers = {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+          };
 
-        if (!alreadyClaimed) {
-          try {
-            const response = await post({
-              path: `admin/promos/${pd.id}/items`,
-              headers: { Authorization: `Bearer ${token}` },
-              body: { promo_id: pd.id, source: 'qr_scan' },
-            });
+          const apiUrls = [
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
+          ];
 
-            if (response?.status === 200) {
-              const claimedVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
-              const newPromoItem = {
-                id: response.data.data.id,
-                promo_id: pd.id,
-                code: response.data.data.code,
-                claimed_at: new Date().toISOString(),
-                expired_at: pd.expires_at,
-                ad: {
-                  id: pd.id,
-                  title: pd.title,
-                  picture_source: pd.image,
-                  status: 'active',
-                  cube: {
-                    code: `community-${communityId}`,
-                    user: { name: pd.seller?.name || 'Admin', phone: pd.seller?.phone || '' },
-                    corporate: null,
-                    tags: [{ address: pd.location, link: null, map_lat: null, map_lng: null }],
-                  },
-                },
-              };
-              claimedVouchers.push(newPromoItem);
-              localStorage.setItem('huehuy_vouchers', JSON.stringify(claimedVouchers));
-              setIsAlreadyClaimed(true);
-              setShowSuccessModal(true);
-            } else {
-              const msg = (response?.data?.message || response?.message || '').toLowerCase();
-              if (msg.includes('habis') || msg.includes('stok') || msg.includes('stock')) {
-                setErrorMessage('Maaf, stok promo sudah habis direbut.');
-                setShowErrorModal(true);
-              } else if (msg.includes('sudah') || msg.includes('already') || msg.includes('claimed')) {
-                setIsAlreadyClaimed(true);
-                setErrorMessage('Promo ini sudah pernah direbut pada akun lain.');
-                setShowErrorModal(true);
+          let alreadyClaimed = false;
+
+          for (const url of apiUrls) {
+            try {
+              const response = await fetch(url, { headers });
+              if (response.ok) {
+                const data = await response.json();
+                const items = Array.isArray(data) ? data : (data?.data || []);
+                
+                const apiClaimed = items.some(item => {
+                  const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
+                  return String(itemPromoId) === String(pd.id);
+                });
+
+                if (apiClaimed) {
+                  alreadyClaimed = true;
+                  break;
+                }
               }
+            } catch (err) {
+              console.warn('Error checking API for claimed status:', err);
             }
-          } catch (error) {
-            console.warn('Auto claim failed:', error);
           }
+
+          if (alreadyClaimed) {
+            setIsAlreadyClaimed(true);
+            setErrorMessage('Promo ini sudah pernah direbut pada akun ini.');
+            setShowErrorModal(true);
+            return;
+          }
+        } catch (checkError) {
+          console.warn('Error checking claimed status:', checkError);
+        }
+
+        // Attempt to claim promo via API
+        try {
+          const response = await post({
+            path: `admin/promos/${pd.id}/items`,
+            headers: { Authorization: `Bearer ${token}` },
+            body: { promo_id: pd.id, source: 'qr_scan' },
+          });
+
+          if (response?.status === 200) {
+            // Promo successfully claimed via API
+            setIsAlreadyClaimed(true);
+            setShowSuccessModal(true);
+          } else {
+            const msg = (response?.data?.message || response?.message || '').toLowerCase();
+            if (msg.includes('habis') || msg.includes('stok') || msg.includes('stock')) {
+              setErrorMessage('Maaf, stok promo sudah habis direbut.');
+              setShowErrorModal(true);
+            } else if (msg.includes('sudah') || msg.includes('already') || msg.includes('claimed')) {
+              setIsAlreadyClaimed(true);
+              setErrorMessage('Promo ini sudah pernah direbut sebelumnya.');
+              setShowErrorModal(true);
+            }
+          }
+        } catch (error) {
+          console.warn('Auto claim failed:', error);
         }
       } catch (error) {
         console.warn('Auto register failed:', error);
       }
     },
-    [fetchPromoDetails, communityId]
+    [fetchPromoDetails] // Removed communityId as it's not used in the function
   );
 
   // --- Cek status verifikasi user ---
   const checkUserVerificationStatus = useCallback(
     async (token) => {
+      // Prevent multiple concurrent calls
+      if (checkUserVerificationStatus.isRunning) {
+        console.log('checkUserVerificationStatus already running, skipping...');
+        return;
+      }
+      
+      checkUserVerificationStatus.isRunning = true;
+      
       try {
         console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
 
@@ -580,6 +551,13 @@ export default function PromoDetailUnified() {
         handleAutoRegister(token);
       } catch (err) {
         console.error('Error checking verification status:', err);
+        
+        // Don't redirect on network errors to prevent session loss
+        if (err?.message?.includes('Failed to fetch') || err?.code === 'NETWORK_ERROR') {
+          console.warn('Network error, not redirecting to login');
+          return;
+        }
+        
         const next =
           typeof window !== 'undefined'
             ? window.location.href
@@ -588,6 +566,8 @@ export default function PromoDetailUnified() {
         setTimeout(() => {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }, 100);
+      } finally {
+        checkUserVerificationStatus.isRunning = false;
       }
     },
     [promoId, communityId, handleAutoRegister]
@@ -647,21 +627,29 @@ export default function PromoDetailUnified() {
     }
 
     checkUserVerificationStatus(token);
-  }, [router.isReady, autoRegister, promoId, communityId, checkUserVerificationStatus, hasTriedAuth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, autoRegister, promoId, communityId, hasTriedAuth]); // checkUserVerificationStatus excluded to prevent infinite loop
 
   // Back handler
   const handleBack = () => {
-    const { from } = router.query;
+    try {
+      const { from } = router.query;
 
-    if (autoRegister) {
-      router.push('/app');
-    } else if (from === 'saku') {
-      router.push('/app/saku');
-    } else if (communityId === 'promo-entry') {
-      router.push('/app');
-    } else if (communityId) {
-      router.push(`/app/komunitas/dashboard/${communityId}`);
-    } else {
+      // Prevent potential session issues by not making additional API calls during navigation
+      if (autoRegister) {
+        router.push('/app');
+      } else if (from === 'saku') {
+        router.push('/app/saku');
+      } else if (communityId === 'promo-entry') {
+        router.push('/app');
+      } else if (communityId) {
+        router.push(`/app/komunitas/dashboard/${communityId}`);
+      } else {
+        router.push('/app');
+      }
+    } catch (error) {
+      console.error('Error in handleBack:', error);
+      // Fallback to home if there's any error
       router.push('/app');
     }
   };
@@ -710,15 +698,8 @@ export default function PromoDetailUnified() {
     setShowShareModal(false);
   };
 
-  const submitReport = (reason) => {
-    const reports = safeParse(localStorage.getItem('promoReports'), []);
-    reports.push({
-      promoId: promoData.id,
-      reason,
-      reportedAt: new Date().toISOString(),
-      status: 'pending',
-    });
-    localStorage.setItem('promoReports', JSON.stringify(reports));
+  const submitReport = () => {
+    // For now, just show success message - in production this should send to API
     setShowReportModal(false);
     setTimeout(() => {
       setErrorMessage('Laporan Anda telah dikirim. Terima kasih atas perhatiannya!');
@@ -735,22 +716,48 @@ export default function PromoDetailUnified() {
       const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
       const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
       
-      const existingVouchers = safeParse(localStorage.getItem('huehuy_vouchers'), []);
-      const storedUserToken = localStorage.getItem('huehuy_user_token');
-      
-      // Jika token berbeda, bersihkan localStorage (ganti akun)
-      if (storedUserToken && storedUserToken !== token) {
-        localStorage.removeItem('huehuy_vouchers');
-        localStorage.removeItem('promoReports');
-        existingVouchers.length = 0; // clear array
+      if (!token) {
+        setErrorMessage('Sesi login telah berakhir. Silakan login kembali.');
+        setShowErrorModal(true);
+        setIsClaimedLoading(false);
+        return;
       }
-      
-      // Simpan token user saat ini
-      localStorage.setItem('huehuy_user_token', token);
-      
-      const isDuplicate = existingVouchers.some(
-        (v) => String(v.ad?.id) === String(promoData.id) || String(v.id) === String(promoData.id)
-      );
+
+      // Check claimed status dari API terlebih dahulu
+      const headers = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      };
+
+      const checkUrls = [
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/vouchers/voucher-items`
+      ];
+
+      // Check if already claimed via API
+      let isDuplicate = false;
+      for (const url of checkUrls) {
+        try {
+          const response = await fetch(url, { headers });
+          if (response.ok) {
+            const data = await response.json();
+            const items = Array.isArray(data) ? data : (data?.data || []);
+            
+            const apiClaimed = items.some(item => {
+              const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
+              return String(itemPromoId) === String(promoData.id);
+            });
+
+            if (apiClaimed) {
+              isDuplicate = true;
+              break;
+            }
+          }
+        } catch (err) {
+          console.warn('Error checking API for claimed status:', err);
+        }
+      }
 
       if (isDuplicate) {
         setErrorMessage('Promo ini sudah pernah Anda rebut sebelumnya!');
@@ -774,7 +781,7 @@ export default function PromoDetailUnified() {
           ]
         : [];
 
-      const headers = {
+      const claimHeaders = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -790,7 +797,7 @@ export default function PromoDetailUnified() {
 
       for (const url of endpoints) {
         try {
-          const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+          const res = await fetch(url, { method: 'POST', headers: claimHeaders, body: JSON.stringify(payload) });
           const txt = await res.text().catch(() => '');
           let json = {};
           try {
@@ -832,41 +839,14 @@ export default function PromoDetailUnified() {
           setShowErrorModal(true);
           return;
         }
-        // fallback: lanjut simpan lokal walau server gagal (opsional)
+        // Jika gagal claim via API, tampilkan error
+        setErrorMessage(lastError || 'Gagal merebut promo. Silakan coba lagi.');
+        setShowErrorModal(true);
+        return;
       }
 
-      const enriched = {
-        ...savedItem,
-        code: savedItem?.code || savedItem?.voucher_item?.code,
-        claimed_at: new Date().toISOString(),
-        validation_at: null,
-        voucher_item: savedItem?.voucher_item || null,
-        ad: {
-          id: promoData.id,
-          title: promoData.title,
-          picture_source: promoData.image,
-          status: 'active',
-          cube: {
-            code: `community-${communityId || 'unknown'}`,
-            user: {
-              name: promoData.seller?.name || 'Admin',
-              phone: promoData.seller?.phone || '',
-            },
-            corporate: null,
-            tags: [
-              {
-                address: promoData.location,
-                link: null,
-                map_lat: null,
-                map_lng: null,
-              },
-            ],
-          },
-        },
-      };
-
-      existingVouchers.push(enriched);
-      localStorage.setItem('huehuy_vouchers', JSON.stringify(existingVouchers));
+      // Promo successfully claimed via API
+      setIsAlreadyClaimed(true);
       setShowSuccessModal(true);
     } catch (e) {
       setErrorMessage(e?.message || 'Gagal merebut promo. Silakan coba lagi.');
