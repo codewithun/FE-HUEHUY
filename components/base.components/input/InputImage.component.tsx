@@ -8,7 +8,7 @@ import { validationLangs } from '../../../langs';
 import { inputLabel } from './input.decorate';
 import { useValidationHelper } from '../../../helpers';
 
-export default function InputImageComponent({
+export function InputImageComponent({
   name,
   label,
   onChange,

@@ -9,6 +9,7 @@ export * from './InputFile.component';
 export * from './InputImage.component';
 export * from './InputMap.component';
 export * from './Select.component';
+export * from './Textarea.component';
 export * from './Checkbox.component';
 export * from './Radio.component';
 export * from './input.decorate';
