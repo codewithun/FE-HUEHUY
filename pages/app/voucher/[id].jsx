@@ -285,9 +285,20 @@ const DetailVoucherPage = () => {
             } else {
               // Handle error responses
               const msg = (response?.data?.message || response?.message || '').toLowerCase();
+              
               if (msg.includes('sudah diklaim') || msg.includes('already') || msg.includes('claimed')) {
                 setIsClaimed(true); // Set as claimed jika sudah ada di server
+              } else if (
+                response?.status === 400 ||
+                response?.status === 409 ||
+                msg.includes('habis') ||
+                msg.includes('stock') ||
+                msg.includes('stok')
+              ) {
+                // Stok habis - jangan set claimed dan tampilkan modal
+                setShowOutOfStockModal(true);
               }
+              // Untuk error lain, biarkan user coba manual claim
             }
           } catch (error) {
             // Silent error - user bisa manual claim
