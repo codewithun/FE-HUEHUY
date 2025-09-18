@@ -286,8 +286,8 @@ export default function Save() {
   };
 
   // Fungsi submit validasi
-  const submitValidation = async (validationCode, voucherCode) => {
-    const codeToValidate = voucherCode || validationCode;
+  const submitValidation = async (validationCode) => {
+    const codeToValidate = validationCode;
     
     if (!codeToValidate || codeToValidate.trim() === '') {
       setValidationMessage('Masukkan kode validasi terlebih dahulu');
@@ -297,7 +297,19 @@ export default function Save() {
 
     // Validasi tambahan: pastikan kode yang dimasukkan sesuai dengan item yang dipilih
     const expectedCode = selected?.voucher_item?.code || selected?.code;
+    
+    console.log('🔍 Validating code in Saku:', {
+      inputCode: codeToValidate,
+      expectedCode: expectedCode,
+      selectedItem: selected?.id,
+      selectedType: selected?.type
+    });
+    
     if (expectedCode && codeToValidate.trim() !== expectedCode.trim()) {
+      console.log('❌ Code mismatch:', {
+        input: codeToValidate.trim(),
+        expected: expectedCode.trim()
+      });
       setValidationMessage(`Kode "${codeToValidate}" tidak sesuai dengan item yang dipilih. Kode yang benar adalah "${expectedCode}".`);
       setShowValidationFailed(true);
       return;
@@ -320,8 +332,6 @@ export default function Save() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       };
-
-      console.log('🔍 Validating code in Saku:', codeToValidate.trim());
 
       // Try voucher validation first
       let res = await fetch(`${apiUrl}/vouchers/validate`, {
@@ -822,7 +832,7 @@ export default function Save() {
                             : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
                         }`}
                         onClick={() => {
-                          submitValidation(validationCode, selected?.voucher_item?.code || selected?.code);
+                          submitValidation(validationCode);
                         }}
                         disabled={validationLoading}
                       >
@@ -898,7 +908,7 @@ export default function Save() {
                         : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
                     }`}
                     onClick={() => {
-                      submitValidation(validationCode, selected?.code);
+                      submitValidation(validationCode);
                     }}
                     disabled={validationLoading}
                   >
