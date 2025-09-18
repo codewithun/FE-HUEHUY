@@ -341,7 +341,6 @@ export default function Save() {
   const submitValidation = async (validationCode) => {
     const codeToValidate = (validationCode || '').trim();
 
-    // Wajib isi kode
     if (!codeToValidate) {
       setValidationMessage('Kode unik wajib diisi.');
       setShowValidationFailed(true);
@@ -349,7 +348,6 @@ export default function Save() {
     }
 
     setValidationLoading(true);
-
     try {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : null;
@@ -366,36 +364,31 @@ export default function Save() {
         Authorization: `Bearer ${token}`,
       };
 
-      // Tentukan tipe item
-      const itemType =
-        (selected?.type === 'voucher' || selected?.voucher || selected?.voucher_item)
-          ? 'voucher'
-          : 'promo';
+      // Deteksi tipe item secara aman
+      const isPromoItem =
+        !!(selected?.promo || selected?.promo_id || selected?.promo_item || selected?.type === 'promo');
+      const isVoucherItem =
+        !!(selected?.voucher || selected?.voucher_id || selected?.voucher_item || selected?.type === 'voucher');
 
       let res = null;
       let result = null;
 
-      if (itemType === 'promo') {
-        // Validasi ketat: input harus sama persis dengan kode QR promo di dompet
-        const expected = (selected?.code || '').trim();
+      if (isPromoItem) {
+        const expected = (selected?.code || selected?.promo_item?.code || '').trim();
         if (!expected) {
           setValidationMessage('Kode promo tidak tersedia. Muat ulang dan coba lagi.');
           setShowValidationFailed(true);
           setValidationLoading(false);
           return;
         }
-
-        const same = expected.toUpperCase() === codeToValidate.toUpperCase();
-        if (!same) {
-          // Pesan generic, jangan tampilkan kode yang benar
+        if (expected.toUpperCase() !== codeToValidate.toUpperCase()) {
           setValidationMessage('Kode unik tidak valid.');
           setShowValidationFailed(true);
           setValidationLoading(false);
           return;
         }
 
-        // Redeem via promo-item by ID (stok sudah dihandle BE saat klaim/validasi)
-        const targetId = selected?.id;
+        const targetId = selected?.promo_item?.id || selected?.id;
         if (!targetId) {
           setValidationMessage('Promo tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -403,81 +396,61 @@ export default function Save() {
           return;
         }
 
+        // Endpoint benar untuk promo
         res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ code: codeToValidate }), // kirim kode (opsional di BE)
+          body: JSON.stringify({ code: codeToValidate }),
+        });
+        result = await res.json().catch(() => null);
+      } else if (isVoucherItem) {
+        const targetId = selected?.voucher_item?.id || selected?.id;
+        if (!targetId) {
+          setValidationMessage('Voucher tidak valid atau tidak ditemukan.');
+          setShowValidationFailed(true);
+          setValidationLoading(false);
+          return;
+        }
+
+        // Coba endpoint redeem voucher dulu
+        res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/redeem`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ code: codeToValidate }),
         });
         result = await res.json().catch(() => null);
 
-        // Jika BE tidak mengenal endpoint redeem, fallback ke endpoint validate by code
-        if (res.status === 404) {
-          res = await fetch(`${apiUrl}/promos/validate`, {
-            method: 'POST',
+        // Fallback jika API lama (tanpa /redeem)
+        if (res.status === 404 || res.status === 405) {
+          res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}`, {
+            method: 'PUT',
             headers,
-            body: JSON.stringify({ code: codeToValidate }),
+            body: JSON.stringify({ used_at: new Date().toISOString() }),
           });
           result = await res.json().catch(() => null);
         }
       } else {
-        // Voucher flow tetap (boleh menyesuaikan BE Anda)
-        const targetId = selected?.voucher_item?.id || selected?.id;
-        res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({ used_at: new Date().toISOString() }),
-        });
-        result = await res.json().catch(() => null);
-
-        if (res && res.status === 404) {
-          res = await fetch(`${apiUrl}/vouchers/validate`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ code: codeToValidate }),
-          });
-          result = await res.json().catch(() => null);
-        }
+        setValidationMessage('Item tidak dikenali.');
+        setShowValidationFailed(true);
+        setValidationLoading(false);
+        return;
       }
 
       if (res && res.ok) {
-        setValidationMessage(`${itemType === 'promo' ? 'Promo' : 'Voucher'} berhasil divalidasi!`);
+        setValidationMessage('Berhasil divalidasi.');
         setShowValidationSuccess(true);
         setValidationCode('');
-
-        if (selected) {
-          setData((prev) => ({
-            ...prev,
-            data: prev.data.map((it) => {
-              const isTarget =
-                it.id === selected.id &&
-                it.type === selected.type &&
-                (it.code === selected.code ||
-                  it.voucher_item?.code === selected.voucher_item?.code);
-              return isTarget ? { ...it, validated_at: new Date().toISOString() } : it;
-            }),
-          }));
-        }
-
         setTimeout(() => setRefreshTrigger((p) => p + 1), 500);
       } else {
-        const msg =
-          result?.message ||
-          result?.error ||
-          (res ? `HTTP ${res.status}` : 'Gagal validasi');
-
-        if (res?.status === 409 || /already|used|divalidasi|digunakan|sudah/i.test(msg)) {
-          setValidationMessage('Kode unik sudah pernah divalidasi.');
-        } else if (res?.status === 404 || /tidak ditemukan|not found|invalid/i.test(msg)) {
-          setValidationMessage('Kode unik tidak ditemukan.');
-        } else if (res?.status === 422) {
-          setValidationMessage(msg || 'Kode unik tidak valid atau format salah.');
-        } else {
-          setValidationMessage('Terjadi kesalahan. Silakan coba lagi.');
-        }
+        const msg = result?.message || result?.error || (res ? `HTTP ${res.status}` : '');
+        if (res?.status === 409) setValidationMessage('Kode unik sudah pernah divalidasi.');
+        else if (res?.status === 404) setValidationMessage('Kode unik tidak ditemukan.');
+        else if (res?.status === 422) setValidationMessage(msg || 'Kode unik tidak valid atau format salah.');
+        else setValidationMessage('Terjadi kesalahan. Silakan coba lagi.');
         setShowValidationFailed(true);
       }
-    } catch (err) {
-      console.error('Validation error:', err);
+    } catch (e) {
+      console.error('Validation error:', e);
       setValidationMessage('Terjadi kesalahan. Silakan coba lagi.');
       setShowValidationFailed(true);
     } finally {
