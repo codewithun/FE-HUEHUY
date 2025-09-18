@@ -311,7 +311,7 @@ export default function Save() {
       };
 
       // Try voucher validation first
-      let res = await fetch(`${apiUrl.replace('/api', '')}/vouchers/validate`, {
+      let res = await fetch(`${apiUrl}/vouchers/validate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -324,7 +324,7 @@ export default function Save() {
 
       // If voucher validation fails, try promo validation
       if (!res.ok) {
-        res = await fetch(`${apiUrl.replace('/api', '')}/promos/validate`, {
+        res = await fetch(`${apiUrl}/promos/validate`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -707,7 +707,7 @@ export default function Save() {
                             Memvalidasi...
                           </div>
                         ) : (
-                          '✓ Validasi Voucher'
+                          'Validasi Voucher'
                         )}
                       </button>
                     </div>
