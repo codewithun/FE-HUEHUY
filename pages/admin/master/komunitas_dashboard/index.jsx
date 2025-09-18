@@ -358,21 +358,6 @@ export default function KomunitasDashboard() {
           <span className="text-gray-400">-</span>
         ),
     },
-    {
-      selector: "aksi",
-      label: "Kategori",
-      width: "120px",
-      item: (item) => (
-        <div className="flex gap-2">
-          <ButtonComponent
-            label="Tambah Kategori"
-            paint="info"
-            size="sm"
-            onClick={() => handleOpenCategory(item)}
-          />
-        </div>
-      ),
-    },
   ];
 
   const topBarActions = (
@@ -398,7 +383,19 @@ export default function KomunitasDashboard() {
         noControlBar={false}
         searchable={true}
         setToRefresh={refreshToggle}
-        actionControl={{ except: ['detail'] }}  // nonaktifkan detail
+        actionControl={{ 
+          except: ['detail'],
+          include: (row, actions, hasPermissions) => (
+            <ButtonComponent
+              label="Tambah Kategori"
+              paint="primary"
+              size="xs"
+              variant="outline"
+              rounded
+              onClick={() => handleOpenCategory(row)}
+            />
+          )
+        }}
         fetchControl={{
           path: "admin/communities",
           method: "GET",
@@ -558,96 +555,158 @@ export default function KomunitasDashboard() {
           setSelectedCategory(null);
           setCategoryForm({ title: "", description: "" });
           setPreviewWidgets([]);
+          setShowCategoryForm(false); // Reset form visibility
         }}
         title="Kategori Komunitas"
         size="md"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <ButtonComponent
-              label="Tambah Kategori"
-              paint="primary"
-              onClick={() => {
-                setSelectedCategory(null);
-                setCategoryForm({ title: "", description: "" });
-                setShowCategoryForm(true);
-              }}
-            />
+        <div className="p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <ButtonComponent
+                label="Tambah Kategori"
+                paint="primary"
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setCategoryForm({ title: "", description: "" });
+                  setShowCategoryForm(true);
+                }}
+              />
+            </div>
+
+            <div>
+              <ButtonComponent
+                label="Tambah Promo ke Komunitas"
+                paint="primary"
+                onClick={() => {
+                  if (!activeCommunityId) {
+                    alert("Pilih komunitas terlebih dahulu.");
+                    return;
+                  }
+                  openAddModal({ id: activeCommunityId });
+                }}
+              />
+            </div>
           </div>
 
-          <div>
-            <ButtonComponent
-              label="Tambah Promo ke Komunitas"   // 🎯 teks diubah
-              paint="primary"
-              onClick={() => {
-                if (!activeCommunityId) {
-                  alert("Pilih komunitas terlebih dahulu.");
-                  return;
-                }
-                openAddModal({ id: activeCommunityId }); // selalu promo
-              }}
-            />
-          </div>
-        </div>
+          {/* Form Kategori - Ditampilkan berdasarkan showCategoryForm */}
+          {showCategoryForm && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold mb-4">
+                {selectedCategory ? "Edit Kategori" : "Tambah Kategori"}
+              </h4>
+              <form onSubmit={handleCategorySubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Judul Kategori<span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Masukkan judul kategori"
+                    value={categoryForm.title}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, title: e.target.value })}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Deskripsi
+                  </label>
+                  <textarea
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Masukkan deskripsi kategori"
+                    rows={3}
+                    value={categoryForm.description}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  />
+                </div>
 
-        {/* ... daftar & form kategori (tetap) ... */}
-        {/* (blok tabel kategori dibiarkan sama seperti kode kamu) */}
-
-        <table className="table w-full">
-          <thead>
-            <tr>
-              <th>Judul</th>
-              <th>Deskripsi</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categoryList.map((cat) => (
-              <tr key={cat.id}>
-                <td>{cat.title}</td>
-                <td>{cat.description || "-"}</td>
-                <td>
+                <div className="flex gap-2">
                   <ButtonComponent
-                    label="Edit"
-                    size="sm"
-                    paint="warning"
+                    label="Batal"
+                    paint="secondary"
+                    variant="outline"
+                    type="button"
                     onClick={() => {
-                      setSelectedCategory(cat);
-                      setCategoryForm({
-                        title: cat.title,
-                        description: cat.description || "",
-                      });
-                      setShowCategoryForm(true);
+                      setShowCategoryForm(false);
+                      setSelectedCategory(null);
+                      setCategoryForm({ title: "", description: "" });
                     }}
                   />
                   <ButtonComponent
-                    label="Hapus"
-                    size="sm"
-                    paint="danger"
-                    onClick={() => handleCategoryDelete(cat)}
+                    label={selectedCategory ? "Update Kategori" : "Simpan Kategori"}
+                    paint="primary"
+                    type="submit"
                   />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {previewWidgets.length > 0 && (
-          <div className="mt-6">
-            <h4 className="font-semibold mb-2">Preview Widget Promo</h4>
-            <div className="flex gap-4 overflow-x-auto">
-              {previewWidgets.map((w) => (
-                <div key={w.id} className="bg-primary rounded-xl p-4 text-white min-w-[220px]">
-                  <h5 className="font-bold">{w.title}</h5>
-                  <p className="text-sm text-white/90">{w.subtitle}</p>
-                  <div className="mt-3 bg-white/10 rounded p-2 text-xs">
-                    <p className="text-white/80">No promos yet</p>
-                  </div>
                 </div>
-              ))}
+              </form>
             </div>
+          )}
+
+          {/* Daftar Kategori */}
+          <div className="overflow-x-auto">
+            <table className="table w-full">
+              <thead>
+                <tr>
+                  <th>Judul</th>
+                  <th>Deskripsi</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categoryList.map((cat) => (
+                  <tr key={cat.id}>
+                    <td>{cat.title}</td>
+                    <td>{cat.description || "-"}</td>
+                    <td>
+                      <div className="flex gap-2">
+                        <ButtonComponent
+                          label="Edit"
+                          size="sm"
+                          paint="warning"
+                          onClick={() => {
+                            setSelectedCategory(cat);
+                            setCategoryForm({
+                              title: cat.title,
+                              description: cat.description || "",
+                            });
+                            setShowCategoryForm(true);
+                          }}
+                        />
+                        <ButtonComponent
+                          label="Hapus"
+                          size="sm"
+                          paint="danger"
+                          onClick={() => handleCategoryDelete(cat)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+
+          {/* Preview Widget */}
+          {previewWidgets.length > 0 && (
+            <div className="mt-6">
+              <h4 className="font-semibold mb-2">Preview Widget Promo</h4>
+              <div className="flex gap-4 overflow-x-auto">
+                {previewWidgets.map((w) => (
+                  <div key={w.id} className="bg-primary rounded-xl p-4 text-white min-w-[220px]">
+                    <h5 className="font-bold">{w.title}</h5>
+                    <p className="text-sm text-white/90">{w.subtitle}</p>
+                    <div className="mt-3 bg-white/10 rounded p-2 text-xs">
+                      <p className="text-white/80">No promos yet</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </FloatingPageComponent>
 
       {/* Modal Tambah PROMO (voucher dihapus) */}
