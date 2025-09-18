@@ -343,7 +343,7 @@ export default function Save() {
 
     // Wajib isi kode
     if (!codeToValidate) {
-      setValidationMessage('Masukkan kode validasi terlebih dahulu');
+      setValidationMessage('Kode unik wajib diisi.');
       setShowValidationFailed(true);
       return;
     }
@@ -387,7 +387,8 @@ export default function Save() {
 
         const same = expected.toUpperCase() === codeToValidate.toUpperCase();
         if (!same) {
-          setValidationMessage(`Kode tidak sesuai. Harus sama dengan kode pada QR: "${expected}".`);
+          // Pesan generic, jangan tampilkan kode yang benar
+          setValidationMessage('Kode unik tidak valid.');
           setShowValidationFailed(true);
           setValidationLoading(false);
           return;
@@ -465,13 +466,13 @@ export default function Save() {
           (res ? `HTTP ${res.status}` : 'Gagal validasi');
 
         if (res?.status === 409 || /already|used|divalidasi|digunakan|sudah/i.test(msg)) {
-          setValidationMessage('Kode sudah pernah divalidasi.');
+          setValidationMessage('Kode unik sudah pernah divalidasi.');
         } else if (res?.status === 404 || /tidak ditemukan|not found|invalid/i.test(msg)) {
-          setValidationMessage('Kode tidak ditemukan atau tidak valid.');
+          setValidationMessage('Kode unik tidak ditemukan.');
         } else if (res?.status === 422) {
-          setValidationMessage(msg || 'Kode tidak valid atau format salah.');
+          setValidationMessage(msg || 'Kode unik tidak valid atau format salah.');
         } else {
-          setValidationMessage(msg || 'Terjadi kesalahan. Silakan coba lagi.');
+          setValidationMessage('Terjadi kesalahan. Silakan coba lagi.');
         }
         setShowValidationFailed(true);
       }
