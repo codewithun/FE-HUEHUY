@@ -287,7 +287,9 @@ export default function Save() {
 
   // Fungsi submit validasi
   const submitValidation = async (validationCode, voucherCode) => {
-    if (!validationCode || validationCode.trim() === '') {
+    const codeToValidate = voucherCode || validationCode;
+    
+    if (!codeToValidate || codeToValidate.trim() === '') {
       setValidationMessage('Masukkan kode validasi terlebih dahulu');
       setShowValidationFailed(true);
       return;
@@ -311,18 +313,26 @@ export default function Save() {
         'Authorization': `Bearer ${token}`,
       };
 
+      console.log('🔍 Validating code in Saku:', codeToValidate.trim());
+
       // Try voucher validation first
       let res = await fetch(`${apiUrl}/vouchers/validate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          code: voucherCode || validationCode,
+          code: codeToValidate.trim(),
         }),
       });
 
       let result = await res.json().catch(() => null);
       let itemType = 'voucher';
       let voucherError = null;
+
+      console.log('📡 Voucher validation response:', {
+        status: res.status,
+        ok: res.ok,
+        result: result
+      });
 
       // If voucher validation fails, store the error and try promo validation
       if (!res.ok) {
@@ -332,22 +342,36 @@ export default function Save() {
           result: result
         };
         
+        console.log('🔍 Trying promo validation...');
+        
         res = await fetch(`${apiUrl}/promos/validate`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            code: voucherCode || validationCode,
+            code: codeToValidate.trim(),
           }),
         });
 
         result = await res.json().catch(() => null);
         itemType = 'promo';
+        
+        console.log('📡 Promo validation response:', {
+          status: res.status,
+          ok: res.ok,
+          result: result
+        });
       }
 
       if (res.ok) {
         setValidationMessage(`${itemType === 'promo' ? 'Promo' : 'Voucher'} berhasil divalidasi!`);
         setShowValidationSuccess(true);
         setValidationCode('');
+        
+        console.log('✅ Validation successful:', {
+          itemType,
+          code: codeToValidate,
+          selected: selected?.id
+        });
         
         // Update item status immediately untuk UI response yang cepat
         if (selected) {
@@ -398,8 +422,8 @@ export default function Save() {
           itemType: itemType
         });
       } else {
-        // Handle specific error cases
-        let errorMsg = 'Kode tidak valid atau sudah digunakan';
+        // Handle specific error cases dengan pesan yang lebih informatif
+        let errorMsg = 'Kode tidak valid atau tidak ditemukan';
         
         // Check if this is likely a validation of already used item
         const isAlreadyValidated = (status, message) => {
@@ -408,26 +432,33 @@ export default function Save() {
                  (message && (
                    message.toLowerCase().includes('sudah') ||
                    message.toLowerCase().includes('digunakan') ||
-                   message.toLowerCase().includes('divalidasi')
+                   message.toLowerCase().includes('divalidasi') ||
+                   message.toLowerCase().includes('already') ||
+                   message.toLowerCase().includes('used')
+                 ));
+        };
+        
+        const isNotFound = (status, message) => {
+          return status === 404 || 
+                 (message && (
+                   message.toLowerCase().includes('tidak ditemukan') ||
+                   message.toLowerCase().includes('not found') ||
+                   message.toLowerCase().includes('invalid')
                  ));
         };
         
         // Prioritize "already validated" messages over "not found"
         if (voucherError && isAlreadyValidated(voucherError.status, voucherError.message)) {
-          errorMsg = voucherError.message || 'Voucher sudah divalidasi sebelumnya';
+          errorMsg = `Voucher dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
         } else if (isAlreadyValidated(res.status, result?.message)) {
-          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
-        } else if (res.status === 400) {
-          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
-        } else if (res.status === 404) {
-          // Only show "not found" if we tried both voucher and promo
-          if (voucherError && voucherError.status === 404) {
-            errorMsg = 'Kode tidak valid atau tidak ditemukan';
-          } else {
-            errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak ditemukan`;
-          }
+          errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
+        } else if (voucherError && voucherError.status === 404 && res.status === 404) {
+          // Both voucher and promo returned 404 - code doesn't exist
+          errorMsg = `Kode "${codeToValidate}" tidak ditemukan. Pastikan kode yang Anda masukkan sudah benar.`;
+        } else if (isNotFound(res.status, result?.message)) {
+          errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" tidak ditemukan.`;
         } else if (res.status === 422) {
-          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak dapat divalidasi`;
+          errorMsg = result?.message || `Kode "${codeToValidate}" tidak valid atau format salah.`;
         } else if (result?.message) {
           errorMsg = result.message;
         }
@@ -901,6 +932,11 @@ export default function Save() {
                 setModalValidation(false);
                 setSelected(null);
                 setValidationCode('');
+                
+                // Force refresh setelah modal ditutup untuk memastikan data terbaru
+                setTimeout(() => {
+                  setRefreshTrigger(p => p + 1);
+                }, 100);
               }}
               className="w-full bg-green-500 text-white py-3 rounded-[12px] font-semibold hover:bg-green-600 transition-all"
             >
