@@ -345,7 +345,23 @@ export default function Save() {
           setRefreshTrigger(p => p + 1);
         }, 1000);
       } else {
-        const errorMsg = result?.message || 'Kode tidak valid atau sudah digunakan';
+        // Handle specific error cases
+        let errorMsg = 'Kode tidak valid atau sudah digunakan';
+        
+        if (res.status === 400) {
+          // Bad request - biasanya kode sudah divalidasi
+          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
+        } else if (res.status === 404) {
+          // Not found - kode tidak ditemukan
+          errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak ditemukan`;
+        } else if (res.status === 422) {
+          // Unprocessable entity - validasi gagal
+          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak dapat divalidasi`;
+        } else if (result?.message) {
+          // Use API error message if available
+          errorMsg = result.message;
+        }
+        
         setValidationMessage(errorMsg);
         setShowValidationFailed(true);
       }
@@ -733,14 +749,62 @@ export default function Save() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
               <div className="text-center">
                 <div className="mb-4">
-                  <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">QR Code</span>
+                  <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
+                    QR Code Promo
+                  </span>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <QRCodeSVG value={selected?.code} size={180} bgColor="#f8fafc" fgColor="#0f172a" className="mx-auto rounded-lg" />
+                <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                  <QRCodeSVG
+                    value={selected?.code || 'NO_CODE'}
+                    size={180}
+                    bgColor="#f8fafc"
+                    fgColor="#0f172a"
+                    level="H"
+                    includeMargin={true}
+                    className="mx-auto rounded-lg"
+                  />
                 </div>
 
-                <p className="text-slate-500 text-xs mt-3">Tunjukkan kode ini kepada merchant</p>
+                {/* Input Kode Validasi & Tombol */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Masukkan Kode Validasi
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Masukkan kode validasi..."
+                      value={validationCode}
+                      onChange={(e) => setValidationCode(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
+                      disabled={validationLoading}
+                    />
+                  </div>
+                  
+                  <button
+                    className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 ${
+                      validationLoading 
+                        ? 'bg-slate-400 text-white cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
+                    }`}
+                    onClick={() => {
+                      submitValidation(validationCode, selected?.code);
+                    }}
+                    disabled={validationLoading}
+                  >
+                    {validationLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Memvalidasi...
+                      </div>
+                    ) : (
+                      'Validasi Promo'
+                    )}
+                  </button>
+                </div>
+                
+                <p className="text-slate-500 text-xs mt-3">Masukkan kode validasi untuk memproses promo ini</p>
               </div>
             </div>
           )}
