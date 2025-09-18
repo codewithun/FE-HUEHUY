@@ -372,8 +372,8 @@ export default function Save() {
       let res, result;
 
       if (isPromoItem) {
-        // Tidak perlu cek expected code di FE — serahkan ke BE
-        res = await fetch(`${apiUrl}/promos/validate-code`, {
+        // Validasi promo via BE; jangan bandingkan dengan selected.code di FE
+        res = await fetch(`${apiUrl}/promos/validate`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ code: codeToValidate }),
