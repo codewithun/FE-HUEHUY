@@ -91,6 +91,56 @@ export default function Validasi() {
       // eslint-disable-next-line no-console
       console.log('🔍 Validating code:', codeToValidate);
 
+      // First, check if user has any promo/voucher with this code in their possession
+      // Using the same endpoints as saku.jsx
+      const timestamp = Date.now();
+      const [promoItemsRes, voucherItemsRes] = await Promise.allSettled([
+        fetch(`${apiUrl}/admin/promo-items?_t=${timestamp}`, { headers }),
+        fetch(`${apiUrl}/vouchers/voucher-items?_t=${timestamp}`, { headers }),
+      ]);
+
+      let hasItemWithCode = false;
+      let allUserItems = [];
+
+      // Check promo items
+      if (promoItemsRes.status === 'fulfilled' && promoItemsRes.value.ok) {
+        const promoJson = await promoItemsRes.value.json().catch(() => ({}));
+        const promoItems = promoJson.data || [];
+        allUserItems.push(...promoItems.map(item => ({ ...item, type: 'promo' })));
+      }
+
+      // Check voucher items
+      if (voucherItemsRes.status === 'fulfilled' && voucherItemsRes.value.ok) {
+        const voucherJson = await voucherItemsRes.value.json().catch(() => ({}));
+        const voucherItems = voucherJson.data || [];
+        allUserItems.push(...voucherItems.map(item => ({ ...item, type: 'voucher' })));
+      }
+
+      // Check if user has item with this code
+      hasItemWithCode = allUserItems.some(item => {
+        const itemCode = item.code || item.voucher_item?.code;
+        return itemCode && itemCode.trim() === codeToValidate.trim();
+      });
+      
+      // eslint-disable-next-line no-console
+      console.log('🔍 User items check:', {
+        hasItemWithCode,
+        userItemsCount: allUserItems.length,
+        searchingForCode: codeToValidate,
+        foundItems: allUserItems.filter(item => {
+          const itemCode = item.code || item.voucher_item?.code;
+          return itemCode && itemCode.trim() === codeToValidate.trim();
+        })
+      });
+
+      // If user doesn't have this item, return error immediately
+      if (!hasItemWithCode) {
+        setModalFailedMessage(`Anda tidak memiliki promo atau voucher dengan kode "${codeToValidate}". Pastikan Anda sudah mengambil item tersebut terlebih dahulu.`);
+        setModalFailed(true);
+        setSubmitLoading(false);
+        return;
+      }
+
       // Try promo validation first
       let res = await fetch(`${apiUrl}/promos/validate`, {
         method: 'POST',
@@ -205,6 +255,9 @@ export default function Validasi() {
         setModalFailed(true);
       }
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Validation error:', err);
+      setModalFailedMessage('Terjadi kesalahan saat validasi. Silakan coba lagi.');
       setModalFailed(true);
     } finally {
       setSubmitLoading(false);

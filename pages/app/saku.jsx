@@ -295,6 +295,14 @@ export default function Save() {
       return;
     }
 
+    // Validasi tambahan: pastikan kode yang dimasukkan sesuai dengan item yang dipilih
+    const expectedCode = selected?.voucher_item?.code || selected?.code;
+    if (expectedCode && codeToValidate.trim() !== expectedCode.trim()) {
+      setValidationMessage(`Kode "${codeToValidate}" tidak sesuai dengan item yang dipilih. Kode yang benar adalah "${expectedCode}".`);
+      setShowValidationFailed(true);
+      return;
+    }
+
     setValidationLoading(true);
     
     try {
