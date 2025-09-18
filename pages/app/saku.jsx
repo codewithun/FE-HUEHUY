@@ -56,10 +56,11 @@ export default function Save() {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
 
-      // Ambil data user-scoped (BUKAN admin/global)
+      // Ambil data user-scoped (BUKAN admin/global) dengan cache busting
+      const timestamp = Date.now();
       const [promoRes, voucherRes] = await Promise.allSettled([
-        fetch(`${apiUrl}/admin/promo-items`, { headers, signal: controller.signal }),
-        fetch(`${apiUrl}/vouchers/voucher-items`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/admin/promo-items?_t=${timestamp}`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/vouchers/voucher-items?_t=${timestamp}`, { headers, signal: controller.signal }),
       ]);
 
       let allItems = [];
@@ -350,20 +351,52 @@ export default function Save() {
         
         // Update item status immediately untuk UI response yang cepat
         if (selected) {
-          setData(prevData => ({
-            ...prevData,
-            data: prevData.data.map(item => 
-              item.id === selected.id 
-                ? { ...item, validated_at: new Date().toISOString() }
-                : item
-            )
-          }));
+          console.log('🔄 Updating item status in state:', {
+            selectedItem: selected,
+            currentData: data?.data?.length || 0
+          });
+          
+          setData(prevData => {
+            const updatedData = {
+              ...prevData,
+              data: prevData.data.map(item => {
+                // Identifikasi item yang tepat berdasarkan multiple criteria
+                const isTargetItem = (
+                  (item.id === selected.id) &&
+                  (item.type === selected.type) &&
+                  (item.code === selected.code || 
+                   item.voucher_item?.code === selected.voucher_item?.code)
+                );
+                
+                if (isTargetItem) {
+                  console.log('✅ Updating item in state:', {
+                    beforeUpdate: item,
+                    afterUpdate: { ...item, validated_at: new Date().toISOString() }
+                  });
+                  return { ...item, validated_at: new Date().toISOString() };
+                }
+                return item;
+              })
+            };
+            
+            console.log('📊 Data state after update:', updatedData);
+            return updatedData;
+          });
         }
         
         // Refresh data dari server setelah validasi berhasil
         setTimeout(() => {
+          console.log('🔄 Refreshing data from server...');
           setRefreshTrigger(p => p + 1);
         }, 500);
+        
+        // Log untuk debugging
+        console.log('Validation successful, item updated:', {
+          selectedId: selected?.id,
+          selectedType: selected?.type,
+          selectedCode: selected?.code,
+          itemType: itemType
+        });
       } else {
         // Handle specific error cases
         let errorMsg = 'Kode tidak valid atau sudah digunakan';
