@@ -462,12 +462,12 @@ export default function PromoDetailUnified() {
   const checkUserVerificationStatus = useCallback(
     async (token) => {
       // Prevent multiple concurrent calls
-      if (checkUserVerificationStatus.isRunning) {
-        console.log('checkUserVerificationStatus already running, skipping...');
+      if (isCheckingVerification || verificationCheckDone) {
+        console.log('checkUserVerificationStatus already running or done, skipping...');
         return;
       }
       
-      checkUserVerificationStatus.isRunning = true;
+      setIsCheckingVerification(true);
       
       try {
         console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
@@ -548,10 +548,11 @@ export default function PromoDetailUnified() {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }, 100);
       } finally {
-        checkUserVerificationStatus.isRunning = false;
+        setIsCheckingVerification(false);
+        setVerificationCheckDone(true);
       }
     },
-    [promoId, communityId, handleAutoRegister]
+    [promoId, communityId, handleAutoRegister, isCheckingVerification, verificationCheckDone]
   );
 
   // --- Retry fetch khusus alur QR (saat param sudah siap) ---
@@ -568,12 +569,15 @@ export default function PromoDetailUnified() {
 
   // State untuk mencegah multiple redirects
   const [hasTriedAuth, setHasTriedAuth] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
+  const [verificationCheckDone, setVerificationCheckDone] = useState(false);
 
   // --- QR entry flow ---
   useEffect(() => {
     if (!router.isReady) return;
     if (hasTriedAuth) return; // Prevent multiple auth attempts
     if (!autoRegister) return;
+    if (isCheckingVerification || verificationCheckDone) return; // Prevent API spam
 
     let token = null;
 
