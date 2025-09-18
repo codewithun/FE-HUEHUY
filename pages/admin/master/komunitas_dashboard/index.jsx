@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
@@ -11,6 +12,7 @@ import {
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
 import { token_cookie_name } from "../../../../helpers";
 import { Decrypt } from "../../../../helpers/encryption.helpers";
+import MultiSelectDropdown from "../../../../components/form/MultiSelectDropdown";
 
 // ===== Helpers: BASES & URL JOINERS (AMAN) =====
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -47,10 +49,13 @@ export default function KomunitasDashboard() {
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedCommunity, setSelectedCommunity] = useState(null);
   const [refreshToggle, setRefreshToggle] = useState(false);
+  const [adminContacts, setAdminContacts] = useState([]);
+  const [selectedAdminIds, setSelectedAdminIds] = useState([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     logo: "",
+    admin_contact_ids: [],
   });
 
   // === Attach Promo Only ===
@@ -69,7 +74,9 @@ export default function KomunitasDashboard() {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [previewWidgets, setPreviewWidgets] = useState([]);
 
-  // Fetch community list
+  // =========================
+  // Fetch community list (refetch on refreshToggle)
+  // =========================
   useEffect(() => {
     const fetchData = async () => {
       const encryptedToken = Cookies.get(token_cookie_name);
@@ -89,7 +96,47 @@ export default function KomunitasDashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [refreshToggle]); // <-- UPDATED: depend on refreshToggle
+
+  // =========================
+  // Fetch admin contacts (pakai endpoint baru, tanpa filter di FE)
+  // =========================
+  useEffect(() => {
+    const fetchAdminContacts = async () => {
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : "";
+      try {
+        // ambil semua admin contacts: admin + manager tenant
+        const url = apiJoin("admin/users?only_admin_contacts=true&paginate=all");
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const result = await res.json();
+
+        const users = Array.isArray(result.data)
+          ? result.data
+          : Array.isArray(result)
+          ? result
+          : [];
+
+        // langsung mapping ke opsi dropdown
+        const formattedContacts = users.map((user) => ({
+          value: user.id,
+          label: `${user.name} - ${user.role?.name || "No Role"} (${user.phone || user.email || "No Contact"})`,
+        }));
+
+        setAdminContacts(formattedContacts);
+      } catch (error) {
+        console.error("Failed to fetch admin contacts:", error);
+        setAdminContacts([]);
+      }
+    };
+    fetchAdminContacts();
+  }, []); // cukup sekali saat mount
 
   // Add or update community
   const handleSubmit = async (e) => {
@@ -104,22 +151,36 @@ export default function KomunitasDashboard() {
     const formPayload = new FormData();
     formPayload.append("name", formData.name);
     formPayload.append("description", formData.description);
+
+    // Tambahkan admin contact IDs (array)
+    if (formData.admin_contact_ids && formData.admin_contact_ids.length > 0) {
+      formData.admin_contact_ids.forEach((id, index) => {
+        formPayload.append(`admin_contact_ids[${index}]`, id);
+      });
+    }
+
     if (formData.logo && typeof formData.logo !== "string") {
       formPayload.append("logo", formData.logo);
     } else if (typeof formData.logo === "string" && formData.logo !== "") {
       formPayload.append("logo", formData.logo);
     }
 
-    await fetch(url, {
-      method,
-      headers: { Authorization: `Bearer ${token}` },
-      body: formPayload,
-    });
+    try {
+      await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+        body: formPayload,
+      });
 
-    setModalForm(false);
-    setFormData({ name: "", description: "", logo: "" });
-    setSelectedCommunity(null);
-    setRefreshToggle((s) => !s);
+      setModalForm(false);
+      setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
+      setSelectedCommunity(null);
+      setSelectedAdminIds([]);
+      setRefreshToggle((s) => !s);
+    } catch (error) {
+      console.error("Failed to submit form:", error);
+      alert("Gagal menyimpan komunitas");
+    }
   };
 
   // Delete community
@@ -367,7 +428,8 @@ export default function KomunitasDashboard() {
       paint="primary"
       onClick={() => {
         setSelectedCommunity(null);
-        setFormData({ name: "", description: "", logo: "" });
+        setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
+        setSelectedAdminIds([]);
         setModalForm(true);
       }}
     />
@@ -383,8 +445,8 @@ export default function KomunitasDashboard() {
         noControlBar={false}
         searchable={true}
         setToRefresh={refreshToggle}
-        actionControl={{ 
-          except: ['detail'],
+        actionControl={{
+          except: ["detail"],
           include: (row, actions, hasPermissions) => (
             <ButtonComponent
               label="Tambah Kategori"
@@ -394,7 +456,7 @@ export default function KomunitasDashboard() {
               rounded
               onClick={() => handleOpenCategory(row)}
             />
-          )
+          ),
         }}
         fetchControl={{
           path: "admin/communities",
@@ -446,32 +508,31 @@ export default function KomunitasDashboard() {
           ],
         }}
         formUpdateControl={{
+          // kalau kamu pakai built-in form TableSupervision,
+          // pastikan payload BE sudah mengembalikan admin_contact_ids
           customDefaultValue: (data) => ({
             name: data.name || "",
             description: data.description || "",
+            admin_contact_ids: data.admin_contact_ids || [],
           }),
         }}
       />
 
-      {/* Modal Form */}
+      {/* Modal Form (custom) */}
       <FloatingPageComponent
         show={modalForm}
         onClose={() => {
           setModalForm(false);
           setSelectedCommunity(null);
-          setFormData({ name: "", description: "", logo: "" });
+          setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
+          setSelectedAdminIds([]);
         }}
         title={selectedCommunity ? "Ubah Komunitas" : "Tambah Komunitas"}
         size="md"
         className="bg-gradient-to-br from-white to-gray-50"
       >
-        {/* ...form isi sama persis seperti sebelumnya... */}
         <div className="px-8 py-6">
-          {/* (isi form tidak diubah demi fokus perubahan ke promo only) */}
-          {/* --- mulai form --- */}
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Nama, Deskripsi, Logo */}
-            {/* (salin persis dari kode kamu sebelumnya) */}
             {/* Nama */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -486,6 +547,7 @@ export default function KomunitasDashboard() {
                 required
               />
             </div>
+
             {/* Deskripsi */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -499,6 +561,29 @@ export default function KomunitasDashboard() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
+
+            {/* Kontak Admin */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Kontak Admin<span className="text-danger ml-1">*</span>
+              </label>
+              <MultiSelectDropdown
+                options={adminContacts}
+                value={formData.admin_contact_ids}
+                onChange={(selectedIds) => {
+                  setFormData({ ...formData, admin_contact_ids: selectedIds });
+                  setSelectedAdminIds(selectedIds);
+                }}
+                placeholder="Pilih pengguna admin/manager tenant untuk komunitas ini..."
+                maxHeight={200}
+              />
+              {adminContacts.length === 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Belum ada pengguna dengan role Admin atau Manager Tenant tersedia.
+                </p>
+              )}
+            </div>
+
             {/* Logo */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -507,6 +592,7 @@ export default function KomunitasDashboard() {
               <input
                 type="file"
                 accept="image/*"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onChange={(e) => setFormData({ ...formData, logo: e.target.files[0] })}
               />
             </div>
@@ -519,7 +605,8 @@ export default function KomunitasDashboard() {
                 onClick={() => {
                   setModalForm(false);
                   setSelectedCommunity(null);
-                  setFormData({ name: "", description: "", logo: "" });
+                  setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
+                  setSelectedAdminIds([]);
                 }}
               />
               <ButtonComponent
@@ -529,7 +616,6 @@ export default function KomunitasDashboard() {
               />
             </div>
           </form>
-          {/* --- akhir form --- */}
         </div>
       </FloatingPageComponent>
 
@@ -589,7 +675,7 @@ export default function KomunitasDashboard() {
             </div>
           </div>
 
-          {/* Form Kategori - Ditampilkan berdasarkan showCategoryForm */}
+          {/* Form Kategori */}
           {showCategoryForm && (
             <div className="mb-6 p-4 bg-gray-50 rounded-lg">
               <h4 className="font-semibold mb-4">
@@ -609,18 +695,18 @@ export default function KomunitasDashboard() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Deskripsi
                   </label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Masukkan deskripsi kategori"
-                    rows={3}
-                    value={categoryForm.description}
-                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                  />
+                    <textarea
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Masukkan deskripsi kategori"
+                      rows={3}
+                      value={categoryForm.description}
+                      onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                    />
                 </div>
 
                 <div className="flex gap-2">
