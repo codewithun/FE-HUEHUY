@@ -76,6 +76,11 @@ export default function PromoDetailUnified() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
 
+  // State untuk mencegah multiple redirects dan rate limiting
+  const [hasTriedAuth, setHasTriedAuth] = useState(false);
+  const isCheckingRef = useRef(false);
+  const verificationDoneRef = useRef(false);
+
   // ==== Hook gambar harus di atas (hindari React error #310) ====
   const [imgSrc, setImgSrc] = useState(promoData?.image || '/default-avatar.png');
   useEffect(() => {
@@ -462,12 +467,12 @@ export default function PromoDetailUnified() {
   const checkUserVerificationStatus = useCallback(
     async (token) => {
       // Prevent multiple concurrent calls
-      if (checkUserVerificationStatus.isRunning) {
-        console.log('checkUserVerificationStatus already running, skipping...');
+      if (isCheckingRef.current || verificationDoneRef.current) {
+        console.log('checkUserVerificationStatus already running or done, skipping...');
         return;
       }
       
-      checkUserVerificationStatus.isRunning = true;
+      isCheckingRef.current = true;
       
       try {
         console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
@@ -548,9 +553,11 @@ export default function PromoDetailUnified() {
           window.location.href = `/buat-akun?next=${encodeURIComponent(next)}`;
         }, 100);
       } finally {
-        checkUserVerificationStatus.isRunning = false;
+        isCheckingRef.current = false;
+        verificationDoneRef.current = true;
       }
     },
+    // Simplified dependencies to prevent circular references
     [promoId, communityId, handleAutoRegister]
   );
 
@@ -566,14 +573,12 @@ export default function PromoDetailUnified() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, autoRegister, effectivePromoId, communityId]);
 
-  // State untuk mencegah multiple redirects
-  const [hasTriedAuth, setHasTriedAuth] = useState(false);
-
   // --- QR entry flow ---
   useEffect(() => {
     if (!router.isReady) return;
     if (hasTriedAuth) return; // Prevent multiple auth attempts
     if (!autoRegister) return;
+    if (isCheckingRef.current || verificationDoneRef.current) return; // Prevent API spam
 
     let token = null;
 

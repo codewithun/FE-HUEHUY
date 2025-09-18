@@ -27,6 +27,7 @@ export default function Validasi() {
   const [code, setCode] = useState('');
   const [modalSuccess, setModalSuccess] = useState(false);
   const [modalFailed, setModalFailed] = useState(false);
+  const [modalFailedMessage, setModalFailedMessage] = useState('Kode Tidak Valid / Sudah Digunakan');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [lastItemId, setLastItemId] = useState(null);
   const [lastItemType, setLastItemType] = useState(null);
@@ -87,8 +88,15 @@ export default function Validasi() {
 
       let result = await res.json().catch(() => null);
       let itemType = 'promo';
+      let promoError = null;
 
       if (!res.ok) {
+        promoError = {
+          status: res.status,
+          message: result?.message,
+          result: result
+        };
+        
         res = await fetch(`${apiUrl}/vouchers/validate`, {
           method: 'POST',
           headers,
@@ -102,6 +110,7 @@ export default function Validasi() {
       }
 
       if (res.status === 401) {
+        setModalFailedMessage('Sesi login berakhir. Silakan login kembali.');
         setModalFailed(true);
       } else if (res.ok) {
         const itemId = result?.data?.promo?.id || result?.data?.voucher?.id;
@@ -109,6 +118,41 @@ export default function Validasi() {
         setLastItemType(itemType);
         setModalSuccess(true);
       } else {
+        // Handle specific error cases
+        let errorMsg = 'Kode tidak valid atau sudah digunakan';
+        
+        // Check if this is likely a validation of already used item
+        const isAlreadyValidated = (status, message) => {
+          return status === 400 || 
+                 status === 409 || 
+                 (message && (
+                   message.toLowerCase().includes('sudah') ||
+                   message.toLowerCase().includes('digunakan') ||
+                   message.toLowerCase().includes('divalidasi')
+                 ));
+        };
+        
+        // Prioritize "already validated" messages over "not found"
+        if (promoError && isAlreadyValidated(promoError.status, promoError.message)) {
+          errorMsg = promoError.message || 'Promo sudah divalidasi sebelumnya';
+        } else if (isAlreadyValidated(res.status, result?.message)) {
+          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
+        } else if (res.status === 400) {
+          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
+        } else if (res.status === 404) {
+          // Only show "not found" if we tried both promo and voucher
+          if (promoError && promoError.status === 404) {
+            errorMsg = 'Kode tidak valid atau tidak ditemukan';
+          } else {
+            errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak ditemukan`;
+          }
+        } else if (res.status === 422) {
+          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak dapat divalidasi`;
+        } else if (result?.message) {
+          errorMsg = result.message;
+        }
+        
+        setModalFailedMessage(errorMsg);
         setModalFailed(true);
       }
     } catch (err) {
@@ -204,7 +248,7 @@ export default function Validasi() {
         onClose={() => setModalFailed(false)}
         paint="danger"
         icon={faCheckCircle}
-        title={`Kode Tidak Valid / Sudah Digunakan`}
+        title={modalFailedMessage}
         onSubmit={async () => {
           setModalFailed(false);
         }}

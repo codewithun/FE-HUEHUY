@@ -321,9 +321,16 @@ export default function Save() {
 
       let result = await res.json().catch(() => null);
       let itemType = 'voucher';
+      let voucherError = null;
 
-      // If voucher validation fails, try promo validation
+      // If voucher validation fails, store the error and try promo validation
       if (!res.ok) {
+        voucherError = {
+          status: res.status,
+          message: result?.message,
+          result: result
+        };
+        
         res = await fetch(`${apiUrl}/promos/validate`, {
           method: 'POST',
           headers,
@@ -340,25 +347,55 @@ export default function Save() {
         setValidationMessage(`${itemType === 'promo' ? 'Promo' : 'Voucher'} berhasil divalidasi!`);
         setShowValidationSuccess(true);
         setValidationCode('');
-        // Refresh data setelah validasi berhasil
+        
+        // Update item status immediately untuk UI response yang cepat
+        if (selected) {
+          setData(prevData => ({
+            ...prevData,
+            data: prevData.data.map(item => 
+              item.id === selected.id 
+                ? { ...item, validated_at: new Date().toISOString() }
+                : item
+            )
+          }));
+        }
+        
+        // Refresh data dari server setelah validasi berhasil
         setTimeout(() => {
           setRefreshTrigger(p => p + 1);
-        }, 1000);
+        }, 500);
       } else {
         // Handle specific error cases
         let errorMsg = 'Kode tidak valid atau sudah digunakan';
         
-        if (res.status === 400) {
-          // Bad request - biasanya kode sudah divalidasi
+        // Check if this is likely a validation of already used item
+        const isAlreadyValidated = (status, message) => {
+          return status === 400 || 
+                 status === 409 || 
+                 (message && (
+                   message.toLowerCase().includes('sudah') ||
+                   message.toLowerCase().includes('digunakan') ||
+                   message.toLowerCase().includes('divalidasi')
+                 ));
+        };
+        
+        // Prioritize "already validated" messages over "not found"
+        if (voucherError && isAlreadyValidated(voucherError.status, voucherError.message)) {
+          errorMsg = voucherError.message || 'Voucher sudah divalidasi sebelumnya';
+        } else if (isAlreadyValidated(res.status, result?.message)) {
+          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
+        } else if (res.status === 400) {
           errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
         } else if (res.status === 404) {
-          // Not found - kode tidak ditemukan
-          errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak ditemukan`;
+          // Only show "not found" if we tried both voucher and promo
+          if (voucherError && voucherError.status === 404) {
+            errorMsg = 'Kode tidak valid atau tidak ditemukan';
+          } else {
+            errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak ditemukan`;
+          }
         } else if (res.status === 422) {
-          // Unprocessable entity - validasi gagal
           errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak dapat divalidasi`;
         } else if (result?.message) {
-          // Use API error message if available
           errorMsg = result.message;
         }
         
