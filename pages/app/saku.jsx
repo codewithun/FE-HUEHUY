@@ -189,6 +189,34 @@ export default function Save() {
   }, [router.events]);
 
   // ====== Helpers ======
+  const isItemValidatable = (item) => {
+    // Jika sudah divalidasi, tidak bisa divalidasi lagi
+    if (item?.validated_at) return false;
+
+    // Cek apakah item sudah kedaluwarsa
+    const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
+    const isExpired = expiredAt && new Date(expiredAt) < new Date();
+    if (isExpired) return false;
+
+    // Untuk voucher: cek stock dan status aktif
+    if (item?.type === 'voucher' || item?.voucher) {
+      const voucher = item?.voucher || item?.ad;
+      const hasStock = voucher?.stock === undefined || voucher?.stock > 0;
+      const isVoucherActive = voucher?.status !== 'inactive' && voucher?.status !== 'disabled';
+      return hasStock && isVoucherActive;
+    }
+
+    // Untuk promo: cek status aktif dan stock
+    const promo = item?.ad;
+    const isPromoActive = 
+      promo?.status === 'active' || 
+      promo?.status === 'available' || 
+      (!promo?.status && promo?.id);
+    const hasPromoStock = promo?.stock === undefined || promo?.stock > 0;
+    
+    return isPromoActive && hasPromoStock;
+  };
+
   const getTimeRemaining = (expiredAt) => {
     if (!expiredAt) return null;
     const now = moment();
@@ -226,28 +254,50 @@ export default function Save() {
   };
 
   const getStatusBadge = (item) => {
-    // Voucher: lihat stock & expiry
+    // Cek apakah item sudah divalidasi terlebih dahulu
+    if (item?.validated_at) {
+      return (
+        <div className="flex items-center gap-1">
+          <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
+          <span className="font-medium text-success bg-green-50 px-2 py-1 rounded-full text-xs">Sudah divalidasi</span>
+        </div>
+      );
+    }
+
+    // Cek apakah item sudah kedaluwarsa
+    const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
+    const isExpired = expiredAt && new Date(expiredAt) < new Date();
+    
+    if (isExpired) {
+      return (
+        <div className="flex items-center gap-1">
+          <FontAwesomeIcon icon={faTimesCircle} className="text-danger text-xs" />
+          <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">
+            {item?.type === 'voucher' ? 'Voucher' : 'Promo'} Kadaluwarsa
+          </span>
+        </div>
+      );
+    }
+
+    // Untuk voucher: cek stock dan status aktif
     if (item?.type === 'voucher' || item?.voucher) {
       const voucher = item?.voucher || item?.ad;
-      const isVoucherActive =
-        (voucher?.stock === undefined || voucher?.stock > 0) &&
-        (!voucher?.valid_until || new Date(voucher.valid_until) > new Date());
+      const hasStock = voucher?.stock === undefined || voucher?.stock > 0;
+      const isVoucherActive = voucher?.status !== 'inactive' && voucher?.status !== 'disabled';
 
-      if (item?.validated_at) {
-        return (
-          <div className="flex items-center gap-1">
-            <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
-            <span className="font-medium text-success bg-green-50 px-2 py-1 rounded-full text-xs">Sudah divalidasi</span>
-          </div>
-        );
-      } else if (!isVoucherActive) {
+      // Jika stock habis atau voucher tidak aktif
+      if (!hasStock || !isVoucherActive) {
         return (
           <div className="flex items-center gap-1">
             <FontAwesomeIcon icon={faTimesCircle} className="text-danger text-xs" />
-            <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">Voucher Tidak Tersedia</span>
+            <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">
+              {!hasStock ? 'Voucher Habis' : 'Voucher Tidak Tersedia'}
+            </span>
           </div>
         );
       }
+
+      // Voucher masih tersedia dan belum divalidasi
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
@@ -256,27 +306,28 @@ export default function Save() {
       );
     }
 
-    // Promo
-    const isActive =
-      item?.ad?.status === 'active' ||
-      item?.ad?.status === 'available' ||
-      (!item?.ad?.status && item?.ad?.id);
+    // Untuk promo: cek status aktif
+    const promo = item?.ad;
+    const isPromoActive = 
+      promo?.status === 'active' || 
+      promo?.status === 'available' || 
+      (!promo?.status && promo?.id);
+    
+    const hasPromoStock = promo?.stock === undefined || promo?.stock > 0;
 
-    if (item?.validated_at) {
-      return (
-        <div className="flex items-center gap-1">
-          <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
-          <span className="font-medium text-success bg-green-50 px-2 py-1 rounded-full text-xs">Sudah divalidasi</span>
-        </div>
-      );
-    } else if (!isActive) {
+    // Jika promo tidak aktif atau stock habis
+    if (!isPromoActive || !hasPromoStock) {
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faTimesCircle} className="text-danger text-xs" />
-          <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">Promo Ditutup</span>
+          <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">
+            {!hasPromoStock ? 'Promo Habis' : 'Promo Ditutup'}
+          </span>
         </div>
       );
     }
+
+    // Promo masih aktif dan belum divalidasi
     return (
       <div className="flex items-center gap-1">
         <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
@@ -300,17 +351,13 @@ export default function Save() {
     
     console.log('🔍 Validating code in Saku:', {
       inputCode: codeToValidate,
-      expectedCode: expectedCode,
       selectedItem: selected?.id,
       selectedType: selected?.type
     });
     
     if (expectedCode && codeToValidate.trim() !== expectedCode.trim()) {
-      console.log('❌ Code mismatch:', {
-        input: codeToValidate.trim(),
-        expected: expectedCode.trim()
-      });
-      setValidationMessage(`Kode "${codeToValidate}" tidak sesuai dengan item yang dipilih. Kode yang benar adalah "${expectedCode}".`);
+      console.log('❌ Code validation failed');
+      setValidationMessage(`Kode "${codeToValidate}" tidak valid. Pastikan Anda memasukkan kode yang benar.`);
       setShowValidationFailed(true);
       return;
     }
@@ -522,19 +569,30 @@ export default function Save() {
 
             {data?.data?.length ? (
               <div className="space-y-4">
-                {data?.data?.map((item, key) => (
-                  <div
-                    className={`bg-white rounded-2xl p-4 shadow-lg border hover:shadow-xl transition-all duration-300 cursor-pointer group ${
-                      isRecentlyClaimed(item.claimed_at)
-                        ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white'
-                        : 'border-slate-100'
-                    }`}
-                    key={key}
-                    onClick={() => {
-                      setModalValidation(true);
-                      setSelected(item);
-                    }}
-                  >
+                {data?.data?.map((item, key) => {
+                  const canValidate = !item?.validated_at && isItemValidatable(item);
+                  
+                  return (
+                    <div
+                      className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${
+                        isRecentlyClaimed(item.claimed_at)
+                          ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white'
+                          : 'border-slate-100'
+                      } ${
+                        canValidate 
+                          ? 'hover:shadow-xl cursor-pointer' 
+                          : 'opacity-75 cursor-default'
+                      }`}
+                      key={key}
+                      onClick={() => {
+                        // Cek apakah item bisa divalidasi
+                        if (canValidate) {
+                          setModalValidation(true);
+                          setSelected(item);
+                        }
+                        // Jika tidak bisa divalidasi, tidak ada aksi (item tetap bisa dilihat detail)
+                      }}
+                    >
                     {/* Badge Baru Direbut */}
                     {isRecentlyClaimed(item.claimed_at) && (
                       <div className="mb-3">
@@ -620,7 +678,8 @@ export default function Save() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-16">
@@ -811,6 +870,20 @@ export default function Save() {
 
                     {/* Input Kode Validasi & Tombol */}
                     <div className="space-y-3">
+                      {!isItemValidatable(selected) && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                          <div className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faTimesCircle} className="text-red-500" />
+                            <span className="text-red-700 text-sm font-medium">
+                              {selected?.validated_at 
+                                ? 'Item ini sudah divalidasi sebelumnya'
+                                : 'Item ini tidak dapat divalidasi (habis, kadaluwarsa, atau ditutup)'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Masukkan Kode Validasi
@@ -826,15 +899,19 @@ export default function Save() {
                       </div>
                       
                       <button
-                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 ${
+                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
                           validationLoading 
                             ? 'bg-slate-400 text-white cursor-not-allowed' 
-                            : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
+                            : isItemValidatable(selected)
+                            ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                            : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                         }`}
                         onClick={() => {
-                          submitValidation(validationCode);
+                          if (isItemValidatable(selected)) {
+                            submitValidation(validationCode);
+                          }
                         }}
-                        disabled={validationLoading}
+                        disabled={validationLoading || !isItemValidatable(selected)}
                       >
                         {validationLoading ? (
                           <div className="flex items-center justify-center">
