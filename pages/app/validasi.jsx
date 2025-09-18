@@ -67,7 +67,9 @@ export default function Validasi() {
       const token = encryptedToken ? Decrypt(encryptedToken) : null;
 
       if (!token) {
+        setModalFailedMessage('Sesi login berakhir. Silakan login kembali.');
         setModalFailed(true);
+        setSubmitLoading(false);
         return;
       }
 
@@ -77,12 +79,24 @@ export default function Validasi() {
       };
 
       const codeToValidate = parsingCode || code;
+      
+      // Validasi kode tidak boleh kosong
+      if (!codeToValidate || codeToValidate.trim() === '') {
+        setModalFailedMessage('Kode validasi tidak boleh kosong.');
+        setModalFailed(true);
+        setSubmitLoading(false);
+        return;
+      }
 
+      // eslint-disable-next-line no-console
+      console.log('🔍 Validating code:', codeToValidate);
+
+      // Try promo validation first
       let res = await fetch(`${apiUrl}/promos/validate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          code: codeToValidate,
+          code: codeToValidate.trim(), // Trim whitespace
         }),
       });
 
@@ -90,6 +104,14 @@ export default function Validasi() {
       let itemType = 'promo';
       let promoError = null;
 
+      // eslint-disable-next-line no-console
+      console.log('📡 Promo validation response:', {
+        status: res.status,
+        ok: res.ok,
+        result: result
+      });
+
+      // If promo validation fails, store the error and try voucher validation
       if (!res.ok) {
         promoError = {
           status: res.status,
@@ -97,16 +119,26 @@ export default function Validasi() {
           result: result
         };
         
+        // eslint-disable-next-line no-console
+        console.log('🔍 Trying voucher validation...');
+        
         res = await fetch(`${apiUrl}/vouchers/validate`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            code: codeToValidate,
+            code: codeToValidate.trim(),
           }),
         });
 
         result = await res.json().catch(() => null);
         itemType = 'voucher';
+        
+        // eslint-disable-next-line no-console
+        console.log('📡 Voucher validation response:', {
+          status: res.status,
+          ok: res.ok,
+          result: result
+        });
       }
 
       if (res.status === 401) {
@@ -117,9 +149,19 @@ export default function Validasi() {
         setLastItemId(itemId);
         setLastItemType(itemType);
         setModalSuccess(true);
+        
+        // Clear kode setelah validasi berhasil
+        setCode('');
+        
+        // eslint-disable-next-line no-console
+        console.log('✅ Validation successful:', {
+          itemType,
+          itemId,
+          code: codeToValidate
+        });
       } else {
-        // Handle specific error cases
-        let errorMsg = 'Kode tidak valid atau sudah digunakan';
+        // Handle specific error cases dengan pesan yang lebih informatif
+        let errorMsg = 'Kode tidak valid atau tidak ditemukan';
         
         // Check if this is likely a validation of already used item
         const isAlreadyValidated = (status, message) => {
@@ -128,26 +170,33 @@ export default function Validasi() {
                  (message && (
                    message.toLowerCase().includes('sudah') ||
                    message.toLowerCase().includes('digunakan') ||
-                   message.toLowerCase().includes('divalidasi')
+                   message.toLowerCase().includes('divalidasi') ||
+                   message.toLowerCase().includes('already') ||
+                   message.toLowerCase().includes('used')
+                 ));
+        };
+        
+        const isNotFound = (status, message) => {
+          return status === 404 || 
+                 (message && (
+                   message.toLowerCase().includes('tidak ditemukan') ||
+                   message.toLowerCase().includes('not found') ||
+                   message.toLowerCase().includes('invalid')
                  ));
         };
         
         // Prioritize "already validated" messages over "not found"
         if (promoError && isAlreadyValidated(promoError.status, promoError.message)) {
-          errorMsg = promoError.message || 'Promo sudah divalidasi sebelumnya';
+          errorMsg = `Promo dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
         } else if (isAlreadyValidated(res.status, result?.message)) {
-          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
-        } else if (res.status === 400) {
-          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} sudah divalidasi sebelumnya`;
-        } else if (res.status === 404) {
-          // Only show "not found" if we tried both promo and voucher
-          if (promoError && promoError.status === 404) {
-            errorMsg = 'Kode tidak valid atau tidak ditemukan';
-          } else {
-            errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak ditemukan`;
-          }
+          errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
+        } else if (promoError && promoError.status === 404 && res.status === 404) {
+          // Both promo and voucher returned 404 - code doesn't exist
+          errorMsg = `Kode "${codeToValidate}" tidak ditemukan. Pastikan kode yang Anda masukkan sudah benar.`;
+        } else if (isNotFound(res.status, result?.message)) {
+          errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" tidak ditemukan.`;
         } else if (res.status === 422) {
-          errorMsg = result?.message || `${itemType === 'promo' ? 'Promo' : 'Voucher'} tidak dapat divalidasi`;
+          errorMsg = result?.message || `Kode "${codeToValidate}" tidak valid atau format salah.`;
         } else if (result?.message) {
           errorMsg = result.message;
         }
