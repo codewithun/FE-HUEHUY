@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable no-console */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import InputImageComponent from '../base.components/input/InputImage.component';
 
 const toDateInputValue = (raw) => {
@@ -23,31 +23,41 @@ export default function VoucherForm({
   onSubmit,             // (FormData) => Promise|void
 }) {
   const [imageFile, setImageFile] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    image: '',
-    type: '',
-    valid_until: '',
-    tenant_location: '',
-    stock: 0,
-    code: '',
-    community_id: '',
-    target_type: 'all',
-    target_user_id: '',
-    ...(initialData || {}),
-    valid_until: toDateInputValue(initialData?.valid_until),
-  });
+
+  const initial = useMemo(() => {
+    const targetUserIds =
+      initialData?.target_user_ids
+        ? (Array.isArray(initialData?.target_user_ids)
+            ? initialData?.target_user_ids
+            : String(initialData?.target_user_ids).split(',').map((x) => Number(String(x).trim())).filter(Boolean))
+        : (initialData?.target_user_id ? [Number(initialData.target_user_id)] : []);
+
+    return {
+      name: '',
+      description: '',
+      image: '',
+      type: '',
+      validation_type: 'auto', // default
+      valid_until: '',
+      tenant_location: '',
+      stock: 0,
+      code: '',
+      community_id: '',
+      target_type: 'all',
+      target_user_ids: [],
+      ...initialData,
+      valid_until: toDateInputValue(initialData?.valid_until),
+      validation_type: initialData?.validation_type || (initialData?.code ? 'manual' : 'auto'),
+      target_user_ids: targetUserIds,
+    };
+  }, [initialData]);
+
+  const [formData, setFormData] = useState(initial);
 
   useEffect(() => {
-    setFormData((s) => ({
-      ...s,
-      ...(initialData || {}),
-      valid_until: toDateInputValue(initialData?.valid_until),
-    }));
+    setFormData(initial);
     setImageFile(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData]);
+  }, [initial]);
 
   const title = mode === 'edit' ? 'Ubah Voucher' : 'Tambah Voucher';
   const badgeText = mode === 'edit' ? 'Mode Ubah' : 'Mode Tambah';
@@ -63,12 +73,17 @@ export default function VoucherForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.target_type === 'user' && !formData.target_user_id) {
-      alert('Pilih pengguna untuk target_type=user');
+    // Guard sederhana biar gak 422
+    if (formData.validation_type === 'manual' && !String(formData.code || '').trim()) {
+      alert('Kode wajib diisi untuk tipe validasi manual.');
+      return;
+    }
+    if (formData.target_type === 'user' && (!Array.isArray(formData.target_user_ids) || formData.target_user_ids.length === 0)) {
+      alert('Pilih minimal 1 pengguna untuk target user.');
       return;
     }
     if (formData.target_type === 'community' && !formData.community_id) {
-      alert('Pilih community untuk target_type=community');
+      alert('Pilih community untuk target_type=community.');
       return;
     }
 
@@ -79,12 +94,27 @@ export default function VoucherForm({
     if (formData.valid_until) body.append('valid_until', String(formData.valid_until));
     if (formData.tenant_location) body.append('tenant_location', String(formData.tenant_location));
     body.append('stock', String(formData.stock ?? 0));
-    body.append('code', formData.code || '');
 
-    body.append('target_type', formData.target_type || 'all');
-    if (formData.target_type === 'user' && formData.target_user_id) {
-      body.append('target_user_id', String(formData.target_user_id));
+    // Validation type handling
+    body.append('validation_type', formData.validation_type || 'auto');
+    if (formData.validation_type === 'manual') {
+      body.append('code', String(formData.code).trim());
+      body.append('barcode', String(formData.code).trim()); // kompatibilitas
     }
+
+    // Targeting
+    body.append('target_type', formData.target_type || 'all');
+
+    if (formData.target_type === 'user') {
+      // Backend expects 'target_user_ids' as array
+      // FormData approach: send as multiple fields with same name
+      (formData.target_user_ids || []).forEach((id) => {
+        if (id != null && id !== '') {
+          body.append('target_user_ids[]', String(id));
+        }
+      });
+    }
+
     if (formData.target_type === 'community') {
       const cid = Number(formData.community_id);
       if (Number.isInteger(cid) && cid > 0) {
@@ -117,6 +147,7 @@ export default function VoucherForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Nama */}
           <div className="form-control">
             <label className="label"><span className="label-text font-medium">Nama Voucher</span></label>
             <input
@@ -130,19 +161,48 @@ export default function VoucherForm({
             <span className="text-xs text-gray-500 mt-1">Nama akan tampil di daftar voucher.</span>
           </div>
 
+          {/* Tipe Validasi */}
           <div className="form-control">
-            <label className="label"><span className="label-text font-medium">Kode Unik</span></label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Contoh: HH-20OFF"
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+            <label className="label"><span className="label-text font-medium">Tipe Validasi *</span></label>
+            <select
+              className="select select-bordered w-full"
+              value={formData.validation_type || 'auto'}
+              onChange={(e) =>
+                setFormData((s) => ({
+                  ...s,
+                  validation_type: e.target.value,
+                  code: e.target.value === 'auto' ? '' : s.code,
+                }))
+              }
               required
-            />
-            <span className="text-xs text-gray-500 mt-1">Wajib & tidak boleh duplikat.</span>
+            >
+              <option value="auto">Generate Otomatis (QR Code)</option>
+              <option value="manual">Masukan Kode Unik</option>
+            </select>
           </div>
 
+          {/* Code (hanya manual) */}
+          {formData.validation_type === 'manual' && (
+            <div className="md:col-span-2 form-control">
+              <label className="label">
+                <span className="label-text font-medium">Kode Voucher *</span>
+                <span className="label-text-alt text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                placeholder="Contoh: HH-20OFF"
+                value={formData.code || ''}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                required
+              />
+              <span className="text-xs text-gray-500 mt-1">
+                Masukkan kode voucher yang akan digunakan pengguna untuk validasi
+              </span>
+            </div>
+          )}
+
+          {/* Deskripsi */}
           <div className="md:col-span-2 form-control">
             <label className="label"><span className="label-text font-medium">Deskripsi</span></label>
             <input
@@ -182,6 +242,7 @@ export default function VoucherForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Tipe voucher */}
           <div className="form-control">
             <label className="label"><span className="label-text font-medium">Tipe Voucher</span></label>
             <input
@@ -193,6 +254,7 @@ export default function VoucherForm({
             />
           </div>
 
+          {/* Valid until */}
           <div className="form-control">
             <label className="label"><span className="label-text font-medium">Berlaku Sampai</span></label>
             <input
@@ -204,6 +266,7 @@ export default function VoucherForm({
             <span className="text-xs text-gray-500 mt-1">Format input YYYY-MM-DD.</span>
           </div>
 
+          {/* Lokasi tenant */}
           <div className="form-control">
             <label className="label"><span className="label-text font-medium">Lokasi Tenant</span></label>
             <input
@@ -215,6 +278,7 @@ export default function VoucherForm({
             />
           </div>
 
+          {/* Stok */}
           <div className="form-control">
             <label className="label"><span className="label-text font-medium">Stok Voucher</span></label>
             <div className="join w-full">
@@ -239,6 +303,7 @@ export default function VoucherForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Target type */}
           <div className="form-control">
             <label className="label"><span className="label-text font-medium">Target</span></label>
             <select
@@ -249,8 +314,9 @@ export default function VoucherForm({
                 setFormData((s) => ({
                   ...s,
                   target_type: next,
-                  target_user_id: next === 'user' ? s.target_user_id : '',
-                  community_id: next === 'community' ? s.community_id : '', // kosongkan kalau bukan community
+                  // reset field sesuai target
+                  target_user_ids: next === 'user' ? s.target_user_ids : [],
+                  community_id: next === 'community' ? s.community_id : '',
                 }));
               }}
             >
@@ -260,25 +326,36 @@ export default function VoucherForm({
             </select>
           </div>
 
+          {/* Multi user (target_type=user) */}
           {formData.target_type === 'user' && (
             <div className="form-control">
-              <label className="label"><span className="label-text font-medium">Pilih Pengguna</span></label>
+              <label className="label">
+                <span className="label-text font-medium">Pilih Pengguna (boleh banyak)</span>
+                <span className="label-text-alt text-red-500">*</span>
+              </label>
               <select
-                className="select select-bordered w-full"
-                value={String(formData.target_user_id || '')}
-                onChange={(e) => setFormData({ ...formData, target_user_id: e.target.value })}
+                multiple
+                className="select select-bordered w-full h-40"
+                value={(formData.target_user_ids || []).map(String)}
+                onChange={(e) => {
+                  const values = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
+                  setFormData((s) => ({ ...s, target_user_ids: values }));
+                }}
                 required
               >
-                <option value="">Pilih Pengguna</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name || u.email || `#${u.id}`}
                   </option>
                 ))}
               </select>
+              <span className="text-xs text-gray-500 mt-1">
+                Tekan Ctrl/Cmd untuk memilih beberapa pengguna.
+              </span>
             </div>
           )}
 
+          {/* Community (opsional / wajib saat target_type=community) */}
           <div className="form-control md:col-span-2">
             <label className="label">
               <span className="label-text font-medium">

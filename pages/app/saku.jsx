@@ -1,5 +1,4 @@
 /* eslint-disable no-console */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
 import {
   faArrowLeft,
@@ -35,7 +34,7 @@ export default function Save() {
   const [selected, setSelected] = useState(null);
   const [data, setData] = useState({ data: [] });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
+
   // State untuk validasi
   const [validationCode, setValidationCode] = useState('');
   const [validationLoading, setValidationLoading] = useState(false);
@@ -71,11 +70,13 @@ export default function Save() {
         const rows = Array.isArray(promoJson) ? promoJson : (promoJson?.data || []);
 
         const mapped = rows.map((it) => {
-          // fleksibel: backend bisa kirim {promo: {...}} atau {ad: {...}}
           const ad = it.promo || it.ad || {};
-          const claimedAt   = it.created_at || it.claimed_at || it.validated_at || it.claimedAt || null;
-          const expiredAt   = it.expires_at || it.expired_at || it.expiry || ad.valid_until || null;
+          const claimedAt = it.created_at || it.claimed_at || it.validated_at || it.claimedAt || null;
+          const expiredAt = it.expires_at || it.expired_at || it.expiry || ad.valid_until || null;
           const validatedAt = it.validated_at || it.used_at || it.redeemed_at || it.validation_at || null;
+
+          // tipe validasi (fallback ke 'auto' jika tidak ada)
+          const validation_type = ad.validation_type || it.validation_type || 'auto';
 
           const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
             .replace(/\/api\/?$/, '')
@@ -88,6 +89,7 @@ export default function Save() {
             claimed_at: claimedAt,
             expired_at: expiredAt,
             validated_at: validatedAt,
+            validation_type,
             voucher_item: null,
             voucher: null,
             ad: {
@@ -96,6 +98,7 @@ export default function Save() {
               picture_source: ad.image ? `${base}/storage/${ad.image}` : (ad.picture_source || '/default-avatar.png'),
               status: ad.status || 'active',
               description: ad.description,
+              validation_type,
               cube: {
                 community_id: ad.community_id || ad?.cube?.community_id || 1,
                 user: { name: ad.owner_name || ad?.cube?.user?.name || 'Merchant', phone: ad.owner_contact || '' },
@@ -120,6 +123,8 @@ export default function Save() {
             .replace(/\/api\/?$/, '')
             .replace(/\/$/, '');
 
+          const validation_type = voucher.validation_type || it.validation_type || 'auto';
+
           return {
             id: it.id,
             type: 'voucher',
@@ -127,6 +132,7 @@ export default function Save() {
             claimed_at: it.created_at,
             expired_at: voucher.valid_until || null,
             validated_at: it.validated_at || it.used_at || null,
+            validation_type,
             voucher_item: { id: it.id, code: it.code, user_id: it.user_id, voucher_id: it.voucher_id, used_at: it.used_at },
             voucher,
             ad: {
@@ -140,6 +146,7 @@ export default function Save() {
               delivery: voucher.delivery,
               stock: voucher.stock,
               community: voucher.community,
+              validation_type,
               cube: voucher.community
                 ? {
                     community_id: voucher.community.id,
@@ -156,9 +163,6 @@ export default function Save() {
         allItems = allItems.concat(mapped);
       }
 
-      // === HANYA DARI API SERVER ===
-      // Tidak menggunakan localStorage untuk data yang konsisten secara online
-
       // Urutkan terbaru dulu
       allItems.sort((a, b) => new Date(b.claimed_at || 0) - new Date(a.claimed_at || 0));
       setData({ data: allItems });
@@ -168,7 +172,7 @@ export default function Save() {
     }
 
     return () => controller.abort();
-  }, []); // Hapus refreshTrigger dari dependency
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -190,24 +194,20 @@ export default function Save() {
 
   // ====== Helpers ======
   const isItemValidatable = (item) => {
-    // Jika sudah divalidasi, tidak bisa divalidasi lagi
     if (item?.validated_at) return false;
 
-    // Cek apakah item sudah kedaluwarsa
     const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
     const isExpired = expiredAt && new Date(expiredAt) < new Date();
     if (isExpired) return false;
 
-    // Untuk voucher: jika sudah diklaim (punya voucher_item), abaikan stok/status
     if (item?.type === 'voucher' || item?.voucher) {
-      if (item?.voucher_item) return true; // claimed by current user → boleh validasi
+      if (item?.voucher_item) return true;
       const voucher = item?.voucher || item?.ad;
       const hasStock = voucher?.stock === undefined || voucher?.stock > 0;
       const isVoucherActive = voucher?.status !== 'inactive' && voucher?.status !== 'disabled';
       return hasStock && isVoucherActive;
     }
 
-    // Untuk promo: cek status aktif dan stock
     const promo = item?.ad;
     const isPromoActive =
       promo?.status === 'active' ||
@@ -223,12 +223,12 @@ export default function Save() {
     const now = moment();
     const expired = moment(expiredAt);
     const duration = moment.duration(expired.diff(now));
-    
+
     if (duration.asMilliseconds() <= 0) return 'Sudah kedaluwarsa';
-    
+
     const days = Math.floor(duration.asDays());
     const hours = Math.floor(duration.asHours()) % 24;
-    
+
     if (days > 0) {
       if (days === 1) return '1 hari lagi';
       if (days < 7) return `${days} hari lagi`;
@@ -238,12 +238,12 @@ export default function Save() {
       const months = Math.floor(days / 30);
       return `${months} bulan lagi`;
     }
-    
+
     if (hours > 0) return `${hours} jam lagi`;
-    
+
     const minutes = Math.floor(duration.asMinutes());
     if (minutes > 0) return `${minutes} menit lagi`;
-    
+
     return 'Segera berakhir';
   };
 
@@ -255,7 +255,6 @@ export default function Save() {
   };
 
   const getStatusBadge = (item) => {
-    // Cek apakah item sudah divalidasi terlebih dahulu
     if (item?.validated_at) {
       return (
         <div className="flex items-center gap-1">
@@ -265,10 +264,9 @@ export default function Save() {
       );
     }
 
-    // Cek apakah item sudah kedaluwarsa
     const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
     const isExpired = expiredAt && new Date(expiredAt) < new Date();
-    
+
     if (isExpired) {
       return (
         <div className="flex items-center gap-1">
@@ -280,13 +278,11 @@ export default function Save() {
       );
     }
 
-    // Untuk voucher: cek stock dan status aktif
     if (item?.type === 'voucher' || item?.voucher) {
       const voucher = item?.voucher || item?.ad;
       const hasStock = voucher?.stock === undefined || voucher?.stock > 0;
       const isVoucherActive = voucher?.status !== 'inactive' && voucher?.status !== 'disabled';
 
-      // Jika stock habis atau voucher tidak aktif
       if (!hasStock || !isVoucherActive) {
         return (
           <div className="flex items-center gap-1">
@@ -298,7 +294,6 @@ export default function Save() {
         );
       }
 
-      // Voucher masih tersedia dan belum divalidasi
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
@@ -307,16 +302,14 @@ export default function Save() {
       );
     }
 
-    // Untuk promo: cek status aktif
     const promo = item?.ad;
-    const isPromoActive = 
-      promo?.status === 'active' || 
-      promo?.status === 'available' || 
+    const isPromoActive =
+      promo?.status === 'active' ||
+      promo?.status === 'available' ||
       (!promo?.status && promo?.id);
-    
+
     const hasPromoStock = promo?.stock === undefined || promo?.stock > 0;
 
-    // Jika promo tidak aktif atau stock habis
     if (!isPromoActive || !hasPromoStock) {
       return (
         <div className="flex items-center gap-1">
@@ -328,7 +321,6 @@ export default function Save() {
       );
     }
 
-    // Promo masih aktif dan belum divalidasi
     return (
       <div className="flex items-center gap-1">
         <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
@@ -337,9 +329,13 @@ export default function Save() {
     );
   };
 
-  // Fungsi submit validasi
-  const submitValidation = async (validationCode) => {
-    const codeToValidate = (validationCode || '').trim();
+  // Helper: baca jenis validasi
+  const getValidationType = (item) =>
+    item?.validation_type || item?.voucher?.validation_type || item?.ad?.validation_type || 'auto';
+
+  // Submit validasi
+  const submitValidation = async (valCode) => {
+    const codeToValidate = (valCode || '').trim();
 
     if (!codeToValidate) {
       setValidationMessage('Kode unik wajib diisi.');
@@ -372,7 +368,6 @@ export default function Save() {
       let res, result;
 
       if (isPromoItem) {
-        // Validasi promo via BE; jangan bandingkan dengan selected.code di FE
         res = await fetch(`${apiUrl}/promos/validate`, {
           method: 'POST',
           headers,
@@ -388,7 +383,6 @@ export default function Save() {
           return;
         }
 
-        // Coba endpoint redeem voucher dulu
         res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
@@ -396,7 +390,6 @@ export default function Save() {
         });
         result = await res.json().catch(() => null);
 
-        // Fallback jika API lama (tanpa /redeem)
         if (res.status === 404 || res.status === 405) {
           res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}`, {
             method: 'PUT',
@@ -416,7 +409,6 @@ export default function Save() {
         setValidationMessage('Berhasil divalidasi.');
         setShowValidationSuccess(true);
         setValidationCode('');
-        // optional: tandai item lokal sebagai validated
         if (selected) {
           setData((prev) => ({
             ...prev,
@@ -433,7 +425,6 @@ export default function Save() {
         } else if (res?.status === 404) {
           setValidationMessage('Kode unik tidak ditemukan.');
         } else if (res?.status === 422) {
-          // pesan validasi dari BE jika ada
           setValidationMessage(result?.message || 'Kode unik tidak valid atau format salah.');
         } else {
           setValidationMessage('Terjadi kesalahan. Silakan coba lagi.');
@@ -480,7 +471,7 @@ export default function Save() {
               <div className="space-y-4">
                 {data?.data?.map((item, key) => {
                   const canValidate = !item?.validated_at && isItemValidatable(item);
-                  
+
                   return (
                     <div
                       className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${
@@ -488,105 +479,103 @@ export default function Save() {
                           ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white'
                           : 'border-slate-100'
                       } ${
-                        canValidate 
-                          ? 'hover:shadow-xl cursor-pointer' 
-                          : 'opacity-75 cursor-default'
+                        canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'
                       }`}
                       key={key}
                       onClick={() => {
-                        // Cek apakah item bisa divalidasi
                         if (canValidate) {
                           setModalValidation(true);
                           setSelected(item);
                         }
-                        // Jika tidak bisa divalidasi, tidak ada aksi (item tetap bisa dilihat detail)
                       }}
                     >
-                    {/* Badge Baru Direbut */}
-                    {isRecentlyClaimed(item.claimed_at) && (
-                      <div className="mb-3">
-                        <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                          ✨ Baru Direbut
-                        </span>
-                      </div>
-                    )}
+                      {/* Badge Baru Direbut */}
+                      {isRecentlyClaimed(item.claimed_at) && (
+                        <div className="mb-3">
+                          <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                            ✨ Baru Direbut
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Badge Sudah Digunakan */}
-                    {item.validated_at && (
-                      <div className="mb-3">
-                        <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
-                          ✓ Sudah Digunakan
-                        </span>
-                      </div>
-                    )}
+                      {/* Badge Sudah Digunakan */}
+                      {item.validated_at && (
+                        <div className="mb-3">
+                          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">
+                            ✓ Sudah Digunakan
+                          </span>
+                        </div>
+                      )}
 
-                    <div className="flex gap-4">
-                      {/* Gambar */}
-                      <div className="w-20 h-20 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex justify-center items-center group-hover:scale-105 transition-transform duration-300">
-                        {(() => {
-                          const isVoucher = item?.voucher_item || item?.type === 'voucher' || item?.voucher;
-                          let imageSource = null;
+                      <div className="flex gap-4">
+                        {/* Gambar */}
+                        <div className="w-20 h-20 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex justify-center items-center group-hover:scale-105 transition-transform duration-300">
+                          {(() => {
+                            const isVoucher = item?.voucher_item || item?.type === 'voucher' || item?.voucher;
+                            let imageSource = null;
 
-                          if (isVoucher) {
-                            const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
-                              .replace(/\/api\/?$/, '')
-                              .replace(/\/$/, '');
-                            imageSource = item?.voucher?.image ? `${base}/storage/${item.voucher.image}` : item?.ad?.picture_source;
-                          } else {
-                            imageSource = item?.ad?.picture_source;
-                          }
+                            if (isVoucher) {
+                              const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
+                                .replace(/\/api\/?$/, '')
+                                .replace(/\/$/, '');
+                              imageSource = item?.voucher?.image
+                                ? `${base}/storage/${item.voucher.image}`
+                                : item?.ad?.picture_source;
+                            } else {
+                              imageSource = item?.ad?.picture_source;
+                            }
 
-                          return imageSource ? (
-                            <img
-                              src={imageSource}
-                              className="w-full h-full object-cover"
-                              alt={item?.ad?.title || item?.voucher?.name || 'Promo/Voucher'}
-                              onError={(e) => {
-                                e.currentTarget.src = '/default-avatar.png';
-                              }}
-                            />
-                          ) : (
-                            <FontAwesomeIcon icon={faTag} className="text-slate-400 text-2xl" />
-                          );
-                        })()}
-                      </div>
-
-                      {/* Konten */}
-                      <div className="flex-1 min-w-0">
-                        <div className="mb-2">
-                          <h3 className="font-semibold text-slate-800 text-base leading-tight">
-                            {item?.ad?.title || item?.voucher?.name || item?.name || 'Promo/Voucher Tanpa Judul'}
-                          </h3>
+                            return imageSource ? (
+                              <img
+                                src={imageSource}
+                                className="w-full h-full object-cover"
+                                alt={item?.ad?.title || item?.voucher?.name || 'Promo/Voucher'}
+                                onError={(e) => {
+                                  e.currentTarget.src = '/default-avatar.png';
+                                }}
+                              />
+                            ) : (
+                              <FontAwesomeIcon icon={faTag} className="text-slate-400 text-2xl" />
+                            );
+                          })()}
                         </div>
 
-                        {/* Type Badge */}
-                        <div className="flex items-center gap-2 mb-2">
-                          {item?.voucher_item || item?.type === 'voucher' || item?.voucher ? (
-                            <span className="inline-flex items-center gap-1 font-medium text-success bg-emerald-50 px-3 py-1 rounded-full text-xs border border-emerald-200">
-                              <FontAwesomeIcon icon={faGift} />
-                              Voucher
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 font-medium text-warning bg-amber-50 px-3 py-1 rounded-full text-xs border border-amber-200">
-                              <FontAwesomeIcon icon={faTag} />
-                              Promo
-                            </span>
+                        {/* Konten */}
+                        <div className="flex-1 min-w-0">
+                          <div className="mb-2">
+                            <h3 className="font-semibold text-slate-800 text-base leading-tight">
+                              {item?.ad?.title || item?.voucher?.name || item?.name || 'Promo/Voucher Tanpa Judul'}
+                            </h3>
+                          </div>
+
+                          {/* Type Badge */}
+                          <div className="flex items-center gap-2 mb-2">
+                            {item?.voucher_item || item?.type === 'voucher' || item?.voucher ? (
+                              <span className="inline-flex items-center gap-1 font-medium text-success bg-emerald-50 px-3 py-1 rounded-full text-xs border border-emerald-200">
+                                <FontAwesomeIcon icon={faGift} />
+                                Voucher
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 font-medium text-warning bg-amber-50 px-3 py-1 rounded-full text-xs border border-amber-200">
+                                <FontAwesomeIcon icon={faTag} />
+                                Promo
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Status */}
+                          <div className="mb-2">{getStatusBadge(item)}</div>
+
+                          {/* Expiry */}
+                          {item?.expired_at && (
+                            <div className="flex items-center gap-1 text-xs">
+                              <FontAwesomeIcon icon={faClock} className="text-red-500" />
+                              <span className="text-red-600 font-medium">{getTimeRemaining(item.expired_at)}</span>
+                            </div>
                           )}
                         </div>
-
-                        {/* Status */}
-                        <div className="mb-2">{getStatusBadge(item)}</div>
-
-                        {/* Expiry */}
-                        {item?.expired_at && (
-                          <div className="flex items-center gap-1 text-xs">
-                            <FontAwesomeIcon icon={faClock} className="text-red-500" />
-                            <span className="text-red-600 font-medium">{getTimeRemaining(item.expired_at)}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
-                  </div>
                   );
                 })}
               </div>
@@ -664,9 +653,19 @@ export default function Save() {
                 <span className="text-slate-800 font-medium text-sm">
                   {(() => {
                     if (selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher) {
-                      return selected?.voucher?.community?.name || selected?.ad?.community?.name || selected?.ad?.cube?.user?.name || 'Merchant';
+                      return (
+                        selected?.voucher?.community?.name ||
+                        selected?.ad?.community?.name ||
+                        selected?.ad?.cube?.user?.name ||
+                        'Merchant'
+                      );
                     }
-                    return selected?.ad?.owner_name || selected?.ad?.cube?.user?.name || selected?.ad?.cube?.corporate?.name || '-';
+                    return (
+                      selected?.ad?.owner_name ||
+                      selected?.ad?.cube?.user?.name ||
+                      selected?.ad?.cube?.corporate?.name ||
+                      '-'
+                    );
                   })()}
                 </span>
               </div>
@@ -675,7 +674,10 @@ export default function Save() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 text-sm">No. Telepon</span>
                   <span className="text-slate-800 font-medium text-sm">
-                    {selected?.ad?.owner_contact || selected?.ad?.cube?.user?.phone || selected?.ad?.cube?.corporate?.phone || '-'}
+                    {selected?.ad?.owner_contact ||
+                      selected?.ad?.cube?.user?.phone ||
+                      selected?.ad?.cube?.corporate?.phone ||
+                      '-'}
                   </span>
                 </div>
               )}
@@ -708,7 +710,9 @@ export default function Save() {
                 <div className="flex justify-between items-center">
                   <div className="flex-1">
                     <span className="text-sm text-slate-600">Online Store:</span>
-                    <p className="text-slate-800 text-sm font-medium truncate">{selected?.ad?.cube?.tags?.at(0)?.link}</p>
+                    <p className="text-slate-800 text-sm font-medium truncate">
+                      {selected?.ad?.cube?.tags?.at(0)?.link}
+                    </p>
                   </div>
                   <a
                     href={selected?.ad?.cube?.tags?.at(0)?.link}
@@ -731,7 +735,9 @@ export default function Save() {
               <div className="text-center">
                 <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-4xl mb-3" />
                 <div className="font-bold text-green-700 text-lg">
-                  {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher ? 'Voucher Telah Digunakan' : 'Promo Telah Digunakan'}
+                  {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher
+                    ? 'Voucher Telah Digunakan'
+                    : 'Promo Telah Digunakan'}
                 </div>
                 <p className="text-green-600 text-sm mt-1">Terima kasih</p>
               </div>
@@ -739,9 +745,6 @@ export default function Save() {
           ) : selected?.type === 'voucher' || selected?.voucher ? (
             (() => {
               const voucher = selected?.voucher || selected?.ad;
-              
-              // Untuk voucher yang sudah diklaim, SELALU bisa diakses terlepas dari stok
-              // Hanya cek expired date, bukan stok
               const isVoucherExpired = voucher?.valid_until && new Date(voucher.valid_until) < new Date();
 
               if (isVoucherExpired) {
@@ -756,84 +759,100 @@ export default function Save() {
                 );
               }
 
+              const vt = getValidationType(selected);
+              const isManual = vt === 'manual';
+
               return (
                 <div className="bg-white rounded-2xl border border-slate-200 p-6">
                   <div className="text-center">
                     <div className="mb-4">
                       <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
-                        QR Code Voucher
+                        {isManual ? 'Validasi Kode Voucher' : 'QR Code Voucher'}
                       </span>
                     </div>
 
-                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                      <QRCodeSVG
-                        value={selected?.voucher_item?.code || selected?.code || 'NO_CODE'}
-                        size={180}
-                        bgColor="#f8fafc"
-                        fgColor="#0f172a"
-                        level="H"
-                        includeMargin={true}
-                        className="mx-auto rounded-lg"
-                      />
-                    </div>
-
-                    {/* Input Kode Validasi & Tombol */}
-                    <div className="space-y-3">
-                      {!isItemValidatable(selected) && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                          <div className="flex items-center gap-2">
-                            <FontAwesomeIcon icon={faTimesCircle} className="text-red-500" />
-                            <span className="text-red-700 text-sm font-medium">
-                              {selected?.validated_at 
-                                ? 'Item ini sudah divalidasi sebelumnya'
-                                : 'Item ini tidak dapat divalidasi (habis, kadaluwarsa, atau ditutup)'
-                              }
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Masukkan Kode Validasi
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Masukkan kode validasi..."
-                          value={validationCode}
-                          onChange={(e) => setValidationCode(e.target.value)}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
-                          disabled={validationLoading}
+                    {/* QR Code hanya muncul jika bukan manual */}
+                    {!isManual && (
+                      <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                        <QRCodeSVG
+                          value={selected?.voucher_item?.code || selected?.code || 'NO_CODE'}
+                          size={180}
+                          bgColor="#f8fafc"
+                          fgColor="#0f172a"
+                          level="H"
+                          includeMargin={true}
+                          className="mx-auto rounded-lg"
                         />
                       </div>
-                      
-                      <button
-                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
-                          validationLoading 
-                            ? 'bg-slate-400 text-white cursor-not-allowed' 
-                            : isItemValidatable(selected)
-                            ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
-                            : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                        }`}
-                        onClick={() => {
-                          if (isItemValidatable(selected)) {
-                            submitValidation(validationCode);
-                          }
-                        }}
-                        disabled={validationLoading || !isItemValidatable(selected)}
-                      >
-                        {validationLoading ? (
-                          <div className="flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                            Memvalidasi...
+                    )}
+
+                    {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
+                    {!isManual ? (
+                      <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {!isItemValidatable(selected) && (
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                            <div className="flex items-center gap-2">
+                              <FontAwesomeIcon icon={faTimesCircle} className="text-red-500" />
+                              <span className="text-red-700 text-sm font-medium">
+                                {selected?.validated_at
+                                  ? 'Item ini sudah divalidasi sebelumnya'
+                                  : 'Item ini tidak dapat divalidasi (habis, kadaluwarsa, atau ditutup)'}
+                              </span>
+                            </div>
                           </div>
-                        ) : (
-                          'Validasi Voucher'
                         )}
-                      </button>
-                    </div>
-                    
-                    <p className="text-slate-500 text-xs mt-3">Masukkan kode validasi untuk memproses voucher ini</p>
+
+                        {/* Icon untuk manual validation */}
+                        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <FontAwesomeIcon icon={faGift} className="text-primary text-3xl" />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Masukkan Kode Validasi
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Masukkan kode validasi..."
+                            value={validationCode}
+                            onChange={(e) => setValidationCode(e.target.value)}
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
+                            disabled={validationLoading}
+                          />
+                        </div>
+
+                        <button
+                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
+                            validationLoading
+                              ? 'bg-slate-400 text-white cursor-not-allowed'
+                              : isItemValidatable(selected)
+                              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          }`}
+                          onClick={() => {
+                            if (isItemValidatable(selected)) {
+                              submitValidation(validationCode);
+                            }
+                          }}
+                          disabled={validationLoading || !isItemValidatable(selected)}
+                        >
+                          {validationLoading ? (
+                            <div className="flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                              Memvalidasi...
+                            </div>
+                          ) : (
+                            'Validasi Voucher'
+                          )}
+                        </button>
+
+                        <p className="text-slate-500 text-xs">
+                          Masukkan kode validasi untuk memproses voucher ini
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -851,67 +870,86 @@ export default function Save() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <div className="text-center">
-                <div className="mb-4">
-                  <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
-                    QR Code Promo
-                  </span>
-                </div>
+            (() => {
+              const vt = getValidationType(selected);
+              const isManual = vt === 'manual';
 
-                <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                  <QRCodeSVG
-                    value={selected?.code || 'NO_CODE'}
-                    size={180}
-                    bgColor="#f8fafc"
-                    fgColor="#0f172a"
-                    level="H"
-                    includeMargin={true}
-                    className="mx-auto rounded-lg"
-                  />
-                </div>
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <div className="text-center">
+                    <div className="mb-4">
+                      <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
+                        {isManual ? 'Validasi Kode Promo' : 'QR Code Promo'}
+                      </span>
+                    </div>
 
-                {/* Input Kode Validasi & Tombol */}
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Masukkan Kode Validasi
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Masukkan kode validasi..."
-                      value={validationCode}
-                      onChange={(e) => setValidationCode(e.target.value)}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
-                      disabled={validationLoading}
-                    />
-                  </div>
-                  
-                  <button
-                    className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 ${
-                      validationLoading 
-                        ? 'bg-slate-400 text-white cursor-not-allowed' 
-                        : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
-                    }`}
-                    onClick={() => {
-                      submitValidation(validationCode);
-                    }}
-                    disabled={validationLoading}
-                  >
-                    {validationLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Memvalidasi...
+                    {/* QR Code hanya muncul jika bukan manual */}
+                    {!isManual && (
+                      <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                        <QRCodeSVG
+                          value={selected?.code || 'NO_CODE'}
+                          size={180}
+                          bgColor="#f8fafc"
+                          fgColor="#0f172a"
+                          level="H"
+                          includeMargin={true}
+                          className="mx-auto rounded-lg"
+                        />
                       </div>
-                    ) : (
-                      'Validasi Promo'
                     )}
-                  </button>
+
+                    {/* AUTO → QR saja; MANUAL → input & tombol saja */}
+                    {!isManual ? (
+                      <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Icon untuk manual validation */}
+                        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <FontAwesomeIcon icon={faTag} className="text-primary text-3xl" />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Masukkan Kode Validasi
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Masukkan kode validasi..."
+                            value={validationCode}
+                            onChange={(e) => setValidationCode(e.target.value)}
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
+                            disabled={validationLoading}
+                          />
+                        </div>
+
+                        <button
+                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 ${
+                            validationLoading
+                              ? 'bg-slate-400 text-white cursor-not-allowed'
+                              : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
+                          }`}
+                          onClick={() => submitValidation(validationCode)}
+                          disabled={validationLoading}
+                        >
+                          {validationLoading ? (
+                            <div className="flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                              Memvalidasi...
+                            </div>
+                          ) : (
+                            'Validasi Promo'
+                          )}
+                        </button>
+
+                        <p className="text-slate-500 text-xs">
+                          Masukkan kode validasi untuk memproses promo ini
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                
-                <p className="text-slate-500 text-xs mt-3">Masukkan kode validasi untuk memproses promo ini</p>
-              </div>
-            </div>
+              );
+            })()
           )}
         </div>
       </BottomSheetComponent>
@@ -921,25 +959,18 @@ export default function Save() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon
-                icon={faCheckCircle}
-                className="text-green-500 text-3xl"
-              />
+              <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-3xl" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Validasi Berhasil!</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">
-              {validationMessage}
-            </p>
+            <p className="text-slate-600 mb-6 leading-relaxed">{validationMessage}</p>
             <button
               onClick={() => {
                 setShowValidationSuccess(false);
                 setModalValidation(false);
                 setSelected(null);
                 setValidationCode('');
-                
-                // Force refresh setelah modal ditutup untuk memastikan data terbaru
                 setTimeout(() => {
-                  setRefreshTrigger(p => p + 1);
+                  setRefreshTrigger((p) => p + 1);
                 }, 100);
               }}
               className="w-full bg-green-500 text-white py-3 rounded-[12px] font-semibold hover:bg-green-600 transition-all"
@@ -955,15 +986,10 @@ export default function Save() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon
-                icon={faTimesCircle}
-                className="text-red-500 text-3xl"
-              />
+              <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-3xl" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Validasi Gagal</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">
-              {validationMessage}
-            </p>
+            <p className="text-slate-600 mb-6 leading-relaxed">{validationMessage}</p>
             <button
               onClick={() => {
                 setShowValidationFailed(false);
