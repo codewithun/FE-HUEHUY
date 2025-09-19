@@ -22,6 +22,7 @@ export default function NotificationPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showVoucherOutOfStockModal, setShowVoucherOutOfStockModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState(null);
 
@@ -35,7 +36,7 @@ export default function NotificationPage() {
   const httpCode = Array.isArray(res) ? res[1] : null;
   const payload  = Array.isArray(res) ? res[2] : null;
 
-  const items = Array.isArray(payload?.data) ? payload.data : [];
+  const items = useMemo(() => Array.isArray(payload?.data) ? payload.data : [], [payload?.data]);
 
   useEffect(() => {
     if (!loading) setLocalItems(items);
@@ -75,6 +76,19 @@ export default function NotificationPage() {
 
       if (!res.ok) {
         console.error('Claim failed:', { status: res.status, response: json }); // Debug log
+        
+        // Handle specific voucher out of stock error
+        if (json?.message?.includes('out of stock') || json?.message?.includes('stok habis') || json?.message?.includes('voucher habis') || res.status === 410) {
+          setShowVoucherOutOfStockModal(true);
+          
+          // Auto close after 3 seconds and remove notification
+          setTimeout(() => {
+            setShowVoucherOutOfStockModal(false);
+            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+            setVersion((v) => v + 1);
+          }, 3000);
+          return;
+        }
         
         // Handle specific SQL truncation error
         if (json?.message?.includes('Data too long for column')) {
@@ -119,7 +133,7 @@ export default function NotificationPage() {
         }
         return res.text();
       })
-      .then((text) => {
+      .then(() => {
         setLocalItems([]);
         setVersion((v) => v + 1);
       })
@@ -390,6 +404,26 @@ export default function NotificationPage() {
                 >
                   Tidak
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Voucher Out of Stock Modal */}
+        {showVoucherOutOfStockModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 shadow-lg mx-4 max-w-sm w-full">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Voucher Sudah Habis</h3>
+                <p className="text-gray-600 text-sm mb-4">Maaf, voucher ini sudah tidak tersedia lagi. Notifikasi akan dihapus otomatis.</p>
+                <div className="text-orange-600 text-xs font-medium">
+                  Popup akan tertutup otomatis dalam 3 detik
+                </div>
               </div>
             </div>
           </div>
