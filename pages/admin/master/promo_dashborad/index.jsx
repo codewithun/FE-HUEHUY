@@ -421,16 +421,25 @@ function PromoDashboard() {
               ),
             },
             {
-              type: 'custom',
-              custom: ({ formControl }) => (
-                <InputImageComponent
-                  name="image"
-                  label="Gambar Promo"
-                  aspect="16/9"
-                  {...formControl('image')}
-                />
-              ),
-            },
+  type: 'custom',
+  custom: ({ formControl }) => {
+    const fc = formControl('image');
+    // siapkan value untuk preview:
+    const raw = fc.value;
+    const preparedValue =
+      raw instanceof File ? raw : (raw ? buildImageUrl(String(raw)) : '');
+
+    return (
+      <InputImageComponent
+        name="image"
+        label="Gambar Promo"
+        aspect="16/9"
+        {...fc}
+        value={preparedValue}
+      />
+    );
+  },
+},
             {
               type: 'custom',
               custom: ({ formControl }) => (
@@ -639,12 +648,18 @@ function PromoDashboard() {
           ],
         }}
         formUpdateControl={{
-          customDefaultValue: (data) => ({
-            ...data,
-            // Untuk edit mode, pastikan validation_type dan code tersedia
-            validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
-          }),
-        }}
+  customDefaultValue: (data) => ({
+    ...data,
+    // normalisasi tanggal biar input type="date" aman (opsional)
+    start_date: data.start_date ? new Date(data.start_date).toISOString().slice(0,10) : '',
+    end_date: data.end_date ? new Date(data.end_date).toISOString().slice(0,10) : '',
+    // PENTING: jadikan image URL absolut untuk preview
+    image: data?.image ? buildImageUrl(data.image) : '',
+    // tetap set validation_type
+    validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
+  }),
+}}
+
       />
 
       <ModalConfirmComponent

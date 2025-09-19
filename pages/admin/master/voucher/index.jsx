@@ -16,6 +16,21 @@ import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import MultiSelectDropdown from '../../../../components/form/MultiSelectDropdown';
 
+
+const toDateInput = (raw) => {
+  if (!raw) return '';
+  // aman untuk ISO / '2025-09-20 12:00:00'
+  const s = String(raw);
+  if (s.includes('T')) return s.split('T')[0];
+  // fallback via Date
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s.slice(0, 10); // 'YYYY-MM-DD' dari string
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 /* -------------------- Helpers -------------------- */
 const getApiBase = () => {
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -314,9 +329,21 @@ function VoucherCrud() {
             },
             {
               type: 'custom',
-              custom: ({ formControl }) => (
-                <InputImageComponent name="image" label="Gambar Voucher" {...formControl('image')} />
-              ),
+              custom: ({ formControl }) => {
+                const fc = formControl('image');
+                const raw = fc.value;
+                const preparedValue =
+                  raw instanceof File ? raw : (raw ? buildImageUrl(String(raw)) : '');
+
+                return (
+                  <InputImageComponent
+                    name="image"
+                    label="Gambar Voucher"
+                    {...fc}
+                    value={preparedValue}
+                  />
+                );
+              },
             },
             {
               type: 'custom',
@@ -463,20 +490,21 @@ function VoucherCrud() {
           ],
         }}
         formUpdateControl={{
-          customDefaultValue: (data) => ({
-            ...data,
-            target_user_ids: data.target_user_ids
-              ? Array.isArray(data.target_user_ids)
-                ? data.target_user_ids
-                : String(data.target_user_ids)
-                    .split(',')
-                    .map((id) => Number(String(id).trim()))
-              : [],
-            validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
-            target_type: data.target_type || 'all',
-            stock: data.stock ?? 0,
-          }),
-        }}
+        customDefaultValue: (data) => ({
+          ...data,
+          valid_until: toDateInput(data?.valid_until),
+          // <<< PENTING: jadikan image URL absolut biar preview langsung muncul
+          image: data?.image ? buildImageUrl(data.image) : '',
+          target_user_ids: data.target_user_ids
+            ? Array.isArray(data.target_user_ids)
+              ? data.target_user_ids
+              : String(data.target_user_ids).split(',').map((id) => Number(String(id).trim()))
+            : [],
+          validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
+          target_type: data.target_type || 'all',
+          stock: data.stock ?? 0,
+        }),
+      }}
       />
 
       <ModalConfirmComponent
