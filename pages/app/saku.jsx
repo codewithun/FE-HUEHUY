@@ -943,11 +943,13 @@ export default function Save() {
                 <p className="text-slate-500 text-xs mt-3">Masukkan kode validasi untuk memproses promo ini</p>
               </div>
             </div>
-          )}
+          );
+          })()
+        )}
         </div>
-      </BottomSheetComponent>
+        </BottomSheetComponent>
 
-      {/* Modal Validasi Berhasil */}
+        {/* Modal Validasi Berhasil */}
       {showValidationSuccess && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
