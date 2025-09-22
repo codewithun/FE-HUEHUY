@@ -336,10 +336,22 @@ function PromoDashboard() {
             
             // Optional text fields
             if (data.detail?.trim()) formData.append('detail', data.detail.trim());
-            if (data.code?.trim()) formData.append('code', data.code.trim());
             if (data.location?.trim()) formData.append('location', data.location.trim());
             if (data.start_date) formData.append('start_date', data.start_date);
             if (data.end_date) formData.append('end_date', data.end_date);
+            
+            // Validation type and code handling
+            if (data.validation_type) formData.append('validation_type', data.validation_type);
+            
+            // Jika validation_type adalah manual, kirim code sebagai barcode
+            // Jika auto, biarkan backend generate otomatis
+            if (data.validation_type === 'manual' && data.code?.trim()) {
+              formData.append('code', data.code.trim());
+              formData.append('barcode', data.code.trim()); // untuk compatibility
+            } else if (data.validation_type === 'auto') {
+              // Auto generate - tidak perlu kirim code
+              // Backend akan generate otomatis
+            }
             
             // Numeric fields - convert to proper values
             const promoDistance = parseFloat(data.promo_distance) || 0;
@@ -386,17 +398,6 @@ function PromoDashboard() {
             {
               type: 'custom',
               custom: ({ formControl }) => (
-                <InputComponent
-                  name="code"
-                  label="Kode Promo"
-                  placeholder="Contoh: PROMO50OFF"
-                  {...formControl('code')}
-                />
-              ),
-            },
-            {
-              type: 'custom',
-              custom: ({ formControl }) => (
                 <TextareaComponent
                   name="description"
                   label="Deskripsi Singkat *"
@@ -420,16 +421,25 @@ function PromoDashboard() {
               ),
             },
             {
-              type: 'custom',
-              custom: ({ formControl }) => (
-                <InputImageComponent
-                  name="image"
-                  label="Gambar Promo"
-                  aspect="16/9"
-                  {...formControl('image')}
-                />
-              ),
-            },
+  type: 'custom',
+  custom: ({ formControl }) => {
+    const fc = formControl('image');
+    // siapkan value untuk preview:
+    const raw = fc.value;
+    const preparedValue =
+      raw instanceof File ? raw : (raw ? buildImageUrl(String(raw)) : '');
+
+    return (
+      <InputImageComponent
+        name="image"
+        label="Gambar Promo"
+        aspect="16/9"
+        {...fc}
+        value={preparedValue}
+      />
+    );
+  },
+},
             {
               type: 'custom',
               custom: ({ formControl }) => (
@@ -444,6 +454,51 @@ function PromoDashboard() {
                   ]}
                 />
               ),
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                const fc = formControl('validation_type');
+                const onChange = (e) => {
+                  // pass ke handler formControl bawaan
+                  fc.onChange?.(e);
+                  const val = e?.target?.value ?? e?.value ?? null;
+                  // kalau balik ke auto, kosongkan code
+                  if (val === 'auto') {
+                    formControl('code')?.onChange?.({ target: { value: '' } });
+                  }
+                };
+                return (
+                  <SelectComponent
+                    name="validation_type"
+                    label="Tipe Validasi *"
+                    required
+                    value={fc.value}
+                    onChange={onChange}
+                    options={[
+                      { label: 'Generate Otomatis (QR Code)', value: 'auto' },
+                      { label: 'Masukan Kode Unik', value: 'manual' },
+                    ]}
+                  />
+                );
+              },
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl, values }) => {
+                const validationType = values.find((i) => i.name === 'validation_type')?.value;
+                if (validationType !== 'manual') return null;
+
+                return (
+                  <InputComponent
+                    name="code"
+                    label="Kode Promo *"
+                    placeholder="Contoh: PROMO50OFF"
+                    required
+                    {...formControl('code')}
+                  />
+                );
+              },
             },
             {
               type: 'custom',
@@ -592,6 +647,19 @@ function PromoDashboard() {
             },
           ],
         }}
+        formUpdateControl={{
+  customDefaultValue: (data) => ({
+    ...data,
+    // normalisasi tanggal biar input type="date" aman (opsional)
+    start_date: data.start_date ? new Date(data.start_date).toISOString().slice(0,10) : '',
+    end_date: data.end_date ? new Date(data.end_date).toISOString().slice(0,10) : '',
+    // PENTING: jadikan image URL absolut untuk preview
+    image: data?.image ? buildImageUrl(data.image) : '',
+    // tetap set validation_type
+    validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
+  }),
+}}
+
       />
 
       <ModalConfirmComponent
