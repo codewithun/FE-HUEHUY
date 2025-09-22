@@ -216,81 +216,62 @@ export default function ScanValidasi() {
       });
       console.log('🔐 Validation request headers:', headers);
 
-      // Enhanced validation logic based on QR metadata
+      // TENANT VALIDATION LOGIC - Tenant hanya sebagai validator, bukan pemilik
       let res, result, itemType = 'promo', promoError = null;
 
-      // ✅ Structured QR → gunakan endpoint item-spesifik (redeem by item id)
-      if (isStructured && qrItemType) {
-        console.log(`🎯 Using structured QR validation for ${qrItemType}`);
+      // Payload untuk tenant validation
+      const tenantPayload = {
+        code: codeToValidate.trim(),
+        tenant_id: profile?.id, // ID tenant yang melakukan validasi
+        validation_source: 'qr_scan',
+        is_tenant_validation: true // Flag khusus untuk tenant validation
+      };
 
-        // Payload standar
-        const payload = {
-          code: codeToValidate.trim(),
-          validated_by_tenant: profile?.id,
-          validation_source: 'qr_scan'
+      // Jika QR berisi metadata user_id, sertakan dalam payload
+      if (userId) {
+        tenantPayload.item_owner_id = userId;
+      }
+
+      console.log('🏢 Tenant validation payload:', tenantPayload);
+
+      // Try promo validation first
+      res = await fetch(`${apiUrl}/api/promos/validate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(tenantPayload),
+      });
+      result = await res.json().catch(() => null);
+      itemType = 'promo';
+      
+      console.log('📡 Promo validation response:', { 
+        status: res.status, 
+        ok: res.ok, 
+        result: result 
+      });
+
+      // If promo validation fails, try voucher validation
+      if (!res.ok) {
+        promoError = { 
+          status: res.status, 
+          message: result?.message, 
+          result: result 
         };
-
-        if (qrItemType === 'voucher' && itemId) {
-          console.log('🎫 Validating voucher with item ID:', itemId);
-          res = await fetch(`${apiUrl}/admin/voucher-items/${itemId}/redeem`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload),
-          });
-          result = await res.json().catch(() => null);
-          itemType = 'voucher';
-          console.log('📡 Direct voucher validation response:', { status: res.status, ok: res.ok, result });
-        } else if (qrItemType === 'promo' && itemId) {
-          console.log('🏷️ Validating promo with item ID:', itemId);
-          res = await fetch(`${apiUrl}/admin/promo-items/${itemId}/redeem`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload),
-          });
-          result = await res.json().catch(() => null);
-          itemType = 'promo';
-          console.log('📡 Direct promo validation response:', { status: res.status, ok: res.ok, result });
-        } else {
-          // Structured tapi tidak ada itemId → jatuh ke fallback
-          console.warn('Structured QR without item_id, falling back to unstructured path');
-        }
-
-      } else {
-        // Fallback untuk QR tidak terstruktur (tetap seperti semula)
-        console.log('🔄 Using fallback dual-validation for unstructured QR');
-        console.log('ℹ️ Tenant validation mode: Validating item owned by another user');
-
-        // Coba promo dulu
-        res = await fetch(`${apiUrl}/promos/validate`, {
+        
+        console.log('🔍 Trying voucher validation...');
+        
+        res = await fetch(`${apiUrl}/api/vouchers/validate`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            code: codeToValidate.trim(),
-            validated_by_tenant: profile?.id,
-            validation_source: 'qr_scan'
-          }),
+          body: JSON.stringify(tenantPayload),
         });
         result = await res.json().catch(() => null);
-        itemType = 'promo';
-        console.log('📡 Promo validation response:', { status: res.status, ok: res.ok, result });
-
-        // Jika gagal, coba voucher
-        if (!res.ok) {
-          promoError = { status: res.status, message: result?.message, result };
-          console.log('🔍 Trying voucher validation...');
-          res = await fetch(`${apiUrl}/vouchers/validate`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              code: codeToValidate.trim(),
-              validated_by_tenant: profile?.id,
-              validation_source: 'qr_scan'
-            }),
-          });
-          result = await res.json().catch(() => null);
-          itemType = 'voucher';
-          console.log('📡 Voucher validation response:', { status: res.status, ok: res.ok, result });
-        }
+        itemType = 'voucher';
+        
+        console.log('📡 Voucher validation response:', { 
+          status: res.status, 
+          ok: res.ok, 
+          result: result 
+        });
       }
 
       if (res?.status === 401) {

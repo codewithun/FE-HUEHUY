@@ -78,6 +78,9 @@ export default function Validasi() {
         'Authorization': `Bearer ${token}`,
       };
 
+      // First, try to validate the code directly without checking user items
+      // This allows tenant to validate items that belong to users
+
       const codeToValidate = parsingCode || code;
       
       // Validasi kode tidak boleh kosong
@@ -91,62 +94,13 @@ export default function Validasi() {
       // eslint-disable-next-line no-console
       console.log('🔍 Validating code:', codeToValidate);
 
-      // First, check if user has any promo/voucher with this code in their possession
-      // Using the same endpoints as saku.jsx
-      const timestamp = Date.now();
-      const [promoItemsRes, voucherItemsRes] = await Promise.allSettled([
-        fetch(`${apiUrl}/admin/promo-items?_t=${timestamp}`, { headers }),
-        fetch(`${apiUrl}/vouchers/voucher-items?_t=${timestamp}`, { headers }),
-      ]);
-
-      let hasItemWithCode = false;
-      let allUserItems = [];
-
-      // Check promo items
-      if (promoItemsRes.status === 'fulfilled' && promoItemsRes.value.ok) {
-        const promoJson = await promoItemsRes.value.json().catch(() => ({}));
-        const promoItems = promoJson.data || [];
-        allUserItems.push(...promoItems.map(item => ({ ...item, type: 'promo' })));
-      }
-
-      // Check voucher items
-      if (voucherItemsRes.status === 'fulfilled' && voucherItemsRes.value.ok) {
-        const voucherJson = await voucherItemsRes.value.json().catch(() => ({}));
-        const voucherItems = voucherJson.data || [];
-        allUserItems.push(...voucherItems.map(item => ({ ...item, type: 'voucher' })));
-      }
-
-      // Check if user has item with this code
-      hasItemWithCode = allUserItems.some(item => {
-        const itemCode = item.code || item.voucher_item?.code;
-        return itemCode && itemCode.trim() === codeToValidate.trim();
-      });
-      
-      // eslint-disable-next-line no-console
-      console.log('🔍 User items check:', {
-        hasItemWithCode,
-        userItemsCount: allUserItems.length,
-        searchingForCode: codeToValidate,
-        foundItems: allUserItems.filter(item => {
-          const itemCode = item.code || item.voucher_item?.code;
-          return itemCode && itemCode.trim() === codeToValidate.trim();
-        })
-      });
-
-      // If user doesn't have this item, return error immediately
-      if (!hasItemWithCode) {
-        setModalFailedMessage(`Anda tidak memiliki promo atau voucher dengan kode "${codeToValidate}". Pastikan Anda sudah mengambil item tersebut terlebih dahulu.`);
-        setModalFailed(true);
-        setSubmitLoading(false);
-        return;
-      }
-
-      // Try promo validation first
-      let res = await fetch(`${apiUrl}/promos/validate`, {
+      // Try promo validation first - use endpoint that supports tenant validation
+      let res = await fetch(`${apiUrl}/api/promos/validate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           code: codeToValidate.trim(), // Trim whitespace
+          validator_role: isManagerTenant ? 'tenant' : 'user' // Indicate if this is tenant validation
         }),
       });
 
@@ -172,11 +126,12 @@ export default function Validasi() {
         // eslint-disable-next-line no-console
         console.log('🔍 Trying voucher validation...');
         
-        res = await fetch(`${apiUrl}/vouchers/validate`, {
+        res = await fetch(`${apiUrl}/api/vouchers/validate`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
             code: codeToValidate.trim(),
+            validator_role: isManagerTenant ? 'tenant' : 'user' // Indicate if this is tenant validation
           }),
         });
 
