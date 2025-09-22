@@ -106,9 +106,21 @@ export default function CommunityDashboard({ communityId }) {
         if (!url) return fallback;
         if (/^https?:\/\//i.test(url)) return url;
         if (url.startsWith('/api/placeholder')) return url;
+        
+        // Fix the path construction
         let path = url.replace(/^\/+/, '');
-        path = path.replace(/^api\/storage\//, 'storage/');
-        return `${apiBase}/${path}`;
+        
+        // Handle different storage path patterns
+        if (path.startsWith('storage/')) {
+          // If path already starts with storage/, use it directly
+          return `${apiBase}/${path}`;
+        } else if (path.startsWith('promos/') || path.startsWith('uploads/') || path.startsWith('images/')) {
+          // If it's a direct file path, add storage prefix
+          return `${apiBase}/storage/${path}`;
+        } else {
+          // For any other case, assume it needs storage prefix
+          return `${apiBase}/storage/${path}`;
+        }
       };
 
       const normalizePromos = (arr = []) => {
