@@ -65,12 +65,6 @@ export default function Save() {
       // Ambil data user-scoped (BUKAN admin/global) dengan cache busting dan filter user
       const timestamp = Date.now();
 
-      console.log('🚀 FETCHING SAKU DATA:', {
-        timestamp,
-        promoUrl: `${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`,
-        voucherUrl: `${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`
-      });
-
       const [promoRes, voucherRes] = await Promise.allSettled([
         fetch(`${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
         fetch(`${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
@@ -150,13 +144,6 @@ export default function Save() {
         const voucherJson = await voucherRes.value.json().catch(() => ({}));
         const rows = Array.isArray(voucherJson) ? voucherJson : (voucherJson?.data || []);
 
-        // Debug logging untuk raw response
-        console.log('📡 RAW VOUCHER RESPONSE:', {
-          voucherJson: voucherJson,
-          rows: rows,
-          rowCount: rows.length
-        });
-
         // Filter tambahan untuk memastikan hanya data user yang login
         const userFilteredRows = rows.filter(it => {
           // Pastikan item ini milik user yang sedang login
@@ -175,15 +162,6 @@ export default function Save() {
           // Backend VoucherItem hanya punya field: id, user_id, voucher_id, code, used_at
           const usedAt = it.used_at || null;
           const isUsed = !!usedAt; // Voucher sudah divalidasi jika used_at terisi
-
-          // Debug logging untuk voucher item
-          console.log('🎫 VOUCHER ITEM DEBUG:', {
-            id: it.id,
-            code: it.code,
-            used_at: it.used_at,
-            isUsed: isUsed,
-            raw_item: it
-          });
 
           const mappedItem = {
             id: it.id,
@@ -226,15 +204,6 @@ export default function Save() {
                 : {},
             },
           };
-
-          // Debug log mapped item structure
-          console.log('🔄 MAPPED VOUCHER ITEM:', {
-            id: mappedItem.id,
-            type: mappedItem.type,
-            validated_at: mappedItem.validated_at,
-            voucher_item_used_at: mappedItem.voucher_item?.used_at,
-            voucher_item_status: mappedItem.voucher_item?.status
-          });
 
           return mappedItem;
         });
@@ -512,27 +481,24 @@ export default function Save() {
         // Validasi: Jika current user bukan pemilik promo, maka ini adalah validasi oleh tenant
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
 
-        // Use the same promo validation endpoint as validasi.jsx
-        // This endpoint handles both tenant and owner validation properly
-        res = await fetch(`${apiUrl}/api/promos/validate`, {
+        if (!targetId) {
+          setValidationMessage('Promo tidak valid atau tidak ditemukan.');
+          setShowValidationFailed(true);
+          setValidationLoading(false);
+          return;
+        }
+
+        res = await fetch(`${apiUrl}/api/admin/promo-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            code: codeToValidate.trim(),
-            validator_role: isOwner ? 'user' : 'tenant' // Same pattern as validasi.jsx
+            code: codeToValidate.trim()
           }),
         });
         result = await res.json().catch(() => null);
       } else if (isVoucherItem) {
         const targetId = selected?.voucher_item?.id || selected?.id;
         const userId = selected?.voucher_item?.user_id || selected?.user_id;
-
-        console.log('🎫 VOUCHER VALIDATION START:', {
-          targetId,
-          userId,
-          selected: selected,
-          codeToValidate: codeToValidate
-        });
 
         if (!targetId) {
           setValidationMessage('Voucher tidak valid atau tidak ditemukan.');
@@ -558,13 +524,6 @@ export default function Save() {
         // Validasi: Jika current user bukan pemilik voucher, maka ini adalah validasi oleh tenant
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
 
-        console.log('🔐 VOUCHER OWNERSHIP CHECK:', {
-          currentUserId,
-          userId,
-          isOwner,
-          validatorRole: isOwner ? 'user' : 'tenant'
-        });
-
         res = await fetch(`${apiUrl}/api/admin/voucher-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
@@ -573,13 +532,6 @@ export default function Save() {
           }),
         });
         result = await res.json().catch(() => null);
-
-        console.log('📡 VOUCHER VALIDATION RESPONSE:', {
-          status: res.status,
-          ok: res.ok,
-          result: result,
-          codeValidated: codeToValidate.trim()
-        });
       } else {
         setValidationMessage('Item tidak dikenali.');
         setShowValidationFailed(true);
@@ -669,14 +621,6 @@ export default function Save() {
               return it;
             }),
           }));
-
-          console.log('✅ Local state updated after validation:', {
-            currentUserId,
-            itemOwnerId,
-            isOwner,
-            selectedType: selected.type,
-            timestamp: now
-          });
         }
 
         // ALWAYS refresh data dari server untuk memastikan sinkronisasi
@@ -686,13 +630,6 @@ export default function Save() {
           fetchData(); // Fetch ulang data untuk memastikan status terupdate
         }, 100); // Kurangi delay untuk response yang lebih cepat
       } else {
-        console.log('❌ VALIDATION FAILED:', {
-          status: res?.status,
-          result: result,
-          message: result?.message,
-          selectedType: selected?.type,
-          codeValidated: codeToValidate
-        });
 
         const msg = (result?.message || '').toString();
         let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
@@ -706,7 +643,7 @@ export default function Save() {
         } else if (res?.status === 400) {
           // Often means already validated
           if (msg.toLowerCase().includes('sudah') || msg.toLowerCase().includes('digunakan') || msg.toLowerCase().includes('already')) {
-            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidated}" sudah pernah divalidasi sebelumnya.`;
+            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
           } else {
             errorMessage = result?.message || 'Kode unik tidak valid.';
           }
@@ -761,8 +698,8 @@ export default function Save() {
                   return (
                     <div
                       className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${isRecentlyClaimed(item.claimed_at)
-                          ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white'
-                          : 'border-slate-100'
+                        ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white'
+                        : 'border-slate-100'
                         } ${canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'
                         }`}
                       key={key}
@@ -1128,10 +1065,10 @@ export default function Save() {
 
                         <button
                           className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
-                              ? 'bg-slate-400 text-white cursor-not-allowed'
-                              : isItemValidatable(selected)
-                                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
-                                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                            ? 'bg-slate-400 text-white cursor-not-allowed'
+                            : isItemValidatable(selected)
+                              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                             }`}
                           onClick={() => {
                             if (isItemValidatable(selected)) {
@@ -1253,10 +1190,10 @@ export default function Save() {
 
                       <button
                         className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
-                            ? 'bg-slate-400 text-white cursor-not-allowed'
-                            : isItemValidatable(selected)
-                              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
-                              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          ? 'bg-slate-400 text-white cursor-not-allowed'
+                          : isItemValidatable(selected)
+                            ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                            : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                           }`}
                         onClick={() => {
                           if (isItemValidatable(selected)) {
