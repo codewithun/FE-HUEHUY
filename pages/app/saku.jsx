@@ -369,12 +369,32 @@ export default function Save() {
       let res, result;
 
       if (isPromoItem) {
-        res = await fetch(`${apiUrl}/promos/validate`, {
+        // Untuk promo, gunakan endpoint spesifik dengan item ID seperti voucher
+        const targetId = selected?.id;
+        if (!targetId) {
+          setValidationMessage('Promo tidak valid atau tidak ditemukan.');
+          setShowValidationFailed(true);
+          setValidationLoading(false);
+          return;
+        }
+
+        // Coba endpoint redeem promo spesifik dulu
+        res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ code: codeToValidate }),
         });
         result = await res.json().catch(() => null);
+
+        // Fallback ke endpoint generic jika endpoint spesifik tidak ada
+        if (res.status === 404 || res.status === 405) {
+          res = await fetch(`${apiUrl}/promos/validate`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ code: codeToValidate }),
+          });
+          result = await res.json().catch(() => null);
+        }
       } else if (isVoucherItem) {
         const targetId = selected?.voucher_item?.id || selected?.id;
         if (!targetId) {
@@ -886,62 +906,93 @@ export default function Save() {
                       </span>
                     </div>
 
-                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                      <QRCodeSVG
-                        value={JSON.stringify({
-                          code: selected?.code || 'NO_CODE',
-                          type: 'promo',
-                          item_id: selected?.id,
-                          user_id: selected?.user_id
-                        })}
-                        size={180}
-                        bgColor="#f8fafc"
-                        fgColor="#0f172a"
-                        level="H"
-                        includeMargin={true}
-                        className="mx-auto rounded-lg"
-                      />
-                    </div>
-
-                    {/* Input Kode Validasi & Tombol */}
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Masukkan Kode Validasi
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Masukkan kode validasi..."
-                          value={validationCode}
-                          onChange={(e) => setValidationCode(e.target.value)}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
-                          disabled={validationLoading}
-                        />
-                      </div>
-                      
-                      <button
-                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 ${
-                          validationLoading 
-                            ? 'bg-slate-400 text-white cursor-not-allowed' 
-                            : 'bg-gradient-to-r from-green-600 to-green-700 text-white'
-                        }`}
-                        onClick={() => {
-                          submitValidation(validationCode);
-                        }}
-                        disabled={validationLoading}
-                      >
-                        {validationLoading ? (
-                          <div className="flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                            Memvalidasi...
+                    {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
+                    {!isManual ? (
+                      // Tampilkan QR Code untuk auto validation
+                      <>
+                        <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                          <QRCodeSVG
+                            value={JSON.stringify({
+                              code: selected?.code || 'NO_CODE',
+                              type: 'promo',
+                              item_id: selected?.id,
+                              user_id: selected?.user_id
+                            })}
+                            size={180}
+                            bgColor="#f8fafc"
+                            fgColor="#0f172a"
+                            level="H"
+                            includeMargin={true}
+                            className="mx-auto rounded-lg"
+                          />
+                        </div>
+                        <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
+                      </>
+                    ) : (
+                      // Tampilkan input dan tombol untuk manual validation
+                      <div className="space-y-4">
+                        {!isItemValidatable(selected) && (
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                            <div className="flex items-center gap-2">
+                              <FontAwesomeIcon icon={faTimesCircle} className="text-red-500" />
+                              <span className="text-red-700 text-sm font-medium">
+                                {selected?.validated_at
+                                  ? 'Item ini sudah divalidasi sebelumnya'
+                                  : 'Item ini tidak dapat divalidasi (habis, kadaluwarsa, atau ditutup)'}
+                              </span>
+                            </div>
                           </div>
-                        ) : (
-                          'Validasi Promo'
                         )}
-                      </button>
-                    </div>
-                    
-                    <p className="text-slate-500 text-xs mt-3">Masukkan kode validasi untuk memproses promo ini</p>
+
+                        {/* Icon untuk manual validation */}
+                        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <FontAwesomeIcon icon={faTag} className="text-primary text-3xl" />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Masukkan Kode Validasi
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Masukkan kode validasi..."
+                            value={validationCode}
+                            onChange={(e) => setValidationCode(e.target.value)}
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
+                            disabled={validationLoading}
+                          />
+                        </div>
+
+                        <button
+                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
+                            validationLoading
+                              ? 'bg-slate-400 text-white cursor-not-allowed'
+                              : isItemValidatable(selected)
+                              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          }`}
+                          onClick={() => {
+                            if (isItemValidatable(selected)) {
+                              submitValidation(validationCode);
+                            }
+                          }}
+                          disabled={validationLoading || !isItemValidatable(selected)}
+                        >
+                          {validationLoading ? (
+                            <div className="flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                              Memvalidasi...
+                            </div>
+                          ) : (
+                            'Validasi Promo'
+                          )}
+                        </button>
+
+                        <p className="text-slate-500 text-xs">
+                          Masukkan kode validasi untuk memproses promo ini
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
