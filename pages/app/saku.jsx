@@ -19,14 +19,16 @@ import moment from 'moment';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { QRCodeSVG } from 'qrcode.react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
 import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
 // Pastikan base URL tanpa /api di akhir
-const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '').replace(/\/api$/, '');
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  .replace(/\/$/, '')
+  .replace(/\/api$/, '');
 
 export default function Save() {
   const router = useRouter();
@@ -41,6 +43,19 @@ export default function Save() {
   const [showValidationSuccess, setShowValidationSuccess] = useState(false);
   const [showValidationFailed, setShowValidationFailed] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+
+  // === currentUserId dari token (sekadar pengaman ekstra saat filter FE) ===
+  const currentUserId = useMemo(() => {
+    try {
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : null;
+      if (!token) return null;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub || payload.user_id || payload.id || null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // Ambil data saku: HANYA untuk user saat ini
   const fetchData = useCallback(async () => {
@@ -66,8 +81,14 @@ export default function Save() {
       const timestamp = Date.now();
 
       const [promoRes, voucherRes] = await Promise.allSettled([
-        fetch(`${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
-        fetch(`${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`, {
+          headers,
+          signal: controller.signal,
+        }),
+        fetch(`${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`, {
+          headers,
+          signal: controller.signal,
+        }),
       ]);
 
       let allItems = [];
@@ -75,24 +96,21 @@ export default function Save() {
       // === PROMO ITEMS (untuk user) ===
       if (promoRes.status === 'fulfilled' && promoRes.value.ok) {
         const promoJson = await promoRes.value.json().catch(() => ({}));
-        const rows = Array.isArray(promoJson) ? promoJson : (promoJson?.data || []);
+        const rows = Array.isArray(promoJson) ? promoJson : promoJson?.data || [];
 
-        // Filter tambahan untuk memastikan hanya data user yang login
-        const userFilteredRows = rows.filter(it => {
-          // Pastikan item ini milik user yang sedang login
-          // Tambahan: validasi dengan token untuk double-check
-          return it.user_id || it.owner_id || it.claimed_by;
-        });
+        // Filter tambahan (aman) → pastikan hanya item milik current user
+        const userFilteredRows = rows.filter(
+          (it) => !currentUserId || String(it.user_id) === String(currentUserId)
+        );
 
         const mapped = userFilteredRows.map((it) => {
           const ad = it.promo || it.ad || {};
           const claimedAt = it.created_at || it.reserved_at || null;
           const expiredAt = it.expires_at || ad.end_date || null;
-          // Backend PromoItem menggunakan 'redeemed_at' bukan 'validated_at'
+          // Backend PromoItem menggunakan 'redeemed_at'
           const redeemedAt = it.redeemed_at || null;
           const isRedeemed = !!(redeemedAt || it.status === 'redeemed');
 
-          // tipe validasi (fallback ke 'auto' jika tidak ada)
           const validation_type = ad.validation_type || it.validation_type || 'auto';
 
           const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
@@ -100,12 +118,12 @@ export default function Save() {
             .replace(/\/$/, '');
 
           return {
-            id: it.id,
+            id: it.id, // ini adalah promo_item.id
             type: 'promo',
             code: it.code,
             claimed_at: claimedAt,
             expired_at: expiredAt,
-            validated_at: redeemedAt, // Map redeemed_at ke validated_at untuk konsistensi FE
+            validated_at: redeemedAt, // FE mapping
             validation_type,
             user_id: it.user_id,
             promo_item: {
@@ -115,20 +133,25 @@ export default function Save() {
               promo_id: it.promo_id || ad.id,
               status: it.status || (isRedeemed ? 'redeemed' : 'available'),
               redeemed_at: redeemedAt,
-              reserved_at: it.reserved_at
+              reserved_at: it.reserved_at,
             },
             voucher_item: null,
             voucher: null,
             ad: {
               id: ad.id,
               title: ad.title || ad.name || 'Promo',
-              picture_source: ad.image ? `${base}/storage/${ad.image}` : (ad.picture_source || '/default-avatar.png'),
+              picture_source: ad.image
+                ? `${base}/storage/${ad.image}`
+                : ad.picture_source || '/default-avatar.png',
               status: ad.status || 'active',
               description: ad.description,
               validation_type,
               cube: {
                 community_id: ad.community_id || ad?.cube?.community_id || 1,
-                user: { name: ad.owner_name || ad?.cube?.user?.name || 'Merchant', phone: ad.owner_contact || '' },
+                user: {
+                  name: ad.owner_name || ad?.cube?.user?.name || 'Merchant',
+                  phone: ad.owner_contact || '',
+                },
                 corporate: ad?.cube?.corporate || null,
                 tags: [{ address: ad.location || '', link: null, map_lat: null, map_lng: null }],
               },
@@ -142,14 +165,12 @@ export default function Save() {
       // === VOUCHER ITEMS (untuk user) ===
       if (voucherRes.status === 'fulfilled' && voucherRes.value.ok) {
         const voucherJson = await voucherRes.value.json().catch(() => ({}));
-        const rows = Array.isArray(voucherJson) ? voucherJson : (voucherJson?.data || []);
+        const rows = Array.isArray(voucherJson) ? voucherJson : voucherJson?.data || [];
 
-        // Filter tambahan untuk memastikan hanya data user yang login
-        const userFilteredRows = rows.filter(it => {
-          // Pastikan item ini milik user yang sedang login
-          // Tambahan: validasi dengan token untuk double-check
-          return it.user_id || it.owner_id || it.claimed_by;
-        });
+        // Filter tambahan (aman) → pastikan hanya item milik current user
+        const userFilteredRows = rows.filter(
+          (it) => !currentUserId || String(it.user_id) === String(currentUserId)
+        );
 
         const mapped = userFilteredRows.map((it) => {
           const voucher = it.voucher || {};
@@ -159,17 +180,16 @@ export default function Save() {
 
           const validation_type = voucher.validation_type || it.validation_type || 'auto';
 
-          // Backend VoucherItem hanya punya field: id, user_id, voucher_id, code, used_at
+          // VoucherItem hanya punya: id, user_id, voucher_id, code, used_at
           const usedAt = it.used_at || null;
-          const isUsed = !!usedAt; // Voucher sudah divalidasi jika used_at terisi
 
-          const mappedItem = {
-            id: it.id,
+          return {
+            id: it.id, // ini adalah voucher_item.id
             type: 'voucher',
             code: it.code,
             claimed_at: it.created_at,
             expired_at: voucher.valid_until || null,
-            validated_at: usedAt, // Map used_at ke validated_at untuk konsistensi FE
+            validated_at: usedAt, // FE mapping
             validation_type,
             user_id: it.user_id,
             voucher_item: {
@@ -177,8 +197,7 @@ export default function Save() {
               code: it.code,
               user_id: it.user_id,
               voucher_id: it.voucher_id,
-              used_at: usedAt
-              // Tabel voucher_items hanya punya: id, user_id, voucher_id, code, used_at
+              used_at: usedAt,
             },
             voucher,
             ad: {
@@ -195,17 +214,15 @@ export default function Save() {
               validation_type,
               cube: voucher.community
                 ? {
-                  community_id: voucher.community.id,
-                  code: `community-${voucher.community.id}`,
-                  user: { name: voucher.community.name || 'Community', phone: '' },
-                  corporate: null,
-                  tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
-                }
+                    community_id: voucher.community.id,
+                    code: `community-${voucher.community.id}`,
+                    user: { name: voucher.community.name || 'Community', phone: '' },
+                    corporate: null,
+                    tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
+                  }
                 : {},
             },
           };
-
-          return mappedItem;
         });
 
         allItems = allItems.concat(mapped);
@@ -220,13 +237,13 @@ export default function Save() {
     }
 
     return () => controller.abort();
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData, refreshTrigger]);
 
-  // Auto-refresh saat focus & route change (tanpa localStorage)
+  // Auto-refresh saat focus & route change
   useEffect(() => {
     const handleFocus = () => setRefreshTrigger((p) => p + 1);
     const handleRouteChange = () => setRefreshTrigger((p) => p + 1);
@@ -242,23 +259,18 @@ export default function Save() {
 
   // ====== Helpers ======
   const isItemValidatable = (item) => {
-    // VOUCHER: Cek hanya used_at field (field lain tidak ada di database)
-    // PROMO: Cek redeemed_at dan status field
+    // VOUCHER: cek used_at
+    // PROMO: cek redeemed_at/status
     const isValidated =
-      // Frontend mapping field
       item?.validated_at ||
-      // Voucher: HANYA cek used_at (tabel voucher_items tidak punya status field)
       (item?.type === 'voucher' && item?.voucher_item?.used_at) ||
-      (item?.voucher_item?.used_at) ||
+      item?.voucher_item?.used_at ||
       (item?.type === 'voucher' && item?.used_at) ||
-      // Promo: cek redeemed_at dan status
       (item?.type === 'promo' && item?.promo_item?.redeemed_at) ||
-      (item?.promo_item?.redeemed_at) ||
-      (item?.redeemed_at) ||
-      (item?.promo_item?.status === 'redeemed') ||
+      item?.promo_item?.redeemed_at ||
+      item?.redeemed_at ||
+      item?.promo_item?.status === 'redeemed' ||
       (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
-
-
 
     if (isValidated) return false;
 
@@ -276,9 +288,7 @@ export default function Save() {
 
     const promo = item?.ad;
     const isPromoActive =
-      promo?.status === 'active' ||
-      promo?.status === 'available' ||
-      (!promo?.status && promo?.id);
+      promo?.status === 'active' || promo?.status === 'available' || (!promo?.status && promo?.id);
     const hasPromoStock = promo?.stock === undefined || promo?.stock > 0;
 
     return isPromoActive && hasPromoStock;
@@ -321,29 +331,24 @@ export default function Save() {
   };
 
   const getStatusBadge = (item) => {
-    // VOUCHER: Cek hanya used_at field (field lain tidak ada di database)
-    // PROMO: Cek redeemed_at dan status field
     const isValidated =
-      // Frontend mapping field
       item?.validated_at ||
-      // Voucher: HANYA cek used_at (tabel voucher_items tidak punya status field)
       (item?.type === 'voucher' && item?.voucher_item?.used_at) ||
-      (item?.voucher_item?.used_at) ||
+      item?.voucher_item?.used_at ||
       (item?.type === 'voucher' && item?.used_at) ||
-      // Promo: cek redeemed_at dan status
       (item?.type === 'promo' && item?.promo_item?.redeemed_at) ||
-      (item?.promo_item?.redeemed_at) ||
-      (item?.redeemed_at) ||
-      (item?.promo_item?.status === 'redeemed') ||
+      item?.promo_item?.redeemed_at ||
+      item?.redeemed_at ||
+      item?.promo_item?.status === 'redeemed' ||
       (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
-
-
 
     if (isValidated) {
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
-          <span className="font-medium text-success bg-green-50 px-2 py-1 rounded-full text-xs">Sudah divalidasi</span>
+          <span className="font-medium text-success bg-green-50 px-2 py-1 rounded-full text-xs">
+            Sudah divalidasi
+          </span>
         </div>
       );
     }
@@ -381,16 +386,16 @@ export default function Save() {
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
-          <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded-full text-xs">Belum divalidasi</span>
+          <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded-full text-xs">
+            Belum divalidasi
+          </span>
         </div>
       );
     }
 
     const promo = item?.ad;
     const isPromoActive =
-      promo?.status === 'active' ||
-      promo?.status === 'available' ||
-      (!promo?.status && promo?.id);
+      promo?.status === 'active' || promo?.status === 'available' || (!promo?.status && promo?.id);
 
     const hasPromoStock = promo?.stock === undefined || promo?.stock > 0;
 
@@ -408,7 +413,9 @@ export default function Save() {
     return (
       <div className="flex items-center gap-1">
         <FontAwesomeIcon icon={faExclamationTriangle} className="text-warning text-xs" />
-        <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded-full text-xs">Belum divalidasi</span>
+        <span className="font-medium text-warning bg-yellow-50 px-2 py-1 rounded-full text-xs">
+          Belum divalidasi
+        </span>
       </div>
     );
   };
@@ -417,7 +424,7 @@ export default function Save() {
   const getValidationType = (item) =>
     item?.validation_type || item?.voucher?.validation_type || item?.ad?.validation_type || 'auto';
 
-  // Submit validasi
+  // Submit validasi (manual oleh pemilik di modal)
   const submitValidation = async (valCode) => {
     const codeToValidate = (valCode || '').trim();
 
@@ -452,35 +459,8 @@ export default function Save() {
       let res, result;
 
       if (isPromoItem) {
-        // Untuk promo, pastikan validasi dilakukan pada item milik user yang benar
-        const targetId = selected?.promo_item?.id || selected?.id;
-        const userId = selected?.promo_item?.user_id || selected?.user_id;
-
-        if (!targetId) {
-          setValidationMessage('Promo tidak valid atau tidak ditemukan.');
-          setShowValidationFailed(true);
-          setValidationLoading(false);
-          return;
-        }
-
-        // CRITICAL: Validasi ownership sebelum API call
-        // Jangan biarkan tenant validasi promo yang bukan miliknya
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
-
-        let currentUserId = null;
-        try {
-          if (currentToken) {
-            const tokenPayload = JSON.parse(atob(currentToken.split('.')[1]));
-            currentUserId = tokenPayload.sub || tokenPayload.user_id || tokenPayload.id;
-          }
-        } catch (e) {
-          console.warn('Cannot decode token for ownership validation');
-        }
-
-        // Validasi: Jika current user bukan pemilik promo, maka ini adalah validasi oleh tenant
-        const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
-
+        // harus pakai promo_item.id (bukan ad.id)
+        const targetId = selected?.promo_item?.id;
         if (!targetId) {
           setValidationMessage('Promo tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -491,15 +471,12 @@ export default function Save() {
         res = await fetch(`${apiUrl}/api/admin/promo-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            code: codeToValidate.trim()
-          }),
+          body: JSON.stringify({ code: codeToValidate }),
         });
         result = await res.json().catch(() => null);
       } else if (isVoucherItem) {
-        const targetId = selected?.voucher_item?.id || selected?.id;
-        const userId = selected?.voucher_item?.user_id || selected?.user_id;
-
+        // harus pakai voucher_item.id (bukan voucher/ad.id)
+        const targetId = selected?.voucher_item?.id;
         if (!targetId) {
           setValidationMessage('Voucher tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -507,29 +484,10 @@ export default function Save() {
           return;
         }
 
-        // CRITICAL: Validasi ownership sebelum API call untuk voucher
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
-
-        let currentUserId = null;
-        try {
-          if (currentToken) {
-            const tokenPayload = JSON.parse(atob(currentToken.split('.')[1]));
-            currentUserId = tokenPayload.sub || tokenPayload.user_id || tokenPayload.id;
-          }
-        } catch (e) {
-          console.warn('Cannot decode token for ownership validation');
-        }
-
-        // Validasi: Jika current user bukan pemilik voucher, maka ini adalah validasi oleh tenant
-        const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
-
         res = await fetch(`${apiUrl}/api/admin/voucher-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            code: codeToValidate.trim()
-          }),
+          body: JSON.stringify({ code: codeToValidate }),
         });
         result = await res.json().catch(() => null);
       } else {
@@ -544,93 +502,42 @@ export default function Save() {
         setShowValidationSuccess(true);
         setValidationCode('');
 
-        // Update status item di local state - always try to update regardless of ownership
+        // Update local state untuk UX cepat
         if (selected) {
           const now = new Date().toISOString();
-
-          // Get current user info for logging
-          const encryptedToken = Cookies.get(token_cookie_name);
-          const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
-
-          let currentUserId = null;
-          try {
-            if (currentToken) {
-              const tokenPayload = JSON.parse(atob(currentToken.split('.')[1]));
-              currentUserId = tokenPayload.sub || tokenPayload.user_id || tokenPayload.id;
-            }
-          } catch (e) {
-            console.warn('Cannot decode token for user validation');
-          }
-
-          const itemOwnerId = selected?.user_id || selected?.promo_item?.user_id || selected?.voucher_item?.user_id;
-          const isOwner = currentUserId && itemOwnerId && (currentUserId.toString() === itemOwnerId.toString());
-
-          // Update local state immediately for better UX - data will be refreshed from server anyway
           setData((prev) => ({
             ...prev,
             data: prev.data.map((it) => {
-              // Find the exact item to update
-              const isMatchingItem = (
-                (it.id === selected.id) ||
-                (it.promo_item?.id === selected.promo_item?.id) ||
-                (it.voucher_item?.id === selected.voucher_item?.id) ||
-                (it.ad?.id === selected.ad?.id) ||
-                (it.voucher?.id === selected.voucher?.id)
-              );
+              const sameItem =
+                it.promo_item?.id === selected?.promo_item?.id ||
+                it.voucher_item?.id === selected?.voucher_item?.id;
+              if (!sameItem) return it;
 
-              if (isMatchingItem) {
-                // Update untuk promo - backend menggunakan redeemed_at
-                if ((it.type === 'promo' || it.ad) && it.promo_item) {
-                  return {
-                    ...it,
-                    validated_at: now, // Frontend mapping
-                    promo_item: {
-                      ...it.promo_item,
-                      redeemed_at: now, // Backend field
-                      status: 'redeemed'
-                    }
-                  };
-                }
-                // Update untuk voucher - backend HANYA punya used_at field
-                else if ((it.type === 'voucher' || it.voucher) && it.voucher_item) {
-                  return {
-                    ...it,
-                    validated_at: now, // Frontend mapping
-                    voucher_item: {
-                      ...it.voucher_item,
-                      used_at: now // HANYA field ini yang ada di database
-                    }
-                  };
-                }
-                // Fallback update dengan field backend yang benar
-                else {
-                  const updates = {
-                    ...it,
-                    validated_at: now // Frontend mapping
-                  };
-
-                  if (it.type === 'promo' || it.ad) {
-                    updates.redeemed_at = now;
-                  } else if (it.type === 'voucher' || it.voucher) {
-                    updates.used_at = now;
-                  }
-
-                  return updates;
-                }
+              if (it.type === 'promo' && it.promo_item) {
+                return {
+                  ...it,
+                  validated_at: now,
+                  promo_item: { ...it.promo_item, redeemed_at: now, status: 'redeemed' },
+                };
               }
-              return it;
+              if (it.type === 'voucher' && it.voucher_item) {
+                return {
+                  ...it,
+                  validated_at: now,
+                  voucher_item: { ...it.voucher_item, used_at: now },
+                };
+              }
+              return { ...it, validated_at: now };
             }),
           }));
         }
 
-        // ALWAYS refresh data dari server untuk memastikan sinkronisasi
-        // Ini penting untuk semua user, bukan hanya pemilik item
+        // Refresh dari server
         setTimeout(() => {
           setRefreshTrigger((p) => p + 1);
-          fetchData(); // Fetch ulang data untuk memastikan status terupdate
-        }, 100); // Kurangi delay untuk response yang lebih cepat
+          fetchData();
+        }, 100);
       } else {
-
         const msg = (result?.message || '').toString();
         let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
 
@@ -641,7 +548,6 @@ export default function Save() {
         } else if (res?.status === 422) {
           errorMessage = result?.message || 'Kode unik tidak valid atau format salah.';
         } else if (res?.status === 400) {
-          // Often means already validated
           if (msg.toLowerCase().includes('sudah') || msg.toLowerCase().includes('digunakan') || msg.toLowerCase().includes('already')) {
             errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
           } else {
@@ -697,11 +603,9 @@ export default function Save() {
 
                   return (
                     <div
-                      className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${isRecentlyClaimed(item.claimed_at)
-                        ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white'
-                        : 'border-slate-100'
-                        } ${canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'
-                        }`}
+                      className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${
+                        isRecentlyClaimed(item.claimed_at) ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white' : 'border-slate-100'
+                      } ${canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'}`}
                       key={key}
                       onClick={() => {
                         if (canValidate) {
@@ -825,7 +729,11 @@ export default function Save() {
 
       {/* Modal Bottom Sheet */}
       <BottomSheetComponent
-        title={selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher ? 'Detail Voucher' : 'Detail Promo'}
+        title={
+          selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher
+            ? 'Detail Voucher'
+            : 'Detail Promo'
+        }
         show={modalValidation}
         onClose={() => {
           setModalValidation(false);
@@ -845,16 +753,22 @@ export default function Save() {
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon icon={faTag} className="text-primary text-sm" />
                   <span className="text-sm font-medium text-slate-600">
-                    {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher ? 'Voucher' : 'Promo'}
+                    {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher
+                      ? 'Voucher'
+                      : 'Promo'}
                   </span>
                 </div>
               </div>
 
+              {/* Perbaiki urutan sumber id untuk detail */}
               <Link
                 href={
                   selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher
-                    ? `/app/voucher/${selected?.voucher?.id || selected?.ad?.id || selected?.voucher_item?.voucher_id}`
-                    : `/app/komunitas/promo/${selected?.ad?.id}?communityId=${selected?.ad?.cube?.community_id || 1}&from=saku`
+                    ? `/app/voucher/${selected?.voucher_item?.voucher_id || selected?.voucher?.id || selected?.ad?.id}`
+                    : `/app/komunitas/promo/${selected?.ad?.id}?${new URLSearchParams({
+                        communityId: String(selected?.ad?.cube?.community_id || 1),
+                        from: 'saku',
+                      }).toString()}`
                 }
               >
                 <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors">
@@ -952,12 +866,13 @@ export default function Save() {
         {/* QR / Status */}
         <div className="px-4 pb-6">
           {(() => {
-            // Cek status validasi berdasarkan field backend yang benar
-            const isValidated = selected?.validated_at || // Frontend mapping
-              (selected?.type === 'voucher' && selected?.voucher_item?.used_at) || // Backend voucher field
-              (selected?.type === 'promo' && selected?.promo_item?.redeemed_at) || // Backend promo field
-              (selected?.voucher_item?.status === 'used') ||
-              (selected?.promo_item?.status === 'redeemed');
+            // Status validasi pakai field backend yang benar
+            const isValidated =
+              selected?.validated_at ||
+              (selected?.type === 'voucher' && selected?.voucher_item?.used_at) ||
+              (selected?.type === 'promo' && selected?.promo_item?.redeemed_at) ||
+              selected?.voucher_item?.status === 'used' ||
+              selected?.promo_item?.status === 'redeemed';
 
             if (isValidated) {
               return (
@@ -975,7 +890,7 @@ export default function Save() {
               );
             }
 
-            // Continue with existing validation logic
+            // Voucher section
             if (selected?.type === 'voucher' || selected?.voucher) {
               const voucher = selected?.voucher || selected?.ad;
               const isVoucherExpired = voucher?.valid_until && new Date(voucher.valid_until) < new Date();
@@ -1004,7 +919,7 @@ export default function Save() {
                       </span>
                     </div>
 
-                    {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
+                    {/* AUTO → QR; MANUAL → input */}
                     {!isManual ? (
                       <>
                         <div className="bg-slate-50 rounded-xl p-4 mb-4">
@@ -1012,12 +927,13 @@ export default function Save() {
                             value={JSON.stringify({
                               code: selected?.voucher_item?.code || selected?.code || 'NO_CODE',
                               type: 'voucher',
-                              item_id: selected?.voucher_item?.id || selected?.id,
-                              user_id: selected?.voucher_item?.user_id || selected?.user_id,
-                              owner_validation: true, // Flag untuk menandakan ini QR milik user
-                              timestamp: Date.now(), // Tambah timestamp untuk keamanan
-                              validation_purpose: 'tenant_scan', // Tujuan validasi oleh tenant
-                              owner_only: false // Bisa divalidasi oleh tenant
+                              // ⛔️ JANGAN pakai fallback selain voucher_item.id
+                              item_id: selected?.voucher_item?.id || null,
+                              user_id: selected?.voucher_item?.user_id || null,
+                              owner_validation: true,
+                              timestamp: Date.now(),
+                              validation_purpose: 'tenant_scan',
+                              owner_only: false,
                             })}
                             size={180}
                             bgColor="#f8fafc"
@@ -1044,7 +960,6 @@ export default function Save() {
                           </div>
                         )}
 
-                        {/* Icon untuk manual validation */}
                         <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                           <FontAwesomeIcon icon={faGift} className="text-primary text-3xl" />
                         </div>
@@ -1064,12 +979,13 @@ export default function Save() {
                         </div>
 
                         <button
-                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
-                            ? 'bg-slate-400 text-white cursor-not-allowed'
-                            : isItemValidatable(selected)
+                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
+                            validationLoading
+                              ? 'bg-slate-400 text-white cursor-not-allowed'
+                              : isItemValidatable(selected)
                               ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
                               : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                            }`}
+                          }`}
                           onClick={() => {
                             if (isItemValidatable(selected)) {
                               submitValidation(validationCode);
@@ -1087,9 +1003,7 @@ export default function Save() {
                           )}
                         </button>
 
-                        <p className="text-slate-500 text-xs">
-                          Masukkan kode validasi untuk memproses voucher ini
-                        </p>
+                        <p className="text-slate-500 text-xs">Masukkan kode validasi untuk memproses voucher ini</p>
                       </div>
                     )}
                   </div>
@@ -1097,12 +1011,14 @@ export default function Save() {
               );
             }
 
-            // Check if promo is not active
-            if (!(
-              selected?.ad?.status === 'active' ||
-              selected?.ad?.status === 'available' ||
-              (!selected?.ad?.status && selected?.ad?.id)
-            )) {
+            // Promo status aktif?
+            if (
+              !(
+                selected?.ad?.status === 'active' ||
+                selected?.ad?.status === 'available' ||
+                (!selected?.ad?.status && selected?.ad?.id)
+              )
+            ) {
               return (
                 <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
                   <div className="text-center">
@@ -1114,7 +1030,7 @@ export default function Save() {
               );
             }
 
-            // Promo validation section
+            // Promo section
             const vt = getValidationType(selected);
             const isManual = vt === 'manual';
 
@@ -1127,21 +1043,20 @@ export default function Save() {
                     </span>
                   </div>
 
-                  {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
                   {!isManual ? (
-                    // Tampilkan QR Code untuk auto validation
                     <>
                       <div className="bg-slate-50 rounded-xl p-4 mb-4">
                         <QRCodeSVG
                           value={JSON.stringify({
                             code: selected?.promo_item?.code || selected?.code || 'NO_CODE',
                             type: 'promo',
-                            item_id: selected?.promo_item?.id || selected?.id,
-                            user_id: selected?.promo_item?.user_id || selected?.user_id,
-                            owner_validation: true, // Flag untuk menandakan ini QR milik user
-                            timestamp: Date.now(), // Tambah timestamp untuk keamanan
-                            validation_purpose: 'tenant_scan', // Tujuan validasi oleh tenant
-                            owner_only: false // Bisa divalidasi oleh tenant
+                            // ⛔️ Hanya promo_item.id
+                            item_id: selected?.promo_item?.id || null,
+                            user_id: selected?.promo_item?.user_id || null,
+                            owner_validation: true,
+                            timestamp: Date.now(),
+                            validation_purpose: 'tenant_scan',
+                            owner_only: false,
                           })}
                           size={180}
                           bgColor="#f8fafc"
@@ -1154,7 +1069,6 @@ export default function Save() {
                       <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
                     </>
                   ) : (
-                    // Tampilkan input dan tombol untuk manual validation
                     <div className="space-y-4">
                       {!isItemValidatable(selected) && (
                         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
@@ -1169,7 +1083,6 @@ export default function Save() {
                         </div>
                       )}
 
-                      {/* Icon untuk manual validation */}
                       <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                         <FontAwesomeIcon icon={faTag} className="text-primary text-3xl" />
                       </div>
@@ -1189,12 +1102,13 @@ export default function Save() {
                       </div>
 
                       <button
-                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
-                          ? 'bg-slate-400 text-white cursor-not-allowed'
-                          : isItemValidatable(selected)
+                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
+                          validationLoading
+                            ? 'bg-slate-400 text-white cursor-not-allowed'
+                            : isItemValidatable(selected)
                             ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
                             : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                          }`}
+                        }`}
                         onClick={() => {
                           if (isItemValidatable(selected)) {
                             submitValidation(validationCode);
@@ -1212,9 +1126,7 @@ export default function Save() {
                         )}
                       </button>
 
-                      <p className="text-slate-500 text-xs">
-                        Masukkan kode validasi untuk memproses promo ini
-                      </p>
+                      <p className="text-slate-500 text-xs">Masukkan kode validasi untuk memproses promo ini</p>
                     </div>
                   )}
                 </div>
@@ -1239,10 +1151,8 @@ export default function Save() {
                 setModalValidation(false);
                 setSelected(null);
                 setValidationCode('');
-                // Force immediate data refresh for voucher status update
                 setRefreshTrigger((p) => p + 1);
                 fetchData();
-                // Additional refresh after a short delay to ensure backend sync
                 setTimeout(() => {
                   setRefreshTrigger((p) => p + 1);
                   fetchData();
