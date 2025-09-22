@@ -19,8 +19,8 @@ import { ButtonComponent, IconButtonComponent } from '../../components/base.comp
 import { ModalConfirmComponent } from '../../components/base.components';
 import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
 
-// ✅ Pastikan base mengarah ke /api
-const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+// ✅ Pastikan base URL tanpa /api di akhir
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '').replace(/\/api$/, '');
 
 export default function ScanValidasi() {
   const router = useRouter();
@@ -66,20 +66,27 @@ export default function ScanValidasi() {
       const parsed = JSON.parse(qrResult);
       console.log('📦 Parsed JSON from QR:', parsed);
 
+      // Check for the current QR format with all metadata
       if (parsed && typeof parsed === 'object' && parsed.code) {
         console.log('✅ Found structured QR data:', {
           code: parsed.code,
           type: parsed.type,
           item_id: parsed.item_id,
-          user_id: parsed.user_id
+          user_id: parsed.user_id,
+          owner_validation: parsed.owner_validation,
+          validation_purpose: parsed.validation_purpose
         });
 
-        // Return enhanced validation data with metadata
+        // Return enhanced validation data with all metadata
         return {
           code: parsed.code,
           type: parsed.type || 'unknown',
           item_id: parsed.item_id,
           user_id: parsed.user_id,
+          owner_validation: parsed.owner_validation,
+          validation_purpose: parsed.validation_purpose,
+          owner_only: parsed.owner_only,
+          timestamp: parsed.timestamp,
           isStructured: true
         };
       }
@@ -87,7 +94,7 @@ export default function ScanValidasi() {
       // Legacy JSON format support
       if (parsed.code) {
         console.log('✅ Found code in legacy JSON:', parsed.code);
-        return { code: parsed.code, type: 'unknown', isStructured: false };
+        return { code: parsed.code, type: parsed.type || 'unknown', isStructured: false };
       }
       if (parsed.type === 'voucher' && parsed.id) {
         console.log('✅ Found voucher ID in JSON:', parsed.id);
@@ -140,9 +147,10 @@ export default function ScanValidasi() {
       return { code: qrResult.trim(), type: 'unknown', isStructured: false };
     }
 
-    // Default: use the QR result as-is
-    console.log('⚠️ Using QR result as-is (no specific pattern found):', qrResult);
-    return { code: qrResult.trim(), type: 'unknown', isStructured: false };
+    // Default: use the QR result as-is but trim whitespace
+    const trimmedResult = qrResult.trim();
+    console.log('⚠️ Using QR result as-is (no specific pattern found):', trimmedResult);
+    return { code: trimmedResult, type: 'unknown', isStructured: false };
   };
 
   // Fungsi validasi yang sama dengan validasi.jsx
@@ -217,47 +225,41 @@ export default function ScanValidasi() {
       console.log('🔐 Validation request headers:', headers);
 
       // TENANT VALIDATION LOGIC - Tenant hanya sebagai validator, bukan pemilik
-      let res, result, itemType = 'promo', promoError = null;
+      let res, result, itemType = 'promo', promoError = null, voucherError = null;
 
-      // Payload untuk tenant validation
+      // Payload untuk tenant validation dengan enhanced metadata
       const tenantPayload = {
         code: codeToValidate.trim(),
         tenant_id: profile?.id, // ID tenant yang melakukan validasi
         validation_source: 'qr_scan',
-        is_tenant_validation: true // Flag khusus untuk tenant validation
+        is_tenant_validation: true, // Flag khusus untuk tenant validation
+        validator_role: 'tenant' // Explicit role indicator
       };
 
-      // Jika QR berisi metadata user_id, sertakan dalam payload
+      // Jika QR berisi metadata tambahan, sertakan dalam payload
       if (userId) {
         tenantPayload.item_owner_id = userId;
       }
+      if (itemId) {
+        tenantPayload.item_id = itemId;
+      }
+      if (qrItemType && qrItemType !== 'unknown') {
+        tenantPayload.expected_type = qrItemType;
+      }
+      if (validationData.validation_purpose) {
+        tenantPayload.validation_purpose = validationData.validation_purpose;
+      }
+      if (validationData.timestamp) {
+        tenantPayload.qr_timestamp = validationData.timestamp;
+      }
 
-      console.log('🏢 Tenant validation payload:', tenantPayload);
+      console.log('🏢 Enhanced tenant validation payload:', tenantPayload);
 
-      // Try promo validation first
-      res = await fetch(`${apiUrl}/api/promos/validate`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(tenantPayload),
-      });
-      result = await res.json().catch(() => null);
-      itemType = 'promo';
-      
-      console.log('📡 Promo validation response:', { 
-        status: res.status, 
-        ok: res.ok, 
-        result: result 
-      });
+      // Try validation based on QR metadata type first, then fallback
 
-      // If promo validation fails, try voucher validation
-      if (!res.ok) {
-        promoError = { 
-          status: res.status, 
-          message: result?.message, 
-          result: result 
-        };
-        
-        console.log('🔍 Trying voucher validation...');
+      // If QR indicates specific type, try that first
+      if (qrItemType === 'voucher') {
+        console.log('🎫 QR indicates voucher - trying voucher validation first...');
         
         res = await fetch(`${apiUrl}/api/vouchers/validate`, {
           method: 'POST',
@@ -272,6 +274,73 @@ export default function ScanValidasi() {
           ok: res.ok, 
           result: result 
         });
+
+        // If voucher validation fails, try promo as fallback
+        if (!res.ok) {
+          voucherError = { 
+            status: res.status, 
+            message: result?.message, 
+            result: result 
+          };
+          
+          console.log('🔍 Voucher failed, trying promo validation as fallback...');
+          
+          res = await fetch(`${apiUrl}/api/promos/validate`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(tenantPayload),
+          });
+          result = await res.json().catch(() => null);
+          itemType = 'promo';
+          
+          console.log('📡 Promo validation response (fallback):', { 
+            status: res.status, 
+            ok: res.ok, 
+            result: result 
+          });
+        }
+      } else {
+        // Default: try promo first, then voucher
+        console.log('🎁 Trying promo validation first (default or QR indicates promo)...');
+        
+        res = await fetch(`${apiUrl}/api/promos/validate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(tenantPayload),
+        });
+        result = await res.json().catch(() => null);
+        itemType = 'promo';
+        
+        console.log('📡 Promo validation response:', { 
+          status: res.status, 
+          ok: res.ok, 
+          result: result 
+        });
+
+        // If promo validation fails, try voucher validation
+        if (!res.ok) {
+          promoError = { 
+            status: res.status, 
+            message: result?.message, 
+            result: result 
+          };
+          
+          console.log('🔍 Promo failed, trying voucher validation...');
+          
+          res = await fetch(`${apiUrl}/api/vouchers/validate`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(tenantPayload),
+          });
+          result = await res.json().catch(() => null);
+          itemType = 'voucher';
+          
+          console.log('📡 Voucher validation response:', { 
+            status: res.status, 
+            ok: res.ok, 
+            result: result 
+          });
+        }
       }
 
       if (res?.status === 401) {

@@ -25,8 +25,8 @@ import BottomSheetComponent from '../../components/construct.components/BottomSh
 import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
-// Pastikan apiUrl selalu mengarah ke /api
-const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+// Pastikan base URL tanpa /api di akhir
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '').replace(/\/api$/, '');
 
 export default function Save() {
   const router = useRouter();
@@ -65,8 +65,8 @@ export default function Save() {
       // Ambil data user-scoped (BUKAN admin/global) dengan cache busting dan filter user
       const timestamp = Date.now();
       const [promoRes, voucherRes] = await Promise.allSettled([
-        fetch(`${apiUrl}/admin/promo-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
-        fetch(`${apiUrl}/vouchers/voucher-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
       ]);
 
       let allItems = [];
@@ -435,7 +435,7 @@ export default function Save() {
         
         if (!isOwner) {
           // Ini adalah scan QR oleh tenant - gunakan endpoint yang tersedia di backend
-          res = await fetch(`${apiUrl}/promos/validate`, {
+          res = await fetch(`${apiUrl}/api/promos/validate`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
@@ -449,7 +449,7 @@ export default function Save() {
           result = await res.json().catch(() => null);
         } else {
           // Ini adalah validasi oleh pemilik promo - gunakan endpoint biasa
-          res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
+          res = await fetch(`${apiUrl}/api/admin/promo-items/${targetId}/redeem`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
@@ -463,7 +463,7 @@ export default function Save() {
 
           // Fallback untuk validasi owner
           if (res.status === 404 || res.status === 405) {
-            res = await fetch(`${apiUrl}/promos/validate`, {
+            res = await fetch(`${apiUrl}/api/promos/validate`, {
               method: 'POST',
               headers,
               body: JSON.stringify({ 
@@ -507,7 +507,7 @@ export default function Save() {
         
         if (!isOwner) {
           // Ini adalah scan QR oleh tenant - gunakan endpoint yang tersedia di backend
-          res = await fetch(`${apiUrl}/vouchers/validate`, {
+          res = await fetch(`${apiUrl}/api/vouchers/validate`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
@@ -521,7 +521,7 @@ export default function Save() {
           result = await res.json().catch(() => null);
         } else {
           // Ini adalah validasi oleh pemilik voucher - gunakan endpoint biasa
-          res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/redeem`, {
+          res = await fetch(`${apiUrl}/api/admin/voucher-items/${targetId}/redeem`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
@@ -535,7 +535,7 @@ export default function Save() {
 
           // Fallback untuk validasi owner
           if (res.status === 404 || res.status === 405) {
-            res = await fetch(`${apiUrl}/vouchers/validate`, {
+            res = await fetch(`${apiUrl}/api/vouchers/validate`, {
               method: 'POST',
               headers,
               body: JSON.stringify({ 
@@ -644,11 +644,12 @@ export default function Save() {
           }
         }
         
-        // Refresh data dari server untuk memastikan sinkronisasi dengan delay yang lebih lama
+        // ALWAYS refresh data dari server untuk memastikan sinkronisasi
+        // Ini penting untuk semua user, bukan hanya pemilik item
         setTimeout(() => {
           setRefreshTrigger((p) => p + 1);
           fetchData(); // Fetch ulang data untuk memastikan status terupdate
-        }, 1000); // Tambah delay untuk memastikan backend sudah update
+        }, 500); // Kurangi delay untuk response yang lebih cepat
       } else {
         const msg = (result?.message || '').toString();
         if (res?.status === 409) {
