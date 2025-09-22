@@ -434,34 +434,19 @@ export default function Save() {
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
         
         if (!isOwner) {
-          // Ini adalah scan QR oleh tenant - gunakan endpoint khusus untuk validasi tenant
-          res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/validate-by-tenant`, {
+          // Ini adalah scan QR oleh tenant - gunakan endpoint yang tersedia di backend
+          res = await fetch(`${apiUrl}/promos/validate`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
               code: codeToValidate,
-              tenant_user_id: currentUserId, // ID tenant yang melakukan validasi
-              owner_user_id: userId,         // ID pemilik promo
-              validation_type: 'tenant_scan'
+              tenant_id: currentUserId, // ID tenant yang melakukan validasi
+              item_owner_id: userId,    // ID pemilik promo  
+              is_tenant_validation: true,
+              validation_source: 'qr_scan'
             }),
           });
           result = await res.json().catch(() => null);
-          
-          // Fallback untuk validasi tenant
-          if (res.status === 404 || res.status === 405) {
-            res = await fetch(`${apiUrl}/promos/validate-by-tenant`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ 
-                code: codeToValidate,
-                promo_item_id: targetId,
-                tenant_user_id: currentUserId,
-                owner_user_id: userId,
-                validation_type: 'tenant_scan'
-              }),
-            });
-            result = await res.json().catch(() => null);
-          }
         } else {
           // Ini adalah validasi oleh pemilik promo - gunakan endpoint biasa
           res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
@@ -521,34 +506,19 @@ export default function Save() {
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
         
         if (!isOwner) {
-          // Ini adalah scan QR oleh tenant - gunakan endpoint khusus untuk validasi tenant
-          res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/validate-by-tenant`, {
+          // Ini adalah scan QR oleh tenant - gunakan endpoint yang tersedia di backend
+          res = await fetch(`${apiUrl}/vouchers/validate`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
               code: codeToValidate,
-              tenant_user_id: currentUserId, // ID tenant yang melakukan validasi
-              owner_user_id: userId,         // ID pemilik voucher
-              validation_type: 'tenant_scan'
+              tenant_id: currentUserId, // ID tenant yang melakukan validasi
+              item_owner_id: userId,    // ID pemilik voucher
+              is_tenant_validation: true,
+              validation_source: 'qr_scan'
             }),
           });
           result = await res.json().catch(() => null);
-
-          // Fallback untuk validasi tenant
-          if (res.status === 404 || res.status === 405) {
-            res = await fetch(`${apiUrl}/vouchers/validate-by-tenant`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ 
-                code: codeToValidate,
-                voucher_item_id: targetId,
-                tenant_user_id: currentUserId,
-                owner_user_id: userId,
-                validation_type: 'tenant_scan'
-              }),
-            });
-            result = await res.json().catch(() => null);
-          }
         } else {
           // Ini adalah validasi oleh pemilik voucher - gunakan endpoint biasa
           res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/redeem`, {
