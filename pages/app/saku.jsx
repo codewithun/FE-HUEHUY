@@ -49,17 +49,24 @@ export default function Save() {
     try {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
+      
+      if (!token) {
+        console.warn('No token found, cannot fetch user-specific data');
+        setData({ data: [] });
+        return;
+      }
+
       const headers = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       };
 
-      // Ambil data user-scoped (BUKAN admin/global) dengan cache busting
+      // Ambil data user-scoped (BUKAN admin/global) dengan cache busting dan filter user
       const timestamp = Date.now();
       const [promoRes, voucherRes] = await Promise.allSettled([
-        fetch(`${apiUrl}/admin/promo-items?_t=${timestamp}`, { headers, signal: controller.signal }),
-        fetch(`${apiUrl}/vouchers/voucher-items?_t=${timestamp}`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/user/promo-items?user_only=true&_t=${timestamp}`, { headers, signal: controller.signal }),
+        fetch(`${apiUrl}/user/voucher-items?user_only=true&_t=${timestamp}`, { headers, signal: controller.signal }),
       ]);
 
       let allItems = [];
@@ -69,7 +76,13 @@ export default function Save() {
         const promoJson = await promoRes.value.json().catch(() => ({}));
         const rows = Array.isArray(promoJson) ? promoJson : (promoJson?.data || []);
 
-        const mapped = rows.map((it) => {
+        // Filter tambahan untuk memastikan hanya data user yang login
+        const userFilteredRows = rows.filter(it => {
+          // Pastikan item ini milik user yang sedang login
+          return it.user_id || it.owner_id || it.claimed_by;
+        });
+
+        const mapped = userFilteredRows.map((it) => {
           const ad = it.promo || it.ad || {};
           const claimedAt = it.created_at || it.claimed_at || it.validated_at || it.claimedAt || null;
           const expiredAt = it.expires_at || it.expired_at || it.expiry || ad.valid_until || null;
@@ -119,7 +132,13 @@ export default function Save() {
         const voucherJson = await voucherRes.value.json().catch(() => ({}));
         const rows = Array.isArray(voucherJson) ? voucherJson : (voucherJson?.data || []);
 
-        const mapped = rows.map((it) => {
+        // Filter tambahan untuk memastikan hanya data user yang login
+        const userFilteredRows = rows.filter(it => {
+          // Pastikan item ini milik user yang sedang login
+          return it.user_id || it.owner_id || it.claimed_by;
+        });
+
+        const mapped = userFilteredRows.map((it) => {
           const voucher = it.voucher || {};
           const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
             .replace(/\/api\/?$/, '')
@@ -370,8 +389,10 @@ export default function Save() {
       let res, result;
 
       if (isPromoItem) {
-        // Untuk promo, gunakan endpoint redeem spesifik dengan item ID seperti voucher
+        // Untuk promo, pastikan validasi dilakukan pada item milik user yang benar
         const targetId = selected?.promo_item?.id || selected?.id;
+        const userId = selected?.promo_item?.user_id || selected?.user_id;
+        
         if (!targetId) {
           setValidationMessage('Promo tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -379,38 +400,34 @@ export default function Save() {
           return;
         }
 
-        // Gunakan endpoint admin promo-items redeem (sesuai API routes)
-        res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
+        // Gunakan endpoint user-specific untuk validasi promo
+        res = await fetch(`${apiUrl}/user/promo-items/${targetId}/validate`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ code: codeToValidate }),
+          body: JSON.stringify({ 
+            code: codeToValidate,
+            user_id: userId // Pastikan validasi hanya untuk user yang benar
+          }),
         });
         result = await res.json().catch(() => null);
 
-        // Jika endpoint admin tidak tersedia, fallback ke endpoint generic
-        if (res.status === 404 || res.status === 405 || res.status === 401) {
-          res = await fetch(`${apiUrl}/promos/validate`, {
+        // Fallback untuk validasi promo dengan endpoint berbeda
+        if (res.status === 404 || res.status === 405) {
+          res = await fetch(`${apiUrl}/promos/validate-user-item`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
               code: codeToValidate,
-              promo_item_id: targetId 
+              promo_item_id: targetId,
+              user_id: userId
             }),
-          });
-          result = await res.json().catch(() => null);
-        }
-        
-        // Jika masih gagal, coba update langsung promo item
-        if (res.status === 404 || res.status === 405) {
-          res = await fetch(`${apiUrl}/admin/promo-items/${targetId}`, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify({ validated_at: new Date().toISOString() }),
           });
           result = await res.json().catch(() => null);
         }
       } else if (isVoucherItem) {
         const targetId = selected?.voucher_item?.id || selected?.id;
+        const userId = selected?.voucher_item?.user_id || selected?.user_id;
+        
         if (!targetId) {
           setValidationMessage('Voucher tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -418,18 +435,27 @@ export default function Save() {
           return;
         }
 
-        res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/redeem`, {
+        // Gunakan endpoint user-specific untuk validasi voucher
+        res = await fetch(`${apiUrl}/user/voucher-items/${targetId}/validate`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ code: codeToValidate }),
+          body: JSON.stringify({ 
+            code: codeToValidate,
+            user_id: userId // Pastikan validasi hanya untuk user yang benar
+          }),
         });
         result = await res.json().catch(() => null);
 
+        // Fallback untuk validasi voucher
         if (res.status === 404 || res.status === 405) {
-          res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}`, {
-            method: 'PUT',
+          res = await fetch(`${apiUrl}/vouchers/validate-user-item`, {
+            method: 'POST',
             headers,
-            body: JSON.stringify({ used_at: new Date().toISOString() }),
+            body: JSON.stringify({ 
+              code: codeToValidate,
+              voucher_item_id: targetId,
+              user_id: userId
+            }),
           });
           result = await res.json().catch(() => null);
         }
@@ -445,48 +471,61 @@ export default function Save() {
         setShowValidationSuccess(true);
         setValidationCode('');
         
-        // Update status item di local state
+        // Update status item di local state dengan validasi yang lebih ketat
         if (selected) {
           const now = new Date().toISOString();
           setData((prev) => ({
             ...prev,
             data: prev.data.map((it) => {
-              if (it.id === selected.id) {
-                // Update untuk promo
+              // Pastikan update hanya dilakukan pada item yang sama persis
+              if (it.id === selected.id && 
+                  ((it.type === selected.type) || 
+                   (it.promo_item?.id === selected.promo_item?.id) || 
+                   (it.voucher_item?.id === selected.voucher_item?.id))) {
+                
+                // Update untuk promo milik user
                 if (it.type === 'promo' && it.promo_item) {
                   return {
                     ...it,
                     validated_at: now,
                     promo_item: {
                       ...it.promo_item,
-                      validated_at: now
+                      validated_at: now,
+                      validation_date: now
                     }
                   };
                 }
-                // Update untuk voucher
+                // Update untuk voucher milik user
                 else if (it.type === 'voucher' && it.voucher_item) {
                   return {
                     ...it,
                     validated_at: now,
                     voucher_item: {
                       ...it.voucher_item,
-                      used_at: now
+                      used_at: now,
+                      validation_date: now
                     }
                   };
                 }
-                // Fallback update
-                return { ...it, validated_at: now, used_at: now, redeemed_at: now };
+                // Fallback update dengan validasi tambahan
+                return { 
+                  ...it, 
+                  validated_at: now, 
+                  used_at: now, 
+                  redeemed_at: now,
+                  validation_date: now 
+                };
               }
               return it;
             }),
           }));
         }
         
-        // Refresh data dari server untuk memastikan sinkronisasi
+        // Refresh data dari server untuk memastikan sinkronisasi dengan delay yang lebih lama
         setTimeout(() => {
           setRefreshTrigger((p) => p + 1);
           fetchData(); // Fetch ulang data untuk memastikan status terupdate
-        }, 500);
+        }, 1000); // Tambah delay untuk memastikan backend sudah update
       } else {
         const msg = (result?.message || '').toString();
         if (res?.status === 409) {
@@ -849,7 +888,9 @@ export default function Save() {
                               code: selected?.voucher_item?.code || selected?.code || 'NO_CODE',
                               type: 'voucher',
                               item_id: selected?.voucher_item?.id || selected?.id,
-                              user_id: selected?.voucher_item?.user_id || selected?.user_id
+                              user_id: selected?.voucher_item?.user_id || selected?.user_id,
+                              owner_validation: true, // Flag untuk menandakan ini QR milik user
+                              timestamp: Date.now() // Tambah timestamp untuk keamanan
                             })}
                             size={180}
                             bgColor="#f8fafc"
@@ -965,7 +1006,9 @@ export default function Save() {
                               code: selected?.promo_item?.code || selected?.code || 'NO_CODE',
                               type: 'promo',
                               item_id: selected?.promo_item?.id || selected?.id,
-                              user_id: selected?.promo_item?.user_id || selected?.user_id
+                              user_id: selected?.promo_item?.user_id || selected?.user_id,
+                              owner_validation: true, // Flag untuk menandakan ini QR milik user
+                              timestamp: Date.now() // Tambah timestamp untuk keamanan
                             })}
                             size={180}
                             bgColor="#f8fafc"
