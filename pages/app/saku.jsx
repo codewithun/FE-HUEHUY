@@ -240,11 +240,22 @@ export default function Save() {
   // ====== Helpers ======
   const isItemValidatable = (item) => {
     // Cek status validasi berdasarkan field backend yang benar
-    const isValidated = item?.validated_at || // Frontend mapping
-                       (item?.type === 'voucher' && item?.voucher_item?.used_at) || // Backend voucher field
-                       (item?.type === 'promo' && item?.promo_item?.redeemed_at) || // Backend promo field
-                       (item?.voucher_item?.status === 'used') ||
-                       (item?.promo_item?.status === 'redeemed');
+    const isValidated = 
+      // Frontend mapping fields
+      item?.validated_at ||
+      // Backend voucher fields - both old and new structure
+      (item?.type === 'voucher' && item?.voucher_item?.used_at) ||
+      (item?.voucher_item?.used_at) ||
+      (item?.used_at) ||
+      // Backend promo fields - both old and new structure  
+      (item?.type === 'promo' && item?.promo_item?.redeemed_at) ||
+      (item?.promo_item?.redeemed_at) ||
+      (item?.redeemed_at) ||
+      // Status fields
+      (item?.voucher_item?.status === 'used') ||
+      (item?.promo_item?.status === 'redeemed') ||
+      (item?.status === 'used' && (item?.type === 'voucher' || item?.voucher)) ||
+      (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
     
     if (isValidated) return false;
 
@@ -308,11 +319,22 @@ export default function Save() {
 
   const getStatusBadge = (item) => {
     // Cek status validasi berdasarkan field backend yang benar
-    const isValidated = item?.validated_at || // Frontend mapping
-                       (item?.type === 'voucher' && item?.voucher_item?.used_at) || // Backend voucher field
-                       (item?.type === 'promo' && item?.promo_item?.redeemed_at) || // Backend promo field
-                       (item?.voucher_item?.status === 'used') ||
-                       (item?.promo_item?.status === 'redeemed');
+    const isValidated = 
+      // Frontend mapping fields
+      item?.validated_at ||
+      // Backend voucher fields - both old and new structure
+      (item?.type === 'voucher' && item?.voucher_item?.used_at) ||
+      (item?.voucher_item?.used_at) ||
+      (item?.used_at) ||
+      // Backend promo fields - both old and new structure  
+      (item?.type === 'promo' && item?.promo_item?.redeemed_at) ||
+      (item?.promo_item?.redeemed_at) ||
+      (item?.redeemed_at) ||
+      // Status fields
+      (item?.voucher_item?.status === 'used') ||
+      (item?.promo_item?.status === 'redeemed') ||
+      (item?.status === 'used' && (item?.type === 'voucher' || item?.voucher)) ||
+      (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
     
     if (isValidated) {
       return (
@@ -584,20 +606,17 @@ export default function Save() {
         setShowValidationSuccess(true);
         setValidationCode('');
         
-        // Update status item di local state dengan validasi yang lebih ketat
+        // Update status item di local state - always try to update regardless of ownership
         if (selected) {
           const now = new Date().toISOString();
           
-          // CRITICAL: Hanya update local state jika user yang login adalah PEMILIK promo/voucher
-          // Jangan update jika user adalah tenant yang melakukan scan
+          // Get current user info for logging
           const encryptedToken = Cookies.get(token_cookie_name);
           const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
           
-          // Decode user info dari token untuk memastikan ownership
           let currentUserId = null;
           try {
             if (currentToken) {
-              // Ambil user ID dari token jika tersedia dalam payload
               const tokenPayload = JSON.parse(atob(currentToken.split('.')[1]));
               currentUserId = tokenPayload.sub || tokenPayload.user_id || tokenPayload.id;
             }
@@ -605,65 +624,74 @@ export default function Save() {
             console.warn('Cannot decode token for user validation');
           }
           
-          // Validasi ownership: hanya update jika current user adalah pemilik item
           const itemOwnerId = selected?.user_id || selected?.promo_item?.user_id || selected?.voucher_item?.user_id;
           const isOwner = currentUserId && itemOwnerId && (currentUserId.toString() === itemOwnerId.toString());
           
-          // HANYA update local state jika user adalah pemilik promo/voucher
-          if (isOwner) {
-            setData((prev) => ({
-              ...prev,
-              data: prev.data.map((it) => {
-                // Pastikan update hanya dilakukan pada item yang sama persis
-                if (it.id === selected.id && 
-                    ((it.type === selected.type) || 
-                     (it.promo_item?.id === selected.promo_item?.id) || 
-                     (it.voucher_item?.id === selected.voucher_item?.id))) {
-                  
-                  // Update untuk promo milik user - backend menggunakan redeemed_at
-                  if (it.type === 'promo' && it.promo_item) {
-                    return {
-                      ...it,
-                      validated_at: now, // Frontend mapping
-                      promo_item: {
-                        ...it.promo_item,
-                        redeemed_at: now, // Backend field
-                        status: 'redeemed'
-                      }
-                    };
-                  }
-                  // Update untuk voucher milik user - backend menggunakan used_at
-                  else if (it.type === 'voucher' && it.voucher_item) {
-                    return {
-                      ...it,
-                      validated_at: now, // Frontend mapping
-                      voucher_item: {
-                        ...it.voucher_item,
-                        used_at: now, // Backend field
-                        status: 'used'
-                      }
-                    };
-                  }
-                  // Fallback update dengan field backend yang benar
-                  return { 
-                    ...it, 
+          // Update local state immediately for better UX - data will be refreshed from server anyway
+          setData((prev) => ({
+            ...prev,
+            data: prev.data.map((it) => {
+              // Find the exact item to update
+              const isMatchingItem = (
+                (it.id === selected.id) ||
+                (it.promo_item?.id === selected.promo_item?.id) ||
+                (it.voucher_item?.id === selected.voucher_item?.id) ||
+                (it.ad?.id === selected.ad?.id) ||
+                (it.voucher?.id === selected.voucher?.id)
+              );
+              
+              if (isMatchingItem) {
+                // Update untuk promo - backend menggunakan redeemed_at
+                if ((it.type === 'promo' || it.ad) && it.promo_item) {
+                  return {
+                    ...it,
                     validated_at: now, // Frontend mapping
-                    redeemed_at: it.type === 'promo' ? now : undefined,
-                    used_at: it.type === 'voucher' ? now : undefined
+                    promo_item: {
+                      ...it.promo_item,
+                      redeemed_at: now, // Backend field
+                      status: 'redeemed'
+                    }
                   };
                 }
-                return it;
-              }),
-            }));
-            
-            console.log('Local state updated for item owner:', itemOwnerId);
-          } else {
-            console.log('Skipping local state update - current user is not the owner:', {
-              currentUserId,
-              itemOwnerId,
-              isOwner
-            });
-          }
+                // Update untuk voucher - backend menggunakan used_at
+                else if ((it.type === 'voucher' || it.voucher) && it.voucher_item) {
+                  return {
+                    ...it,
+                    validated_at: now, // Frontend mapping
+                    voucher_item: {
+                      ...it.voucher_item,
+                      used_at: now, // Backend field
+                      status: 'used'
+                    }
+                  };
+                }
+                // Fallback update dengan field backend yang benar
+                else {
+                  const updates = { 
+                    ...it, 
+                    validated_at: now // Frontend mapping
+                  };
+                  
+                  if (it.type === 'promo' || it.ad) {
+                    updates.redeemed_at = now;
+                  } else if (it.type === 'voucher' || it.voucher) {
+                    updates.used_at = now;
+                  }
+                  
+                  return updates;
+                }
+              }
+              return it;
+            }),
+          }));
+          
+          console.log('✅ Local state updated after validation:', {
+            currentUserId,
+            itemOwnerId,
+            isOwner,
+            selectedType: selected.type,
+            timestamp: now
+          });
         }
         
         // ALWAYS refresh data dari server untuk memastikan sinkronisasi
@@ -671,7 +699,7 @@ export default function Save() {
         setTimeout(() => {
           setRefreshTrigger((p) => p + 1);
           fetchData(); // Fetch ulang data untuk memastikan status terupdate
-        }, 500); // Kurangi delay untuk response yang lebih cepat
+        }, 100); // Kurangi delay untuk response yang lebih cepat
       } else {
         const msg = (result?.message || '').toString();
         if (res?.status === 409) {
