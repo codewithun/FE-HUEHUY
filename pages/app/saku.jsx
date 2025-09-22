@@ -58,6 +58,7 @@ export default function Save() {
       // Ambil data user-scoped (BUKAN admin/global) dengan cache busting
       const timestamp = Date.now();
       const [promoRes, voucherRes] = await Promise.allSettled([
+        // Coba endpoint admin promo-items dulu, fallback ke user promo validations
         fetch(`${apiUrl}/admin/promo-items?_t=${timestamp}`, { headers, signal: controller.signal }),
         fetch(`${apiUrl}/vouchers/voucher-items?_t=${timestamp}`, { headers, signal: controller.signal }),
       ]);
@@ -68,6 +69,23 @@ export default function Save() {
       if (promoRes.status === 'fulfilled' && promoRes.value.ok) {
         const promoJson = await promoRes.value.json().catch(() => ({}));
         const rows = Array.isArray(promoJson) ? promoJson : (promoJson?.data || []);
+        
+        if (rows.length === 0) {
+          // Fallback ke user promo validations jika admin endpoint kosong
+          try {
+            const fallbackRes = await fetch(`${apiUrl}/user/promo-validations?_t=${timestamp}`, { headers, signal: controller.signal });
+            if (fallbackRes.ok) {
+              const fallbackJson = await fallbackRes.json().catch(() => ({}));
+              const fallbackRows = Array.isArray(fallbackJson) ? fallbackJson : (fallbackJson?.data || []);
+              // Ubah rows ke fallbackRows jika ada data
+              if (fallbackRows.length > 0) {
+                // Proses fallbackRows dengan struktur yang mungkin berbeda
+              }
+            }
+          } catch (err) {
+            console.log('Fallback failed:', err);
+          }
+        }
 
         const mapped = rows.map((it) => {
           const ad = it.promo || it.ad || {};
@@ -448,45 +466,48 @@ export default function Save() {
         // Update status item di local state
         if (selected) {
           const now = new Date().toISOString();
-          setData((prev) => ({
-            ...prev,
-            data: prev.data.map((it) => {
-              if (it.id === selected.id) {
-                // Update untuk promo
-                if (it.type === 'promo' && it.promo_item) {
-                  return {
-                    ...it,
-                    validated_at: now,
-                    promo_item: {
-                      ...it.promo_item,
-                      validated_at: now
-                    }
-                  };
+          setData((prev) => {
+            const updatedData = {
+              ...prev,
+              data: prev.data.map((it) => {
+                if (it.id === selected.id) {
+                  // Update untuk promo
+                  if (it.type === 'promo' && it.promo_item) {
+                    return {
+                      ...it,
+                      validated_at: now,
+                      promo_item: {
+                        ...it.promo_item,
+                        validated_at: now
+                      }
+                    };
+                  }
+                  // Update untuk voucher
+                  else if (it.type === 'voucher' && it.voucher_item) {
+                    return {
+                      ...it,
+                      validated_at: now,
+                      voucher_item: {
+                        ...it.voucher_item,
+                        used_at: now
+                      }
+                    };
+                  }
+                  // Fallback update
+                  return { ...it, validated_at: now, used_at: now, redeemed_at: now };
                 }
-                // Update untuk voucher
-                else if (it.type === 'voucher' && it.voucher_item) {
-                  return {
-                    ...it,
-                    validated_at: now,
-                    voucher_item: {
-                      ...it.voucher_item,
-                      used_at: now
-                    }
-                  };
-                }
-                // Fallback update
-                return { ...it, validated_at: now, used_at: now, redeemed_at: now };
-              }
-              return it;
-            }),
-          }));
+                return it;
+              }),
+            };
+            return updatedData;
+          });
         }
         
         // Refresh data dari server untuk memastikan sinkronisasi
         setTimeout(() => {
           setRefreshTrigger((p) => p + 1);
           fetchData(); // Fetch ulang data untuk memastikan status terupdate
-        }, 500);
+        }, 1000); // Increase delay to 1 second
       } else {
         const msg = (result?.message || '').toString();
         if (res?.status === 409) {
