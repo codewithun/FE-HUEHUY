@@ -64,6 +64,13 @@ export default function Save() {
 
       // Ambil data user-scoped (BUKAN admin/global) dengan cache busting dan filter user
       const timestamp = Date.now();
+      
+      console.log('🚀 FETCHING SAKU DATA:', {
+        timestamp,
+        promoUrl: `${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`,
+        voucherUrl: `${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`
+      });
+      
       const [promoRes, voucherRes] = await Promise.allSettled([
         fetch(`${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
         fetch(`${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
@@ -143,6 +150,13 @@ export default function Save() {
         const voucherJson = await voucherRes.value.json().catch(() => ({}));
         const rows = Array.isArray(voucherJson) ? voucherJson : (voucherJson?.data || []);
 
+        // Debug logging untuk raw response
+        console.log('📡 RAW VOUCHER RESPONSE:', {
+          voucherJson: voucherJson,
+          rows: rows,
+          rowCount: rows.length
+        });
+
         // Filter tambahan untuk memastikan hanya data user yang login
         const userFilteredRows = rows.filter(it => {
           // Pastikan item ini milik user yang sedang login
@@ -158,11 +172,20 @@ export default function Save() {
 
           const validation_type = voucher.validation_type || it.validation_type || 'auto';
           
-          // Backend VoucherItem menggunakan 'used_at' bukan 'validated_at'
+          // Backend VoucherItem hanya punya field: id, user_id, voucher_id, code, used_at
           const usedAt = it.used_at || null;
-          const isUsed = !!(usedAt || it.status === 'used');
+          const isUsed = !!usedAt; // Voucher sudah divalidasi jika used_at terisi
 
-          return {
+          // Debug logging untuk voucher item
+          console.log('🎫 VOUCHER ITEM DEBUG:', {
+            id: it.id,
+            code: it.code,
+            used_at: it.used_at,
+            isUsed: isUsed,
+            raw_item: it
+          });
+
+          const mappedItem = {
             id: it.id,
             type: 'voucher',
             code: it.code,
@@ -176,8 +199,8 @@ export default function Save() {
               code: it.code, 
               user_id: it.user_id, 
               voucher_id: it.voucher_id, 
-              used_at: usedAt,
-              status: it.status || (isUsed ? 'used' : 'available')
+              used_at: usedAt
+              // Tabel voucher_items hanya punya: id, user_id, voucher_id, code, used_at
             },
             voucher,
             ad: {
@@ -203,6 +226,17 @@ export default function Save() {
                 : {},
             },
           };
+
+          // Debug log mapped item structure
+          console.log('🔄 MAPPED VOUCHER ITEM:', {
+            id: mappedItem.id,
+            type: mappedItem.type,
+            validated_at: mappedItem.validated_at,
+            voucher_item_used_at: mappedItem.voucher_item?.used_at,
+            voucher_item_status: mappedItem.voucher_item?.status
+          });
+
+          return mappedItem;
         });
 
         allItems = allItems.concat(mapped);
@@ -239,23 +273,32 @@ export default function Save() {
 
   // ====== Helpers ======
   const isItemValidatable = (item) => {
-    // Cek status validasi berdasarkan field backend yang benar
+    // VOUCHER: Cek hanya used_at field (field lain tidak ada di database)
+    // PROMO: Cek redeemed_at dan status field
     const isValidated = 
-      // Frontend mapping fields
+      // Frontend mapping field
       item?.validated_at ||
-      // Backend voucher fields - both old and new structure
+      // Voucher: HANYA cek used_at (tabel voucher_items tidak punya status field)
       (item?.type === 'voucher' && item?.voucher_item?.used_at) ||
       (item?.voucher_item?.used_at) ||
-      (item?.used_at) ||
-      // Backend promo fields - both old and new structure  
+      (item?.type === 'voucher' && item?.used_at) ||
+      // Promo: cek redeemed_at dan status
       (item?.type === 'promo' && item?.promo_item?.redeemed_at) ||
       (item?.promo_item?.redeemed_at) ||
       (item?.redeemed_at) ||
-      // Status fields
-      (item?.voucher_item?.status === 'used') ||
       (item?.promo_item?.status === 'redeemed') ||
-      (item?.status === 'used' && (item?.type === 'voucher' || item?.voucher)) ||
       (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
+    
+    // Debug logging for validation check
+    console.log('🔍 VALIDATION CHECK:', {
+      itemId: item?.id,
+      itemType: item?.type,
+      validated_at: item?.validated_at,
+      voucher_item_used_at: item?.voucher_item?.used_at,
+      used_at: item?.used_at,
+      promo_item_redeemed_at: item?.promo_item?.redeemed_at,
+      isValidated: isValidated
+    });
     
     if (isValidated) return false;
 
@@ -318,23 +361,33 @@ export default function Save() {
   };
 
   const getStatusBadge = (item) => {
-    // Cek status validasi berdasarkan field backend yang benar
+    // VOUCHER: Cek hanya used_at field (field lain tidak ada di database)
+    // PROMO: Cek redeemed_at dan status field
     const isValidated = 
-      // Frontend mapping fields
+      // Frontend mapping field
       item?.validated_at ||
-      // Backend voucher fields - both old and new structure
+      // Voucher: HANYA cek used_at (tabel voucher_items tidak punya status field)
       (item?.type === 'voucher' && item?.voucher_item?.used_at) ||
       (item?.voucher_item?.used_at) ||
-      (item?.used_at) ||
-      // Backend promo fields - both old and new structure  
+      (item?.type === 'voucher' && item?.used_at) ||
+      // Promo: cek redeemed_at dan status
       (item?.type === 'promo' && item?.promo_item?.redeemed_at) ||
       (item?.promo_item?.redeemed_at) ||
       (item?.redeemed_at) ||
-      // Status fields
-      (item?.voucher_item?.status === 'used') ||
       (item?.promo_item?.status === 'redeemed') ||
-      (item?.status === 'used' && (item?.type === 'voucher' || item?.voucher)) ||
       (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
+    
+    // Debug logging for status badge
+    console.log('🏷️ STATUS BADGE CHECK:', {
+      itemId: item?.id,
+      itemType: item?.type,
+      validated_at: item?.validated_at,
+      voucher_item_used_at: item?.voucher_item?.used_at,
+      used_at: item?.used_at,
+      promo_item_redeemed_at: item?.promo_item?.redeemed_at,
+      isValidated: isValidated,
+      willShowValidated: !!isValidated
+    });
     
     if (isValidated) {
       return (
@@ -653,15 +706,14 @@ export default function Save() {
                     }
                   };
                 }
-                // Update untuk voucher - backend menggunakan used_at
+                // Update untuk voucher - backend HANYA punya used_at field
                 else if ((it.type === 'voucher' || it.voucher) && it.voucher_item) {
                   return {
                     ...it,
                     validated_at: now, // Frontend mapping
                     voucher_item: {
                       ...it.voucher_item,
-                      used_at: now, // Backend field
-                      status: 'used'
+                      used_at: now // HANYA field ini yang ada di database
                     }
                   };
                 }
