@@ -49,7 +49,7 @@ export default function Save() {
     try {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      
+
       if (!token) {
         console.warn('No token found, cannot fetch user-specific data');
         setData({ data: [] });
@@ -64,13 +64,13 @@ export default function Save() {
 
       // Ambil data user-scoped (BUKAN admin/global) dengan cache busting dan filter user
       const timestamp = Date.now();
-      
+
       console.log('🚀 FETCHING SAKU DATA:', {
         timestamp,
         promoUrl: `${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`,
         voucherUrl: `${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`
       });
-      
+
       const [promoRes, voucherRes] = await Promise.allSettled([
         fetch(`${apiUrl}/api/admin/promo-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
         fetch(`${apiUrl}/api/vouchers/voucher-items?user_scope=true&_t=${timestamp}`, { headers, signal: controller.signal }),
@@ -114,10 +114,10 @@ export default function Save() {
             validated_at: redeemedAt, // Map redeemed_at ke validated_at untuk konsistensi FE
             validation_type,
             user_id: it.user_id,
-            promo_item: { 
-              id: it.id, 
-              code: it.code, 
-              user_id: it.user_id, 
+            promo_item: {
+              id: it.id,
+              code: it.code,
+              user_id: it.user_id,
               promo_id: it.promo_id || ad.id,
               status: it.status || (isRedeemed ? 'redeemed' : 'available'),
               redeemed_at: redeemedAt,
@@ -171,7 +171,7 @@ export default function Save() {
             .replace(/\/$/, '');
 
           const validation_type = voucher.validation_type || it.validation_type || 'auto';
-          
+
           // Backend VoucherItem hanya punya field: id, user_id, voucher_id, code, used_at
           const usedAt = it.used_at || null;
           const isUsed = !!usedAt; // Voucher sudah divalidasi jika used_at terisi
@@ -194,11 +194,11 @@ export default function Save() {
             validated_at: usedAt, // Map used_at ke validated_at untuk konsistensi FE
             validation_type,
             user_id: it.user_id,
-            voucher_item: { 
-              id: it.id, 
-              code: it.code, 
-              user_id: it.user_id, 
-              voucher_id: it.voucher_id, 
+            voucher_item: {
+              id: it.id,
+              code: it.code,
+              user_id: it.user_id,
+              voucher_id: it.voucher_id,
               used_at: usedAt
               // Tabel voucher_items hanya punya: id, user_id, voucher_id, code, used_at
             },
@@ -217,12 +217,12 @@ export default function Save() {
               validation_type,
               cube: voucher.community
                 ? {
-                    community_id: voucher.community.id,
-                    code: `community-${voucher.community.id}`,
-                    user: { name: voucher.community.name || 'Community', phone: '' },
-                    corporate: null,
-                    tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
-                  }
+                  community_id: voucher.community.id,
+                  code: `community-${voucher.community.id}`,
+                  user: { name: voucher.community.name || 'Community', phone: '' },
+                  corporate: null,
+                  tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
+                }
                 : {},
             },
           };
@@ -275,7 +275,7 @@ export default function Save() {
   const isItemValidatable = (item) => {
     // VOUCHER: Cek hanya used_at field (field lain tidak ada di database)
     // PROMO: Cek redeemed_at dan status field
-    const isValidated = 
+    const isValidated =
       // Frontend mapping field
       item?.validated_at ||
       // Voucher: HANYA cek used_at (tabel voucher_items tidak punya status field)
@@ -288,18 +288,9 @@ export default function Save() {
       (item?.redeemed_at) ||
       (item?.promo_item?.status === 'redeemed') ||
       (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
-    
-    // Debug logging for validation check
-    console.log('🔍 VALIDATION CHECK:', {
-      itemId: item?.id,
-      itemType: item?.type,
-      validated_at: item?.validated_at,
-      voucher_item_used_at: item?.voucher_item?.used_at,
-      used_at: item?.used_at,
-      promo_item_redeemed_at: item?.promo_item?.redeemed_at,
-      isValidated: isValidated
-    });
-    
+
+
+
     if (isValidated) return false;
 
     const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
@@ -363,7 +354,7 @@ export default function Save() {
   const getStatusBadge = (item) => {
     // VOUCHER: Cek hanya used_at field (field lain tidak ada di database)
     // PROMO: Cek redeemed_at dan status field
-    const isValidated = 
+    const isValidated =
       // Frontend mapping field
       item?.validated_at ||
       // Voucher: HANYA cek used_at (tabel voucher_items tidak punya status field)
@@ -376,19 +367,9 @@ export default function Save() {
       (item?.redeemed_at) ||
       (item?.promo_item?.status === 'redeemed') ||
       (item?.status === 'redeemed' && (item?.type === 'promo' || item?.ad));
-    
-    // Debug logging for status badge
-    console.log('🏷️ STATUS BADGE CHECK:', {
-      itemId: item?.id,
-      itemType: item?.type,
-      validated_at: item?.validated_at,
-      voucher_item_used_at: item?.voucher_item?.used_at,
-      used_at: item?.used_at,
-      promo_item_redeemed_at: item?.promo_item?.redeemed_at,
-      isValidated: isValidated,
-      willShowValidated: !!isValidated
-    });
-    
+
+
+
     if (isValidated) {
       return (
         <div className="flex items-center gap-1">
@@ -505,7 +486,7 @@ export default function Save() {
         // Untuk promo, pastikan validasi dilakukan pada item milik user yang benar
         const targetId = selected?.promo_item?.id || selected?.id;
         const userId = selected?.promo_item?.user_id || selected?.user_id;
-        
+
         if (!targetId) {
           setValidationMessage('Promo tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -517,7 +498,7 @@ export default function Save() {
         // Jangan biarkan tenant validasi promo yang bukan miliknya
         const encryptedToken = Cookies.get(token_cookie_name);
         const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
-        
+
         let currentUserId = null;
         try {
           if (currentToken) {
@@ -527,16 +508,16 @@ export default function Save() {
         } catch (e) {
           console.warn('Cannot decode token for ownership validation');
         }
-        
+
         // Validasi: Jika current user bukan pemilik promo, maka ini adalah validasi oleh tenant
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
-        
+
         // Use the same promo validation endpoint as validasi.jsx
         // This endpoint handles both tenant and owner validation properly
         res = await fetch(`${apiUrl}/api/promos/validate`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             code: codeToValidate.trim(),
             validator_role: isOwner ? 'user' : 'tenant' // Same pattern as validasi.jsx
           }),
@@ -545,14 +526,14 @@ export default function Save() {
       } else if (isVoucherItem) {
         const targetId = selected?.voucher_item?.id || selected?.id;
         const userId = selected?.voucher_item?.user_id || selected?.user_id;
-        
+
         console.log('🎫 VOUCHER VALIDATION START:', {
           targetId,
           userId,
           selected: selected,
           codeToValidate: codeToValidate
         });
-        
+
         if (!targetId) {
           setValidationMessage('Voucher tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -563,7 +544,7 @@ export default function Save() {
         // CRITICAL: Validasi ownership sebelum API call untuk voucher
         const encryptedToken = Cookies.get(token_cookie_name);
         const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
-        
+
         let currentUserId = null;
         try {
           if (currentToken) {
@@ -573,29 +554,26 @@ export default function Save() {
         } catch (e) {
           console.warn('Cannot decode token for ownership validation');
         }
-        
+
         // Validasi: Jika current user bukan pemilik voucher, maka ini adalah validasi oleh tenant
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
-        
+
         console.log('🔐 VOUCHER OWNERSHIP CHECK:', {
           currentUserId,
           userId,
           isOwner,
           validatorRole: isOwner ? 'user' : 'tenant'
         });
-        
-        // Use the same voucher validation endpoint as validasi.jsx
-        // This endpoint handles both tenant and owner validation properly
-        res = await fetch(`${apiUrl}/api/vouchers/validate`, {
+
+        res = await fetch(`${apiUrl}/api/admin/voucher-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ 
-            code: codeToValidate.trim(),
-            validator_role: isOwner ? 'user' : 'tenant' // Same pattern as validasi.jsx
+          body: JSON.stringify({
+            code: codeToValidate.trim()
           }),
         });
         result = await res.json().catch(() => null);
-        
+
         console.log('📡 VOUCHER VALIDATION RESPONSE:', {
           status: res.status,
           ok: res.ok,
@@ -613,15 +591,15 @@ export default function Save() {
         setValidationMessage('Berhasil divalidasi.');
         setShowValidationSuccess(true);
         setValidationCode('');
-        
+
         // Update status item di local state - always try to update regardless of ownership
         if (selected) {
           const now = new Date().toISOString();
-          
+
           // Get current user info for logging
           const encryptedToken = Cookies.get(token_cookie_name);
           const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
-          
+
           let currentUserId = null;
           try {
             if (currentToken) {
@@ -631,10 +609,10 @@ export default function Save() {
           } catch (e) {
             console.warn('Cannot decode token for user validation');
           }
-          
+
           const itemOwnerId = selected?.user_id || selected?.promo_item?.user_id || selected?.voucher_item?.user_id;
           const isOwner = currentUserId && itemOwnerId && (currentUserId.toString() === itemOwnerId.toString());
-          
+
           // Update local state immediately for better UX - data will be refreshed from server anyway
           setData((prev) => ({
             ...prev,
@@ -647,7 +625,7 @@ export default function Save() {
                 (it.ad?.id === selected.ad?.id) ||
                 (it.voucher?.id === selected.voucher?.id)
               );
-              
+
               if (isMatchingItem) {
                 // Update untuk promo - backend menggunakan redeemed_at
                 if ((it.type === 'promo' || it.ad) && it.promo_item) {
@@ -674,24 +652,24 @@ export default function Save() {
                 }
                 // Fallback update dengan field backend yang benar
                 else {
-                  const updates = { 
-                    ...it, 
+                  const updates = {
+                    ...it,
                     validated_at: now // Frontend mapping
                   };
-                  
+
                   if (it.type === 'promo' || it.ad) {
                     updates.redeemed_at = now;
                   } else if (it.type === 'voucher' || it.voucher) {
                     updates.used_at = now;
                   }
-                  
+
                   return updates;
                 }
               }
               return it;
             }),
           }));
-          
+
           console.log('✅ Local state updated after validation:', {
             currentUserId,
             itemOwnerId,
@@ -700,7 +678,7 @@ export default function Save() {
             timestamp: now
           });
         }
-        
+
         // ALWAYS refresh data dari server untuk memastikan sinkronisasi
         // Ini penting untuk semua user, bukan hanya pemilik item
         setTimeout(() => {
@@ -715,10 +693,10 @@ export default function Save() {
           selectedType: selected?.type,
           codeValidated: codeToValidate
         });
-        
+
         const msg = (result?.message || '').toString();
         let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
-        
+
         if (res?.status === 409) {
           errorMessage = /stok/i.test(msg) ? 'Stok promo habis.' : 'Kode unik sudah pernah divalidasi.';
         } else if (res?.status === 404) {
@@ -728,14 +706,14 @@ export default function Save() {
         } else if (res?.status === 400) {
           // Often means already validated
           if (msg.toLowerCase().includes('sudah') || msg.toLowerCase().includes('digunakan') || msg.toLowerCase().includes('already')) {
-            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
+            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidated}" sudah pernah divalidasi sebelumnya.`;
           } else {
             errorMessage = result?.message || 'Kode unik tidak valid.';
           }
         } else {
           errorMessage = result?.message || 'Terjadi kesalahan saat validasi.';
         }
-        
+
         setValidationMessage(errorMessage);
         setShowValidationFailed(true);
       }
@@ -782,13 +760,11 @@ export default function Save() {
 
                   return (
                     <div
-                      className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${
-                        isRecentlyClaimed(item.claimed_at)
+                      className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${isRecentlyClaimed(item.claimed_at)
                           ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white'
                           : 'border-slate-100'
-                      } ${
-                        canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'
-                      }`}
+                        } ${canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'
+                        }`}
                       key={key}
                       onClick={() => {
                         if (canValidate) {
@@ -1041,11 +1017,11 @@ export default function Save() {
           {(() => {
             // Cek status validasi berdasarkan field backend yang benar
             const isValidated = selected?.validated_at || // Frontend mapping
-                               (selected?.type === 'voucher' && selected?.voucher_item?.used_at) || // Backend voucher field
-                               (selected?.type === 'promo' && selected?.promo_item?.redeemed_at) || // Backend promo field
-                               (selected?.voucher_item?.status === 'used') ||
-                               (selected?.promo_item?.status === 'redeemed');
-            
+              (selected?.type === 'voucher' && selected?.voucher_item?.used_at) || // Backend voucher field
+              (selected?.type === 'promo' && selected?.promo_item?.redeemed_at) || // Backend promo field
+              (selected?.voucher_item?.status === 'used') ||
+              (selected?.promo_item?.status === 'redeemed');
+
             if (isValidated) {
               return (
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl py-8">
@@ -1061,7 +1037,7 @@ export default function Save() {
                 </div>
               );
             }
-            
+
             // Continue with existing validation logic
             if (selected?.type === 'voucher' || selected?.voucher) {
               const voucher = selected?.voucher || selected?.ad;
@@ -1151,13 +1127,12 @@ export default function Save() {
                         </div>
 
                         <button
-                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
-                            validationLoading
+                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
                               ? 'bg-slate-400 text-white cursor-not-allowed'
                               : isItemValidatable(selected)
-                              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
-                              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                          }`}
+                                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                            }`}
                           onClick={() => {
                             if (isItemValidatable(selected)) {
                               submitValidation(validationCode);
@@ -1184,7 +1159,7 @@ export default function Save() {
                 </div>
               );
             }
-            
+
             // Check if promo is not active
             if (!(
               selected?.ad?.status === 'active' ||
@@ -1201,7 +1176,7 @@ export default function Save() {
                 </div>
               );
             }
-            
+
             // Promo validation section
             const vt = getValidationType(selected);
             const isManual = vt === 'manual';
@@ -1217,98 +1192,97 @@ export default function Save() {
 
                   {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
                   {!isManual ? (
-                      // Tampilkan QR Code untuk auto validation
-                      <>
-                        <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                          <QRCodeSVG
-                            value={JSON.stringify({
-                              code: selected?.promo_item?.code || selected?.code || 'NO_CODE',
-                              type: 'promo',
-                              item_id: selected?.promo_item?.id || selected?.id,
-                              user_id: selected?.promo_item?.user_id || selected?.user_id,
-                              owner_validation: true, // Flag untuk menandakan ini QR milik user
-                              timestamp: Date.now(), // Tambah timestamp untuk keamanan
-                              validation_purpose: 'tenant_scan', // Tujuan validasi oleh tenant
-                              owner_only: false // Bisa divalidasi oleh tenant
-                            })}
-                            size={180}
-                            bgColor="#f8fafc"
-                            fgColor="#0f172a"
-                            level="H"
-                            includeMargin={true}
-                            className="mx-auto rounded-lg"
-                          />
-                        </div>
-                        <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
-                      </>
-                    ) : (
-                      // Tampilkan input dan tombol untuk manual validation
-                      <div className="space-y-4">
-                        {!isItemValidatable(selected) && (
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                            <div className="flex items-center gap-2">
-                              <FontAwesomeIcon icon={faTimesCircle} className="text-red-500" />
-                              <span className="text-red-700 text-sm font-medium">
-                                {selected?.validated_at
-                                  ? 'Item ini sudah divalidasi sebelumnya'
-                                  : 'Item ini tidak dapat divalidasi (habis, kadaluwarsa, atau ditutup)'}
-                              </span>
-                            </div>
+                    // Tampilkan QR Code untuk auto validation
+                    <>
+                      <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                        <QRCodeSVG
+                          value={JSON.stringify({
+                            code: selected?.promo_item?.code || selected?.code || 'NO_CODE',
+                            type: 'promo',
+                            item_id: selected?.promo_item?.id || selected?.id,
+                            user_id: selected?.promo_item?.user_id || selected?.user_id,
+                            owner_validation: true, // Flag untuk menandakan ini QR milik user
+                            timestamp: Date.now(), // Tambah timestamp untuk keamanan
+                            validation_purpose: 'tenant_scan', // Tujuan validasi oleh tenant
+                            owner_only: false // Bisa divalidasi oleh tenant
+                          })}
+                          size={180}
+                          bgColor="#f8fafc"
+                          fgColor="#0f172a"
+                          level="H"
+                          includeMargin={true}
+                          className="mx-auto rounded-lg"
+                        />
+                      </div>
+                      <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
+                    </>
+                  ) : (
+                    // Tampilkan input dan tombol untuk manual validation
+                    <div className="space-y-4">
+                      {!isItemValidatable(selected) && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                          <div className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faTimesCircle} className="text-red-500" />
+                            <span className="text-red-700 text-sm font-medium">
+                              {selected?.validated_at
+                                ? 'Item ini sudah divalidasi sebelumnya'
+                                : 'Item ini tidak dapat divalidasi (habis, kadaluwarsa, atau ditutup)'}
+                            </span>
                           </div>
-                        )}
-
-                        {/* Icon untuk manual validation */}
-                        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <FontAwesomeIcon icon={faTag} className="text-primary text-3xl" />
                         </div>
+                      )}
 
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Masukkan Kode Validasi
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Masukkan kode validasi..."
-                            value={validationCode}
-                            onChange={(e) => setValidationCode(e.target.value)}
-                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
-                            disabled={validationLoading}
-                          />
-                        </div>
+                      {/* Icon untuk manual validation */}
+                      <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FontAwesomeIcon icon={faTag} className="text-primary text-3xl" />
+                      </div>
 
-                        <button
-                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
-                            validationLoading
-                              ? 'bg-slate-400 text-white cursor-not-allowed'
-                              : isItemValidatable(selected)
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Masukkan Kode Validasi
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Masukkan kode validasi..."
+                          value={validationCode}
+                          onChange={(e) => setValidationCode(e.target.value)}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center text-lg font-mono tracking-wider"
+                          disabled={validationLoading}
+                        />
+                      </div>
+
+                      <button
+                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
+                            ? 'bg-slate-400 text-white cursor-not-allowed'
+                            : isItemValidatable(selected)
                               ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
                               : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                           }`}
-                          onClick={() => {
-                            if (isItemValidatable(selected)) {
-                              submitValidation(validationCode);
-                            }
-                          }}
-                          disabled={validationLoading || !isItemValidatable(selected)}
-                        >
-                          {validationLoading ? (
-                            <div className="flex items-center justify-center">
-                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                              Memvalidasi...
-                            </div>
-                          ) : (
-                            'Validasi Promo'
-                          )}
-                        </button>
+                        onClick={() => {
+                          if (isItemValidatable(selected)) {
+                            submitValidation(validationCode);
+                          }
+                        }}
+                        disabled={validationLoading || !isItemValidatable(selected)}
+                      >
+                        {validationLoading ? (
+                          <div className="flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                            Memvalidasi...
+                          </div>
+                        ) : (
+                          'Validasi Promo'
+                        )}
+                      </button>
 
-                        <p className="text-slate-500 text-xs">
-                          Masukkan kode validasi untuk memproses promo ini
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                      <p className="text-slate-500 text-xs">
+                        Masukkan kode validasi untuk memproses promo ini
+                      </p>
+                    </div>
+                  )}
                 </div>
-              );
+              </div>
+            );
           })()}
         </div>
       </BottomSheetComponent>
