@@ -347,18 +347,16 @@ export default function ScanValidasi() {
         setModalFailedMessage('Sesi login berakhir. Silakan login kembali.');
         setModalFailed(true);
       } else if (res?.ok) {
-        // ✅ Guard konsistensi ID (hindari mismatch 49 → 23)
+        // Validasi berhasil - let backend handle the correct item association
         const respItemId =
           result?.data?.promo_item_id ||
           result?.data?.voucher_item_id ||
           result?.data?.promo?.id ||
           result?.data?.voucher?.id;
 
+        // Log for debugging but don't block validation
         if (isStructured && itemId && respItemId && String(respItemId) !== String(itemId)) {
-          console.error('Item ID mismatch:', { qr_item_id: itemId, resp_item_id: respItemId });
-          setModalFailedMessage('Kode tidak sesuai dengan item yang dipindai. Coba ulangi scan.');
-          setModalFailed(true);
-          return;
+          console.log('ℹ️ ID Info:', { qr_item_id: itemId, resp_item_id: respItemId, note: 'Backend handles correct item association' });
         }
 
         setLastItemType(itemType);
@@ -426,8 +424,15 @@ export default function ScanValidasi() {
   };
 
   const handleScanResult = async (result) => {
-    if (!result || submitLoading) return;
+    // Prevent multiple simultaneous scans
+    if (!result || submitLoading || !isScanning) {
+      console.log('🚫 Scan blocked:', { hasResult: !!result, isLoading: submitLoading, isScanning });
+      return;
+    }
 
+    // Immediately stop scanning to prevent multiple triggers
+    setIsScanning(false);
+    
     console.log('🎯 QR SCAN RESULT:', result);
 
     let qrDataToProcess = result;
@@ -459,7 +464,7 @@ export default function ScanValidasi() {
       setModalFailedMessage('QR Code tidak valid atau tidak mengandung kode validasi.');
       setModalFailed(true);
       setSubmitLoading(false);
-      setIsScanning(true);
+      setIsScanning(true); // Re-enable scanning for retry
     }
   };
 
