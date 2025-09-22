@@ -8,6 +8,7 @@ import {
   ButtonComponent,
   FloatingPageComponent,
   ModalConfirmComponent,
+  SelectComponent,
   TableSupervisionComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
@@ -332,30 +333,99 @@ export default function QRCodeCrud() {
           }),
           custom: [
             {
-              type: 'select',
-              construction: {
-                name: 'voucher_id',
-                label: 'Voucher',
-                placeholder: 'Pilih voucher…',
-                tip: 'Pilih salah satu: Voucher atau Promo',
-                options: (voucherList || []).map((v) => ({
-                  label: v.name || v.kode || v.code || v.id,
-                  value: v.id,
-                })),
+              type: 'custom',
+              custom: ({ formControl }) => {
+                const v = formControl('voucher_id');
+                const p = formControl('promo_id');
+
+                const onVoucherChange = (val) => {
+                  if (val === undefined || val === null || val === '') {
+                    // kosongkan voucher_id -> unregister agar tidak terkirim sebagai ''
+                    v.unregister?.();
+                  } else {
+                    v.onChange?.(val);
+                    // saat pilih voucher, kosongkan promo
+                    p.unregister?.();
+                  }
+                };
+
+                return (
+                  <div className="col-span-12">
+                    <SelectComponent
+                      name="voucher_id"
+                      label="Voucher"
+                      placeholder="Pilih voucher…"
+                      tip="Pilih salah satu: Voucher atau Promo"
+                      options={(voucherList || []).map((vv) => ({
+                        label: vv.name || vv.kode || vv.code || vv.id,
+                        value: vv.id,
+                      }))}
+                      clearable
+                      searchable
+                      value={v.value}
+                      onChange={onVoucherChange}
+                    />
+                    {v.value ? (
+                      <div className="mt-1">
+                        <button
+                          type="button"
+                          className="text-xs text-red-600 hover:underline"
+                          onClick={() => v.unregister?.()}
+                        >
+                          Kosongkan pilihan voucher
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
               },
               col: 12,
             },
             {
-              type: 'select',
-              construction: {
-                name: 'promo_id',
-                label: 'Promo',
-                placeholder: 'Pilih promo…',
-                tip: 'Kosongkan jika menggunakan Voucher',
-                options: (promoList || []).map((p) => ({
-                  label: p.name || p.kode || p.code || p.id,
-                  value: p.id,
-                })),
+              type: 'custom',
+              custom: ({ formControl }) => {
+                const v = formControl('voucher_id');
+                const p = formControl('promo_id');
+
+                const onPromoChange = (val) => {
+                  if (val === undefined || val === null || val === '') {
+                    p.unregister?.();
+                  } else {
+                    p.onChange?.(val);
+                    // saat pilih promo, kosongkan voucher
+                    v.unregister?.();
+                  }
+                };
+
+                return (
+                  <div className="col-span-12">
+                    <SelectComponent
+                      name="promo_id"
+                      label="Promo"
+                      placeholder="Pilih promo…"
+                      tip="Kosongkan jika menggunakan Voucher"
+                      options={(promoList || []).map((pp) => ({
+                        label: pp.name || pp.kode || pp.code || pp.id,
+                        value: pp.id,
+                      }))}
+                      clearable
+                      searchable
+                      value={p.value}
+                      onChange={onPromoChange}
+                    />
+                    {p.value ? (
+                      <div className="mt-1">
+                        <button
+                          type="button"
+                          className="text-xs text-red-600 hover:underline"
+                          onClick={() => p.unregister?.()}
+                        >
+                          Kosongkan pilihan promo
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
               },
               col: 12,
             },
