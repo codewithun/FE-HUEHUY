@@ -91,6 +91,7 @@ export default function Save() {
             validated_at: validatedAt,
             validation_type,
             user_id: it.user_id, // Tambahkan user_id dari API response
+            promo_item: { id: it.id, code: it.code || it.qr || it.token, user_id: it.user_id, promo_id: it.promo_id || ad.id, validated_at: validatedAt },
             voucher_item: null,
             voucher: null,
             ad: {
@@ -369,8 +370,8 @@ export default function Save() {
       let res, result;
 
       if (isPromoItem) {
-        // Untuk promo, gunakan endpoint redeem spesifik dengan item ID
-        const targetId = selected?.id;
+        // Untuk promo, gunakan endpoint redeem spesifik dengan item ID seperti voucher
+        const targetId = selected?.promo_item?.id || selected?.id;
         if (!targetId) {
           setValidationMessage('Promo tidak valid atau tidak ditemukan.');
           setShowValidationFailed(true);
@@ -395,6 +396,16 @@ export default function Save() {
               code: codeToValidate,
               promo_item_id: targetId 
             }),
+          });
+          result = await res.json().catch(() => null);
+        }
+        
+        // Jika masih gagal, coba update langsung promo item
+        if (res.status === 404 || res.status === 405) {
+          res = await fetch(`${apiUrl}/admin/promo-items/${targetId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ validated_at: new Date().toISOString() }),
           });
           result = await res.json().catch(() => null);
         }
@@ -439,11 +450,35 @@ export default function Save() {
           const now = new Date().toISOString();
           setData((prev) => ({
             ...prev,
-            data: prev.data.map((it) =>
-              it.id === selected.id 
-                ? { ...it, validated_at: now, used_at: now, redeemed_at: now } 
-                : it
-            ),
+            data: prev.data.map((it) => {
+              if (it.id === selected.id) {
+                // Update untuk promo
+                if (it.type === 'promo' && it.promo_item) {
+                  return {
+                    ...it,
+                    validated_at: now,
+                    promo_item: {
+                      ...it.promo_item,
+                      validated_at: now
+                    }
+                  };
+                }
+                // Update untuk voucher
+                else if (it.type === 'voucher' && it.voucher_item) {
+                  return {
+                    ...it,
+                    validated_at: now,
+                    voucher_item: {
+                      ...it.voucher_item,
+                      used_at: now
+                    }
+                  };
+                }
+                // Fallback update
+                return { ...it, validated_at: now, used_at: now, redeemed_at: now };
+              }
+              return it;
+            }),
           }));
         }
         
@@ -927,10 +962,10 @@ export default function Save() {
                         <div className="bg-slate-50 rounded-xl p-4 mb-4">
                           <QRCodeSVG
                             value={JSON.stringify({
-                              code: selected?.code || 'NO_CODE',
+                              code: selected?.promo_item?.code || selected?.code || 'NO_CODE',
                               type: 'promo',
-                              item_id: selected?.id,
-                              user_id: selected?.user_id
+                              item_id: selected?.promo_item?.id || selected?.id,
+                              user_id: selected?.promo_item?.user_id || selected?.user_id
                             })}
                             size={180}
                             bgColor="#f8fafc"
