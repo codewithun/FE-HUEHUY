@@ -19,12 +19,13 @@ import { ButtonComponent, IconButtonComponent } from '../../components/base.comp
 import { ModalConfirmComponent } from '../../components/base.components';
 import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// ✅ Pastikan base mengarah ke /api
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
 export default function ScanValidasi() {
   const router = useRouter();
   const { profile, loading, fetchProfile } = useUserContext();
-  
+
   const [modalSuccess, setModalSuccess] = useState(false);
   const [modalFailed, setModalFailed] = useState(false);
   const [modalFailedMessage, setModalFailedMessage] = useState('Kode Tidak Valid / Sudah Digunakan');
@@ -37,7 +38,6 @@ export default function ScanValidasi() {
 
   useEffect(() => {
     const token = Cookies.get(token_cookie_name);
-    
     if (token && !profile && !loading) {
       fetchProfile();
     }
@@ -55,7 +55,7 @@ export default function ScanValidasi() {
   // Helper function to extract validation code from QR result
   const extractValidationCode = (qrResult) => {
     console.log('🔍 Raw QR Scan Result:', qrResult);
-    
+
     if (!qrResult || typeof qrResult !== 'string') {
       console.log('❌ Invalid QR result format');
       return null;
@@ -65,7 +65,7 @@ export default function ScanValidasi() {
     try {
       const parsed = JSON.parse(qrResult);
       console.log('📦 Parsed JSON from QR:', parsed);
-      
+
       if (parsed && typeof parsed === 'object' && parsed.code) {
         console.log('✅ Found structured QR data:', {
           code: parsed.code,
@@ -73,7 +73,7 @@ export default function ScanValidasi() {
           item_id: parsed.item_id,
           user_id: parsed.user_id
         });
-        
+
         // Return enhanced validation data with metadata
         return {
           code: parsed.code,
@@ -83,7 +83,7 @@ export default function ScanValidasi() {
           isStructured: true
         };
       }
-      
+
       // Legacy JSON format support
       if (parsed.code) {
         console.log('✅ Found code in legacy JSON:', parsed.code);
@@ -104,7 +104,7 @@ export default function ScanValidasi() {
     // If it's a URL, try to extract ID or code from it
     if (qrResult.includes('http')) {
       console.log('🔗 QR contains URL:', qrResult);
-      
+
       // Extract ID from URL patterns like /voucher/123 or /promo/456
       const urlMatch = qrResult.match(/\/(voucher|promo)\/(\d+)/);
       if (urlMatch) {
@@ -112,7 +112,7 @@ export default function ScanValidasi() {
         console.log(`✅ Extracted ${urlMatch[1]} ID from URL:`, code);
         return { code: code, type: urlMatch[1], isStructured: false };
       }
-      
+
       // Extract from query parameters
       const codeMatch = qrResult.match(/[?&]code=([^&]+)/);
       if (codeMatch) {
@@ -126,7 +126,7 @@ export default function ScanValidasi() {
     if (qrResult.includes('|')) {
       const parts = qrResult.split('|');
       console.log('📋 Pipe-separated QR parts:', parts);
-      
+
       if (parts.length >= 2 && (parts[0] === 'voucher' || parts[0] === 'promo')) {
         const code = parts[1];
         console.log(`✅ Extracted ${parts[0]} code:`, code);
@@ -149,7 +149,7 @@ export default function ScanValidasi() {
   const submitValidate = async (qrData) => {
     setSubmitLoading(true);
     setIsScanning(false);
-    
+
     console.log('🚀 STARTING VALIDATION PROCESS:', {
       qrData: qrData,
       tenant: {
@@ -160,7 +160,7 @@ export default function ScanValidasi() {
       },
       timestamp: new Date().toISOString()
     });
-    
+
     try {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : null;
@@ -180,7 +180,7 @@ export default function ScanValidasi() {
 
       // Extract the validation code from QR data
       const validationData = extractValidationCode(qrData);
-      
+
       if (!validationData || !validationData.code) {
         setModalFailedMessage('QR Code tidak valid atau tidak mengandung kode validasi yang dapat dibaca.');
         setModalFailed(true);
@@ -219,68 +219,48 @@ export default function ScanValidasi() {
       // Enhanced validation logic based on QR metadata
       let res, result, itemType = 'promo', promoError = null;
 
-      // If we have structured QR data with type information, validate accordingly
+      // ✅ Structured QR → gunakan endpoint item-spesifik (redeem by item id)
       if (isStructured && qrItemType) {
         console.log(`🎯 Using structured QR validation for ${qrItemType}`);
-        
+
+        // Payload standar
+        const payload = {
+          code: codeToValidate.trim(),
+          validated_by_tenant: profile?.id,
+          validation_source: 'qr_scan'
+        };
+
         if (qrItemType === 'voucher' && itemId) {
-          // Direct voucher validation with item ID
           console.log('🎫 Validating voucher with item ID:', itemId);
           res = await fetch(`${apiUrl}/admin/voucher-items/${itemId}/redeem`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-              code: codeToValidate.trim(),
-              validated_by_tenant: profile?.id,
-              validation_source: 'qr_scan'
-            }),
+            body: JSON.stringify(payload),
           });
-          
           result = await res.json().catch(() => null);
           itemType = 'voucher';
-          
-          console.log('📡 Direct voucher validation response:', {
-            status: res.status,
-            ok: res.ok,
-            result: result
-          });
-        } else if (qrItemType === 'promo') {
-          // Direct promo validation
-          console.log('🏷️ Validating promo');
-          res = await fetch(`${apiUrl}/promos/validate`, {
+          console.log('📡 Direct voucher validation response:', { status: res.status, ok: res.ok, result });
+        } else if (qrItemType === 'promo' && itemId) {
+          console.log('🏷️ Validating promo with item ID:', itemId);
+          res = await fetch(`${apiUrl}/admin/promo-items/${itemId}/redeem`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-              code: codeToValidate.trim(),
-              validated_by_tenant: profile?.id,
-              validation_source: 'qr_scan'
-            }),
+            body: JSON.stringify(payload),
           });
-          
           result = await res.json().catch(() => null);
           itemType = 'promo';
-          
-          console.log('📡 Direct promo validation response:', {
-            status: res.status,
-            ok: res.ok,
-            result: result
-          });
+          console.log('📡 Direct promo validation response:', { status: res.status, ok: res.ok, result });
+        } else {
+          // Structured tapi tidak ada itemId → jatuh ke fallback
+          console.warn('Structured QR without item_id, falling back to unstructured path');
         }
-      } else {
-        // Fallback to original dual-validation logic for unstructured QR codes
-        console.log('🔄 Using fallback dual-validation for unstructured QR');
-        
-        // Skip ownership check - tenant doesn't need to own the item to validate it
-        // Tenant role is to validate items that belong to other users
-        console.log('ℹ️ Tenant validation mode: Validating item owned by another user');
-        
-        // IMPORTANT: When tenant validates a voucher/promo, the backend should:
-        // 1. Find the user who owns the voucher/promo by the code
-        // 2. Update that user's voucher_item/promo_item status to 'validated'
-        // 3. The validation endpoint should handle finding the owner automatically
-        console.log('📝 API should find owner by code and update their status');
 
-        // Try promo validation first
+      } else {
+        // Fallback untuk QR tidak terstruktur (tetap seperti semula)
+        console.log('🔄 Using fallback dual-validation for unstructured QR');
+        console.log('ℹ️ Tenant validation mode: Validating item owned by another user');
+
+        // Coba promo dulu
         res = await fetch(`${apiUrl}/promos/validate`, {
           method: 'POST',
           headers,
@@ -290,26 +270,14 @@ export default function ScanValidasi() {
             validation_source: 'qr_scan'
           }),
         });
-
         result = await res.json().catch(() => null);
         itemType = 'promo';
+        console.log('📡 Promo validation response:', { status: res.status, ok: res.ok, result });
 
-        console.log('📡 Promo validation response:', {
-          status: res.status,
-          ok: res.ok,
-          result: result
-        });
-
-        // If promo validation fails, store the error and try voucher validation
+        // Jika gagal, coba voucher
         if (!res.ok) {
-          promoError = {
-            status: res.status,
-            message: result?.message,
-            result: result
-          };
-          
+          promoError = { status: res.status, message: result?.message, result };
           console.log('🔍 Trying voucher validation...');
-          
           res = await fetch(`${apiUrl}/vouchers/validate`, {
             method: 'POST',
             headers,
@@ -319,29 +287,36 @@ export default function ScanValidasi() {
               validation_source: 'qr_scan'
             }),
           });
-
           result = await res.json().catch(() => null);
           itemType = 'voucher';
-          
-          console.log('📡 Voucher validation response:', {
-            status: res.status,
-            ok: res.ok,
-            result: result
-          });
+          console.log('📡 Voucher validation response:', { status: res.status, ok: res.ok, result });
         }
       }
 
-      if (res.status === 401) {
+      if (res?.status === 401) {
         setModalFailedMessage('Sesi login berakhir. Silakan login kembali.');
         setModalFailed(true);
-      } else if (res.ok) {
-        const itemId = result?.data?.promo?.id || result?.data?.voucher?.id;
+      } else if (res?.ok) {
+        // ✅ Guard konsistensi ID (hindari mismatch 49 → 23)
+        const respItemId =
+          result?.data?.promo_item_id ||
+          result?.data?.voucher_item_id ||
+          result?.data?.promo?.id ||
+          result?.data?.voucher?.id;
+
+        if (isStructured && itemId && respItemId && String(respItemId) !== String(itemId)) {
+          console.error('Item ID mismatch:', { qr_item_id: itemId, resp_item_id: respItemId });
+          setModalFailedMessage('Kode tidak sesuai dengan item yang dipindai. Coba ulangi scan.');
+          setModalFailed(true);
+          return;
+        }
+
         setLastItemType(itemType);
         setModalSuccess(true);
-        
+
         console.log('✅ VALIDATION SUCCESSFUL:', {
           itemType,
-          itemId,
+          itemId: respItemId,
           code: codeToValidate,
           tenantId: profile?.id,
           tenantName: profile?.fullname,
@@ -352,45 +327,42 @@ export default function ScanValidasi() {
       } else {
         // Handle specific error cases dengan pesan yang lebih informatif
         let errorMsg = 'Kode tidak valid atau tidak ditemukan';
-        
-        // Check if this is likely a validation of already used item
+
         const isAlreadyValidated = (status, message) => {
-          return status === 400 || 
-                 status === 409 || 
-                 (message && (
-                   message.toLowerCase().includes('sudah') ||
-                   message.toLowerCase().includes('digunakan') ||
-                   message.toLowerCase().includes('divalidasi') ||
-                   message.toLowerCase().includes('already') ||
-                   message.toLowerCase().includes('used')
-                 ));
+          return status === 400 ||
+            status === 409 ||
+            (message && (
+              message.toLowerCase().includes('sudah') ||
+              message.toLowerCase().includes('digunakan') ||
+              message.toLowerCase().includes('divalidasi') ||
+              message.toLowerCase().includes('already') ||
+              message.toLowerCase().includes('used')
+            ));
         };
-        
+
         const isNotFound = (status, message) => {
-          return status === 404 || 
-                 (message && (
-                   message.toLowerCase().includes('tidak ditemukan') ||
-                   message.toLowerCase().includes('not found') ||
-                   message.toLowerCase().includes('invalid')
-                 ));
+          return status === 404 ||
+            (message && (
+              message.toLowerCase().includes('tidak ditemukan') ||
+              message.toLowerCase().includes('not found') ||
+              message.toLowerCase().includes('invalid')
+            ));
         };
-        
-        // Prioritize "already validated" messages over "not found"
+
         if (promoError && isAlreadyValidated(promoError.status, promoError.message)) {
           errorMsg = `Promo dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
-        } else if (isAlreadyValidated(res.status, result?.message)) {
+        } else if (isAlreadyValidated(res?.status, result?.message)) {
           errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
-        } else if (promoError && promoError.status === 404 && res.status === 404) {
-          // Both promo and voucher returned 404 - code doesn't exist
+        } else if (promoError && promoError.status === 404 && res?.status === 404) {
           errorMsg = `Kode "${codeToValidate}" tidak ditemukan. Pastikan kode yang Anda masukkan sudah benar.`;
-        } else if (isNotFound(res.status, result?.message)) {
+        } else if (isNotFound(res?.status, result?.message)) {
           errorMsg = `${itemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" tidak ditemukan.`;
-        } else if (res.status === 422) {
+        } else if (res?.status === 422) {
           errorMsg = result?.message || `Kode "${codeToValidate}" tidak valid atau format salah.`;
         } else if (result?.message) {
           errorMsg = result.message;
         }
-        
+
         setModalFailedMessage(errorMsg);
         setModalFailed(true);
       }
@@ -405,11 +377,11 @@ export default function ScanValidasi() {
 
   const handleScanResult = async (result) => {
     if (!result || submitLoading) return;
-    
+
     console.log('🎯 QR SCAN RESULT:', result);
-    
+
     let qrDataToProcess = result;
-    
+
     // If result has text property, extract it
     if (result?.text) {
       console.log('📱 QR Code Text Found:', result.text);
@@ -418,16 +390,16 @@ export default function ScanValidasi() {
       console.log('� Direct String QR Code:', result);
       qrDataToProcess = result;
     }
-    
+
     // Extract validation data from QR
     const validationData = extractValidationCode(qrDataToProcess);
-    
+
     console.log('� Extracted Validation Data:', {
       originalQR: qrDataToProcess,
       validationData: validationData,
       isValidData: validationData && validationData.code
     });
-    
+
     if (validationData && validationData.code) {
       setScannedCode(validationData.code);
       setScanResult(result);
@@ -447,7 +419,7 @@ export default function ScanValidasi() {
       previousScanResult: scanResult,
       previousScannedCode: scannedCode
     });
-    
+
     setScanResult(null);
     setScannedCode(null);
     setIsScanning(true);
@@ -538,7 +510,7 @@ export default function ScanValidasi() {
                   <p className="text-lg font-mono text-blue-900 break-all bg-white p-2 rounded border">{scannedCode}</p>
                 </div>
               )}
-              
+
               <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm border border-gray-100 overflow-hidden">
                 {isScanning ? (
                   <div className="relative">
@@ -579,16 +551,15 @@ export default function ScanValidasi() {
             <div className="flex gap-3 mb-6">
               <button
                 onClick={() => setFlashOn(!flashOn)}
-                className={`flex-1 py-3 px-3 rounded-[15px] flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${
-                  flashOn 
-                    ? 'bg-yellow-500 text-white' 
-                    : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`flex-1 py-3 px-3 rounded-[15px] flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${flashOn
+                  ? 'bg-yellow-500 text-white'
+                  : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 <FontAwesomeIcon icon={flashOn ? faFlashlightSlash : faFlashlight} className="text-base" />
                 <span>{flashOn ? 'Matikan Flash' : 'Flash'}</span>
               </button>
-              
+
               {!isScanning && (
                 <button
                   onClick={resetScanner}
@@ -614,7 +585,6 @@ export default function ScanValidasi() {
                 </div>
               </div>
             )}
-
 
           </div>
         </div>
