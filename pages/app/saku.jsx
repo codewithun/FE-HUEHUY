@@ -415,31 +415,82 @@ export default function Save() {
           return;
         }
 
-        // Gunakan endpoint yang benar untuk validasi promo dengan user validation
-        res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ 
-            code: codeToValidate,
-            validate_user: true, // Flag untuk memvalidasi kepemilikan user
-            user_id: userId
-          }),
-        });
-        result = await res.json().catch(() => null);
-
-        // Fallback untuk validasi promo dengan endpoint berbeda
-        if (res.status === 404 || res.status === 405) {
-          res = await fetch(`${apiUrl}/promos/validate`, {
+        // CRITICAL: Validasi ownership sebelum API call
+        // Jangan biarkan tenant validasi promo yang bukan miliknya
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
+        
+        let currentUserId = null;
+        try {
+          if (currentToken) {
+            const tokenPayload = JSON.parse(atob(currentToken.split('.')[1]));
+            currentUserId = tokenPayload.sub || tokenPayload.user_id || tokenPayload.id;
+          }
+        } catch (e) {
+          console.warn('Cannot decode token for ownership validation');
+        }
+        
+        // Validasi: Jika current user bukan pemilik promo, maka ini adalah validasi oleh tenant
+        const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
+        
+        if (!isOwner) {
+          // Ini adalah scan QR oleh tenant - gunakan endpoint khusus untuk validasi tenant
+          res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/validate-by-tenant`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
               code: codeToValidate,
-              promo_item_id: targetId,
-              user_id: userId,
-              validate_ownership: true
+              tenant_user_id: currentUserId, // ID tenant yang melakukan validasi
+              owner_user_id: userId,         // ID pemilik promo
+              validation_type: 'tenant_scan'
             }),
           });
           result = await res.json().catch(() => null);
+          
+          // Fallback untuk validasi tenant
+          if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${apiUrl}/promos/validate-by-tenant`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ 
+                code: codeToValidate,
+                promo_item_id: targetId,
+                tenant_user_id: currentUserId,
+                owner_user_id: userId,
+                validation_type: 'tenant_scan'
+              }),
+            });
+            result = await res.json().catch(() => null);
+          }
+        } else {
+          // Ini adalah validasi oleh pemilik promo - gunakan endpoint biasa
+          res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ 
+              code: codeToValidate,
+              validate_user: true,
+              user_id: userId,
+              validation_type: 'owner_self'
+            }),
+          });
+          result = await res.json().catch(() => null);
+
+          // Fallback untuk validasi owner
+          if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${apiUrl}/promos/validate`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ 
+                code: codeToValidate,
+                promo_item_id: targetId,
+                user_id: userId,
+                validate_ownership: true,
+                validation_type: 'owner_self'
+              }),
+            });
+            result = await res.json().catch(() => null);
+          }
         }
       } else if (isVoucherItem) {
         const targetId = selected?.voucher_item?.id || selected?.id;
@@ -452,31 +503,81 @@ export default function Save() {
           return;
         }
 
-        // Gunakan endpoint yang benar untuk validasi voucher dengan user validation
-        res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/redeem`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ 
-            code: codeToValidate,
-            validate_user: true, // Flag untuk memvalidasi kepemilikan user
-            user_id: userId
-          }),
-        });
-        result = await res.json().catch(() => null);
-
-        // Fallback untuk validasi voucher
-        if (res.status === 404 || res.status === 405) {
-          res = await fetch(`${apiUrl}/vouchers/validate`, {
+        // CRITICAL: Validasi ownership sebelum API call untuk voucher
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
+        
+        let currentUserId = null;
+        try {
+          if (currentToken) {
+            const tokenPayload = JSON.parse(atob(currentToken.split('.')[1]));
+            currentUserId = tokenPayload.sub || tokenPayload.user_id || tokenPayload.id;
+          }
+        } catch (e) {
+          console.warn('Cannot decode token for ownership validation');
+        }
+        
+        // Validasi: Jika current user bukan pemilik voucher, maka ini adalah validasi oleh tenant
+        const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
+        
+        if (!isOwner) {
+          // Ini adalah scan QR oleh tenant - gunakan endpoint khusus untuk validasi tenant
+          res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/validate-by-tenant`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ 
               code: codeToValidate,
-              voucher_item_id: targetId,
-              user_id: userId,
-              validate_ownership: true
+              tenant_user_id: currentUserId, // ID tenant yang melakukan validasi
+              owner_user_id: userId,         // ID pemilik voucher
+              validation_type: 'tenant_scan'
             }),
           });
           result = await res.json().catch(() => null);
+
+          // Fallback untuk validasi tenant
+          if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${apiUrl}/vouchers/validate-by-tenant`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ 
+                code: codeToValidate,
+                voucher_item_id: targetId,
+                tenant_user_id: currentUserId,
+                owner_user_id: userId,
+                validation_type: 'tenant_scan'
+              }),
+            });
+            result = await res.json().catch(() => null);
+          }
+        } else {
+          // Ini adalah validasi oleh pemilik voucher - gunakan endpoint biasa
+          res = await fetch(`${apiUrl}/admin/voucher-items/${targetId}/redeem`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ 
+              code: codeToValidate,
+              validate_user: true,
+              user_id: userId,
+              validation_type: 'owner_self'
+            }),
+          });
+          result = await res.json().catch(() => null);
+
+          // Fallback untuk validasi owner
+          if (res.status === 404 || res.status === 405) {
+            res = await fetch(`${apiUrl}/vouchers/validate`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ 
+                code: codeToValidate,
+                voucher_item_id: targetId,
+                user_id: userId,
+                validate_ownership: true,
+                validation_type: 'owner_self'
+              }),
+            });
+            result = await res.json().catch(() => null);
+          }
         }
       } else {
         setValidationMessage('Item tidak dikenali.');
@@ -493,51 +594,84 @@ export default function Save() {
         // Update status item di local state dengan validasi yang lebih ketat
         if (selected) {
           const now = new Date().toISOString();
-          setData((prev) => ({
-            ...prev,
-            data: prev.data.map((it) => {
-              // Pastikan update hanya dilakukan pada item yang sama persis
-              if (it.id === selected.id && 
-                  ((it.type === selected.type) || 
-                   (it.promo_item?.id === selected.promo_item?.id) || 
-                   (it.voucher_item?.id === selected.voucher_item?.id))) {
-                
-                // Update untuk promo milik user
-                if (it.type === 'promo' && it.promo_item) {
-                  return {
-                    ...it,
-                    validated_at: now,
-                    promo_item: {
-                      ...it.promo_item,
+          
+          // CRITICAL: Hanya update local state jika user yang login adalah PEMILIK promo/voucher
+          // Jangan update jika user adalah tenant yang melakukan scan
+          const encryptedToken = Cookies.get(token_cookie_name);
+          const currentToken = encryptedToken ? Decrypt(encryptedToken) : null;
+          
+          // Decode user info dari token untuk memastikan ownership
+          let currentUserId = null;
+          try {
+            if (currentToken) {
+              // Ambil user ID dari token jika tersedia dalam payload
+              const tokenPayload = JSON.parse(atob(currentToken.split('.')[1]));
+              currentUserId = tokenPayload.sub || tokenPayload.user_id || tokenPayload.id;
+            }
+          } catch (e) {
+            console.warn('Cannot decode token for user validation');
+          }
+          
+          // Validasi ownership: hanya update jika current user adalah pemilik item
+          const itemOwnerId = selected?.user_id || selected?.promo_item?.user_id || selected?.voucher_item?.user_id;
+          const isOwner = currentUserId && itemOwnerId && (currentUserId.toString() === itemOwnerId.toString());
+          
+          // HANYA update local state jika user adalah pemilik promo/voucher
+          if (isOwner) {
+            setData((prev) => ({
+              ...prev,
+              data: prev.data.map((it) => {
+                // Pastikan update hanya dilakukan pada item yang sama persis
+                if (it.id === selected.id && 
+                    ((it.type === selected.type) || 
+                     (it.promo_item?.id === selected.promo_item?.id) || 
+                     (it.voucher_item?.id === selected.voucher_item?.id))) {
+                  
+                  // Update untuk promo milik user
+                  if (it.type === 'promo' && it.promo_item) {
+                    return {
+                      ...it,
                       validated_at: now,
-                      validation_date: now
-                    }
+                      promo_item: {
+                        ...it.promo_item,
+                        validated_at: now,
+                        validation_date: now
+                      }
+                    };
+                  }
+                  // Update untuk voucher milik user
+                  else if (it.type === 'voucher' && it.voucher_item) {
+                    return {
+                      ...it,
+                      validated_at: now,
+                      voucher_item: {
+                        ...it.voucher_item,
+                        used_at: now,
+                        validation_date: now
+                      }
+                    };
+                  }
+                  // Fallback update dengan validasi tambahan
+                  return { 
+                    ...it, 
+                    validated_at: now, 
+                    used_at: now, 
+                    redeemed_at: now,
+                    validation_date: now 
                   };
                 }
-                // Update untuk voucher milik user
-                else if (it.type === 'voucher' && it.voucher_item) {
-                  return {
-                    ...it,
-                    validated_at: now,
-                    voucher_item: {
-                      ...it.voucher_item,
-                      used_at: now,
-                      validation_date: now
-                    }
-                  };
-                }
-                // Fallback update dengan validasi tambahan
-                return { 
-                  ...it, 
-                  validated_at: now, 
-                  used_at: now, 
-                  redeemed_at: now,
-                  validation_date: now 
-                };
-              }
-              return it;
-            }),
-          }));
+                return it;
+              }),
+            }));
+            
+            console.log('Local state updated for item owner:', itemOwnerId);
+          } else {
+            console.log('Skipping local state update - current user is not the owner:', {
+              currentUserId,
+              itemOwnerId,
+              isOwner
+            });
+          }
         }
         
         // Refresh data dari server untuk memastikan sinkronisasi dengan delay yang lebih lama
@@ -909,7 +1043,9 @@ export default function Save() {
                               item_id: selected?.voucher_item?.id || selected?.id,
                               user_id: selected?.voucher_item?.user_id || selected?.user_id,
                               owner_validation: true, // Flag untuk menandakan ini QR milik user
-                              timestamp: Date.now() // Tambah timestamp untuk keamanan
+                              timestamp: Date.now(), // Tambah timestamp untuk keamanan
+                              validation_purpose: 'tenant_scan', // Tujuan validasi oleh tenant
+                              owner_only: false // Bisa divalidasi oleh tenant
                             })}
                             size={180}
                             bgColor="#f8fafc"
@@ -1027,7 +1163,9 @@ export default function Save() {
                               item_id: selected?.promo_item?.id || selected?.id,
                               user_id: selected?.promo_item?.user_id || selected?.user_id,
                               owner_validation: true, // Flag untuk menandakan ini QR milik user
-                              timestamp: Date.now() // Tambah timestamp untuk keamanan
+                              timestamp: Date.now(), // Tambah timestamp untuk keamanan
+                              validation_purpose: 'tenant_scan', // Tujuan validasi oleh tenant
+                              owner_only: false // Bisa divalidasi oleh tenant
                             })}
                             size={180}
                             bgColor="#f8fafc"
