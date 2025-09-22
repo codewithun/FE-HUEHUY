@@ -20,13 +20,9 @@ export default function CommunityDashboard({ communityId }) {
   const [communityData, setCommunityData] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // Tambahkan state yang hilang
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [promoCategories, setPromoCategories] = useState([]);
-  
-  // Tambahkan refresh trigger untuk real-time update
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     setIsClient(true);
@@ -90,11 +86,9 @@ export default function CommunityDashboard({ communityId }) {
     const fetchEventsAndPromos = async () => {
       if (!communityId) return;
 
-      // Prepare base URL & auth header (sesuaikan dengan promo.jsx)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const baseUrl = (apiUrl || '')
-        .replace(/\/api\/?$/, '')
-        .replace(/\/+$/, '');
+      // Prepare base URL & auth header
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiBase = baseUrl.replace(/\/api\/?$/, '');
 
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
@@ -103,40 +97,18 @@ export default function CommunityDashboard({ communityId }) {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      // Helper functions (sama dengan promo.jsx)
-      const isAbsoluteUrl = (u) =>
-        typeof u === 'string' && /^https?:\/\//i.test(u);
-
-      const isPlaceholder = (u) =>
-        typeof u === 'string' && u.startsWith('/api/placeholder');
-
+      // helper: build image url (similar logic to promo page)
       const buildImageUrl = (raw) => {
         const fallback = '/api/placeholder/180/130';
         if (typeof raw !== 'string') return fallback;
 
         let url = raw.trim();
         if (!url) return fallback;
-
-        // 1) Sudah absolute? langsung pakai
-        if (isAbsoluteUrl(url)) return url;
-
-        // 2) Placeholder? biarkan
-        if (isPlaceholder(url)) return url;
-
-        // 3) Normalisasi path relatif dari backend
-        let path = url.replace(/^\/+/, '');                   // buang leading slash
-        path = path.replace(/^api\/storage\//, 'storage/');   // api/storage → storage
-
-        // Jika bukan diawali "storage/", tetapi diawali folder konten seperti "promos/", "uploads/", arahkan ke storage
-        if (/^(promos|uploads|images|files)\//i.test(path)) {
-          path = `storage/${path}`;
-        }
-
-        // 4) Gabungkan dengan baseUrl (tanpa /api, tanpa trailing slash)
-        const finalUrl = `${baseUrl}/${path}`;
-
-        // 5) Validasi akhir
-        return /^https?:\/\//i.test(finalUrl) ? finalUrl : fallback;
+        if (/^https?:\/\//i.test(url)) return url;
+        if (url.startsWith('/api/placeholder')) return url;
+        let path = url.replace(/^\/+/, '');
+        path = path.replace(/^api\/storage\//, 'storage/');
+        return `${apiBase}/${path}`;
       };
 
       const normalizePromos = (arr = []) => {
@@ -171,48 +143,58 @@ export default function CommunityDashboard({ communityId }) {
           setUpcomingEvents([]);
         }
 
-        // Fetch promos for community (sesuaikan dengan promo.jsx untuk real-time update)
+        // Fetch promos for community
         try {
-          // Tambahkan cache busting untuk memastikan data terbaru
-          const timestamp = Date.now();
-          
-          // Langsung fetch promo endpoint seperti di promo.jsx
-          const promoRes = await fetch(`${apiUrl}/communities/${communityId}/promos?_t=${timestamp}`, { headers });
-          
-          if (promoRes.ok) {
-            const promoJson = await promoRes.json().catch(() => null);
-            const promoList = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
-            
-            // Buat kategori tunggal dengan data terbaru
-            setPromoCategories([
-              {
-                id: 'promo-terkini',
-                title: 'Promo Terkini',
-                subtitle: 'Promo terbaru dari komunitas',
-                promos: normalizePromos(promoList),
-              },
-            ]);
-          } else {
-            // Coba endpoint promo-categories sebagai fallback
-            const pcRes = await fetch(`${apiUrl}/communities/${communityId}/promo-categories?_t=${timestamp}`, { headers });
-            if (pcRes.ok) {
-              const pcJson = await pcRes.json().catch(() => null);
-              const pcList = Array.isArray(pcJson?.data) ? pcJson.data : Array.isArray(pcJson) ? pcJson : [];
-              
-              if (pcList.length > 0) {
-                const normalizedCategories = pcList.map((cat) => {
-                  const rawPromos = Array.isArray(cat.promos) ? cat.promos : (cat.items || []);
-                  return {
-                    id: cat.id ?? `pc-${cat.title ?? Math.random().toString(36).slice(2,8)}`,
-                    title: cat.title ?? cat.name ?? 'Promo',
-                    subtitle: cat.subtitle ?? cat.description ?? '',
-                    promos: normalizePromos(rawPromos),
-                  };
-                });
-                setPromoCategories(normalizedCategories);
+          // Prefer promo-categories (created via "Tambah Kategori") which include title/subtitle and attached promos
+          const pcRes = await fetch(`${apiBase}/api/communities/${communityId}/promo-categories`, { headers });
+          if (pcRes.ok) {
+            const pcJson = await pcRes.json().catch(() => null);
+            const pcList = Array.isArray(pcJson?.data) ? pcJson.data : Array.isArray(pcJson) ? pcJson : [];
+            // Normalize each category and its promos
+            const normalizedCategories = (pcList || []).map((cat) => {
+              const rawPromos = Array.isArray(cat.promos) ? cat.promos : (cat.items || []);
+              return {
+                id: cat.id ?? `pc-${cat.title ?? Math.random().toString(36).slice(2,8)}`,
+                title: cat.title ?? cat.name ?? 'Promo',
+                subtitle: cat.subtitle ?? cat.description ?? '',
+                promos: normalizePromos(rawPromos),
+              };
+            });
+            // if server returned empty promo-categories, fallback to the generic promos endpoint
+            if (normalizedCategories.length > 0) {
+              setPromoCategories(normalizedCategories);
+            } else {
+              // fallback: use /promos endpoint as single "Promo Terkini" category
+              const promoRes = await fetch(`${apiBase}/api/communities/${communityId}/promos`, { headers });
+              if (promoRes.ok) {
+                const promoJson = await promoRes.json().catch(() => null);
+                const promoList = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
+                setPromoCategories([
+                  {
+                    id: 'promo-terkini',
+                    title: 'Promo Terkini',
+                    subtitle: 'Promo dari komunitas',
+                    promos: normalizePromos(promoList),
+                  },
+                ]);
               } else {
                 setPromoCategories([]);
               }
+            }
+          } else {
+            // If promo-categories endpoint not available, fallback to previous behavior
+            const promoRes = await fetch(`${apiBase}/api/communities/${communityId}/promos`, { headers });
+            if (promoRes.ok) {
+              const promoJson = await promoRes.json().catch(() => null);
+              const promoList = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
+              setPromoCategories([
+                {
+                  id: 'promo-terkini',
+                  title: 'Promo Terkini',
+                  subtitle: 'Promo dari komunitas',
+                  promos: normalizePromos(promoList),
+                },
+              ]);
             } else {
               setPromoCategories([]);
             }
@@ -231,37 +213,7 @@ export default function CommunityDashboard({ communityId }) {
     };
 
     fetchEventsAndPromos();
-  }, [communityId, refreshTrigger]);
-
-  // Auto-refresh saat focus & route change untuk data terbaru
-  useEffect(() => {
-    const handleFocus = () => setRefreshTrigger((p) => p + 1);
-    const handleRouteChange = () => setRefreshTrigger((p) => p + 1);
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        setRefreshTrigger((p) => p + 1);
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    router.events.on('routeChangeComplete', handleRouteChange);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      router.events.off('routeChangeComplete', handleRouteChange);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [router.events]);
-
-  // Tambahkan interval refresh untuk memastikan data selalu terbaru
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRefreshTrigger((p) => p + 1);
-    }, 30000); // Refresh setiap 30 detik
-
-    return () => clearInterval(interval);
-  }, []);
+  }, [communityId]);
 
   // Function untuk menentukan gradient berdasarkan kategori
   const getCommunityGradient = (category) => {
