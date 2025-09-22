@@ -244,7 +244,13 @@ export function TableSupervisionComponent({
       const newColumns: any[] = [];
       const newData: any[] = [];
 
-      const apiTotal = data?.totalRow ?? data?.total_row ?? 0;
+      const apiTotal =
+        data?.totalRow ??
+        data?.total_row ??
+        data?.total ??            // <— penting: Laravel paginator
+        data?.meta?.total ??      // <— kalau pakai bentuk meta
+        0;
+
       setTotalRow(Number(apiTotal) || 0);
 
       if (originalData.length) {
