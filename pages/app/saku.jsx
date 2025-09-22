@@ -767,7 +767,12 @@ export default function Save() {
 
                     <div className="bg-slate-50 rounded-xl p-4 mb-4">
                       <QRCodeSVG
-                        value={selected?.voucher_item?.code || selected?.code || 'NO_CODE'}
+                        value={JSON.stringify({
+                          code: selected?.voucher_item?.code || selected?.code || 'NO_CODE',
+                          type: 'voucher',
+                          item_id: selected?.voucher_item?.id || selected?.id,
+                          user_id: selected?.voucher_item?.user_id || 'current_user'
+                        })}
                         size={180}
                         bgColor="#f8fafc"
                         fgColor="#0f172a"
@@ -861,7 +866,12 @@ export default function Save() {
 
                 <div className="bg-slate-50 rounded-xl p-4 mb-4">
                   <QRCodeSVG
-                    value={selected?.code || 'NO_CODE'}
+                    value={JSON.stringify({
+                      code: selected?.code || 'NO_CODE',
+                      type: 'promo',
+                      item_id: selected?.id,
+                      user_id: 'current_user'
+                    })}
                     size={180}
                     bgColor="#f8fafc"
                     fgColor="#0f172a"

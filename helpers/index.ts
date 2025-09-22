@@ -1,4 +1,5 @@
 export * from './api.helpers';
+export * from './encryption.helpers';
 export * from './form.helpers';
 export * from './middleware.helpers';
 export * from './promo-entry.helpers';

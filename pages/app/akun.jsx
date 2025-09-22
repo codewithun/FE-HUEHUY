@@ -119,6 +119,17 @@ export default function Akun() {
                 <FontAwesomeIcon icon={faChevronRight} />
               </div>
             </Link>
+            
+            {/* Menu Scan QR untuk Manager Tenant */}
+            {data?.data?.profile?.role_id === 6 && (
+              <Link href="/app/scan-validasi">
+                <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
+                  <p className="font-medium">Scan QR Validasi</p>
+                  <FontAwesomeIcon icon={faChevronRight} />
+                </div>
+              </Link>
+            )}
+            
             <Link href="/app/riwayat-validasi">
               <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
                 <p className="font-medium">Riwayat Validasi</p>

@@ -1,6 +1,6 @@
 const CryptoJS = require('crypto-js');
 
-export function Encrypt(data: any, key = process.env.NEXT_PUBLIC_COOKIE_KEY) {
+export function Encrypt(data: any, key = process.env.NEXT_PUBLIC_COOKIE_KEY): string {
   if (!data || !key) return '';
   try {
     let encJson = CryptoJS.AES.encrypt(String(data), key).toString();
@@ -11,7 +11,7 @@ export function Encrypt(data: any, key = process.env.NEXT_PUBLIC_COOKIE_KEY) {
   }
 }
 
-export function Decrypt(data: any, key = process.env.NEXT_PUBLIC_COOKIE_KEY) {
+export function Decrypt(data: any, key = process.env.NEXT_PUBLIC_COOKIE_KEY): string {
   if (!data || !key) return '';
   try {
     let decData = CryptoJS.enc.Base64.parse(data).toString(CryptoJS.enc.Utf8);
