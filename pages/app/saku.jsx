@@ -85,9 +85,11 @@ export default function Save() {
 
         const mapped = userFilteredRows.map((it) => {
           const ad = it.promo || it.ad || {};
-          const claimedAt = it.created_at || it.claimed_at || it.validated_at || it.claimedAt || null;
-          const expiredAt = it.expires_at || it.expired_at || it.expiry || ad.valid_until || null;
-          const validatedAt = it.validated_at || it.used_at || it.redeemed_at || it.validation_at || null;
+          const claimedAt = it.created_at || it.reserved_at || null;
+          const expiredAt = it.expires_at || ad.end_date || null;
+          // Backend PromoItem menggunakan 'redeemed_at' bukan 'validated_at'
+          const redeemedAt = it.redeemed_at || null;
+          const isRedeemed = !!(redeemedAt || it.status === 'redeemed');
 
           // tipe validasi (fallback ke 'auto' jika tidak ada)
           const validation_type = ad.validation_type || it.validation_type || 'auto';
@@ -99,18 +101,20 @@ export default function Save() {
           return {
             id: it.id,
             type: 'promo',
-            code: it.code || it.qr || it.token || null,
+            code: it.code,
             claimed_at: claimedAt,
             expired_at: expiredAt,
-            validated_at: validatedAt,
+            validated_at: redeemedAt, // Map redeemed_at ke validated_at untuk konsistensi FE
             validation_type,
-            user_id: it.user_id, // Pastikan user_id tetap ada untuk validasi
+            user_id: it.user_id,
             promo_item: { 
               id: it.id, 
-              code: it.code || it.qr || it.token, 
+              code: it.code, 
               user_id: it.user_id, 
-              promo_id: it.promo_id || ad.id, 
-              validated_at: validatedAt 
+              promo_id: it.promo_id || ad.id,
+              status: it.status || (isRedeemed ? 'redeemed' : 'available'),
+              redeemed_at: redeemedAt,
+              reserved_at: it.reserved_at
             },
             voucher_item: null,
             voucher: null,
@@ -153,6 +157,10 @@ export default function Save() {
             .replace(/\/$/, '');
 
           const validation_type = voucher.validation_type || it.validation_type || 'auto';
+          
+          // Backend VoucherItem menggunakan 'used_at' bukan 'validated_at'
+          const usedAt = it.used_at || null;
+          const isUsed = !!(usedAt || it.status === 'used');
 
           return {
             id: it.id,
@@ -160,15 +168,16 @@ export default function Save() {
             code: it.code,
             claimed_at: it.created_at,
             expired_at: voucher.valid_until || null,
-            validated_at: it.validated_at || it.used_at || null,
+            validated_at: usedAt, // Map used_at ke validated_at untuk konsistensi FE
             validation_type,
-            user_id: it.user_id, // Pastikan user_id tetap ada untuk validasi
+            user_id: it.user_id,
             voucher_item: { 
               id: it.id, 
               code: it.code, 
               user_id: it.user_id, 
               voucher_id: it.voucher_id, 
-              used_at: it.used_at 
+              used_at: usedAt,
+              status: it.status || (isUsed ? 'used' : 'available')
             },
             voucher,
             ad: {
@@ -230,7 +239,14 @@ export default function Save() {
 
   // ====== Helpers ======
   const isItemValidatable = (item) => {
-    if (item?.validated_at) return false;
+    // Cek status validasi berdasarkan field backend yang benar
+    const isValidated = item?.validated_at || // Frontend mapping
+                       (item?.type === 'voucher' && item?.voucher_item?.used_at) || // Backend voucher field
+                       (item?.type === 'promo' && item?.promo_item?.redeemed_at) || // Backend promo field
+                       (item?.voucher_item?.status === 'used') ||
+                       (item?.promo_item?.status === 'redeemed');
+    
+    if (isValidated) return false;
 
     const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
     const isExpired = expiredAt && new Date(expiredAt) < new Date();
@@ -291,7 +307,14 @@ export default function Save() {
   };
 
   const getStatusBadge = (item) => {
-    if (item?.validated_at) {
+    // Cek status validasi berdasarkan field backend yang benar
+    const isValidated = item?.validated_at || // Frontend mapping
+                       (item?.type === 'voucher' && item?.voucher_item?.used_at) || // Backend voucher field
+                       (item?.type === 'promo' && item?.promo_item?.redeemed_at) || // Backend promo field
+                       (item?.voucher_item?.status === 'used') ||
+                       (item?.promo_item?.status === 'redeemed');
+    
+    if (isValidated) {
       return (
         <div className="flex items-center gap-1">
           <FontAwesomeIcon icon={faCheckCircle} className="text-success text-xs" />
@@ -597,37 +620,36 @@ export default function Save() {
                      (it.promo_item?.id === selected.promo_item?.id) || 
                      (it.voucher_item?.id === selected.voucher_item?.id))) {
                   
-                  // Update untuk promo milik user
+                  // Update untuk promo milik user - backend menggunakan redeemed_at
                   if (it.type === 'promo' && it.promo_item) {
                     return {
                       ...it,
-                      validated_at: now,
+                      validated_at: now, // Frontend mapping
                       promo_item: {
                         ...it.promo_item,
-                        validated_at: now,
-                        validation_date: now
+                        redeemed_at: now, // Backend field
+                        status: 'redeemed'
                       }
                     };
                   }
-                  // Update untuk voucher milik user
+                  // Update untuk voucher milik user - backend menggunakan used_at
                   else if (it.type === 'voucher' && it.voucher_item) {
                     return {
                       ...it,
-                      validated_at: now,
+                      validated_at: now, // Frontend mapping
                       voucher_item: {
                         ...it.voucher_item,
-                        used_at: now,
-                        validation_date: now
+                        used_at: now, // Backend field
+                        status: 'used'
                       }
                     };
                   }
-                  // Fallback update dengan validasi tambahan
+                  // Fallback update dengan field backend yang benar
                   return { 
                     ...it, 
-                    validated_at: now, 
-                    used_at: now, 
-                    redeemed_at: now,
-                    validation_date: now 
+                    validated_at: now, // Frontend mapping
+                    redeemed_at: it.type === 'promo' ? now : undefined,
+                    used_at: it.type === 'voucher' ? now : undefined
                   };
                 }
                 return it;
@@ -962,20 +984,32 @@ export default function Save() {
 
         {/* QR / Status */}
         <div className="px-4 pb-6">
-          {selected?.validated_at ? (
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl py-8">
-              <div className="text-center">
-                <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-4xl mb-3" />
-                <div className="font-bold text-green-700 text-lg">
-                  {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher
-                    ? 'Voucher Telah Digunakan'
-                    : 'Promo Telah Digunakan'}
+          {(() => {
+            // Cek status validasi berdasarkan field backend yang benar
+            const isValidated = selected?.validated_at || // Frontend mapping
+                               (selected?.type === 'voucher' && selected?.voucher_item?.used_at) || // Backend voucher field
+                               (selected?.type === 'promo' && selected?.promo_item?.redeemed_at) || // Backend promo field
+                               (selected?.voucher_item?.status === 'used') ||
+                               (selected?.promo_item?.status === 'redeemed');
+            
+            if (isValidated) {
+              return (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl py-8">
+                  <div className="text-center">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-4xl mb-3" />
+                    <div className="font-bold text-green-700 text-lg">
+                      {selected?.voucher_item || selected?.type === 'voucher' || selected?.voucher
+                        ? 'Voucher Telah Digunakan'
+                        : 'Promo Telah Digunakan'}
+                    </div>
+                    <p className="text-green-600 text-sm mt-1">Terima kasih</p>
+                  </div>
                 </div>
-                <p className="text-green-600 text-sm mt-1">Terima kasih</p>
-              </div>
-            </div>
-          ) : selected?.type === 'voucher' || selected?.voucher ? (
-            (() => {
+              );
+            }
+            
+            // Continue with existing validation logic
+            if (selected?.type === 'voucher' || selected?.voucher) {
               const voucher = selected?.voucher || selected?.ad;
               const isVoucherExpired = voucher?.valid_until && new Date(voucher.valid_until) < new Date();
 
@@ -1095,35 +1129,40 @@ export default function Save() {
                   </div>
                 </div>
               );
-            })()
-          ) : !(
+            }
+            
+            // Check if promo is not active
+            if (!(
               selected?.ad?.status === 'active' ||
               selected?.ad?.status === 'available' ||
               (!selected?.ad?.status && selected?.ad?.id)
-            ) ? (
-            <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
-              <div className="text-center">
-                <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />
-                <div className="font-bold text-red-700 text-lg">Promo Tidak Tersedia</div>
-                <p className="text-red-600 text-sm mt-1">Promo sudah berakhir</p>
-              </div>
-            </div>
-          ) : (
-            (() => {
-              const vt = getValidationType(selected);
-              const isManual = vt === 'manual';
-
+            )) {
               return (
-                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
                   <div className="text-center">
-                    <div className="mb-4">
-                      <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
-                        {isManual ? 'Validasi Kode Promo' : 'QR Code Promo'}
-                      </span>
-                    </div>
+                    <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />
+                    <div className="font-bold text-red-700 text-lg">Promo Tidak Tersedia</div>
+                    <p className="text-red-600 text-sm mt-1">Promo sudah berakhir</p>
+                  </div>
+                </div>
+              );
+            }
+            
+            // Promo validation section
+            const vt = getValidationType(selected);
+            const isManual = vt === 'manual';
 
-                    {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
-                    {!isManual ? (
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="text-center">
+                  <div className="mb-4">
+                    <span className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
+                      {isManual ? 'Validasi Kode Promo' : 'QR Code Promo'}
+                    </span>
+                  </div>
+
+                  {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
+                  {!isManual ? (
                       // Tampilkan QR Code untuk auto validation
                       <>
                         <div className="bg-slate-50 rounded-xl p-4 mb-4">
@@ -1216,8 +1255,7 @@ export default function Save() {
                   </div>
                 </div>
               );
-            })()
-          )}
+          })()}
         </div>
       </BottomSheetComponent>
 
@@ -1236,9 +1274,14 @@ export default function Save() {
                 setModalValidation(false);
                 setSelected(null);
                 setValidationCode('');
+                // Force immediate data refresh for voucher status update
+                setRefreshTrigger((p) => p + 1);
+                fetchData();
+                // Additional refresh after a short delay to ensure backend sync
                 setTimeout(() => {
                   setRefreshTrigger((p) => p + 1);
-                }, 100);
+                  fetchData();
+                }, 1000);
               }}
               className="w-full bg-green-500 text-white py-3 rounded-[12px] font-semibold hover:bg-green-600 transition-all"
             >
