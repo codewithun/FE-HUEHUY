@@ -531,53 +531,27 @@ export default function Save() {
         // Validasi: Jika current user bukan pemilik promo, maka ini adalah validasi oleh tenant
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
         
-        if (!isOwner) {
-          // Ini adalah scan QR oleh tenant - gunakan endpoint yang tersedia di backend
-          res = await fetch(`${apiUrl}/api/promos/validate`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ 
-              code: codeToValidate,
-              tenant_id: currentUserId, // ID tenant yang melakukan validasi
-              item_owner_id: userId,    // ID pemilik promo  
-              is_tenant_validation: true,
-              validation_source: 'qr_scan'
-            }),
-          });
-          result = await res.json().catch(() => null);
-        } else {
-          // Ini adalah validasi oleh pemilik promo - gunakan endpoint biasa
-          res = await fetch(`${apiUrl}/api/admin/promo-items/${targetId}/redeem`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ 
-              code: codeToValidate,
-              validate_user: true,
-              user_id: userId,
-              validation_type: 'owner_self'
-            }),
-          });
-          result = await res.json().catch(() => null);
-
-          // Fallback untuk validasi owner
-          if (res.status === 404 || res.status === 405) {
-            res = await fetch(`${apiUrl}/api/promos/validate`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ 
-                code: codeToValidate,
-                promo_item_id: targetId,
-                user_id: userId,
-                validate_ownership: true,
-                validation_type: 'owner_self'
-              }),
-            });
-            result = await res.json().catch(() => null);
-          }
-        }
+        // Use the same promo validation endpoint as validasi.jsx
+        // This endpoint handles both tenant and owner validation properly
+        res = await fetch(`${apiUrl}/api/promos/validate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ 
+            code: codeToValidate.trim(),
+            validator_role: isOwner ? 'user' : 'tenant' // Same pattern as validasi.jsx
+          }),
+        });
+        result = await res.json().catch(() => null);
       } else if (isVoucherItem) {
         const targetId = selected?.voucher_item?.id || selected?.id;
         const userId = selected?.voucher_item?.user_id || selected?.user_id;
+        
+        console.log('🎫 VOUCHER VALIDATION START:', {
+          targetId,
+          userId,
+          selected: selected,
+          codeToValidate: codeToValidate
+        });
         
         if (!targetId) {
           setValidationMessage('Voucher tidak valid atau tidak ditemukan.');
@@ -603,50 +577,31 @@ export default function Save() {
         // Validasi: Jika current user bukan pemilik voucher, maka ini adalah validasi oleh tenant
         const isOwner = currentUserId && userId && (currentUserId.toString() === userId.toString());
         
-        if (!isOwner) {
-          // Ini adalah scan QR oleh tenant - gunakan endpoint yang tersedia di backend
-          res = await fetch(`${apiUrl}/api/vouchers/validate`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ 
-              code: codeToValidate,
-              tenant_id: currentUserId, // ID tenant yang melakukan validasi
-              item_owner_id: userId,    // ID pemilik voucher
-              is_tenant_validation: true,
-              validation_source: 'qr_scan'
-            }),
-          });
-          result = await res.json().catch(() => null);
-        } else {
-          // Ini adalah validasi oleh pemilik voucher - gunakan endpoint biasa
-          res = await fetch(`${apiUrl}/api/admin/voucher-items/${targetId}/redeem`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ 
-              code: codeToValidate,
-              validate_user: true,
-              user_id: userId,
-              validation_type: 'owner_self'
-            }),
-          });
-          result = await res.json().catch(() => null);
-
-          // Fallback untuk validasi owner
-          if (res.status === 404 || res.status === 405) {
-            res = await fetch(`${apiUrl}/api/vouchers/validate`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ 
-                code: codeToValidate,
-                voucher_item_id: targetId,
-                user_id: userId,
-                validate_ownership: true,
-                validation_type: 'owner_self'
-              }),
-            });
-            result = await res.json().catch(() => null);
-          }
-        }
+        console.log('🔐 VOUCHER OWNERSHIP CHECK:', {
+          currentUserId,
+          userId,
+          isOwner,
+          validatorRole: isOwner ? 'user' : 'tenant'
+        });
+        
+        // Use the same voucher validation endpoint as validasi.jsx
+        // This endpoint handles both tenant and owner validation properly
+        res = await fetch(`${apiUrl}/api/vouchers/validate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ 
+            code: codeToValidate.trim(),
+            validator_role: isOwner ? 'user' : 'tenant' // Same pattern as validasi.jsx
+          }),
+        });
+        result = await res.json().catch(() => null);
+        
+        console.log('📡 VOUCHER VALIDATION RESPONSE:', {
+          status: res.status,
+          ok: res.ok,
+          result: result,
+          codeValidated: codeToValidate.trim()
+        });
       } else {
         setValidationMessage('Item tidak dikenali.');
         setShowValidationFailed(true);
@@ -753,16 +708,35 @@ export default function Save() {
           fetchData(); // Fetch ulang data untuk memastikan status terupdate
         }, 100); // Kurangi delay untuk response yang lebih cepat
       } else {
+        console.log('❌ VALIDATION FAILED:', {
+          status: res?.status,
+          result: result,
+          message: result?.message,
+          selectedType: selected?.type,
+          codeValidated: codeToValidate
+        });
+        
         const msg = (result?.message || '').toString();
+        let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
+        
         if (res?.status === 409) {
-          setValidationMessage(/stok/i.test(msg) ? 'Stok promo habis.' : 'Kode unik sudah pernah divalidasi.');
+          errorMessage = /stok/i.test(msg) ? 'Stok promo habis.' : 'Kode unik sudah pernah divalidasi.';
         } else if (res?.status === 404) {
-          setValidationMessage('Kode unik tidak ditemukan.');
+          errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" tidak ditemukan.`;
         } else if (res?.status === 422) {
-          setValidationMessage(result?.message || 'Kode unik tidak valid atau format salah.');
+          errorMessage = result?.message || 'Kode unik tidak valid atau format salah.';
+        } else if (res?.status === 400) {
+          // Often means already validated
+          if (msg.toLowerCase().includes('sudah') || msg.toLowerCase().includes('digunakan') || msg.toLowerCase().includes('already')) {
+            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
+          } else {
+            errorMessage = result?.message || 'Kode unik tidak valid.';
+          }
         } else {
-          setValidationMessage('Terjadi kesalahan. Silakan coba lagi.');
+          errorMessage = result?.message || 'Terjadi kesalahan saat validasi.';
         }
+        
+        setValidationMessage(errorMessage);
         setShowValidationFailed(true);
       }
     } catch (e) {
