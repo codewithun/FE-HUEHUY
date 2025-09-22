@@ -29,6 +29,19 @@ const dev = process.env.NODE_ENV !== 'production';
 // eslint-disable-next-line no-console
 const dlog = (...args) => dev && console.log(...args);
 
+// Ambil item_id dari berbagai kemungkinan struktur response backend
+const getRespItemId = (payload) => {
+  if (!payload) return null;
+  const d = payload.data || payload;
+  return (
+    d?.voucher_item?.id ||
+    d?.voucher_item_id ||
+    d?.promo_item?.id ||
+    d?.promo_item_id ||
+    null
+  );
+};
+
 export default function ScanValidasi() {
   const router = useRouter();
   const { profile, loading, fetchProfile } = useUserContext();
@@ -156,7 +169,7 @@ export default function ScanValidasi() {
     return { code: trimmedResult, type: 'unknown', isStructured: false };
   };
 
-  // Validasi tenant + sinkronisasi item user agar “Saku” langsung updated
+  // Validasi tenant – TANPA redeem manual (hindari 409)
   const submitValidate = async (qrData) => {
     setSubmitLoading(true);
     setIsScanning(false);
@@ -220,12 +233,7 @@ export default function ScanValidasi() {
       dlog('📋 QR metadata:', { type: qrItemType, item_id: itemId, user_id: userId, isStructured });
       dlog('🔐 Validation request headers:', headers);
 
-      // Tenant sebagai validator
-      let res,
-        result,
-        itemType = 'promo',
-        promoError = null,
-        voucherError = null;
+      let res, result, itemType = 'promo', promoError = null, voucherError = null;
 
       const tenantPayload = {
         code: codeToValidate.trim(),
@@ -243,10 +251,8 @@ export default function ScanValidasi() {
 
       dlog('🏢 Enhanced tenant validation payload:', tenantPayload);
 
-      // Prioritas: pakai hint type dari QR → coba itu dulu
       if (qrItemType === 'voucher') {
         dlog('🎫 QR indicates voucher - trying voucher validation first...');
-
         res = await fetch(`${apiUrl}/api/vouchers/validate`, {
           method: 'POST',
           headers,
@@ -254,13 +260,11 @@ export default function ScanValidasi() {
         });
         result = await res.json().catch(() => null);
         itemType = 'voucher';
-
         dlog('📡 Voucher validation response:', { status: res.status, ok: res.ok, result });
 
         if (!res.ok) {
           voucherError = { status: res.status, message: result?.message, result };
           dlog('🔍 Voucher failed, trying promo validation as fallback...');
-
           res = await fetch(`${apiUrl}/api/promos/validate`, {
             method: 'POST',
             headers,
@@ -268,13 +272,10 @@ export default function ScanValidasi() {
           });
           result = await res.json().catch(() => null);
           itemType = 'promo';
-
           dlog('📡 Promo validation response (fallback):', { status: res.status, ok: res.ok, result });
         }
       } else {
-        // Default: promo dulu
         dlog('🎁 Trying promo validation first (default or QR indicates promo)...');
-
         res = await fetch(`${apiUrl}/api/promos/validate`, {
           method: 'POST',
           headers,
@@ -282,13 +283,11 @@ export default function ScanValidasi() {
         });
         result = await res.json().catch(() => null);
         itemType = 'promo';
-
         dlog('📡 Promo validation response:', { status: res.status, ok: res.ok, result });
 
         if (!res.ok) {
           promoError = { status: res.status, message: result?.message, result };
           dlog('🔍 Promo failed, trying voucher validation...');
-
           res = await fetch(`${apiUrl}/api/vouchers/validate`, {
             method: 'POST',
             headers,
@@ -296,7 +295,6 @@ export default function ScanValidasi() {
           });
           result = await res.json().catch(() => null);
           itemType = 'voucher';
-
           dlog('📡 Voucher validation response:', { status: res.status, ok: res.ok, result });
         }
       }
@@ -306,13 +304,7 @@ export default function ScanValidasi() {
         setModalFailed(true);
       } else if (res?.ok) {
         // === SUKSES VALIDASI TENANT ===
-        // Ambil item id yang benar dari backend
-        const respItemId =
-          result?.data?.promo_item_id ||
-          result?.data?.voucher_item_id ||
-          result?.data?.promo?.id ||
-          result?.data?.voucher?.id;
-
+        const respItemId = getRespItemId(result);
         if (isStructured && itemId && respItemId && String(respItemId) !== String(itemId)) {
           dlog('ℹ️ ID Info:', {
             qr_item_id: itemId,
@@ -321,7 +313,6 @@ export default function ScanValidasi() {
           });
         }
 
-        // Tampilkan sukses ke tenant
         setLastItemType(itemType);
         setModalSuccess(true);
 
@@ -335,28 +326,7 @@ export default function ScanValidasi() {
           validationResponse: result,
         });
 
-        // === Sinkronisasi (idempotent) ke baris item user supaya Saku user langsung updated ===
-        // Aman dipanggil 2x, backend seharusnya mengabaikan kalau sudah used/redeemed.
-        try {
-          const idToRedeem = respItemId || itemId;
-          if (idToRedeem) {
-            if (itemType === 'voucher') {
-              await fetch(`${apiUrl}/api/admin/voucher-items/${idToRedeem}/redeem`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ code: codeToValidate }),
-              });
-            } else {
-              await fetch(`${apiUrl}/api/admin/promo-items/${idToRedeem}/redeem`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ code: codeToValidate }),
-              });
-            }
-          }
-        } catch {
-          // Dibiarkan silent; ini hanya langkah sinkronisasi tambahan
-        }
+        // ❗️Tidak ada redeem manual di sini — biarkan backend handle status user.
       } else {
         // === Error handling dengan pesan informatif ===
         let errorMsg = 'Kode tidak valid atau tidak ditemukan';
@@ -381,11 +351,11 @@ export default function ScanValidasi() {
         if (promoError && isAlreadyValidated(promoError.status, promoError.message)) {
           errorMsg = `Promo dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
         } else if (isAlreadyValidated(res?.status, result?.message)) {
-          errorMsg = `${lastItemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
+          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
         } else if (promoError && promoError.status === 404 && res?.status === 404) {
           errorMsg = `Kode "${codeToValidate}" tidak ditemukan. Pastikan kode yang Anda masukkan sudah benar.`;
         } else if (isNotFound(res?.status, result?.message)) {
-          errorMsg = `${lastItemType === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" tidak ditemukan.`;
+          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" tidak ditemukan.`;
         } else if (res?.status === 422) {
           errorMsg = result?.message || `Kode "${codeToValidate}" tidak valid atau format salah.`;
         } else if (result?.message) {
@@ -396,7 +366,6 @@ export default function ScanValidasi() {
         setModalFailed(true);
       }
     } catch (err) {
-      // Simpan error ke console saat dev saja
       // eslint-disable-next-line no-console
       if (dev) console.error('Validation error:', err);
       setModalFailedMessage('Terjadi kesalahan saat validasi. Silakan coba lagi.');
