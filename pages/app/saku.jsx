@@ -369,7 +369,7 @@ export default function Save() {
       let res, result;
 
       if (isPromoItem) {
-        // Untuk promo, gunakan endpoint spesifik dengan item ID seperti voucher
+        // Untuk promo, gunakan endpoint redeem spesifik dengan item ID
         const targetId = selected?.id;
         if (!targetId) {
           setValidationMessage('Promo tidak valid atau tidak ditemukan.');
@@ -378,7 +378,7 @@ export default function Save() {
           return;
         }
 
-        // Coba endpoint redeem promo spesifik dulu
+        // Gunakan endpoint admin promo-items redeem (sesuai API routes)
         res = await fetch(`${apiUrl}/admin/promo-items/${targetId}/redeem`, {
           method: 'POST',
           headers,
@@ -386,12 +386,15 @@ export default function Save() {
         });
         result = await res.json().catch(() => null);
 
-        // Fallback ke endpoint generic jika endpoint spesifik tidak ada
-        if (res.status === 404 || res.status === 405) {
+        // Jika endpoint admin tidak tersedia, fallback ke endpoint generic
+        if (res.status === 404 || res.status === 405 || res.status === 401) {
           res = await fetch(`${apiUrl}/promos/validate`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ code: codeToValidate }),
+            body: JSON.stringify({ 
+              code: codeToValidate,
+              promo_item_id: targetId 
+            }),
           });
           result = await res.json().catch(() => null);
         }
@@ -430,15 +433,25 @@ export default function Save() {
         setValidationMessage('Berhasil divalidasi.');
         setShowValidationSuccess(true);
         setValidationCode('');
+        
+        // Update status item di local state
         if (selected) {
+          const now = new Date().toISOString();
           setData((prev) => ({
             ...prev,
             data: prev.data.map((it) =>
-              it.id === selected.id ? { ...it, validated_at: new Date().toISOString() } : it
+              it.id === selected.id 
+                ? { ...it, validated_at: now, used_at: now, redeemed_at: now } 
+                : it
             ),
           }));
         }
-        setTimeout(() => setRefreshTrigger((p) => p + 1), 400);
+        
+        // Refresh data dari server untuk memastikan sinkronisasi
+        setTimeout(() => {
+          setRefreshTrigger((p) => p + 1);
+          fetchData(); // Fetch ulang data untuk memastikan status terupdate
+        }, 500);
       } else {
         const msg = (result?.message || '').toString();
         if (res?.status === 409) {
@@ -792,26 +805,27 @@ export default function Save() {
                       </span>
                     </div>
 
-                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
-                      <QRCodeSVG
-                        value={JSON.stringify({
-                          code: selected?.voucher_item?.code || selected?.code || 'NO_CODE',
-                          type: 'voucher',
-                          item_id: selected?.voucher_item?.id || selected?.id,
-                          user_id: selected?.voucher_item?.user_id || selected?.user_id
-                        })}
-                        size={180}
-                        bgColor="#f8fafc"
-                        fgColor="#0f172a"
-                        level="H"
-                        includeMargin={true}
-                        className="mx-auto rounded-lg"
-                      />
-                    </div>
-
                     {/* AUTO → QR saja; MANUAL → tampilkan input & tombol */}
                     {!isManual ? (
-                      <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
+                      <>
+                        <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                          <QRCodeSVG
+                            value={JSON.stringify({
+                              code: selected?.voucher_item?.code || selected?.code || 'NO_CODE',
+                              type: 'voucher',
+                              item_id: selected?.voucher_item?.id || selected?.id,
+                              user_id: selected?.voucher_item?.user_id || selected?.user_id
+                            })}
+                            size={180}
+                            bgColor="#f8fafc"
+                            fgColor="#0f172a"
+                            level="H"
+                            includeMargin={true}
+                            className="mx-auto rounded-lg"
+                          />
+                        </div>
+                        <p className="text-slate-500 text-sm">Tunjukkan QR ini ke merchant untuk dipindai.</p>
+                      </>
                     ) : (
                       <div className="space-y-4">
                         {!isItemValidatable(selected) && (
