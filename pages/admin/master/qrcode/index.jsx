@@ -1,13 +1,15 @@
 /* eslint-disable no-console */
-import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { QRCodeCanvas } from 'qrcode.react';
-import React, { useRef, useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ButtonComponent,
   FloatingPageComponent,
+  InputComponent,
   ModalConfirmComponent,
+  SelectComponent,
   TableSupervisionComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
@@ -15,12 +17,9 @@ import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
 export default function QRCodeCrud() {
-  const [qrList, setQrList] = useState([]);
-  const [modalForm, setModalForm] = useState(false);
   const [modalView, setModalView] = useState(false);
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [formData, setFormData] = useState({ voucher_id: '', promo_id: '', tenant_name: '' });
   const [voucherList, setVoucherList] = useState([]);
   const [promoList, setPromoList] = useState([]);
   const [refreshToggle, setRefreshToggle] = useState(false);
@@ -38,6 +37,12 @@ export default function QRCodeCrud() {
   // Hapus '/api' hanya jika berada di UJUNG string
   const storageBase = apiBase.replace(/\/api\/?$/, '');
 
+  const authHeader = useCallback(() => {
+    const enc = Cookies.get(token_cookie_name);
+    const token = enc ? Decrypt(enc) : '';
+    return { Authorization: `Bearer ${token}` };
+  }, []);
+
   // Helper membentuk URL image storage yang aman
   const toStorageUrl = (path) => {
     if (!path) return '';
@@ -46,7 +51,85 @@ export default function QRCodeCrud() {
     return `${storageBase}/storage/${path}`.replace(/([^:]\/)\/+/g, '$1');
   };
 
-  const columns = [
+  // Helper format tanggal (lokal Indonesia)
+  const formatDate = (value) => {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString('id-ID', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Helper ambil label/ nama terbaik dari object voucher/promo
+  const getLabel = (item) => {
+    if (!item) return '';
+    return (
+      item.name ||
+      item.nama ||
+      item.title ||
+      item.kode ||
+      item.code ||
+      item.label ||
+      (item.id !== undefined ? String(item.id) : JSON.stringify(item))
+    );
+  };
+
+  const getVoucherLabel = useCallback((id) => {
+    if (!id) return '';
+    const v = voucherList.find((x) => String(x.id) === String(id));
+    return v ? getLabel(v) : `Voucher #${id}`;
+  }, [voucherList]);
+
+  const getPromoLabel = useCallback((id) => {
+    if (!id) return '';
+    const p = promoList.find((x) => String(x.id) === String(id));
+    return p ? getLabel(p) : `Promo #${id}`;
+  }, [promoList]);
+
+  // Fetch vouchers dan promos
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        // Fetch voucher - Remove /api/ prefix
+        const voucherRes = await fetch(`${apiBase}/admin/vouchers`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', ...authHeader() },
+        });
+        if (voucherRes.ok) {
+          const voucherResult = await voucherRes.json();
+          console.log('Voucher result:', voucherResult); // Add debug log
+          setVoucherList(Array.isArray(voucherResult.data) ? voucherResult.data : []);
+        } else {
+          console.error('Failed to fetch vouchers:', voucherRes.status);
+        }
+
+        // Fetch promo - Remove /api/ prefix
+        const promoRes = await fetch(`${apiBase}/admin/promos`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', ...authHeader() },
+        });
+        if (promoRes.ok) {
+          const promoResult = await promoRes.json();
+          console.log('Promo result:', promoResult); // Add debug log
+          setPromoList(Array.isArray(promoResult.data) ? promoResult.data : []);
+        } else {
+          console.error('Failed to fetch promos:', promoRes.status);
+        }
+      } catch (error) {
+        console.error('Error fetching options:', error);
+        setVoucherList([]);
+        setPromoList([]);
+      }
+    };
+    fetchOptions();
+  }, [apiBase, authHeader]);
+
+  const columns = useMemo(() => [
     {
       selector: 'tenant_name',
       label: 'Nama Tenant',
@@ -54,16 +137,20 @@ export default function QRCodeCrud() {
       item: ({ tenant_name }) => <span className="font-semibold">{tenant_name}</span>,
     },
     {
-      selector: 'voucher',
+      selector: 'voucher_id',
       label: 'Voucher',
-      item: ({ voucher }) =>
-        voucher ? (voucher.name || voucher.kode || voucher.code || voucher.id) : '-',
+      item: ({ voucher_id, voucher }) => {
+        if (voucher) return getLabel(voucher);
+        return voucher_id ? getVoucherLabel(voucher_id) : '-';
+      },
     },
     {
-      selector: 'promo',
+      selector: 'promo_id',
       label: 'Promo',
-      item: ({ promo }) =>
-        promo ? (promo.name || promo.kode || promo.code || promo.id) : '-',
+      item: ({ promo_id, promo }) => {
+        if (promo) return getLabel(promo);
+        return promo_id ? getPromoLabel(promo_id) : '-';
+      },
     },
     {
       selector: 'qr_code',
@@ -86,158 +173,53 @@ export default function QRCodeCrud() {
       selector: 'created_at',
       label: 'Tanggal Dibuat',
       sortable: true,
-      item: ({ created_at }) => created_at,
+      item: ({ created_at }) => formatDate(created_at),
     },
-  ];
+  ], [getVoucherLabel, getPromoLabel]);
 
-  // Fetch data QR code saat halaman dibuka
-  useEffect(() => {
-    const fetchData = async () => {
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      try {
-        const res = await fetch(`${apiBase}/admin/qrcodes`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const result = await res.json();
-        const dataArray = Array.isArray(result) ? result : result.data;
-        if (res.ok && Array.isArray(dataArray)) {
-          setQrList(
-            dataArray.map((item) => ({
-              id: item.id,
-              tenant_name: item.tenant_name,
-              text: [
-                item.tenant_name,
-                item.voucher?.name || item.voucher?.kode || item.voucher?.code,
-                item.promo?.name || item.promo?.kode || item.promo?.code,
-              ]
-                .filter(Boolean)
-                .join(' | '),
-              voucher: item.voucher, // keep as object
-              promo: item.promo,     // keep as object
-              // backend bisa kirim path relatif (qr_code/path) atau absolute url
-              qr_code: item.qr_code || item.path,
-              created_at: item.created_at,
-            }))
-          );
-        }
-      } catch (err) {
-        console.error('Fetch qrcodes failed:', err);
-      }
-    };
-    fetchData();
-  }, [apiBase]);
-
-  // Fetch data voucher, promo saat modalForm dibuka
-  useEffect(() => {
-    if (modalForm) {
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      // Fetch voucher
-      fetch(`${apiBase}/admin/vouchers`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(res => res.json())
-        .then(res => setVoucherList(res.data || []))
-        .catch(() => setVoucherList([]));
-      // Fetch promo
-      fetch(`${apiBase}/admin/promos`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(res => res.json())
-        .then(res => setPromoList(res.data || []))
-        .catch(() => setPromoList([]));
-    }
-  }, [modalForm, apiBase]);
-
-  const handleAdd = async () => {
-    if (!formData.tenant_name) {
-      alert('Nama tenant wajib diisi');
-      return;
-    }
-    if (!formData.voucher_id && !formData.promo_id) {
-      alert('Voucher atau Promo harus diisi salah satu.');
-      return;
-    }
+  const handleDelete = async () => {
+    if (!selectedItem) return;
     try {
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      const res = await fetch(`${apiBase}/admin/qrcodes/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          voucher_id: formData.voucher_id || null,
-          promo_id: formData.promo_id || null,
-          tenant_name: formData.tenant_name,
-        }),
+      // Also fix the delete endpoint - remove /api/ prefix
+      const res = await fetch(`${apiBase}/admin/qrcodes/${selectedItem.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
       });
-
-      let result = {};
-      try {
-        result = await res.json(); // antisipasi 204/500 tanpa body
-      } catch {
-        result = {};
-      }
-
-      if (res.ok && result.qrcode) {
-        setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
-        setModalForm(false);
-        // trigger TableSupervisionComponent to refresh via setToRefresh prop
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
         setRefreshToggle((s) => !s);
+        alert('QR Code berhasil dihapus');
       } else {
-        alert(result.message || 'Gagal membuat QR code');
+        console.error('Delete failed:', body);
+        alert(body?.message || 'Gagal menghapus QR Code');
       }
-    } catch (err) {
-      console.error(err);
-      alert('Gagal membuat QR code');
+    } catch (error) {
+      console.error('Error deleting QR Code:', error);
+      alert('Gagal menghapus QR Code: Network error');
+    } finally {
+      setModalDelete(false);
+      setSelectedItem(null);
     }
   };
-
-  const handleUpdate = () => {
-    // FE-only placeholder; sambungkan ke API update jika diperlukan
-    if (!formData.tenant_name) return;
-    setModalForm(false);
-    setSelectedItem(null);
-  };
-
-  const handleDelete = () => {
-    setQrList(qrList.filter(item => item.id !== selectedItem.id));
-    setModalDelete(false);
-    setSelectedItem(null);
-  };
-
-  const topBarActions = (
-    <ButtonComponent
-      label="Tambah Baru"
-      icon={faPlus}
-      paint="primary"
-      onClick={() => {
-        setSelectedItem(null);
-        setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
-        setModalForm(true);
-      }}
-    />
-  );
 
   // helper to build target URL (untuk nilai QR yang dipreview)
   const buildTargetUrl = (item) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     if (!item) return '';
 
-    if (item.promo) {
-      const communityId = item.promo?.community?.id || item.promo?.community_id || 'default';
-      return `${origin}/app/komunitas/promo/detail_promo?promoId=${item.promo.id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
+    if (item.promo || item.promo_id) {
+      const promo = item.promo || promoList.find(p => String(p.id) === String(item.promo_id));
+      if (promo) {
+        const communityId = promo?.community?.id || promo?.community_id || 'default';
+        return `${origin}/app/komunitas/promo/detail_promo?promoId=${promo.id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
+      }
     }
-    if (item.voucher) {
-      const id = item.voucher.id ?? item.voucher.voucher_item?.id ?? item.voucher.voucherId;
-      return `${origin}/app/voucher/${id}?autoRegister=1&source=qr_scan`;
+    if (item.voucher || item.voucher_id) {
+      const voucher = item.voucher || voucherList.find(v => String(v.id) === String(item.voucher_id));
+      if (voucher) {
+        const id = voucher.id ?? voucher.voucher_item?.id ?? voucher.voucherId;
+        return `${origin}/app/voucher/${id}?autoRegister=1&source=qr_scan`;
+      }
     }
     return '';
   };
@@ -248,7 +230,7 @@ export default function QRCodeCrud() {
     setQrUrl(buildTargetUrl(selectedItem));
     // reset ref biar clean
     qrCanvasRef.current = null;
-  }, [selectedItem]);
+  }, [selectedItem, promoList, voucherList]);
 
   // === Download: pilih otomatis server-PNG atau FE konversi SVG -> PNG ===
   const smartDownload = async () => {
@@ -330,115 +312,129 @@ export default function QRCodeCrud() {
     <>
       <TableSupervisionComponent
         title="Generator QR Event"
-        data={qrList}
         columnControl={{ custom: columns }}
-        customTopBar={topBarActions}
+        searchable
         noControlBar={false}
-        searchable={true}
         setToRefresh={refreshToggle}
-        // 🔴 Nonaktifkan modal detail default (klik row tidak ngapa2in)
-        actionControl={{ except: ['detail'] }}
-        fetchControl={{
-          path: 'admin/qrcodes',
-          method: 'GET',
-          headers: () => {
-            const encryptedToken = Cookies.get(token_cookie_name);
-            const token = encryptedToken ? Decrypt(encryptedToken) : '';
-            return {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            };
-          },
-          mapData: (result) => {
-            if (Array.isArray(result)) {
-              return { data: result, totalRow: result.length };
-            }
-            return result;
+        actionControl={{
+          except: ['detail', 'edit'], // Remove edit from actions
+          onAdd: () => setSelectedItem(null),
+          onDelete: (item) => {
+            setSelectedItem(item);
+            setModalDelete(true);
           },
         }}
-        // Keep your custom row click handler for the QR view modal
+        fetchControl={{
+          path: 'admin/qrcodes',
+          includeHeaders: {
+            'Content-Type': 'application/json',
+            ...authHeader(),
+          },
+        }}
+        // Default values untuk form
+        formDefaultValue={{
+          voucher_id: '',
+          promo_id: '',
+          tenant_name: '',
+        }}
+        // Validasi sebelum submit
+        beforeSubmit={(payload) => {
+          if (!payload.tenant_name?.trim()) {
+            alert('Nama tenant wajib diisi');
+            return false;
+          }
+          if (!payload.voucher_id && !payload.promo_id) {
+            alert('Voucher atau Promo harus diisi salah satu.');
+            return false;
+          }
+          return true;
+        }}
+        formControl={{
+          contentType: 'application/json',
+          // Make sure this is the correct endpoint path
+          endpoint: 'admin/qrcodes/generate', 
+          // Add method explicitly to ensure it's POST
+          method: 'POST',
+          transformData: (data) => {
+            console.log('Sending data:', data); // Debug log
+            return {
+              voucher_id: data.voucher_id || null,
+              promo_id: data.promo_id || null,
+              tenant_name: data.tenant_name,
+            };
+          },
+          custom: [
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                const fc = formControl('voucher_id');
+                const current = fc.value ?? '';
+                return (
+                  <div className="col-span-12">
+                    <SelectComponent
+                      name="voucher_id"
+                      label="Voucher"
+                      placeholder="Pilih Voucher..."
+                      value={current}
+                      onChange={fc.onChange}
+                      clearable={true}
+                      options={voucherList.map((v) => ({
+                        label: getLabel(v),
+                        value: v.id,
+                      }))}
+                    />
+                  </div>
+                );
+              },
+              col: 12,
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                const fc = formControl('promo_id');
+                const current = fc.value ?? '';
+                return (
+                  <div className="col-span-12">
+                    <SelectComponent
+                      name="promo_id"
+                      label="Promo"
+                      placeholder="Pilih Promo..."
+                      value={current}
+                      onChange={fc.onChange}
+                      clearable={true}
+                      options={promoList.map((p) => ({
+                        label: getLabel(p),
+                        value: p.id,
+                      }))}
+                    />
+                  </div>
+                );
+              },
+              col: 12,
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => (
+                <div className="col-span-12">
+                  <InputComponent
+                    name="tenant_name"
+                    label="Nama Tenant *"
+                    placeholder="Masukkan nama tenant"
+                    required
+                    {...formControl('tenant_name')}
+                  />
+                </div>
+              ),
+              col: 12,
+            },
+          ],
+        }}
+        // Custom row click untuk modal view
         onRowClick={(item) => {
           setSelectedItem(item);
           setModalView(true);
         }}
       />
-
-      {/* Modal Form */}
-      <FloatingPageComponent
-        show={modalForm}
-        onClose={() => {
-          setModalForm(false);
-          setSelectedItem(null);
-          setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
-        }}
-        title={selectedItem ? 'Ubah QR Event' : 'Tambah QR Event'}
-        size="md"
-        className="bg-background"
-      >
-        <form
-          className="flex flex-col gap-4 p-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            selectedItem ? handleUpdate() : handleAdd();
-          }}
-        >
-          <div>
-            <label className="font-semibold">Voucher</label>
-            <select
-              className="input input-bordered w-full"
-              value={formData.voucher_id}
-              onChange={(e) => setFormData({ ...formData, voucher_id: e.target.value })}
-            >
-              <option value="">Pilih Voucher</option>
-              {voucherList.length === 0 && <option value="" disabled>Tidak ada voucher</option>}
-              {voucherList.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name || v.kode || v.id}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="font-semibold">Promo</label>
-            <select
-              className="input input-bordered w-full"
-              value={formData.promo_id}
-              onChange={(e) => setFormData({ ...formData, promo_id: e.target.value })}
-            >
-              <option value="">Pilih Promo</option>
-              {promoList.length === 0 && <option value="" disabled>Tidak ada promo</option>}
-              {promoList.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name || p.kode || p.id}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="font-semibold">Nama Tenant</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Masukkan nama tenant"
-              value={formData.tenant_name}
-              onChange={(e) => setFormData({ ...formData, tenant_name: e.target.value })}
-            />
-          </div>
-          <div className="flex gap-2 justify-end mt-4">
-            <ButtonComponent
-              label="Batal"
-              paint="secondary"
-              variant="outline"
-              onClick={() => {
-                setModalForm(false);
-                setSelectedItem(null);
-                setFormData({ voucher_id: '', promo_id: '', tenant_name: '' });
-              }}
-            />
-            <ButtonComponent label={selectedItem ? 'Perbarui' : 'Simpan'} paint="primary" type="submit" />
-          </div>
-        </form>
-      </FloatingPageComponent>
 
       {/* Modal View QR */}
       <FloatingPageComponent
@@ -452,7 +448,7 @@ export default function QRCodeCrud() {
         size="md"
         className="bg-background"
       >
-        {selectedItem && (selectedItem.promo || selectedItem.voucher) ? (
+        {selectedItem && (selectedItem.promo || selectedItem.voucher || selectedItem.promo_id || selectedItem.voucher_id) ? (
           <div className="flex flex-col items-center gap-4 p-6" ref={qrContainerRef}>
             {qrUrl ? (
               <>
@@ -468,16 +464,12 @@ export default function QRCodeCrud() {
                 />
                 <div className="text-center">
                   <div className="font-bold text-primary text-lg">
-                    {selectedItem.promo
-                      ? `Promo: ${selectedItem.promo.name || selectedItem.promo.kode || selectedItem.promo.id}`
-                      : `Voucher: ${selectedItem.voucher.name || selectedItem.voucher.kode || selectedItem.voucher.id}`}
+                    {selectedItem.promo || selectedItem.promo_id
+                      ? `Promo: ${selectedItem.promo ? getLabel(selectedItem.promo) : getPromoLabel(selectedItem.promo_id)}`
+                      : `Voucher: ${selectedItem.voucher ? getLabel(selectedItem.voucher) : getVoucherLabel(selectedItem.voucher_id)}`}
                   </div>
                   <div className="text-sm text-secondary mt-1">
-                    Community:{' '}
-                    {selectedItem.promo?.community_id ||
-                      selectedItem.voucher?.community?.id ||
-                      selectedItem.voucher?.community_id ||
-                      'default'}
+                    Tenant: {selectedItem.tenant_name}
                   </div>
                 </div>
 
@@ -504,15 +496,19 @@ export default function QRCodeCrud() {
 
       {/* Modal Delete Confirmation */}
       <ModalConfirmComponent
-        open={modalDelete}
+        title="Hapus QR Code"
+        show={modalDelete}
         onClose={() => {
           setModalDelete(false);
           setSelectedItem(null);
         }}
-        onConfirm={handleDelete}
-        title="Hapus QR Event"
-        message={`Apakah Anda yakin ingin menghapus QR Event "${selectedItem?.text}"?`}
-      />
+        onSubmit={handleDelete}
+      >
+        <p className="text-gray-600 mb-4">
+          Apakah Anda yakin ingin menghapus QR Code untuk tenant {selectedItem?.tenant_name}?
+        </p>
+        <p className="text-sm text-red-600">Tindakan ini tidak dapat dibatalkan.</p>
+      </ModalConfirmComponent>
     </>
   );
 }
