@@ -72,7 +72,9 @@ export default function KomunitasDashboard() {
   const [categoryForm, setCategoryForm] = useState({ title: "", description: "" });
   const [activeCommunityId, setActiveCommunityId] = useState(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
-  const [previewWidgets, setPreviewWidgets] = useState([]);
+
+  // Map kategori -> daftar promo {id,title}
+  const [categoryPromosMap, setCategoryPromosMap] = useState({});
 
   // === Anggota (members) ===
   const [modalMember, setModalMember] = useState(false);
@@ -217,7 +219,29 @@ export default function KomunitasDashboard() {
       },
     });
     const result = await res.json();
-    setCategoryList(Array.isArray(result) ? result : result.data || []);
+    const cats = Array.isArray(result) ? result : result.data || [];
+    setCategoryList(cats);
+
+    // Try build promos map from API response if tersedia
+    setCategoryPromosMap((prev) => {
+      const next = { ...prev };
+      cats.forEach((cat) => {
+        const fromPromos = Array.isArray(cat.promos) ? cat.promos : [];
+        const fromItems = Array.isArray(cat.items)
+          ? cat.items.filter((it) => (it.type || it.item_type) === "promo")
+          : [];
+        const promos = fromPromos.length ? fromPromos : fromItems;
+        if (promos.length) {
+          next[cat.id] = promos.map((p) => ({
+            id: p.id,
+            title: p.title || p.name || `Promo #${p.id}`,
+          }));
+        } else if (!(cat.id in next)) {
+          next[cat.id] = [];
+        }
+      });
+      return next;
+    });
   };
 
   // Open category modal
@@ -246,62 +270,8 @@ export default function KomunitasDashboard() {
         },
         body: JSON.stringify(categoryForm),
       });
-      setCategoryForm({ title: "", description: "" });
-      setSelectedCategory(null);
-      fetchCategories(activeCommunityId);
 
-      // coba buat promo-widget terkait kategori (opsional)
-      try {
-        const widgetRes = await fetch(
-          apiJoin(`communities/${activeCommunityId}/promo-categories`),
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              title: categoryForm.title,
-              subtitle: categoryForm.description || "",
-            }),
-          }
-        );
-        const widgetJson = await widgetRes.json().catch(() => ({}));
-        if (widgetRes.ok || (widgetJson && widgetJson.success)) {
-          const created =
-            widgetJson.data ||
-            widgetJson || {
-              id: widgetJson.id || Date.now(),
-              title: categoryForm.title,
-              subtitle: categoryForm.description || "",
-              promos: [],
-            };
-          setPreviewWidgets((p) => [created, ...p]);
-        } else {
-          setPreviewWidgets((p) => [
-            {
-              id: `local-${Date.now()}`,
-              title: categoryForm.title,
-              subtitle: categoryForm.description || "",
-              promos: [],
-            },
-            ...p,
-          ]);
-        }
-      } catch {
-        setPreviewWidgets((p) => [
-          {
-            id: `local-${Date.now()}`,
-            title: categoryForm.title,
-            subtitle: categoryForm.description || "",
-            promos: [],
-          },
-          ...p,
-        ]);
-      }
-
-      // Trigger refresh di home.jsx dengan broadcast event
-      // Ini akan memicu home.jsx untuk refresh data promo
+      // Broadcast event ke home.jsx
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('communityDataUpdated', {
           detail: {
@@ -314,6 +284,10 @@ export default function KomunitasDashboard() {
           }
         }));
       }
+
+      setCategoryForm({ title: "", description: "" });
+      setSelectedCategory(null);
+      fetchCategories(activeCommunityId);
     } catch {
       // noop
     }
@@ -400,9 +374,30 @@ export default function KomunitasDashboard() {
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok || (json && json.success)) {
+        // Update map lokal untuk menampilkan langsung di tabel
+        const addedPromo = existingPromoList.find(
+          (p) => String(p.id) === String(selectedPromoId)
+        );
+        const catIdNum = Number(selectedAttachCategoryId);
+        setCategoryPromosMap((prev) => {
+          const current = prev[catIdNum] ? [...prev[catIdNum]] : [];
+          if (addedPromo && !current.some((p) => p.id === addedPromo.id)) {
+            current.push({
+              id: addedPromo.id,
+              title: addedPromo.title || addedPromo.name || `Promo #${addedPromo.id}`,
+            });
+          }
+          return { ...prev, [catIdNum]: current };
+        });
+
+        // Tutup modal dan refresh kategori untuk sinkron server
         setModalAdd(false);
         setSelectedCommunityForAdd(null);
         setSelectedPromoId(null);
+
+        if (activeCommunityId) {
+          fetchCategories(activeCommunityId);
+        }
       } else {
         alert(json.message || "Gagal menambahkan promo ke komunitas");
       }
@@ -710,7 +705,6 @@ export default function KomunitasDashboard() {
           setActiveCommunityId(null);
           setSelectedCategory(null);
           setCategoryForm({ title: "", description: "" });
-          setPreviewWidgets([]);
           setShowCategoryForm(false);
         }}
         title="Kategori Komunitas"
@@ -808,60 +802,67 @@ export default function KomunitasDashboard() {
                 <tr>
                   <th>Judul</th>
                   <th>Deskripsi</th>
+                  <th>Promo Terhubung</th>
                   <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {categoryList.map((cat) => (
-                  <tr key={cat.id}>
-                    <td>{cat.title}</td>
-                    <td>{cat.description || "-"}</td>
-                    <td>
-                      <div className="flex gap-2">
-                        <ButtonComponent
-                          label="Edit"
-                          size="sm"
-                          paint="warning"
-                          onClick={() => {
-                            setSelectedCategory(cat);
-                            setCategoryForm({
-                              title: cat.title,
-                              description: cat.description || "",
-                            });
-                            setShowCategoryForm(true);
-                          }}
-                        />
-                        <ButtonComponent
-                          label="Hapus"
-                          size="sm"
-                          paint="danger"
-                          onClick={() => handleCategoryDelete(cat)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {categoryList.map((cat) => {
+                  const promos = categoryPromosMap[cat.id] || [];
+                  return (
+                    <tr key={cat.id}>
+                      <td>{cat.title}</td>
+                      <td>{cat.description || "-"}</td>
+                      <td>
+                        {promos.length === 0 ? (
+                          <span className="text-gray-400">-</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {promos.slice(0, 3).map((p) => (
+                              <span
+                                key={p.id}
+                                className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800"
+                              >
+                                {p.title}
+                              </span>
+                            ))}
+                            {promos.length > 3 && (
+                              <span className="text-xs text-gray-500">
+                                +{promos.length - 3} lagi
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div className="flex gap-2">
+                          <ButtonComponent
+                            label="Edit"
+                            size="sm"
+                            paint="warning"
+                            onClick={() => {
+                              setSelectedCategory(cat);
+                              setCategoryForm({
+                                title: cat.title,
+                                description: cat.description || "",
+                              });
+                              setShowCategoryForm(true);
+                            }}
+                          />
+                          <ButtonComponent
+                            label="Hapus"
+                            size="sm"
+                            paint="danger"
+                            onClick={() => handleCategoryDelete(cat)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-
-          {/* Preview Widget */}
-          {previewWidgets.length > 0 && (
-            <div className="mt-6">
-              <h4 className="font-semibold mb-2">Preview Widget Promo</h4>
-              <div className="flex gap-4 overflow-x-auto">
-                {previewWidgets.map((w) => (
-                  <div key={w.id} className="bg-primary rounded-xl p-4 text-white min-w-[220px]">
-                    <h5 className="font-bold">{w.title}</h5>
-                    <p className="text-sm text-white/90">{w.subtitle}</p>
-                    <div className="mt-3 bg-white/10 rounded p-2 text-xs">
-                      <p className="text-white/80">No promos yet</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </FloatingPageComponent>
 
