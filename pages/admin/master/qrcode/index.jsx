@@ -96,7 +96,7 @@ export default function QRCodeCrud() {
     const fetchOptions = async () => {
       try {
         // Fetch voucher - Remove /api/ prefix
-        const voucherRes = await fetch(`${apiBase}/admin/vouchers`, {
+        const voucherRes = await fetch(`${apiBase}/admin/vouchers?all=1`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json', ...authHeader() },
         });
@@ -109,7 +109,7 @@ export default function QRCodeCrud() {
         }
 
         // Fetch promo - Remove /api/ prefix
-        const promoRes = await fetch(`${apiBase}/admin/promos`, {
+        const promoRes = await fetch(`${apiBase}/admin/promos?all=1`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json', ...authHeader() },
         });
