@@ -103,7 +103,7 @@ const joinCommunityAPI = async (communityId) => {
 
 /** Normalisasi bentuk respons dari backend menjadi array CommunityItem */
 const normalizeCommunities = (raw) => {
-  // backend kita sekarang balikin { data: [...] }, tapi handle array langsung juga
+  // backend kita sekarang balikin { data: [...] }, tapi handle array langsung
   const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
   return list.map((c) => {
     const isJoinedRaw = c.isJoined ?? c.is_joined ?? false;
@@ -646,14 +646,16 @@ function CommunityCard({
 
   return (
     <div
-      className={`bg-white bg-opacity-60 backdrop-blur-sm rounded-[15px] p-4 shadow-sm border transition-all duration-300 cursor-pointer ${
+      className={`bg-white bg-opacity-60 backdrop-blur-sm rounded-[15px] p-4 shadow-sm border transition-all duration-300 ${
         justJoined
           ? 'border-green-300 bg-green-50 shadow-md'
           : isJoined
-            ? 'border-primary bg-primary/5'
-            : 'border-slate-200 hover:shadow-md'
+            ? 'border-primary bg-primary/5 hover:shadow-md cursor-pointer'
+            : 'border-slate-200 cursor-default'
       }`}
-      onClick={handleClickCard}
+      onClick={isJoined ? handleClickCard : undefined}
+      aria-disabled={!isJoined}
+      title={!isJoined ? 'Gabung dulu untuk membuka komunitas' : undefined}
     >
       <div className="flex gap-3">
         <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
