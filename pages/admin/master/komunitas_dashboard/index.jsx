@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faUsers } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
@@ -74,6 +74,12 @@ export default function KomunitasDashboard() {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [previewWidgets, setPreviewWidgets] = useState([]);
 
+  // === Anggota (members) ===
+  const [modalMember, setModalMember] = useState(false);
+  const [memberList, setMemberList] = useState([]);
+  const [memberLoading, setMemberLoading] = useState(false);
+  const [memberError, setMemberError] = useState("");
+
   // =========================
   // Fetch community list (refetch on refreshToggle)
   // =========================
@@ -96,7 +102,7 @@ export default function KomunitasDashboard() {
       }
     };
     fetchData();
-  }, [refreshToggle]); // <-- UPDATED: depend on refreshToggle
+  }, [refreshToggle]);
 
   // =========================
   // Fetch admin contacts (pakai endpoint baru, tanpa filter di FE)
@@ -136,7 +142,7 @@ export default function KomunitasDashboard() {
       }
     };
     fetchAdminContacts();
-  }, []); // cukup sekali saat mount
+  }, []);
 
   // Add or update community
   const handleSubmit = async (e) => {
@@ -293,6 +299,21 @@ export default function KomunitasDashboard() {
           ...p,
         ]);
       }
+
+      // Trigger refresh di home.jsx dengan broadcast event
+      // Ini akan memicu home.jsx untuk refresh data promo
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('communityDataUpdated', {
+          detail: {
+            communityId: activeCommunityId,
+            action: 'category_added',
+            category: {
+              title: categoryForm.title,
+              description: categoryForm.description
+            }
+          }
+        }));
+      }
     } catch {
       // noop
     }
@@ -390,6 +411,45 @@ export default function KomunitasDashboard() {
     }
   };
 
+  // === MEMBERS: fetch & open modal ===
+  const openMemberModal = async (community) => {
+    setSelectedCommunity(community);
+    setModalMember(true);
+    setMemberLoading(true);
+    setMemberError("");
+    setMemberList([]);
+
+    const encryptedToken = Cookies.get(token_cookie_name);
+    const token = encryptedToken ? Decrypt(encryptedToken) : "";
+
+    // Coba endpoint admin dulu → fallback ke non-admin bila 404
+    const tryFetch = async (url) => {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return res;
+    };
+
+    try {
+      let res = await tryFetch(apiJoin(`admin/communities/${community.id}/members`));
+      if (res.status === 404) {
+        res = await tryFetch(apiJoin(`communities/${community.id}/members`));
+      }
+      const json = await res.json().catch(() => ({}));
+      const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      setMemberList(rows);
+    } catch (err) {
+      console.error("Gagal memuat anggota:", err);
+      setMemberError("Tidak bisa memuat daftar anggota");
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
   const columns = [
     {
       selector: "name",
@@ -448,14 +508,26 @@ export default function KomunitasDashboard() {
         actionControl={{
           except: ["detail"],
           include: (row, actions, hasPermissions) => (
-            <ButtonComponent
-              label="Tambah Kategori"
-              paint="primary"
-              size="xs"
-              variant="outline"
-              rounded
-              onClick={() => handleOpenCategory(row)}
-            />
+            <div className="flex items-center gap-2">
+              <ButtonComponent
+                label="Tambah Kategori"
+                paint="primary"
+                size="xs"
+                variant="outline"
+                rounded
+                onClick={() => handleOpenCategory(row)}
+              />
+              {/* Tombol Anggota (Member) */}
+              <ButtonComponent
+                label="Anggota"
+                icon={faUsers}
+                paint="secondary"
+                size="xs"
+                variant="solid"
+                rounded
+                onClick={() => openMemberModal(row)}
+              />
+            </div>
           ),
         }}
         fetchControl={{
@@ -508,8 +580,6 @@ export default function KomunitasDashboard() {
           ],
         }}
         formUpdateControl={{
-          // kalau kamu pakai built-in form TableSupervision,
-          // pastikan payload BE sudah mengembalikan admin_contact_ids
           customDefaultValue: (data) => ({
             name: data.name || "",
             description: data.description || "",
@@ -641,7 +711,7 @@ export default function KomunitasDashboard() {
           setSelectedCategory(null);
           setCategoryForm({ title: "", description: "" });
           setPreviewWidgets([]);
-          setShowCategoryForm(false); // Reset form visibility
+          setShowCategoryForm(false);
         }}
         title="Kategori Komunitas"
         size="md"
@@ -700,13 +770,13 @@ export default function KomunitasDashboard() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Deskripsi
                   </label>
-                    <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="Masukkan deskripsi kategori"
-                      rows={3}
-                      value={categoryForm.description}
-                      onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                    />
+                  <textarea
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Masukkan deskripsi kategori"
+                    rows={3}
+                    value={categoryForm.description}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  />
                 </div>
 
                 <div className="flex gap-2">
@@ -860,6 +930,55 @@ export default function KomunitasDashboard() {
             <ButtonComponent label="Tambahkan Promo" paint="primary" type="submit" />
           </div>
         </form>
+      </FloatingPageComponent>
+
+      {/* Modal Anggota Komunitas */}
+      <FloatingPageComponent
+        show={modalMember}
+        onClose={() => {
+          setModalMember(false);
+          setSelectedCommunity(null);
+          setMemberList([]);
+          setMemberError("");
+        }}
+        title={`Anggota: ${selectedCommunity?.name || "-"}`}
+        size="lg"
+        className="bg-background"
+      >
+        <div className="p-6">
+          {memberLoading ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Memuat anggota…</div>
+          ) : memberError ? (
+            <div className="py-10 text-center text-red-600 font-semibold">{memberError}</div>
+          ) : memberList.length === 0 ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Belum ada anggota.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table w-full">
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>Email</th>
+                    <th>Telepon</th>
+                    <th>Role</th>
+                    <th>Bergabung</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memberList.map((m) => (
+                    <tr key={m.id}>
+                      <td>{m.name || m.full_name || '-'}</td>
+                      <td>{m.email || '-'}</td>
+                      <td>{m.phone || '-'}</td>
+                      <td>{m.role?.name || m.role || '-'}</td>
+                      <td>{m.joined_at ? new Date(m.joined_at).toLocaleDateString('id-ID') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </FloatingPageComponent>
     </>
   );
