@@ -351,9 +351,7 @@ export default function QRCodeCrud() {
         }}
         formControl={{
           contentType: 'application/json',
-          // Make sure this is the correct endpoint path
-          endpoint: 'admin/qrcodes/generate', 
-          // Add method explicitly to ensure it's POST
+          endpoint: 'admin/qrcodes', // Changed from 'admin/qrcodes/generate'
           method: 'POST',
           transformData: (data) => {
             console.log('Sending data:', data); // Debug log
