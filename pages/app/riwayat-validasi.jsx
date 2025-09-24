@@ -67,11 +67,14 @@ export default function RiwayatValidasi() {
   // Jika ada ID dan type, ambil history item tertentu
   // Jika tidak ada ID, ambil semua history user yang login (promo dan voucher)
   const [promoLoading, promoStatus, promoRes] = useGet({
-    path: (ready && id && type === 'promo') ? `promos/${id}/history` : (ready ? 'user/promo-validations' : null),
+    path: (ready && id && type === 'promo') ? `promos/${id}/history` : (ready ? 'user/promo-validations' : null), params: undefined,
   });
 
   const [voucherLoading, voucherStatus, voucherRes] = useGet({
-    path: (ready && id && type === 'voucher') ? `vouchers/${id}/history` : (ready ? 'user/voucher-validations' : null),
+    path: (ready && id && type === 'voucher')
+      ? `vouchers/${id}/history`
+      : (ready ? 'user/voucher-validations' : null),
+    params: undefined,
   });
 
   // Combine and sort items by date
