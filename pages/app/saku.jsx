@@ -468,10 +468,15 @@ export default function Save() {
           return;
         }
 
-        res = await fetch(`${apiUrl}/api/admin/promo-items/${targetId}/redeem`, {
+        res = await fetch(`${apiUrl}/api/promos/validate`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ code: codeToValidate }),
+          body: JSON.stringify({
+            code: codeToValidate,     // kode unik yang kamu input
+            item_id: targetId,        // Wajib: promo_item.id
+            expected_type: 'promo',
+            validation_purpose: 'tenant_scan',
+          }),
         });
         result = await res.json().catch(() => null);
       } else if (isVoucherItem) {
