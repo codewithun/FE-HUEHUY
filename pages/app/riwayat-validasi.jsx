@@ -7,12 +7,15 @@ import {
   DateFormatComponent,
   IconButtonComponent,
 } from '../../components/base.components';
+import { useUserContext } from '../../context/user.context';
 import { useGet } from '../../helpers';
 
 export default function RiwayatValidasi() {
   const router = useRouter();
   const { id, type } = router.query;
   const ready = router.isReady;
+  const { profile } = useUserContext?.() || {};
+  const isTenant = profile?.role_id === 6; // 6 = Manager Tenant
 
   // API URL untuk base URL gambar
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -149,7 +152,9 @@ export default function RiwayatValidasi() {
                     ? (v.voucher?.title ?? v.voucher?.name ?? 'Voucher')
                     : (v.promo?.title ?? 'Promo')}</p>
                   <p className="text-slate-600 text-sm mb-1">
-                    Divalidasi oleh: {v.user?.name ?? 'Guest'}
+                    {isTenant
+                      ? <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
+                      : <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>}
                   </p>
                   <p className="text-slate-600 text-xs mb-1">
                     Kode: <span className="font-medium">{v.code}</span>
