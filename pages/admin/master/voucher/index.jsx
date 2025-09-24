@@ -258,16 +258,13 @@ function VoucherCrud() {
       {
         selector: 'target_type',
         label: 'Target',
-        item: ({ target_type, target_user_ids, community_id }) => {
+        item: ({ target_type, target_user_names, target_user_total, community_id }) => {
           if (target_type === 'user') {
-            const userIds = Array.isArray(target_user_ids)
-              ? target_user_ids
-              : target_user_ids
-              ? String(target_user_ids).split(',').map((id) => id.trim())
-              : [];
-            if (userIds.length === 0) return 'Tidak ada pengguna';
-            if (userIds.length === 1) return getUserLabel(userIds[0]);
-            return `${userIds.length} Pengguna Dipilih`;
+            const names = Array.isArray(target_user_names) ? target_user_names : [];
+            const total = Number(target_user_total ?? names.length);
+            if (total === 0) return 'Pengguna Tertentu';
+            const rest = Math.max(0, total - names.length);
+            return `${names.join(', ')}${rest > 0 ? ` +${rest} lainnya` : ''}`;
           }
           if (target_type === 'community') return getCommunityLabel(community_id);
           return 'Semua (role: user)';
@@ -279,7 +276,7 @@ function VoucherCrud() {
         item: ({ valid_until }) => <span className="text-sm">{formatDateID(valid_until)}</span>,
       },
     ],
-    [getUserLabel, getCommunityLabel]
+    [getCommunityLabel]
   );
 
   const topBarActions = null;
