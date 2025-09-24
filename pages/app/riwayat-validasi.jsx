@@ -125,7 +125,7 @@ export default function RiwayatValidasi() {
           ) : allItems.length ? (
             allItems.map((v) => (
               <div
-                key={v.id}
+                key={`${v.itemType}-${v.id}`}
                 className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative cursor-pointer m-3"
               >
                 <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
