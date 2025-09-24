@@ -148,14 +148,23 @@ export default function RiwayatValidasi() {
                 </div>
 
                 <div className="col-span-3">
-                  <p className="font-semibold">{v.itemType === 'voucher'
-                    ? (v.voucher?.title ?? v.voucher?.name ?? 'Voucher')
-                    : (v.promo?.title ?? 'Promo')}</p>
-                  <p className="text-slate-600 text-sm mb-1">
-                    {isTenant
-                      ? <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
-                      : <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>}
-                  </p>
+                  {(() => {
+                    const isSameValidator = String(v?.user?.id ?? '') === String(profile?.id ?? '');
+                    return (
+                      <>
+                        <p className="font-semibold">
+                          {v.itemType === 'voucher'
+                            ? (v.voucher?.title ?? v.voucher?.name ?? 'Voucher')
+                            : (v.promo?.title ?? 'Promo')}
+                        </p>
+                        <p className="text-slate-600 text-sm mb-1">
+                          {isSameValidator
+                            ? <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
+                            : <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>}
+                        </p>
+                      </>
+                    );
+                  })()}
                   <p className="text-slate-600 text-xs mb-1">
                     Kode: <span className="font-medium">{v.code}</span>
                   </p>
