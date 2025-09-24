@@ -72,6 +72,21 @@ function VoucherCrud() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [currentFormControl, setCurrentFormControl] = useState(null);
 
+  // New: session key to force remount + full reset helper
+  const [formSessionKey, setFormSessionKey] = useState(0);
+
+  const resetImageStates = useCallback(() => {
+    try {
+      if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+      if (rawImageUrl && rawImageUrl.startsWith('blob:')) URL.revokeObjectURL(rawImageUrl);
+    } catch {}
+    setPreviewUrl('');
+    setCurrentImageFile(null);
+    setRawImageUrl('');
+    setCropOpen(false);
+    setCurrentFormControl(null);
+  }, [previewUrl, rawImageUrl]);
+
   const apiBase = useMemo(() => getApiBase(), []);
   const authHeader = useCallback(() => {
     const enc = Cookies.get(token_cookie_name);
@@ -422,6 +437,7 @@ function VoucherCrud() {
       />
       
       <TableSupervisionComponent
+        key={formSessionKey}
         title="Manajemen Voucher"
         columnControl={{ custom: columns }}
         customTopBar={topBarActions}
@@ -430,8 +446,16 @@ function VoucherCrud() {
         setToRefresh={refreshToggle}
         actionControl={{
           except: ['detail'],
-          onAdd: () => setSelectedVoucher(null),
-          onEdit: (voucher) => setSelectedVoucher(voucher),
+          onAdd: () => {
+            resetImageStates();
+            setSelectedVoucher(null);
+            setFormSessionKey((k) => k + 1);
+          },
+          onEdit: (voucher) => {
+            resetImageStates();
+            setSelectedVoucher(voucher);
+            setFormSessionKey((k) => k + 1);
+          },
           onDelete: (voucher) => {
             setSelectedVoucher(voucher);
             setModalDelete(true);
@@ -449,6 +473,7 @@ function VoucherCrud() {
           validation_type: 'auto',
           target_type: 'all',
           stock: 0,
+          image: '', // ensure image field exists and is empty by default
         }}
         /* ===== GUARD opsional sebelum submit ===== */
         beforeSubmit={(payload) => {
@@ -495,24 +520,33 @@ function VoucherCrud() {
               custom: ({ formControl }) => {
                 const fc = formControl('image');
                 const raw = fc.value;
-                
+
+                // Tentukan sumber preview yang sah
+                const hasCroppedFile = raw instanceof File;
+                const hasServerImage = !!raw && !(raw instanceof File);
+
+                const previewSrc = hasCroppedFile
+                  ? previewUrl                 // hanya pakai previewUrl kalau memang ada File di field
+                  : hasServerImage
+                  ? buildImageUrl(String(raw)) // mode edit: url dari server
+                  : '';
+
                 return (
                   <div className="form-control">
                     <label className="label">
                       <span className="label-text font-medium">Gambar Voucher</span>
                     </label>
-                    
+
                     {/* Preview Area */}
                     <div className="mb-4">
-                      {(previewUrl || (raw && !(raw instanceof File))) ? (
+                      {previewSrc ? (
                         <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
-                          <Image 
-                            src={previewUrl || buildImageUrl(String(raw))} 
-                            alt="Preview" 
+                          <Image
+                            src={previewSrc}
+                            alt="Preview"
                             width={192}
                             height={192}
-                            className="max-w-full max-h-full object-contain" 
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            className="max-w-full max-h-full object-contain"
                           />
                         </div>
                       ) : (
@@ -526,8 +560,8 @@ function VoucherCrud() {
                         </div>
                       )}
                     </div>
-                    
-                    {/* File Input with Action Buttons */}
+
+                    {/* Input + Actions */}
                     <div className="flex gap-2">
                       <input
                         type="file"
@@ -535,15 +569,13 @@ function VoucherCrud() {
                         className="file-input file-input-bordered flex-1"
                         onChange={(e) => handleFileInput(e, fc)}
                       />
-                      
-                      {/* Action Buttons - positioned at the right */}
-                      {(previewUrl || (raw && !(raw instanceof File))) && (
+
+                      {previewSrc && (
                         <div className="flex gap-2">
-                          <button 
-                            type="button" 
-                            className="btn btn-outline btn-sm" 
-                            onClick={() => handleRecrop(fc)} 
-                            title="Crop ulang untuk menyesuaikan gambar"
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleRecrop(fc)}
                           >
                             Crop Ulang
                           </button>
@@ -551,24 +583,19 @@ function VoucherCrud() {
                             type="button"
                             className="btn btn-outline btn-error btn-sm"
                             onClick={() => {
-                              // Clean up blob URLs
-                              if (previewUrl && previewUrl.startsWith('blob:')) {
-                                URL.revokeObjectURL(previewUrl);
-                              }
-                              
+                              if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
                               setPreviewUrl('');
                               setCurrentImageFile(null);
                               setRawImageUrl('');
-                              fc.onChange('');
+                              fc.onChange('');                // kosongkan field form juga
                             }}
-                            title="Hapus gambar yang sudah dipilih"
                           >
                             Hapus
                           </button>
                         </div>
                       )}
                     </div>
-                    
+
                     <span className="text-xs text-gray-500 mt-1">
                       PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
                     </span>
