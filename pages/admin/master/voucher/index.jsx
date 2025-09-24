@@ -2,19 +2,19 @@
 /* eslint-disable no-console */
 import Cookies from 'js-cookie';
 import Image from 'next/image';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   InputComponent,
-  InputImageComponent,
   ModalConfirmComponent,
   SelectComponent,
   TableSupervisionComponent,
   TextareaComponent,
 } from '../../../../components/base.components';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
+import CropperDialog from '../../../../components/crop.components/CropperDialog';
+import MultiSelectDropdown from '../../../../components/form/MultiSelectDropdown';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
-import MultiSelectDropdown from '../../../../components/form/MultiSelectDropdown';
 
 const toDateInput = (raw) => {
   if (!raw) return '';
@@ -64,6 +64,13 @@ function VoucherCrud() {
   const [refreshToggle, setRefreshToggle] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [users, setUsers] = useState([]);
+  
+  // Crop states
+  const [cropOpen, setCropOpen] = useState(false);
+  const [rawImageUrl, setRawImageUrl] = useState('');
+  const [currentImageFile, setCurrentImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [currentFormControl, setCurrentFormControl] = useState(null);
 
   const apiBase = useMemo(() => getApiBase(), []);
   const authHeader = useCallback(() => {
@@ -147,6 +154,63 @@ function VoucherCrud() {
   }, []);
 
   const onlyUsers = useMemo(() => (users || []).filter(isUserRole), [users, isUserRole]);
+
+  // Crop handlers
+  const handleFileInput = (e, formControl) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Harap pilih file gambar (JPG/PNG)');
+      return;
+    }
+    
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Ukuran file terlalu besar. Maksimal 10MB');
+      return;
+    }
+    
+    try {
+      const url = URL.createObjectURL(file);
+      setRawImageUrl(url);
+      setCurrentFormControl(formControl);
+      setCropOpen(true);
+    } catch (error) {
+      console.error('Error creating image URL:', error);
+      alert('Gagal memproses gambar. Silakan coba lagi.');
+    }
+  };
+
+  const handleCropSave = async (croppedBlob) => {
+    setCropOpen(false);
+    setCurrentImageFile(croppedBlob);
+    setPreviewUrl(URL.createObjectURL(croppedBlob));
+    if (currentFormControl) {
+      // Set the cropped blob as the form value
+      currentFormControl.onChange(croppedBlob);
+    }
+  };
+
+  const handleRecrop = (formControl) => {
+    const existingValue = formControl.value;
+    let imageUrl = '';
+    
+    if (previewUrl) {
+      // Use cropped preview
+      imageUrl = previewUrl;
+    } else if (existingValue && !(existingValue instanceof File)) {
+      // Use existing server image
+      imageUrl = buildImageUrl(String(existingValue));
+    }
+    
+    if (imageUrl) {
+      setRawImageUrl(imageUrl);
+      setCurrentFormControl(formControl);
+      setCropOpen(true);
+    }
+  };
 
   // Fetch communities
   useEffect(() => {
@@ -332,6 +396,15 @@ function VoucherCrud() {
 
   return (
     <>
+      {/* Cropper Dialog */}
+      <CropperDialog
+        open={cropOpen}
+        imageUrl={rawImageUrl}
+        onClose={() => setCropOpen(false)}
+        onSave={handleCropSave}
+        aspect={1}
+      />
+      
       <TableSupervisionComponent
         title="Manajemen Voucher"
         columnControl={{ custom: columns }}
@@ -406,8 +479,81 @@ function VoucherCrud() {
               custom: ({ formControl }) => {
                 const fc = formControl('image');
                 const raw = fc.value;
-                const preparedValue = raw instanceof File ? raw : raw ? buildImageUrl(String(raw)) : '';
-                return <InputImageComponent name="image" label="Gambar Voucher" {...fc} value={preparedValue} />;
+                
+                return (
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text font-medium">Gambar Voucher</span>
+                    </label>
+                    
+                    {/* Preview Area */}
+                    <div className="mb-4">
+                      {previewUrl || (raw && !(raw instanceof File)) ? (
+                        <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                          <Image 
+                            src={previewUrl || buildImageUrl(String(raw))} 
+                            alt="Preview" 
+                            width={192}
+                            height={192}
+                            className="max-w-full max-h-full object-contain" 
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-48 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                          <div className="text-center">
+                            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-gray-500 text-sm">Belum ada gambar dipilih</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* File Input with Action Buttons */}
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="file-input file-input-bordered flex-1"
+                        onChange={(e) => handleFileInput(e, fc)}
+                      />
+                      
+                      {/* Action Buttons - positioned at the right */}
+                      {(previewUrl || raw) && (
+                        <div className="flex gap-2">
+                          <button 
+                            type="button" 
+                            className="btn btn-outline btn-sm" 
+                            onClick={() => handleRecrop(fc)} 
+                            disabled={!previewUrl && !raw}
+                            title="Crop ulang untuk menyesuaikan gambar"
+                          >
+                            Crop Ulang
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-error btn-sm"
+                            onClick={() => {
+                              setPreviewUrl('');
+                              setCurrentImageFile(null);
+                              setRawImageUrl('');
+                              fc.onChange('');
+                            }}
+                            title="Hapus gambar yang sudah dipilih"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <span className="text-xs text-gray-500 mt-1">
+                      PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
+                    </span>
+                  </div>
+                );
               },
             },
             {

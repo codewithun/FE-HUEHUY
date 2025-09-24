@@ -1,7 +1,8 @@
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable no-console */
-import React, { useEffect, useMemo, useState } from 'react';
-import InputImageComponent from '../base.components/input/InputImage.component';
+import Image from 'next/image';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import CropperDialog from '../crop.components/CropperDialog';
 
 const toDateInputValue = (raw) => {
   if (!raw) return '';
@@ -22,7 +23,12 @@ export default function VoucherForm({
   onCancel,             // () => void
   onSubmit,             // (FormData) => Promise|void
 }) {
+  // Crop states
+  const [cropOpen, setCropOpen] = useState(false);
+  const [rawImageUrl, setRawImageUrl] = useState('');
   const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const fileInputRef = useRef(null);
 
   const initial = useMemo(() => {
     const targetUserIds =
@@ -56,17 +62,129 @@ export default function VoucherForm({
 
   useEffect(() => {
     setFormData(initial);
+    
+    // Clear all image-related states first
     setImageFile(null);
-  }, [initial]);
+    setRawImageUrl('');
+    setCropOpen(false);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
+    // Then set the appropriate preview based on mode
+    if (mode === 'edit' && initial.image) {
+      const serverImageUrl = buildImageUrl(initial.image);
+      setPreviewUrl(serverImageUrl);
+    } else {
+      setPreviewUrl('');
+    }
+  }, [initial, mode, buildImageUrl]);
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(rawImageUrl);
+      }
+    };
+  }, [previewUrl, rawImageUrl]);
 
   const title = mode === 'edit' ? 'Ubah Voucher' : 'Tambah Voucher';
   const badgeText = mode === 'edit' ? 'Mode Ubah' : 'Mode Tambah';
   const submitText = mode === 'edit' ? 'Perbarui' : 'Simpan';
 
-  const handleImageChange = (file) => {
-    setImageFile(file || null);
-    if (file) {
-      setFormData((s) => ({ ...s, image: '' }));
+  // When user selects file, open cropper
+  const handleFileInput = (e) => {
+    const file = e.target.files[0];
+    console.log('File selected:', file);
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Harap pilih file gambar (JPG/PNG)');
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+    
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Ukuran file terlalu besar. Maksimal 10MB');
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+    
+    try {
+      // Cleanup previous rawImageUrl if it's a blob
+      if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(rawImageUrl);
+      }
+      
+      const url = URL.createObjectURL(file);
+      console.log('Image URL created:', url);
+      setRawImageUrl(url);
+      console.log('Setting cropOpen to true');
+      setCropOpen(true);
+    } catch (error) {
+      console.error('Error creating image URL:', error);
+      alert('Gagal memproses gambar. Silakan coba lagi.');
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // When cropper saves
+  const handleCropSave = async (croppedBlob) => {
+    setCropOpen(false);
+    
+    // Cleanup previous blob URL if it exists
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
+    // Reset file input to allow selecting the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
+    setImageFile(croppedBlob);
+    setPreviewUrl(URL.createObjectURL(croppedBlob));
+    // Clear the image field in formData since we now have a new file
+    setFormData((s) => ({ ...s, image: '' }));
+  };
+
+  // Recrop existing image
+  const handleRecrop = () => {
+    // Priority order:
+    // 1. If we have a new cropped image, use that
+    // 2. If in edit mode, use the original server image
+    // 3. Otherwise use current preview
+    
+    if (imageFile && previewUrl) {
+      // We have a newly cropped image
+      setRawImageUrl(previewUrl);
+      setCropOpen(true);
+    } else if (mode === 'edit' && initial.image) {
+      // In edit mode, always start from server image
+      const serverImageUrl = buildImageUrl(initial.image);
+      setRawImageUrl(serverImageUrl);
+      setCropOpen(true);
+    } else if (previewUrl) {
+      // Fallback to current preview
+      setRawImageUrl(previewUrl);
+      setCropOpen(true);
     }
   };
 
@@ -221,16 +339,129 @@ export default function VoucherForm({
           <p className="text-sm text-muted-foreground">Gambar voucher (opsional).</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Cropper Dialog */}
+        <CropperDialog
+          open={cropOpen}
+          imageUrl={rawImageUrl}
+          onClose={() => setCropOpen(false)}
+          onSave={handleCropSave}
+          aspect={1}
+        />
+
+        <div className="space-y-6">
           <div className="form-control">
-            <InputImageComponent
-              name="image"
-              label="Gambar Voucher"
-              value={imageFile || (formData.image && !imageFile ? buildImageUrl(formData.image) : '')}
-              onChange={handleImageChange}
-            />
+            <label className="label"><span className="label-text font-medium">Gambar Voucher</span></label>
+            
+            {/* Preview Area */}
+            <div className="mb-4">
+              {previewUrl ? (
+                <div className="relative">
+                  <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                    <Image 
+                      src={previewUrl} 
+                      alt="Preview voucher" 
+                      width={192}
+                      height={192}
+                      className="max-w-full max-h-full object-contain"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                  </div>
+                  <div className="absolute top-2 right-2">
+                    <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Hasil Crop
+                    </span>
+                  </div>
+                </div>
+              ) : mode === 'edit' && initial.image && !imageFile ? (
+                <div className="relative">
+                  <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                    <Image 
+                      src={buildImageUrl(initial.image)} 
+                      alt="Gambar existing" 
+                      width={192}
+                      height={192}
+                      className="max-w-full max-h-full object-contain"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                  </div>
+                  <div className="absolute top-2 right-2">
+                    <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
+                      </svg>
+                      Gambar Existing
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full h-48 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                  <div className="text-center">
+                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-gray-500 text-sm">Belum ada gambar dipilih</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* File Input with Action Buttons */}
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                className="file-input file-input-bordered flex-1"
+                onChange={handleFileInput}
+                id="voucher-image-upload"
+              />
+              
+              {/* Action Buttons - positioned at the right */}
+              {(previewUrl || (mode === 'edit' && initial.image)) && (
+                <div className="flex gap-2">
+                  <button 
+                    type="button" 
+                    className="btn btn-outline btn-primary btn-sm px-4 py-2 min-h-[40px] font-medium border-2" 
+                    onClick={handleRecrop}
+                    title="Crop ulang untuk menyesuaikan gambar"
+                  >
+                    Crop Ulang
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-error btn-sm px-4 py-2 min-h-[40px] font-medium border-2"
+                    onClick={() => {
+                      // Cleanup blob URLs
+                      if (previewUrl && previewUrl.startsWith('blob:')) {
+                        URL.revokeObjectURL(previewUrl);
+                      }
+                      if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+                        URL.revokeObjectURL(rawImageUrl);
+                      }
+                      
+                      // Reset input file
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                      
+                      setPreviewUrl('');
+                      setImageFile(null);
+                      setRawImageUrl('');
+                      setFormData((s) => ({ ...s, image: mode === 'edit' ? initial.image : '' }));
+                    }}
+                    title="Hapus gambar yang sudah dipilih"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              )}
+            </div>
+            
             <span className="text-xs text-gray-500 mt-1">
-              PNG/JPG. Jika tidak diubah saat edit, gambar lama dipertahankan.
+              PNG/JPG/WEBP, maksimal 5MB. Dialog crop akan terbuka otomatis setelah memilih file.
             </span>
           </div>
         </div>
