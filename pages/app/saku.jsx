@@ -214,12 +214,12 @@ export default function Save() {
               validation_type,
               cube: voucher.community
                 ? {
-                    community_id: voucher.community.id,
-                    code: `community-${voucher.community.id}`,
-                    user: { name: voucher.community.name || 'Community', phone: '' },
-                    corporate: null,
-                    tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
-                  }
+                  community_id: voucher.community.id,
+                  code: `community-${voucher.community.id}`,
+                  user: { name: voucher.community.name || 'Community', phone: '' },
+                  corporate: null,
+                  tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
+                }
                 : {},
             },
           };
@@ -484,10 +484,15 @@ export default function Save() {
           return;
         }
 
-        res = await fetch(`${apiUrl}/api/admin/voucher-items/${targetId}/redeem`, {
+        res = await fetch(`${apiUrl}/api/vouchers/validate`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ code: codeToValidate }),
+          body: JSON.stringify({
+            code: codeToValidate,
+            item_id: targetId,
+            expected_type: 'voucher',
+            validation_purpose: 'tenant_scan',
+          }),
         });
         result = await res.json().catch(() => null);
       } else {
@@ -603,9 +608,8 @@ export default function Save() {
 
                   return (
                     <div
-                      className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${
-                        isRecentlyClaimed(item.claimed_at) ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white' : 'border-slate-100'
-                      } ${canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'}`}
+                      className={`bg-white rounded-2xl p-4 shadow-lg border transition-all duration-300 group ${isRecentlyClaimed(item.claimed_at) ? 'border-green-200 bg-gradient-to-r from-green-50/50 to-white' : 'border-slate-100'
+                        } ${canValidate ? 'hover:shadow-xl cursor-pointer' : 'opacity-75 cursor-default'}`}
                       key={key}
                       onClick={() => {
                         if (canValidate) {
@@ -766,9 +770,9 @@ export default function Save() {
                   selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher
                     ? `/app/voucher/${selected?.voucher_item?.voucher_id || selected?.voucher?.id || selected?.ad?.id}`
                     : `/app/komunitas/promo/${selected?.ad?.id}?${new URLSearchParams({
-                        communityId: String(selected?.ad?.cube?.community_id || 1),
-                        from: 'saku',
-                      }).toString()}`
+                      communityId: String(selected?.ad?.cube?.community_id || 1),
+                      from: 'saku',
+                    }).toString()}`
                 }
               >
                 <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors">
@@ -979,13 +983,12 @@ export default function Save() {
                         </div>
 
                         <button
-                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
-                            validationLoading
-                              ? 'bg-slate-400 text-white cursor-not-allowed'
-                              : isItemValidatable(selected)
+                          className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
+                            ? 'bg-slate-400 text-white cursor-not-allowed'
+                            : isItemValidatable(selected)
                               ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
                               : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                          }`}
+                            }`}
                           onClick={() => {
                             if (isItemValidatable(selected)) {
                               submitValidation(validationCode);
@@ -1102,13 +1105,12 @@ export default function Save() {
                       </div>
 
                       <button
-                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${
-                          validationLoading
-                            ? 'bg-slate-400 text-white cursor-not-allowed'
-                            : isItemValidatable(selected)
+                        className={`w-full font-bold py-4 px-6 rounded-xl shadow-lg transition-all duration-200 ${validationLoading
+                          ? 'bg-slate-400 text-white cursor-not-allowed'
+                          : isItemValidatable(selected)
                             ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
                             : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                        }`}
+                          }`}
                         onClick={() => {
                           if (isItemValidatable(selected)) {
                             submitValidation(validationCode);
@@ -1151,12 +1153,12 @@ export default function Save() {
                 setModalValidation(false);
                 setSelected(null);
                 setValidationCode('');
-                setRefreshTrigger((p) => p + 1);
-                fetchData();
-                setTimeout(() => {
-                  setRefreshTrigger((p) => p + 1);
-                  fetchData();
-                }, 1000);
+                const voucherId = selected?.voucher_item?.voucher_id || selected?.voucher?.id || selected?.ad?.id;
+                if (voucherId) {
+                  router.replace(`/app/riwayat-validasi?type=voucher&id=${voucherId}`);
+                } else {
+                  router.replace('/app/riwayat-validasi');
+                }
               }}
               className="w-full bg-green-500 text-white py-3 rounded-[12px] font-semibold hover:bg-green-600 transition-all"
             >
