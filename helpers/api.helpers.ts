@@ -25,7 +25,7 @@ const getAuthHeader = () => {
       console.debug('No encrypted token found in cookies');
       return {};
     }
-    
+
     const token = Decrypt(enc);
     if (!token || token.trim() === '') {
       // eslint-disable-next-line no-console
@@ -34,7 +34,7 @@ const getAuthHeader = () => {
       Cookies.remove(token_cookie_name);
       return {};
     }
-    
+
     // eslint-disable-next-line no-console
     console.debug('Token found and decrypted successfully, length:', token.length);
     return { Authorization: `Bearer ${token}` };
@@ -128,13 +128,19 @@ export const get = async ({
   }
 
   try {
+    const queryParams: Record<string, any> = {
+      ...(params || {}),
+      ...(includeParams || {}),
+    };
+
+    // hanya set 'filter' kalau memang ada
+    if (params?.filter && Object.keys(filter).length > 0) {
+      queryParams.filter = JSON.stringify(filter);
+    }
+
     const res = await axios.get(fetchUrl, {
       headers: fetchHeaders,
-      params: {
-        ...params,
-        ...includeParams,
-        filter: params?.filter ? JSON.stringify(filter) : '',
-      },
+      params: queryParams,
     });
     return res;
   } catch (err: any) {
@@ -150,14 +156,14 @@ export const get = async ({
         responseHeaders: resp?.headers,
         timestamp: new Date().toISOString()
       });
-      
+
       // TAMBAHAN: Cek apakah ini request ke endpoint yang memang butuh delay
       const isAccountRequest = (path || url || '').includes('account');
       const delayTime = isAccountRequest ? 500 : 100; // Delay lebih lama untuk account request
-      
+
       // eslint-disable-next-line no-console
       console.warn(`Will redirect to login in ${delayTime}ms due to 401 error`);
-      
+
       // Berikan delay kecil sebelum redirect untuk menghindari race condition
       setTimeout(() => {
         Cookies.remove(token_cookie_name);
