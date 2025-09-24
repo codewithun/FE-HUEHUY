@@ -77,9 +77,17 @@ export default function RiwayatValidasi() {
     params: undefined,
   });
 
+  const extractList = (res) => {
+    if (!res) return [];
+    if (Array.isArray(res)) return res;                // array langsung
+    if (Array.isArray(res?.data)) return res.data;     // { data: [...] }
+    if (Array.isArray(res?.data?.data)) return res.data.data; // { data: { data: [...] } }
+    return [];
+  };
+
   // Combine and sort items by date
-  const promoItems = (promoRes?.data ?? []).map(item => ({ ...item, itemType: 'promo' }));
-  const voucherItems = (voucherRes?.data ?? []).map(item => ({ ...item, itemType: 'voucher' }));
+  const promoItems = extractList(promoRes).map(item => ({ ...item, itemType: 'promo' }));
+  const voucherItems = extractList(voucherRes).map(item => ({ ...item, itemType: 'voucher' }));
 
   // If viewing specific item, show only that type
   const allItems = id && type
