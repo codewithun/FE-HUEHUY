@@ -1153,12 +1153,8 @@ export default function Save() {
                 setModalValidation(false);
                 setSelected(null);
                 setValidationCode('');
-                const voucherId = selected?.voucher_item?.voucher_id || selected?.voucher?.id || selected?.ad?.id;
-                if (voucherId) {
-                  router.replace(`/app/riwayat-validasi?type=voucher&id=${voucherId}`);
-                } else {
-                  router.replace('/app/riwayat-validasi');
-                }
+                // Langsung ke halaman riwayat TANPA query agar ambil semua
+                router.replace('/app/riwayat-validasi');
               }}
               className="w-full bg-green-500 text-white py-3 rounded-[12px] font-semibold hover:bg-green-600 transition-all"
             >
