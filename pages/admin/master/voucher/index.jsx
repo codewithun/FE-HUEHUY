@@ -16,15 +16,12 @@ import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import MultiSelectDropdown from '../../../../components/form/MultiSelectDropdown';
 
-
 const toDateInput = (raw) => {
   if (!raw) return '';
-  // aman untuk ISO / '2025-09-20 12:00:00'
   const s = String(raw);
   if (s.includes('T')) return s.split('T')[0];
-  // fallback via Date
   const d = new Date(s);
-  if (isNaN(d.getTime())) return s.slice(0, 10); // 'YYYY-MM-DD' dari string
+  if (isNaN(d.getTime())) return s.slice(0, 10);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
@@ -75,17 +72,81 @@ function VoucherCrud() {
     return { Authorization: `Bearer ${token}` };
   }, []);
 
-  const getUserLabel = useCallback((id) => {
-    if (!id) return '';
-    const u = users.find((x) => String(x.id) === String(id));
-    return u?.name || u?.email || `User #${id}`;
-  }, [users]);
+  const getUserLabel = useCallback(
+    (id) => {
+      if (!id) return '';
+      const u = users.find((x) => String(x.id) === String(id));
+      return u?.name || u?.email || `User #${id}`;
+    },
+    [users]
+  );
 
-  const getCommunityLabel = useCallback((id) => {
-    if (!id) return '';
-    const c = communities.find((x) => String(x.id) === String(id));
-    return c?.name || `Community #${id}`;
-  }, [communities]);
+  const getCommunityLabel = useCallback(
+    (id) => {
+      if (!id) return '';
+      const c = communities.find((x) => String(x.id) === String(id));
+      return c?.name || `Community #${id}`;
+    },
+    [communities]
+  );
+
+  // ==== ROLE FILTER: hanya user (exclude admin & manager/tenant manager) ====
+  const isUserRole = useCallback((u) => {
+    if (!u) return false;
+
+    const denyList = ['admin','superadmin','manager','tenant','tenant_manager','manager_tenant','staff','owner','operator','moderator'];
+
+    // 0) role object { name: '...' }
+    if (u.role && typeof u.role === 'object' && u.role.name) {
+      const r = String(u.role.name).toLowerCase();
+      return r === 'user';
+    }
+
+    // 1) kolom role tunggal (string)
+    if (typeof u.role === 'string') {
+      const r = u.role.toLowerCase();
+      return r === 'user';
+    }
+
+    // 2) kolom roles (array of strings / objects)
+    if (Array.isArray(u.roles)) {
+      const roles = u.roles.map((r) => {
+        if (typeof r === 'string') return r.toLowerCase();
+        if (r && typeof r === 'object' && r.name) return String(r.name).toLowerCase();
+        return String(r ?? '').toLowerCase();
+      });
+      const hasDeny = roles.some((r) => denyList.includes(r));
+      const hasUser = roles.includes('user');
+      return hasUser && !hasDeny;
+    }
+
+    // 3) kolom level/type string
+    if (typeof u.level === 'string') {
+      const r = u.level.toLowerCase();
+      if (denyList.includes(r)) return false;
+      return r === 'user';
+    }
+    if (typeof u.type === 'string') {
+      const r = u.type.toLowerCase();
+      if (denyList.includes(r)) return false;
+      return r === 'user';
+    }
+
+    // 4) berbagai flag boolean umum
+    const boolTrue = (v) => v === true || v === 1 || v === '1';
+    if (boolTrue(u.is_admin)) return false;
+    if (boolTrue(u.is_superadmin)) return false;
+    if (boolTrue(u.is_staff)) return false;
+    if (boolTrue(u.is_manager)) return false;
+    if (boolTrue(u.is_tenant_manager)) return false;
+    if (boolTrue(u.tenant_manager)) return false;
+
+    // 5) fallback: kalau sama sekali nggak ada info role,
+    //    anggap user biasa (permisif). Kalau mau super ketat, return false.
+    return true;
+  }, []);
+
+  const onlyUsers = useMemo(() => (users || []).filter(isUserRole), [users, isUserRole]);
 
   // Fetch communities
   useEffect(() => {
@@ -107,11 +168,11 @@ function VoucherCrud() {
     fetchCommunities();
   }, [apiBase, authHeader]);
 
-  // Fetch users
+  // Fetch users (pastikan BE kirim role info: minimal u.role.name atau u.role string)
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch(`${apiBase}/api/admin/users`, {
+        const res = await fetch(`${apiBase}/api/admin/users?paginate=all`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json', ...authHeader() },
         });
@@ -151,80 +212,126 @@ function VoucherCrud() {
     }
   };
 
-  const columns = useMemo(() => [
-    {
-      selector: 'name',
-      label: 'Nama Voucher',
-      sortable: true,
-      item: ({ name }) => <span className="font-semibold">{name || '-'}</span>,
-    },
-    {
-      selector: 'code',
-      label: 'Kode',
-      sortable: true,
-      item: ({ code }) => <span className="font-mono text-sm">{code || '-'}</span>,
-    },
-    {
-      selector: 'image',
-      label: 'Gambar',
-      width: '100px',
-      item: ({ image }) => {
-        const src = buildImageUrl(image);
-        return src ? (
-          <Image
-            src={src}
-            alt="Voucher"
-            width={48}
-            height={48}
-            className="w-12 h-12 object-cover rounded-lg"
-          />
-        ) : (
-          <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
-            <span className="text-xs text-gray-500">No Image</span>
-          </div>
-        );
+  const columns = useMemo(
+    () => [
+      {
+        selector: 'name',
+        label: 'Nama Voucher',
+        sortable: true,
+        item: ({ name }) => <span className="font-semibold">{name || '-'}</span>,
       },
-    },
-    {
-      selector: 'stock',
-      label: 'Sisa Voucher',
-      sortable: true,
-      item: ({ stock }) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs ${
-            Number(stock) > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}
-        >
-          {formatStockVoucher(stock)}
-        </span>
-      ),
-    },
-    {
-      selector: 'target_type',
-      label: 'Target',
-      item: ({ target_type, target_user_ids, community_id }) => {
-        if (target_type === 'user') {
-          const userIds = Array.isArray(target_user_ids)
-            ? target_user_ids
-            : target_user_ids
-            ? String(target_user_ids).split(',').map((id) => id.trim())
-            : [];
-          if (userIds.length === 0) return 'Tidak ada pengguna';
-          if (userIds.length === 1) return getUserLabel(userIds[0]);
-          return `${userIds.length} Pengguna Dipilih`;
-        }
-        if (target_type === 'community') return getCommunityLabel(community_id);
-        return 'Semua';
+      {
+        selector: 'code',
+        label: 'Kode',
+        sortable: true,
+        item: ({ code }) => <span className="font-mono text-sm">{code || '-'}</span>,
       },
-    },
-    {
-      selector: 'valid_until',
-      label: 'Berlaku Sampai',
-      item: ({ valid_until }) => <span className="text-sm">{formatDateID(valid_until)}</span>,
-    },
-  ], [getUserLabel, getCommunityLabel]);
+      {
+        selector: 'image',
+        label: 'Gambar',
+        width: '100px',
+        item: ({ image }) => {
+          const src = buildImageUrl(image);
+          return src ? (
+            <Image src={src} alt="Voucher" width={48} height={48} className="w-12 h-12 object-cover rounded-lg" />
+          ) : (
+            <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+              <span className="text-xs text-gray-500">No Image</span>
+            </div>
+          );
+        },
+      },
+      {
+        selector: 'stock',
+        label: 'Sisa Voucher',
+        sortable: true,
+        item: ({ stock }) => (
+          <span
+            className={`px-2 py-1 rounded-full text-xs ${
+              Number(stock) > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}
+          >
+            {formatStockVoucher(stock)}
+          </span>
+        ),
+      },
+      {
+        selector: 'target_type',
+        label: 'Target',
+        item: ({ target_type, target_user_ids, community_id }) => {
+          if (target_type === 'user') {
+            const userIds = Array.isArray(target_user_ids)
+              ? target_user_ids
+              : target_user_ids
+              ? String(target_user_ids).split(',').map((id) => id.trim())
+              : [];
+            if (userIds.length === 0) return 'Tidak ada pengguna';
+            if (userIds.length === 1) return getUserLabel(userIds[0]);
+            return `${userIds.length} Pengguna Dipilih`;
+          }
+          if (target_type === 'community') return getCommunityLabel(community_id);
+          return 'Semua (role: user)';
+        },
+      },
+      {
+        selector: 'valid_until',
+        label: 'Berlaku Sampai',
+        item: ({ valid_until }) => <span className="text-sm">{formatDateID(valid_until)}</span>,
+      },
+    ],
+    [getUserLabel, getCommunityLabel]
+  );
 
   const topBarActions = null;
+
+  // ===== Transform payload (konversi "all" => semua ID role user saja) =====
+  const transformData = useCallback(
+    (data) => {
+      data.target_type = data.target_type || 'all';
+      data.validation_type = data.validation_type || 'auto';
+
+      if (!data.image || !(data.image instanceof File)) delete data.image;
+      if (!data.valid_until) delete data.valid_until;
+
+      if (data.target_type !== 'community' || !data.community_id) {
+        delete data.community_id;
+      } else {
+        data.community_id = String(data.community_id);
+      }
+
+      if (data.target_type === 'user' && Array.isArray(data.target_user_ids) && data.target_user_ids.length) {
+        data.target_user_ids
+          .map(Number)
+          .filter((id) => Number.isFinite(id) && id > 0)
+          .forEach((id, i) => {
+            data[`target_user_ids[${i}]`] = id;
+          });
+      } else if (data.target_type === 'all') {
+        // >>> “Semua Pengguna” = hanya role user (exclude admin & manager tenant)
+        const ids = onlyUsers
+          .map((u) => Number(u.id))
+          .filter((n) => Number.isFinite(n) && n > 0);
+
+        // ubah jadi target_type user dengan daftar id
+        data.target_type = 'user';
+        ids.forEach((id, i) => {
+          data[`target_user_ids[${i}]`] = id;
+        });
+      }
+      delete data.target_user_ids;
+      delete data.target_user_id;
+
+      if (data.validation_type === 'manual') {
+        if (data.code) data.code = String(data.code).trim();
+      } else {
+        if (!data.code) delete data.code;
+      }
+
+      data.stock = Number(data.stock ?? 0);
+      return data;
+    },
+    [onlyUsers]
+  );
 
   return (
     <>
@@ -257,7 +364,7 @@ function VoucherCrud() {
           target_type: 'all',
           stock: 0,
         }}
-        /* ===== GUARD opsional sebelum submit (cegah 422 on FE) ===== */
+        /* ===== GUARD opsional sebelum submit ===== */
         beforeSubmit={(payload) => {
           const tt = payload?.target_type || 'all';
           if (tt === 'user' && (!payload.target_user_ids || payload.target_user_ids.length === 0)) {
@@ -272,37 +379,7 @@ function VoucherCrud() {
         }}
         formControl={{
           contentType: 'multipart/form-data',
-         transformData: (data) => {
-  data.target_type = data.target_type || 'all';
-  data.validation_type = data.validation_type || 'auto';
-
-  if (!data.image || !(data.image instanceof File)) delete data.image;
-  if (!data.valid_until) delete data.valid_until;
-
-  if (data.target_type !== 'community' || !data.community_id) {
-    delete data.community_id;
-  } else {
-    data.community_id = String(data.community_id);
-  }
-
-  if (data.target_type === 'user' && Array.isArray(data.target_user_ids) && data.target_user_ids.length) {
-    data.target_user_ids
-      .map(Number)
-      .filter((id) => Number.isFinite(id) && id > 0)
-      .forEach((id, i) => { data[`target_user_ids[${i}]`] = id; });
-  }
-  delete data.target_user_ids;
-  delete data.target_user_id;
-
-  if (data.validation_type === 'manual') {
-    if (data.code) data.code = String(data.code).trim();
-  } else {
-    if (!data.code) delete data.code;
-  }
-
-  data.stock = Number(data.stock ?? 0);
-  return data;
-},
+          transformData,
           custom: [
             {
               type: 'custom',
@@ -332,17 +409,8 @@ function VoucherCrud() {
               custom: ({ formControl }) => {
                 const fc = formControl('image');
                 const raw = fc.value;
-                const preparedValue =
-                  raw instanceof File ? raw : (raw ? buildImageUrl(String(raw)) : '');
-
-                return (
-                  <InputImageComponent
-                    name="image"
-                    label="Gambar Voucher"
-                    {...fc}
-                    value={preparedValue}
-                  />
-                );
+                const preparedValue = raw instanceof File ? raw : raw ? buildImageUrl(String(raw)) : '';
+                return <InputImageComponent name="image" label="Gambar Voucher" {...fc} value={preparedValue} />;
               },
             },
             {
@@ -434,7 +502,7 @@ function VoucherCrud() {
                     value={current}
                     onChange={fc.onChange}
                     options={[
-                      { label: 'Semua Pengguna', value: 'all' },
+                      { label: 'Semua Pengguna (role: user)', value: 'all' },
                       { label: 'Pengguna Tertentu', value: 'user' },
                       { label: 'Anggota Community', value: 'community' },
                     ]}
@@ -453,7 +521,7 @@ function VoucherCrud() {
                       <span className="label-text-alt text-red-500">*</span>
                     </label>
                     <MultiSelectDropdown
-                      options={users.map((u) => ({
+                      options={onlyUsers.map((u) => ({
                         label: `${u.name || u.email || `#${u.id}`}`,
                         value: u.id,
                       }))}
@@ -473,38 +541,44 @@ function VoucherCrud() {
             },
             {
               type: 'custom',
-              custom: ({ formControl }) => (
-                <SelectComponent
-                  name="community_id"
-                  label="Community (opsional)"
-                  placeholder="Pilih community..."
-                  {...formControl('community_id')}
-                  clearable={true}
-                  options={communities.map((c) => ({
-                    label: c.name,
-                    value: c.id,
-                  }))}
-                />
-              ),
+              custom: ({ formControl, values }) => {
+                const tt = values.find((i) => i.name === 'target_type')?.value ?? 'all';
+                const fc = formControl('community_id');
+                return (
+                  <SelectComponent
+                    name="community_id"
+                    label="Community (opsional)"
+                    placeholder="Pilih community..."
+                    {...fc}
+                    clearable={true}
+                    disabled={tt !== 'community'}
+                    options={communities.map((c) => ({
+                      label: c.name,
+                      value: c.id,
+                    }))}
+                  />
+                );
+              },
             },
           ],
         }}
         formUpdateControl={{
-        customDefaultValue: (data) => ({
-          ...data,
-          valid_until: toDateInput(data?.valid_until),
-          // <<< PENTING: jadikan image URL absolut biar preview langsung muncul
-          image: data?.image ? buildImageUrl(data.image) : '',
-          target_user_ids: data.target_user_ids
-            ? Array.isArray(data.target_user_ids)
-              ? data.target_user_ids
-              : String(data.target_user_ids).split(',').map((id) => Number(String(id).trim()))
-            : [],
-          validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
-          target_type: data.target_type || 'all',
-          stock: data.stock ?? 0,
-        }),
-      }}
+          customDefaultValue: (data) => ({
+            ...data,
+            valid_until: toDateInput(data?.valid_until),
+            image: data?.image ? buildImageUrl(data.image) : '',
+            target_user_ids: data.target_user_ids
+              ? Array.isArray(data.target_user_ids)
+                ? data.target_user_ids
+                : String(data.target_user_ids)
+                    .split(',')
+                    .map((id) => Number(String(id).trim()))
+              : [],
+            validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
+            target_type: data.target_type || 'all',
+            stock: data.stock ?? 0,
+          }),
+        }}
       />
 
       <ModalConfirmComponent
