@@ -82,6 +82,10 @@ export default function KomunitasDashboard() {
   const [memberLoading, setMemberLoading] = useState(false);
   const [memberError, setMemberError] = useState("");
 
+  // Tambahkan state untuk modal detail promo
+  const [modalDetailPromo, setModalDetailPromo] = useState(false);
+  const [selectedPromoList, setSelectedPromoList] = useState([]);
+
   // =========================
   // Fetch community list (refetch on refreshToggle)
   // =========================
@@ -443,6 +447,12 @@ export default function KomunitasDashboard() {
     } finally {
       setMemberLoading(false);
     }
+  };
+
+  // Function untuk membuka detail promo
+  const openPromoDetail = (promos, categoryTitle) => {
+    setSelectedPromoList({ promos, categoryTitle });
+    setModalDetailPromo(true);
   };
 
   const columns = [
@@ -817,19 +827,32 @@ export default function KomunitasDashboard() {
                         {promos.length === 0 ? (
                           <span className="text-gray-400">-</span>
                         ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {promos.slice(0, 3).map((p) => (
-                              <span
-                                key={p.id}
-                                className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800"
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap gap-1">
+                              {promos.slice(0, 2).map((p) => (
+                                <span
+                                  key={p.id}
+                                  className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800"
+                                >
+                                  {p.title}
+                                </span>
+                              ))}
+                            </div>
+                            {promos.length > 2 && (
+                              <button
+                                className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                onClick={() => openPromoDetail(promos, cat.title)}
                               >
-                                {p.title}
-                              </span>
-                            ))}
-                            {promos.length > 3 && (
-                              <span className="text-xs text-gray-500">
-                                +{promos.length - 3} lagi
-                              </span>
+                                Lihat semua ({promos.length})
+                              </button>
+                            )}
+                            {promos.length <= 2 && promos.length > 0 && (
+                              <button
+                                className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                onClick={() => openPromoDetail(promos, cat.title)}
+                              >
+                                Detail
+                              </button>
                             )}
                           </div>
                         )}
@@ -979,6 +1002,53 @@ export default function KomunitasDashboard() {
               </table>
             </div>
           )}
+        </div>
+      </FloatingPageComponent>
+
+      {/* Modal Detail Promo */}
+      <FloatingPageComponent
+        show={modalDetailPromo}
+        onClose={() => {
+          setModalDetailPromo(false);
+          setSelectedPromoList([]);
+        }}
+        title={`Daftar Promo - ${selectedPromoList?.categoryTitle || ''}`}
+        size="md"
+        className="bg-background"
+      >
+        <div className="p-6">
+          {selectedPromoList?.promos?.length === 0 ? (
+            <div className="py-8 text-center text-gray-500">Tidak ada promo</div>
+          ) : (
+            <div className="space-y-3">
+              {selectedPromoList?.promos?.map((promo) => (
+                <div
+                  key={promo.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                >
+                  <div>
+                    <h4 className="font-medium text-gray-900">{promo.title}</h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                      Aktif
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="flex justify-end mt-6">
+            <ButtonComponent
+              label="Tutup"
+              paint="secondary"
+              onClick={() => {
+                setModalDetailPromo(false);
+                setSelectedPromoList([]);
+              }}
+            />
+          </div>
         </div>
       </FloatingPageComponent>
     </>
