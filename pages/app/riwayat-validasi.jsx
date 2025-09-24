@@ -103,7 +103,7 @@ export default function RiwayatValidasi() {
       <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="bg-primary h-10"></div>
         <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20">
-          <div className="flex items-center gap-2 p-2 sticky top-0 bg-white border-b">
+          <div className="flex items-center gap-2 p-2 sticky top-0 bg-white border-b z-50">
             <div className="px-2">
               <IconButtonComponent
                 icon={faArrowLeftLong}
