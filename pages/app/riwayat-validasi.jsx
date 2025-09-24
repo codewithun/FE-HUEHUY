@@ -21,22 +21,22 @@ export default function RiwayatValidasi() {
   // Fungsi untuk normalisasi URL gambar promo
   const normalizePromoImage = (imagePath) => {
     if (!imagePath) return '/placeholder.png';
-    
+
     // Jika sudah absolute URL, return as is
     if (/^https?:\/\//i.test(imagePath)) {
       return imagePath;
     }
-    
+
     // Jika path dimulai dengan 'promos/', tambahkan baseUrl dan storage
     if (imagePath.startsWith('promos/')) {
       return `${baseUrl}/storage/${imagePath}`;
     }
-    
+
     // Jika path dimulai dengan 'storage/', tambahkan baseUrl
     if (imagePath.startsWith('storage/')) {
       return `${baseUrl}/${imagePath}`;
     }
-    
+
     // Jika path lain, tambahkan baseUrl dan storage
     return `${baseUrl}/storage/${imagePath}`;
   };
@@ -44,22 +44,22 @@ export default function RiwayatValidasi() {
   // Fungsi untuk normalisasi URL gambar voucher
   const normalizeVoucherImage = (imagePath) => {
     if (!imagePath) return '/placeholder.png';
-    
+
     // Jika sudah absolute URL, return as is
     if (/^https?:\/\//i.test(imagePath)) {
       return imagePath;
     }
-    
+
     // Jika path dimulai dengan 'vouchers/', tambahkan baseUrl dan storage
     if (imagePath.startsWith('vouchers/')) {
       return `${baseUrl}/storage/${imagePath}`;
     }
-    
+
     // Jika path dimulai dengan 'storage/', tambahkan baseUrl
     if (imagePath.startsWith('storage/')) {
       return `${baseUrl}/${imagePath}`;
     }
-    
+
     // Jika path lain, tambahkan baseUrl dan storage
     return `${baseUrl}/storage/${imagePath}`;
   };
@@ -77,13 +77,13 @@ export default function RiwayatValidasi() {
   // Combine and sort items by date
   const promoItems = (promoRes?.data ?? []).map(item => ({ ...item, itemType: 'promo' }));
   const voucherItems = (voucherRes?.data ?? []).map(item => ({ ...item, itemType: 'voucher' }));
-  
+
   // If viewing specific item, show only that type
-  const allItems = id && type 
+  const allItems = id && type
     ? (type === 'promo' ? promoItems : voucherItems)
-    : [...promoItems, ...voucherItems].sort((a, b) => 
-        new Date(b.validated_at || b.created_at) - new Date(a.validated_at || a.created_at)
-      );
+    : [...promoItems, ...voucherItems].sort((a, b) =>
+      new Date(b.validated_at || b.created_at) - new Date(a.validated_at || a.created_at)
+    );
 
   const loading = promoLoading || voucherLoading;
 
@@ -134,7 +134,9 @@ export default function RiwayatValidasi() {
                 </div>
 
                 <div className="col-span-3">
-                  <p className="font-semibold">{v.itemType === 'voucher' ? v.voucher?.title ?? 'Voucher' : v.promo?.title ?? 'Promo'}</p>
+                  <p className="font-semibold">{v.itemType === 'voucher'
+                    ? (v.voucher?.title ?? v.voucher?.name ?? 'Voucher')
+                    : (v.promo?.title ?? 'Promo')}</p>
                   <p className="text-slate-600 text-sm mb-1">
                     Divalidasi oleh: {v.user?.name ?? 'Guest'}
                   </p>
