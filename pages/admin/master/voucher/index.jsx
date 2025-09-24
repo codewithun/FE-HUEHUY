@@ -87,6 +87,12 @@ function VoucherCrud() {
     setCurrentFormControl(null);
   }, [previewUrl, rawImageUrl]);
 
+  // Pastikan state preview ter-reset saat sesi form berubah
+  useEffect(() => {
+    resetImageStates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formSessionKey]);
+
   const apiBase = useMemo(() => getApiBase(), []);
   const authHeader = useCallback(() => {
     const enc = Cookies.get(token_cookie_name);
@@ -521,14 +527,14 @@ function VoucherCrud() {
                 const fc = formControl('image');
                 const raw = fc.value;
 
-                // Tentukan sumber preview yang sah
+                // baru: nilai form -> file crop -> url server -> kosong
                 const hasCroppedFile = raw instanceof File;
                 const hasServerImage = !!raw && !(raw instanceof File);
 
                 const previewSrc = hasCroppedFile
-                  ? previewUrl                 // hanya pakai previewUrl kalau memang ada File di field
+                  ? previewUrl                 // file hasil crop pada sesi ini
                   : hasServerImage
-                  ? buildImageUrl(String(raw)) // mode edit: url dari server
+                  ? buildImageUrl(String(raw)) // gambar server saat edit
                   : '';
 
                 return (
@@ -537,16 +543,17 @@ function VoucherCrud() {
                       <span className="label-text font-medium">Gambar Voucher</span>
                     </label>
 
-                    {/* Preview Area */}
                     <div className="mb-4">
                       {previewSrc ? (
                         <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
                           <Image
+                            key={previewSrc}          // paksa rerender saat src berubah
                             src={previewSrc}
                             alt="Preview"
                             width={192}
                             height={192}
                             className="max-w-full max-h-full object-contain"
+                            unoptimized               // agar blob: bisa dirender
                           />
                         </div>
                       ) : (
@@ -561,7 +568,6 @@ function VoucherCrud() {
                       )}
                     </div>
 
-                    {/* Input + Actions */}
                     <div className="flex gap-2">
                       <input
                         type="file"
@@ -569,7 +575,6 @@ function VoucherCrud() {
                         className="file-input file-input-bordered flex-1"
                         onChange={(e) => handleFileInput(e, fc)}
                       />
-
                       {previewSrc && (
                         <div className="flex gap-2">
                           <button
