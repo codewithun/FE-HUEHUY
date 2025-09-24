@@ -579,19 +579,6 @@ function VoucherCrud() {
                           >
                             Crop Ulang
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-error btn-sm"
-                            onClick={() => {
-                              if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-                              setPreviewUrl('');
-                              setCurrentImageFile(null);
-                              setRawImageUrl('');
-                              fc.onChange('');                // kosongkan field form juga
-                            }}
-                          >
-                            Hapus
-                          </button>
                         </div>
                       )}
                     </div>
