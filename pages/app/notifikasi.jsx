@@ -24,10 +24,13 @@ export default function NotificationPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showVoucherOutOfStockModal, setShowVoucherOutOfStockModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
-  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null); // () => Promise<void> | null
 
   const path = useMemo(
-    () => `notification${type ? `?type=${encodeURIComponent(type)}` : ''}&v=${version}`,
+    () =>
+      `notification${
+        type ? `?type=${encodeURIComponent(type)}` : ''
+      }&paginate=all&sortBy=created_at&sortDirection=DESC&v=${version}`,
     [type, version]
   );
 
@@ -44,7 +47,6 @@ export default function NotificationPage() {
 
   useEffect(() => {
     if (!DEBUG) return;
-    // eslint-disable-next-line no-console
     console.log('NOTIF DEBUG', { type, path, loading, httpCode, payload, items, localItems, version });
   }, [type, path, loading, httpCode, payload, items, localItems, version]);
 
@@ -112,40 +114,27 @@ export default function NotificationPage() {
     }
   }
 
-  async function clearAllNotifications() {
-    setModalMessage(`Hapus semua notifikasi di tab "${type}"? Tindakan ini tidak bisa dibatalkan.`);
-    setConfirmAction(() => () => {
-      setClearing(true);
-
-      fetch(
-        `${apiBase}/api/notification?type=${encodeURIComponent(type)}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Accept: 'application/json',
-            ...authHeader(),
-          },
-        }
-      )
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        return res.text();
-      })
-      .then(() => {
-        setLocalItems([]);
-        setVersion((v) => v + 1);
-      })
-      .catch((e) => {
-        setModalMessage('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
-        setShowErrorModal(true);
-      })
-      .finally(() => {
-        setClearing(false);
+  async function doClearAll(tab) {
+    setShowConfirmModal(false);                 // tutup modal dulu
+    setShowVoucherOutOfStockModal(false);       // jaga-jaga jika pernah terbuka
+    setShowErrorModal(false);                   // bersih-bersih modal lain
+    setShowSuccessModal(false);
+    setClearing(true);
+    try {
+      const res = await fetch(`${apiBase}/api/notification?type=${encodeURIComponent(tab)}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', ...authHeader() },
       });
-    });
-    setShowConfirmModal(true);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await res.text();
+      setLocalItems([]);
+      setVersion(v => v + 1);
+    } catch (e) {
+      setModalMessage('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
+      setShowErrorModal(true);
+    } finally {
+      setClearing(false);
+    }
   }
 
   const cardMeta = (n) => {
@@ -182,8 +171,9 @@ export default function NotificationPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setModalMessage(`Hapus semua notifikasi di tab "${type}"? Tindakan ini tidak bisa dibatalkan.`);
-                  setConfirmAction(clearAllNotifications);
+                  setModalMessage(`Hapus semua notifikasi di tab "${type}"?`);
+                  // === FIX: simpan fungsi, bukan hasil eksekusinya ===
+                  setConfirmAction(() => () => doClearAll(type));
                   setShowConfirmModal(true);
                 }}
                 disabled={clearing}
@@ -313,6 +303,7 @@ export default function NotificationPage() {
 
                             {isVoucher && item?.target_id && (
                               <button
+                                type="button"
                                 onClick={() => claimVoucher(item.target_id, item.id)}
                                 className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark transition-colors"
                               >
@@ -346,7 +337,7 @@ export default function NotificationPage() {
 
         {/* Modals */}
         {showSuccessModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 shadow-md">
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
                 <FontAwesomeIcon icon={faCheckCircle} className="w-8 h-8 text-green-600" />
@@ -363,7 +354,7 @@ export default function NotificationPage() {
           </div>
         )}
         {showErrorModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 shadow-md">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
                 <FontAwesomeIcon icon={faExclamationTriangle} className="w-8 h-8 text-red-600" />
@@ -379,31 +370,41 @@ export default function NotificationPage() {
             </div>
           </div>
         )}
+        {/* Confirmation Modal for Delete All */}
         {showConfirmModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white rounded-2xl p-8 shadow-md">
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
-                <FontAwesomeIcon icon={faTimesCircle} className="w-8 h-8 text-yellow-600" />
-              </div>
-              <p className="text-yellow-600 font-medium">{modalMessage}</p>
-              <div className="flex gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowConfirmModal(false);
-                    confirmAction();
-                  }}
-                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-yellow-400 text-yellow-600 hover:bg-yellow-100 transition"
-                >
-                  Ya
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmModal(false)}
-                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-100 transition"
-                >
-                  Tidak
-                </button>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 shadow-lg mx-4 max-w-sm w-full">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FontAwesomeIcon icon={faTimesCircle} className="w-10 h-10 text-yellow-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Konfirmasi Hapus</h3>
+                <p className="text-gray-600 text-sm mb-6">{modalMessage}</p>
+                
+                <div className="flex gap-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fn = confirmAction;
+                      setShowConfirmModal(false);
+                      fn && fn();          // jalankan aksi final (DELETE) saat ini
+                    }}
+                    disabled={clearing}
+                    className={`px-6 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition ${
+                      clearing ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {clearing ? 'Menghapus...' : 'Ya, Hapus'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmModal(false)}
+                    disabled={clearing}
+                    className="px-6 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-100 transition"
+                  >
+                    Batal
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { useCallback, useEffect, useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '../../helpers/crop.helpers';
@@ -9,9 +10,6 @@ export default function CropperDialog({
   onSave,
   aspect = 1,
 }) {
-  // eslint-disable-next-line no-console
-  console.log('CropperDialog render:', { open, imageUrl });
-  
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -34,7 +32,6 @@ export default function CropperDialog({
       setCroppedAreaPixels(croppedAreaPixels);
       setError('');
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error in onCropComplete:', err);
       setError('Error saat crop gambar');
     }
@@ -49,14 +46,20 @@ export default function CropperDialog({
     try {
       setLoading(true);
       setError('');
+      
       const croppedBlob = await getCroppedImg(imageUrl, croppedAreaPixels);
       if (croppedBlob) {
-        onSave(croppedBlob);
+        // Convert Blob to File with proper name and type
+        const croppedFile = new File([croppedBlob], 'cropped-image.jpg', {
+          type: 'image/jpeg',
+          lastModified: Date.now(),
+        });
+        
+        onSave(croppedFile);
       } else {
         setError('Gagal memproses gambar');
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error in handleSave:', err);
       setError('Gagal menyimpan crop gambar: ' + (err.message || 'Unknown error'));
     } finally {

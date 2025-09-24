@@ -183,13 +183,22 @@ function VoucherCrud() {
     }
   };
 
-  const handleCropSave = async (croppedBlob) => {
+  const handleCropSave = async (croppedFile) => {
     setCropOpen(false);
-    setCurrentImageFile(croppedBlob);
-    setPreviewUrl(URL.createObjectURL(croppedBlob));
+    
+    // Clean up previous preview URL if it's a blob
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
+    // Set the cropped file and preview
+    setCurrentImageFile(croppedFile);
+    const newPreviewUrl = URL.createObjectURL(croppedFile);
+    setPreviewUrl(newPreviewUrl);
+    
     if (currentFormControl) {
-      // Set the cropped blob as the form value
-      currentFormControl.onChange(croppedBlob);
+      // Set the cropped File object as the form value
+      currentFormControl.onChange(croppedFile);
     }
   };
 
@@ -351,7 +360,14 @@ function VoucherCrud() {
       data.target_type = data.target_type || 'all';
       data.validation_type = data.validation_type || 'auto';
 
-      if (!data.image || !(data.image instanceof File)) delete data.image;
+      // Handle image properly - only remove if it's not a File object
+      if (data.image && !(data.image instanceof File)) {
+        // If it's a string (URL), don't include it in FormData for update
+        if (typeof data.image === 'string') {
+          delete data.image;
+        }
+      }
+
       if (!data.valid_until) delete data.valid_until;
 
       if (data.target_type !== 'community' || !data.community_id) {
@@ -368,7 +384,7 @@ function VoucherCrud() {
             data[`target_user_ids[${i}]`] = id;
           });
       } else if (data.target_type === 'all') {
-        // >>> “Semua Pengguna” = hanya role user (exclude admin & manager tenant)
+        // >>> "Semua Pengguna" = hanya role user (exclude admin & manager tenant)
         const ids = onlyUsers
           .map((u) => Number(u.id))
           .filter((n) => Number.isFinite(n) && n > 0);
@@ -488,7 +504,7 @@ function VoucherCrud() {
                     
                     {/* Preview Area */}
                     <div className="mb-4">
-                      {previewUrl || (raw && !(raw instanceof File)) ? (
+                      {(previewUrl || (raw && !(raw instanceof File))) ? (
                         <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
                           <Image 
                             src={previewUrl || buildImageUrl(String(raw))} 
@@ -521,13 +537,12 @@ function VoucherCrud() {
                       />
                       
                       {/* Action Buttons - positioned at the right */}
-                      {(previewUrl || raw) && (
+                      {(previewUrl || (raw && !(raw instanceof File))) && (
                         <div className="flex gap-2">
                           <button 
                             type="button" 
                             className="btn btn-outline btn-sm" 
                             onClick={() => handleRecrop(fc)} 
-                            disabled={!previewUrl && !raw}
                             title="Crop ulang untuk menyesuaikan gambar"
                           >
                             Crop Ulang
@@ -536,6 +551,11 @@ function VoucherCrud() {
                             type="button"
                             className="btn btn-outline btn-error btn-sm"
                             onClick={() => {
+                              // Clean up blob URLs
+                              if (previewUrl && previewUrl.startsWith('blob:')) {
+                                URL.revokeObjectURL(previewUrl);
+                              }
+                              
                               setPreviewUrl('');
                               setCurrentImageFile(null);
                               setRawImageUrl('');
