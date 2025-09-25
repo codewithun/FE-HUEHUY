@@ -10,6 +10,18 @@ const withPWA = require('next-pwa')({
 
 /** @type {import('next').NextConfig} */
 module.exports = withPWA({
+  // ✅ Tambahan: proxy agar hindari CORS untuk file statis Laravel
+  async rewrites() {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const FILE_BASE = API_BASE.replace(/\/api\/?$/, '');
+
+    return [
+      { source: '/storage/:path*',      destination: `${FILE_BASE}/storage/:path*` },
+      { source: '/promos/:path*',       destination: `${FILE_BASE}/promos/:path*` },
+      { source: '/api/storage/:path*',  destination: `${FILE_BASE}/storage/:path*` },
+    ];
+  },
+
   async headers() {
     return [
       {
@@ -20,9 +32,8 @@ module.exports = withPWA({
   },
   reactStrictMode: false,
   images: {
-    // Hapus "domains", fokus ke remotePatterns (lebih strict & disarankan)
+    // (tetap persis seperti punyamu)
     remotePatterns: [
-      // ====== LOCAL DEV ======
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/promos/**' },
       { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/promos/**' },
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/**' },
@@ -30,13 +41,10 @@ module.exports = withPWA({
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/api/storage/**' },
       { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/api/storage/**' },
 
-      // ====== PRODUCTION BACKEND (api.huehuy.com) ======
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/promos/**' },
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/storage/**' },
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/api/storage/**' },
 
-      // (opsional) tetap pertahankan IP entries jika perlu fallback
-      // ====== ANTISIPASI REDIRECT KE IP LANGSUNG ======
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/promos/**' },
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/promos/**' },
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/storage/**' },
@@ -44,7 +52,6 @@ module.exports = withPWA({
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/api/storage/**' },
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/api/storage/**' },
     ],
-    // Kalau mau debugging: uncomment sementara
     // unoptimized: true,
   },
 });

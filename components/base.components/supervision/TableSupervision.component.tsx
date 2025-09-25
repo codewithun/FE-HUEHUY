@@ -36,6 +36,11 @@ interface TableSupervisionProps {
   searchable?: boolean;
   onDetail?: (row: any) => void;
   updateEndpoint?: string | null;
+  // Optional callbacks to bubble up submit results
+  onStoreSuccess?: (data?: any) => void;
+  onUpdateSuccess?: (data?: any) => void;
+  onSubmitSuccess?: (data?: any) => void;
+  onFormClose?: () => void;
 }
 
 export function TableSupervisionComponent({
@@ -59,6 +64,10 @@ export function TableSupervisionComponent({
   searchable,
   onDetail,
   updateEndpoint,
+  onStoreSuccess,
+  onUpdateSuccess,
+  onSubmitSuccess,
+  onFormClose,
 }: TableSupervisionProps) {
   const router = useRouter();
   const {
@@ -527,6 +536,8 @@ export function TableSupervisionComponent({
           setModalForm(false);
           setDataSelected(null);
           if (refreshOnClose && formUpdateControl?.custom) reset();
+          // bubble close to parent if provided (for external cleanup)
+          try { onFormClose?.(); } catch {}
         }}
       >
         <div className="px-6 pt-4 pb-20 h-full overflow-scroll scroll_control">
@@ -544,7 +555,13 @@ export function TableSupervisionComponent({
                     : updateEndpoint == null
                     ? fetchControl.path + '/' + (dataOriginal?.at(dataSelected) || {}).id
                     : fetchControl.path + '/' + (dataOriginal?.at(dataSelected) || {}).id + updateEndpoint,
-                includeHeaders: fetchControl.includeHeaders,
+                // Strip Content-Type untuk request FormData - biarkan browser yang atur boundary
+                includeHeaders: (() => {
+                  const h = { ...(fetchControl.includeHeaders || {}) };
+                  delete h['Content-Type'];
+                  delete h['content-type'];
+                  return h; // sisakan Authorization saja
+                })(),
                 contentType: formControl?.contentType || undefined,
               }}
               confirmation
@@ -563,9 +580,15 @@ export function TableSupervisionComponent({
                     }
                   : { _method: 'PUT', ...(dataOriginal?.at(dataSelected) || {}) }
               }
-              onSuccess={() => {
+              onSuccess={(resp: any) => {
+                const wasUpdate = dataSelected !== null;
                 setModalForm(false);
                 reset();
+                try { onSubmitSuccess?.(resp); } catch {}
+                try {
+                  if (wasUpdate) onUpdateSuccess?.(resp);
+                  else onStoreSuccess?.(resp);
+                } catch {}
                 setDataSelected(null);
               }}
             />
