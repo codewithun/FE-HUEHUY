@@ -58,6 +58,8 @@ const formatDateID = (raw) => {
 const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
 
 /* -------------------- Page -------------------- */
+// Hapus ClearOnSessionChange
+
 function VoucherCrud() {
   const [modalDelete, setModalDelete] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
@@ -72,26 +74,28 @@ function VoucherCrud() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [currentFormControl, setCurrentFormControl] = useState(null);
 
-  // New: session key to force remount + full reset helper
-  const [formSessionKey, setFormSessionKey] = useState(0);
+  // Tambah: penanda session agar form remount
+  const [formSessionId, setFormSessionId] = useState(0);
+  const [listSessionId, setListSessionId] = useState(0);
 
+  // Helper: reset semua state gambar
   const resetImageStates = useCallback(() => {
     try {
       if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
       if (rawImageUrl && rawImageUrl.startsWith('blob:')) URL.revokeObjectURL(rawImageUrl);
-    } catch {}
+    } catch (_) {}
+    // penting: kosongkan value field form 'image' juga
+    try {
+      if (currentFormControl && typeof currentFormControl.onChange === 'function') {
+        currentFormControl.onChange(null);  // buang File/URL di state form
+      }
+    } catch (_) {}
     setPreviewUrl('');
-    setCurrentImageFile(null);
     setRawImageUrl('');
-    setCropOpen(false);
+    setCurrentImageFile(null);
     setCurrentFormControl(null);
-  }, [previewUrl, rawImageUrl]);
-
-  // Pastikan state preview ter-reset saat sesi form berubah
-  useEffect(() => {
-    resetImageStates();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formSessionKey]);
+    setCropOpen(false);
+  }, [previewUrl, rawImageUrl, currentFormControl]);
 
   const apiBase = useMemo(() => getApiBase(), []);
   const authHeader = useCallback(() => {
@@ -324,14 +328,32 @@ function VoucherCrud() {
         selector: 'image',
         label: 'Gambar',
         width: '100px',
-        item: ({ image }) => {
-          const src = buildImageUrl(image);
-          return src ? (
-            <Image src={src} alt="Voucher" width={48} height={48} className="w-12 h-12 object-cover rounded-lg" />
-          ) : (
-            <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
-              <span className="text-xs text-gray-500">No Image</span>
-            </div>
+        item: (row) => {
+          const raw =
+            row?.image_url_versioned || // gunakan versi dari API (sudah versioned)
+            row?.image_url ||
+            row?.image?.url ||
+            row?.image ||
+            '';
+
+          if (!raw) {
+            return (
+              <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                <span className="text-xs text-gray-500">No Image</span>
+              </div>
+            );
+          }
+
+          return (
+            <Image
+              key={`${row.id}-${row.updated_at}`}
+              src={raw}
+              alt="Voucher"
+              width={48}
+              height={48}
+              className="w-12 h-12 object-cover rounded-lg"
+              unoptimized
+            />
           );
         },
       },
@@ -375,18 +397,14 @@ function VoucherCrud() {
 
   const topBarActions = null;
 
-  // ===== Transform payload (konversi "all" => semua ID role user saja) =====
   const transformData = useCallback(
     (data) => {
       data.target_type = data.target_type || 'all';
       data.validation_type = data.validation_type || 'auto';
 
-      // Handle image properly - only remove if it's not a File object
-      if (data.image && !(data.image instanceof File)) {
-        // If it's a string (URL), don't include it in FormData for update
-        if (typeof data.image === 'string') {
-          delete data.image;
-        }
+      // pastikan string URL/image tidak ikut terkirim saat tidak upload baru
+      if (typeof data.image === 'string') {
+        delete data.image;
       }
 
       if (!data.valid_until) delete data.valid_until;
@@ -405,12 +423,10 @@ function VoucherCrud() {
             data[`target_user_ids[${i}]`] = id;
           });
       } else if (data.target_type === 'all') {
-        // >>> "Semua Pengguna" = hanya role user (exclude admin & manager tenant)
         const ids = onlyUsers
           .map((u) => Number(u.id))
           .filter((n) => Number.isFinite(n) && n > 0);
 
-        // ubah jadi target_type user dengan daftar id
         data.target_type = 'user';
         ids.forEach((id, i) => {
           data[`target_user_ids[${i}]`] = id;
@@ -441,9 +457,10 @@ function VoucherCrud() {
         onSave={handleCropSave}
         aspect={1}
       />
-      
+
+      {/* Tambah: key agar form remount tiap session baru */}
       <TableSupervisionComponent
-        key={formSessionKey}
+        key={`voucher-${formSessionId}-${listSessionId}-${refreshToggle}-${selectedVoucher?.id || 'new'}`}
         title="Manajemen Voucher"
         columnControl={{ custom: columns }}
         customTopBar={topBarActions}
@@ -455,12 +472,12 @@ function VoucherCrud() {
           onAdd: () => {
             resetImageStates();
             setSelectedVoucher(null);
-            setFormSessionKey((k) => k + 1);
+            setFormSessionId((n) => n + 1);
           },
           onEdit: (voucher) => {
             resetImageStates();
             setSelectedVoucher(voucher);
-            setFormSessionKey((k) => k + 1);
+            setFormSessionId((n) => n + 1);
           },
           onDelete: (voucher) => {
             setSelectedVoucher(voucher);
@@ -471,17 +488,24 @@ function VoucherCrud() {
           path: 'admin/vouchers',
           includeHeaders: {
             'Content-Type': 'application/json',
+            // 'X-Refresh': String(listSessionId), // HAPUS. Ini pemicu preflight.
             ...authHeader(),
           },
         }}
-        /* ===== DEFAULT VALUE supaya tidak 422 ===== */
+        onFormClose={() => {
+          // pastikan bersih saat modal form ditutup tanpa submit
+          resetImageStates();
+          setSelectedVoucher(null);
+          setFormSessionId((n) => n + 1);
+          setListSessionId((n) => n + 1);
+        }}
+        /* Default value ditambah image kosong supaya tidak carry-over */
         formDefaultValue={{
           validation_type: 'auto',
           target_type: 'all',
           stock: 0,
-          image: '', // ensure image field exists and is empty by default
+          image: '', // penting: kosongkan nilai image saat create
         }}
-        /* ===== GUARD opsional sebelum submit ===== */
         beforeSubmit={(payload) => {
           const tt = payload?.target_type || 'all';
           if (tt === 'user' && (!payload.target_user_ids || payload.target_user_ids.length === 0)) {
@@ -493,6 +517,28 @@ function VoucherCrud() {
             return false;
           }
           return true;
+        }}
+        // Reset state + bump session setelah submit sukses (store/update)
+        onStoreSuccess={() => {
+          resetImageStates();
+          setSelectedVoucher(null);
+          setFormSessionId((n) => n + 1);
+          setListSessionId((n) => n + 1);
+          setRefreshToggle((s) => !s);
+        }}
+        onUpdateSuccess={() => {
+          resetImageStates();
+          setSelectedVoucher(null);
+          setFormSessionId((n) => n + 1);
+          setListSessionId((n) => n + 1);
+          setRefreshToggle((s) => !s);
+        }}
+        onSubmitSuccess={() => {
+          resetImageStates();
+          setSelectedVoucher(null);
+          setFormSessionId((n) => n + 1);
+          setListSessionId((n) => n + 1);
+          setRefreshToggle((s) => !s);
         }}
         formControl={{
           contentType: 'multipart/form-data',
@@ -524,75 +570,78 @@ function VoucherCrud() {
             {
               type: 'custom',
               custom: ({ formControl }) => {
-                const fc = formControl('image');
-                const raw = fc.value;
+                const ImgField = () => {
+                  const fc = formControl('image');
 
-                // baru: nilai form -> file crop -> url server -> kosong
-                const hasCroppedFile = raw instanceof File;
-                const hasServerImage = !!raw && !(raw instanceof File);
+                  const previewSrc = (() => {
+                    if (previewUrl) return previewUrl;
+                    if (selectedVoucher && fc.value && !(fc.value instanceof File)) {
+                      const val = String(fc.value);
+                      // jika absolute URL, pakai langsung; jika path relatif, bangun via buildImageUrl
+                      return /^https?:\/\//i.test(val) ? val : buildImageUrl(val);
+                    }
+                    return '';
+                  })();
 
-                const previewSrc = hasCroppedFile
-                  ? previewUrl                 // file hasil crop pada sesi ini
-                  : hasServerImage
-                  ? buildImageUrl(String(raw)) // gambar server saat edit
-                  : '';
-
-                return (
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text font-medium">Gambar Voucher</span>
-                    </label>
-
-                    <div className="mb-4">
-                      {previewSrc ? (
-                        <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
-                          <Image
-                            key={previewSrc}          // paksa rerender saat src berubah
-                            src={previewSrc}
-                            alt="Preview"
-                            width={192}
-                            height={192}
-                            className="max-w-full max-h-full object-contain"
-                            unoptimized               // agar blob: bisa dirender
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-full h-48 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                          <div className="text-center">
-                            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <p className="text-gray-500 text-sm">Belum ada gambar dipilih</p>
+                  return (
+                    <div
+                      key={`img-field-${formSessionId}-${selectedVoucher?.id || 'new'}`}
+                      className="form-control"
+                    >
+                      <label className="label">
+                        <span className="label-text font-medium">Gambar Voucher</span>
+                      </label>
+                      <div className="mb-4">
+                        {previewSrc ? (
+                          <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                            <Image
+                              src={previewSrc}
+                              alt="Preview"
+                              width={192}
+                              height={192}
+                              className="max-w-full max-h-full object-contain"
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            />
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="w-full h-48 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                            <div className="text-center">
+                              <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <p className="text-gray-500 text-sm">Belum ada gambar dipilih</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="file-input file-input-bordered flex-1"
+                          onChange={(e) => handleFileInput(e, fc)}
+                        />
+                        {previewSrc && (
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              onClick={() => handleRecrop(fc)}
+                              title="Crop ulang untuk menyesuaikan gambar"
+                            >
+                              Crop Ulang
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500 mt-1">
+                        PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
+                      </span>
                     </div>
+                  );
+                };
 
-                    <div className="flex gap-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="file-input file-input-bordered flex-1"
-                        onChange={(e) => handleFileInput(e, fc)}
-                      />
-                      {previewSrc && (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            onClick={() => handleRecrop(fc)}
-                          >
-                            Crop Ulang
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <span className="text-xs text-gray-500 mt-1">
-                      PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
-                    </span>
-                  </div>
-                );
+                return <ImgField />;
               },
             },
             {
@@ -748,14 +797,13 @@ function VoucherCrud() {
           customDefaultValue: (data) => ({
             ...data,
             valid_until: toDateInput(data?.valid_until),
-            image: data?.image ? buildImageUrl(data.image) : '',
-            target_user_ids: data.target_user_ids
-              ? Array.isArray(data.target_user_ids)
-                ? data.target_user_ids
-                : String(data.target_user_ids)
-                    .split(',')
-                    .map((id) => Number(String(id).trim()))
-              : [],
+            image: typeof data?.image === 'string' ? data.image : '',
+            target_user_ids: Array.isArray(data?.target_user_ids)
+              ? data.target_user_ids
+              : String(data?.target_user_ids || '')
+                  .split(',')
+                  .map((id) => Number(String(id).trim()))
+                  .filter(Boolean),
             validation_type: data.validation_type || (data.code ? 'manual' : 'auto'),
             target_type: data.target_type || 'all',
             stock: data.stock ?? 0,
