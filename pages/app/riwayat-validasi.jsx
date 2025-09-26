@@ -15,20 +15,15 @@ export default function RiwayatValidasi() {
   const { id, type } = router.query;
   const ready = router.isReady;
 
-  // state khusus agar ctxTenant stabil setelah router ready
-  const [ctxTenant, setCtxTenant] = React.useState(false);
-
-  // hitung ctxTenant setelah router siap (baca URL + localStorage di client)
-  React.useEffect(() => {
-    if (!router.isReady) return;
-    try {
-      const q = (new URLSearchParams(window.location.search).get('ctx') || '').toLowerCase();
-      const ls = localStorage.getItem('tenant_view') === '1';
-      setCtxTenant(q === 'tenant' || ls);
-    } catch {
-      setCtxTenant(false);
-    }
-  }, [router.isReady, router.query?.ctx]);
+const ctxTenant = React.useMemo(() => {
+  const fromQuery =
+    String(router.query?.ctx || '').toLowerCase() === 'tenant';
+  let fromLS = false;
+  if (typeof window !== 'undefined') {
+    try { fromLS = localStorage.getItem('tenant_view') === '1'; } catch {}
+  }
+  return fromQuery || fromLS;
+}, [router.query?.ctx]);
 
   // --- paksa mode tenant berdasarkan URL/route, lebih stabil dari window ---
   const forceTenantView =
