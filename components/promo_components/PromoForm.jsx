@@ -84,8 +84,17 @@ export default function PromoForm({
       
       // Set image preview for edit mode
       if (mode === 'edit' && initialData.image && buildImageUrl) {
-        const imageUrl = buildImageUrl(initialData.image);
-        setImagePreview(imageUrl);
+        // Try different image fields for proper preview
+        const imagePath = initialData.image_url_versioned || 
+                         initialData.image_url || 
+                         initialData.image;
+        if (imagePath) {
+          const imageUrl = buildImageUrl(imagePath);
+          console.log('Setting image preview for edit:', { imagePath, imageUrl });
+          setImagePreview(imageUrl);
+        } else {
+          setImagePreview('');
+        }
       } else {
         setImagePreview('');
       }
@@ -122,9 +131,17 @@ export default function PromoForm({
       setImagePreview(previewUrl);
     } else {
       // If no file selected, restore original image for edit mode
-      if (mode === 'edit' && initialData?.image && buildImageUrl) {
-        const imageUrl = buildImageUrl(initialData.image);
-        setImagePreview(imageUrl);
+      if (mode === 'edit' && initialData && buildImageUrl) {
+        const imagePath = initialData.image_url_versioned || 
+                         initialData.image_url || 
+                         initialData.image;
+        if (imagePath) {
+          const imageUrl = buildImageUrl(imagePath);
+          console.log('Restoring original image preview:', { imagePath, imageUrl });
+          setImagePreview(imageUrl);
+        } else {
+          setImagePreview('');
+        }
       } else {
         setImagePreview('');
       }
@@ -144,13 +161,16 @@ export default function PromoForm({
     body.append('promo_type', formData.promo_type || 'offline');
     
     // wajib sertakan community_id saat update
-    const cid = formData.community_id ?? initialData?.community_id;
-    if (cid) {
+    const cid = formData.community_id || initialData?.community_id;
+    if (cid && cid !== '') {
       body.append('community_id', String(cid));
       console.log('Community ID being sent:', cid);
     } else {
-      console.error('community_id is required but not provided');
-      alert('Community ID is required');
+      console.error('community_id is required but not provided:', { 
+        formData_cid: formData.community_id, 
+        initialData_cid: initialData?.community_id 
+      });
+      alert('Community ID diperlukan untuk menyimpan promo');
       return;
     }
 
@@ -158,6 +178,10 @@ export default function PromoForm({
     if (formData.detail) body.append('detail', String(formData.detail));
     if (formData.code) body.append('code', String(formData.code));
     if (formData.location) body.append('location', String(formData.location));
+    
+    // Owner information (required by backend)
+    if (formData.owner_name) body.append('owner_name', String(formData.owner_name));
+    if (formData.owner_contact) body.append('owner_contact', String(formData.owner_contact));
     
     // Numeric fields - always send with default values
     body.append('promo_distance', String(formData.promo_distance ?? 0));
@@ -169,6 +193,9 @@ export default function PromoForm({
     // Date fields - only send if not empty
     if (formData.start_date) body.append('start_date', String(formData.start_date));
     if (formData.end_date) body.append('end_date', String(formData.end_date));
+    
+    // Validation type - default to auto if not set
+    body.append('validation_type', formData.validation_type || 'auto');
 
     // Image file
     if (imageFile) body.append('image', imageFile);
@@ -265,7 +292,7 @@ export default function PromoForm({
               name="image"
               label="Gambar Promo"
               aspect="16/9"
-              value={imageFile ? imageFile : imagePreview}
+              value={imageFile || (imagePreview || '')}
               onChange={handleImageChange}
             />
             <span className="text-xs text-gray-500 mt-1">

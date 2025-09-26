@@ -24,7 +24,11 @@ const getApiBase = () => {
 const buildImageUrl = (raw) => {
   if (!raw) return null;
   if (/^https?:\/\//i.test(raw)) return raw;
-  const base = getApiBase();
+  
+  // Use NEXT_PUBLIC_API_URL or fallback to backend port
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  const base = apiUrl.replace(/\/api\/?$/, ""); // Remove /api suffix to get base URL
+  
   let path = String(raw).replace(/^\/+/, "");
   path = path.replace(/^api\/storage\//, "storage/");
   if (!/^storage\//.test(path)) path = `storage/${path}`;
@@ -94,30 +98,40 @@ function PromoDashboard() {
   const MANAGERS_ENDPOINT = `${apiBase}/api/admin/users?roles[]=manager_tenant&roles[]=manager%20tenant&paginate=all`;
   /**
    * Normalisasi URL gambar agar:
-   * - Selalu jadi PATH RELATIF (lewat Next rewrites) → /storage/...
-   * - Aman untuk both absolute URL dari BE atau path raw (promos/...).
+   * - Gunakan absolute URL dari backend untuk akses gambar
+   * - Fallback ke konstruksi manual jika diperlukan
    */
   const toStoragePath = (raw) => {
     if (!raw) return "";
 
     const s = String(raw).trim();
 
-    // Sudah berupa path absolut FE
-    if (s.startsWith("/")) return s;
+    // Jika sudah berupa URL absolut, gunakan langsung
+    if (/^https?:\/\//i.test(s)) return s;
 
-    // Bentuk absolut ke BE → petakan ke path FE
-    // contoh: http://localhost:8000/storage/xxx → /storage/xxx
-    const m1 = s.match(/^https?:\/\/[^\/]+\/(api\/)?storage\/(.+)$/i);
-    if (m1) return `/storage/${m1[2]}`;
+    // Jika berupa path absolut, konstruksi URL backend
+    if (s.startsWith("/")) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const baseUrl = apiUrl.replace(/\/api\/?$/, "");
+      return `${baseUrl}${s}`;
+    }
 
-    // Kasus BE kirim "api/storage/xxx" → /storage/xxx
-    if (/^api\/storage\//i.test(s)) return `/${s.replace(/^api\//i, "")}`;
+    // Konstruksi URL untuk berbagai format path
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    const baseUrl = apiUrl.replace(/\/api\/?$/, "");
 
-    // Kasus BE kirim "storage/xxx" → /storage/xxx
-    if (/^storage\//i.test(s)) return `/${s}`;
+    // Kasus BE kirim "api/storage/xxx" → http://localhost:8000/storage/xxx
+    if (/^api\/storage\//i.test(s)) {
+      return `${baseUrl}/${s.replace(/^api\//i, "")}`;
+    }
 
-    // Kasus BE kirim hanya "promos/xxx" → /storage/promos/xxx
-    return `/storage/${s.replace(/^\/+/, "")}`;
+    // Kasus BE kirim "storage/xxx" → http://localhost:8000/storage/xxx
+    if (/^storage\//i.test(s)) {
+      return `${baseUrl}/${s}`;
+    }
+
+    // Kasus BE kirim hanya "promos/xxx" → http://localhost:8000/storage/promos/xxx
+    return `${baseUrl}/storage/${s.replace(/^\/+/, "")}`;
   };
 
   /** Tambahkan query param versing k=... */
@@ -1005,8 +1019,11 @@ function PromoDashboard() {
           customDefaultValue: (data) => {
             console.log("🔧 Setting form default values for edit:", {
               id: data?.id,
+              title: data?.title,
+              image: data?.image,
               owner_name: data?.owner_name,
-              owner_phone: data?.owner_phone,
+              owner_contact: data?.owner_contact,
+              community_id: data?.community_id,
               merchantManagersCount: merchantManagers.length,
             });
 
@@ -1016,7 +1033,7 @@ function PromoDashboard() {
             // Prioritize owner_user_id from data if available
             if (data?.owner_user_id) {
               resolvedOwnerUserId = String(data.owner_user_id);
-            } else if (data?.owner_name || data?.owner_phone) {
+            } else if (data?.owner_name || data?.owner_contact) {
               const matchedManager = merchantManagers.find(manager => {
                 const managerName = getDisplayName(manager).toLowerCase();
                 const managerPhone = getPhone(manager).replace(/[^\d+]/g, "");
@@ -1026,8 +1043,8 @@ function PromoDashboard() {
                   managerName.includes(data.owner_name.toLowerCase());
                 
                 // Match berdasarkan phone (normalisasi dulu)
-                const phoneMatch = data.owner_phone && managerPhone && 
-                  managerPhone.includes(data.owner_phone.replace(/[^\d+]/g, ""));
+                const phoneMatch = data.owner_contact && managerPhone && 
+                  managerPhone.includes(data.owner_contact.replace(/[^\d+]/g, ""));
                 
                 return nameMatch || phoneMatch;
               });
@@ -1036,35 +1053,40 @@ function PromoDashboard() {
                 resolvedOwnerUserId = String(matchedManager.id);
                 console.log("🔍 Resolved manager tenant:", {
                   stored_name: data.owner_name,
-                  stored_phone: data.owner_phone,
+                  stored_contact: data.owner_contact,
                   resolved_id: resolvedOwnerUserId,
                   manager_name: getDisplayName(matchedManager),
                   manager_phone: getPhone(matchedManager)
                 });
               } else {
-                console.warn("⚠️ Could not resolve owner from stored name/phone:", {
+                console.warn("⚠️ Could not resolve owner from stored name/contact:", {
                   stored_name: data.owner_name,
-                  stored_phone: data.owner_phone,
+                  stored_contact: data.owner_contact,
                   available_managers: merchantManagers.length
                 });
               }
             }
 
             const result = {
-              id: data?.id,
-              ...data,
-              start_date: data.start_date ? new Date(data.start_date).toISOString().slice(0, 10) : "",
-              end_date: data.end_date ? new Date(data.end_date).toISOString().slice(0, 10) : "",
+              id: data?.id || "",
+              title: data?.title || "",
+              description: data?.description || "",
+              detail: data?.detail || "",
+              code: data?.code || "",
+              promo_type: data?.promo_type || "offline",
+              promo_distance: data?.promo_distance || 0,
+              location: data?.location || "",
+              stock: data?.stock || 0,
+              always_available: Boolean(data?.always_available),
+              community_id: data?.community_id || "",
+              start_date: data?.start_date ? new Date(data.start_date).toISOString().slice(0, 10) : "",
+              end_date: data?.end_date ? new Date(data.end_date).toISOString().slice(0, 10) : "",
+              validation_type: data?.validation_type || (data?.code ? "manual" : "auto"),
 
-              // Image handling
-              image: currentImageFile ||
-                data?.image_url_versioned ||
-                data?.image_url ||
-                data?.image?.url ||
-                data?.image ||
-                "",
+              // Image handling - use raw image path for form
+              image: data?.image || "",
 
-              // Image versioning fields
+              // Image versioning fields for preview
               image_url_versioned: data?.image_url_versioned || null,
               image_url: data?.image_url || null,
               image_updated_at: data?.image_updated_at || null,
@@ -1072,15 +1094,16 @@ function PromoDashboard() {
 
               // Set owner_user_id yang sudah di-resolve
               owner_user_id: resolvedOwnerUserId || "",
-              
-              validation_type: data.validation_type || (data.code ? "manual" : "auto"),
             };
 
             console.log("📋 Final form default values:", {
+              id: result.id,
+              title: result.title,
+              image: result.image,
+              community_id: result.community_id,
               owner_user_id: result.owner_user_id,
-              owner_name: result.owner_name,
-              owner_phone: result.owner_phone,
-              id: result.id
+              owner_name: data?.owner_name,
+              owner_contact: data?.owner_contact,
             });
 
             return result;
