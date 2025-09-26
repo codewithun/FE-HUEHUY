@@ -242,18 +242,25 @@ export default function RiwayatValidasi() {
 
                 <div className="col-span-3">
                   {(() => {
-                    const currentUserId = String(profile?.id ?? profile?.user_id ?? profile?.user?.id ?? '');
+                    // ambil id user yang login
+                    const currentUserId = String(
+                      profile?.id ?? profile?.user_id ?? profile?.user?.id ?? ''
+                    );
 
-                    const isValidatorOfThisRow = String(v?.user?.id ?? '') === currentUserId;
-                    const isOwnerOfThisRow = String(v?.owner?.id ?? '') === currentUserId;
-                    // Tampilkan "Promo milik ..." jika:
+                    // dari backend:
+                    // v.user   = validator (TENANT)
+                    // v.owner  = end-user (PEMILIK ITEM)
+                    const isValidator = String(v?.user?.id ?? '') === currentUserId;
+                    const isEndUser = String(v?.owner?.id ?? '') === currentUserId;
+
+                    // Tampilkan "Promo milik: <end-user>" jika:
                     // - kamu tenant (isTenantContext), atau
-                    // - kamu validator baris ini, atau
-                    // - baris punya owner dan kamu BUKAN owner (tipikal tampilan sisi tenant)
-                    const showOwner = isTenantContext || isValidatorOfThisRow;
+                    // - kamu adalah validator baris ini
+                    const showOwner = isTenantContext || isValidator;
 
+                    // Debug (opsional)
                     dlog('[RiwayatValidasi] row debug =>', {
-                      currentProfileId: profile?.id,
+                      currentProfileId: currentUserId,
                       validatorId: v?.user?.id,
                       ownerId: v?.owner?.id,
                       isTenantContext,
@@ -270,11 +277,11 @@ export default function RiwayatValidasi() {
 
                         <p className="text-slate-600 text-sm mb-1">
                           {showOwner ? (
-                            // Tenant/validator view: tunjukkan pemilik *item* (user yang pakai)
-                            <>Item milik: {v.owner?.name ?? '-'}</>
+                            // Tenant/validator view → tampilkan siapa pengguna (end-user) yang pakai
+                            <>Promo milik: {v.owner?.name ?? '-'}</>
                           ) : (
-                            // User view: tunjukkan validator/tenant (pemilik promo)
-                            <>Divalidasi oleh: {v.user?.name ?? v.promo?.owner_name ?? 'Guest'}</>
+                            // End-user view → tampilkan siapa validator (tenant)
+                            <>Divalidasi oleh: {v.user?.name ?? '—'}</>
                           )}
                         </p>
                       </>
