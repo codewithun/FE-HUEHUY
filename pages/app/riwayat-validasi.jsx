@@ -14,7 +14,7 @@ export default function RiwayatValidasi() {
   const router = useRouter();
   const { id, type } = router.query;
   const ready = router.isReady;
-  const { profile } = useUserContext?.() || {};
+  const { profile } = useUserContext() || {};
   // ===== DEBUG SWITCH =====
   const DEBUG = true;
   // eslint-disable-next-line no-console
@@ -49,13 +49,19 @@ export default function RiwayatValidasi() {
       : []),
   ];
 
-  const isTenantContext =
-    String(profile?.role_id ?? '') === '6' || // legacy
-    tenantHints.some((t) =>
-      /(tenant|manager_tenant|managertenant|merchant)/.test(String(t))
-    ) ||
-    (typeof window !== 'undefined' &&
-      /tenant/i.test(String(window.location?.pathname || ''))); // fallback dari URL
+  // --- URL + Host (buat fallback deteksi tenant lewat alamat) ---
+  const path = typeof window !== 'undefined' ? String(window.location?.pathname || '') : '';
+  const host = typeof window !== 'undefined' ? String(window.location?.host || '') : '';
+
+  const isTenantByRole =
+    String(profile?.role_id ?? '') === '6' ||
+    tenantHints.some((t) => /(tenant|manager_tenant|managertenant|merchant)/i.test(String(t)));
+
+  const isTenantByUrl =
+    /(tenant|merchant|manager-tenant|tenant-manager)/i.test(path) ||  // cocokkan segmen path
+    /^tenant\./i.test(host);                                         // cocokkan subdomain "tenant."
+
+  const isTenantContext = isTenantByRole || isTenantByUrl;
 
   // LOG sesudah nilai boolean-nya jadi
   dgrp('[RiwayatValidasi] context', () => {
