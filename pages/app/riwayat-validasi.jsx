@@ -242,29 +242,33 @@ export default function RiwayatValidasi() {
 
                 <div className="col-span-3">
                   {(() => {
-                    // ambil id user yang login
+                    // id user yang login (pakai fallback beberapa kemungkinan)
                     const currentUserId = String(
                       profile?.id ?? profile?.user_id ?? profile?.user?.id ?? ''
                     );
 
                     // dari backend:
-                    // v.user   = validator (TENANT)
-                    // v.owner  = end-user (PEMILIK ITEM)
-                    const isValidator = String(v?.user?.id ?? '') === currentUserId;
-                    const isEndUser = String(v?.owner?.id ?? '') === currentUserId;
+                    // v.user  = validator (TENANT)
+                    // v.owner = end-user (PEMILIK ITEM)
+                    const validatorId = String(v?.user?.id ?? '');
+                    const ownerId = String(v?.owner?.id ?? '');
 
-                    // Tampilkan "Promo milik: <end-user>" jika:
-                    // - kamu tenant (isTenantContext), atau
-                    // - kamu adalah validator baris ini
-                    const showOwner = isTenantContext || isValidator;
+                    // Tentukan "mode tampilan" berdasar ID.
+                    // Ini membuatnya tetap benar walau isTenantContext gagal.
+                    let view = 'guest';
+                    if (currentUserId && currentUserId === validatorId) {
+                      view = 'tenant';  // kamu adalah validator
+                    } else if (currentUserId && currentUserId === ownerId) {
+                      view = 'owner';   // kamu adalah end-user pemilik item
+                    } else if (isTenantContext) {
+                      view = 'tenant';  // tidak cocok ID tapi url/role mengindikasikan tenant
+                    } else {
+                      view = 'owner';   // fallback: anggap user biasa
+                    }
 
-                    // Debug (opsional)
-                    dlog('[RiwayatValidasi] row debug =>', {
-                      currentProfileId: currentUserId,
-                      validatorId: v?.user?.id,
-                      ownerId: v?.owner?.id,
-                      isTenantContext,
-                      v,
+                    // Debug cepat
+                    dlog('[RiwayatValidasi] row =>', {
+                      currentUserId, validatorId, ownerId, isTenantContext, view, v,
                     });
 
                     return (
@@ -276,11 +280,11 @@ export default function RiwayatValidasi() {
                         </p>
 
                         <p className="text-slate-600 text-sm mb-1">
-                          {showOwner ? (
-                            // Tenant/validator view → tampilkan siapa pengguna (end-user) yang pakai
+                          {view === 'tenant' ? (
+                            // tenant/validator melihat siapa end-user yang pakai
                             <>Promo milik: {v.owner?.name ?? '-'}</>
                           ) : (
-                            // End-user view → tampilkan siapa validator (tenant)
+                            // end-user melihat siapa validator (tenant)
                             <>Divalidasi oleh: {v.user?.name ?? '—'}</>
                           )}
                         </p>
