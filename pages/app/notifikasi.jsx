@@ -3,20 +3,26 @@
 import { faCheckCircle, faExclamationTriangle, faTimesCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DateFormatComponent } from '../../components/base.components';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
-import { token_cookie_name, useGet } from '../../helpers';
+import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
 
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
 
 export default function NotificationPage() {
-  const [type, setType] = useState('merchant'); // 'hunter' | 'merchant'
-  const [version, setVersion] = useState(0);    // cache-buster
+  const [type, setType] = useState('merchant');
+  const [version, setVersion] = useState(0);
   const [localItems, setLocalItems] = useState([]);
   const [clearing, setClearing] = useState(false);
+  
+  // Infinite scroll states
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [cursor, setCursor] = useState(null);
+  const [initialLoad, setInitialLoad] = useState(true);
 
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -24,31 +30,7 @@ export default function NotificationPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showVoucherOutOfStockModal, setShowVoucherOutOfStockModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
-  const [confirmAction, setConfirmAction] = useState(null); // () => Promise<void> | null
-
-  const path = useMemo(
-    () =>
-      `notification${
-        type ? `?type=${encodeURIComponent(type)}` : ''
-      }&paginate=all&sortBy=created_at&sortDirection=DESC&v=${version}`,
-    [type, version]
-  );
-
-  const res = useGet({ path });
-  const loading  = Array.isArray(res) ? Boolean(res[0]) : false;
-  const httpCode = Array.isArray(res) ? res[1] : null;
-  const payload  = Array.isArray(res) ? res[2] : null;
-
-  const items = useMemo(() => Array.isArray(payload?.data) ? payload.data : [], [payload?.data]);
-
-  useEffect(() => {
-    if (!loading) setLocalItems(items);
-  }, [loading, items]);
-
-  useEffect(() => {
-    if (!DEBUG) return;
-    console.log('NOTIF DEBUG', { type, path, loading, httpCode, payload, items, localItems, version });
-  }, [type, path, loading, httpCode, payload, items, localItems, version]);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const authHeader = () => {
     const enc = Cookies.get(token_cookie_name);
@@ -56,9 +38,129 @@ export default function NotificationPage() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
+  // Reset data saat ganti tab
+  const resetData = useCallback(() => {
+    console.log('🔄 Resetting data for tab:', type);
+    setLocalItems([]);
+    setCursor(null);
+    setHasMore(true);
+    setInitialLoad(true);
+    setVersion(v => v + 1);
+  }, [type]);
+
+  // Load notifications dengan cursor-based pagination
+  const loadNotifications = useCallback(async (reset = false) => {
+    if (loading || (!hasMore && !reset)) {
+      console.log('⏸️ Skip loading:', { loading, hasMore, reset });
+      return;
+    }
+
+    console.log('📥 Loading notifications:', { type, cursor, reset });
+    setLoading(true);
+    
+    try {
+      const params = new URLSearchParams({
+        type: type,
+        paginate: 'smart',
+        limit: '20', // Load 20 per batch
+        sortBy: 'created_at',
+        sortDirection: 'DESC',
+        v: version.toString(),
+      });
+
+      if (cursor && !reset) {
+        params.append('cursor', cursor);
+      }
+
+      const res = await fetch(`${apiBase}/api/notification?${params}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      }
+      
+      const data = await res.json();
+      const newItems = Array.isArray(data.data) ? data.data : [];
+
+      console.log('✅ Loaded notifications:', {
+        newCount: newItems.length,
+        hasMore: data.meta?.has_more,
+        nextCursor: data.meta?.next_cursor
+      });
+
+      if (reset) {
+        setLocalItems(newItems);
+      } else {
+        setLocalItems(prev => [...prev, ...newItems]);
+      }
+
+      setHasMore(Boolean(data.meta?.has_more));
+      setCursor(data.meta?.next_cursor || null);
+      setInitialLoad(false);
+
+    } catch (error) {
+      console.error('❌ Failed to load notifications:', error);
+      setHasMore(false);
+      if (reset) {
+        setLocalItems([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [type, cursor, hasMore, loading, version]);
+
+  // Initial load & reload saat ganti tab
+  useEffect(() => {
+    loadNotifications(true);
+  }, [type]);
+
+  // Infinite scroll handler
+  const handleScroll = useCallback(() => {
+    if (loading || !hasMore || initialLoad) return;
+
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollHeight = document.documentElement.scrollHeight;
+    const clientHeight = window.innerHeight;
+
+    // Load more saat hampir sampai bawah (85%)
+    if (scrollTop + clientHeight >= scrollHeight * 0.85) {
+      console.log('🔄 Trigger infinite scroll');
+      loadNotifications(false);
+    }
+  }, [loading, hasMore, loadNotifications, initialLoad]);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  // Tab change handler
+  const handleTabChange = (newType) => {
+    if (newType === type) return;
+    console.log('🔄 Changing tab from', type, 'to', newType);
+    setType(newType);
+    resetData();
+  };
+
+  // Debug logging
+  useEffect(() => {
+    if (!DEBUG) return;
+    console.log('NOTIF DEBUG', { 
+      type, loading, hasMore, cursor, 
+      itemsCount: localItems.length, 
+      initialLoad, version 
+    });
+  }, [type, loading, hasMore, cursor, localItems.length, initialLoad, version]);
+
   async function claimVoucher(voucherId, notificationId) {
     try {
-      console.log('Claiming voucher:', { voucherId, notificationId }); // Debug log
+      console.log('Claiming voucher:', { voucherId, notificationId });
       
       const res = await fetch(`${apiBase}/api/vouchers/${voucherId}/claim`, {
         method: 'POST',
@@ -71,16 +173,19 @@ export default function NotificationPage() {
       });
 
       const text = await res.text();
-      console.log('Response status:', res.status, 'Response text:', text); // Debug log
+      console.log('Response status:', res.status, 'Response text:', text);
       
       let json = {};
       try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
 
       if (!res.ok) {
-        console.error('Claim failed:', { status: res.status, response: json }); // Debug log
+        console.error('Claim failed:', { status: res.status, response: json });
         
         // Handle specific voucher out of stock error
-        if (json?.message?.includes('out of stock') || json?.message?.includes('stok habis') || json?.message?.includes('voucher habis') || res.status === 410) {
+        if (json?.message?.includes('out of stock') || 
+            json?.message?.includes('stok habis') || 
+            json?.message?.includes('voucher habis') || 
+            res.status === 410) {
           setShowVoucherOutOfStockModal(true);
           
           // Auto close after 3 seconds and remove notification
@@ -108,18 +213,19 @@ export default function NotificationPage() {
       setModalMessage('Voucher berhasil diklaim! Cek di Saku.');
       setShowSuccessModal(true);
     } catch (e) {
-      console.error('Network error:', e); // Debug log
+      console.error('Network error:', e);
       setModalMessage('Gagal klaim: ' + (e?.message || 'Network error'));
       setShowErrorModal(true);
     }
   }
 
   async function doClearAll(tab) {
-    setShowConfirmModal(false);                 // tutup modal dulu
-    setShowVoucherOutOfStockModal(false);       // jaga-jaga jika pernah terbuka
-    setShowErrorModal(false);                   // bersih-bersih modal lain
+    setShowConfirmModal(false);
+    setShowVoucherOutOfStockModal(false);
+    setShowErrorModal(false);
     setShowSuccessModal(false);
     setClearing(true);
+    
     try {
       const res = await fetch(`${apiBase}/api/notification?type=${encodeURIComponent(tab)}`, {
         method: 'DELETE',
@@ -127,7 +233,10 @@ export default function NotificationPage() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await res.text();
+      
       setLocalItems([]);
+      setCursor(null);
+      setHasMore(true);
       setVersion(v => v + 1);
     } catch (e) {
       setModalMessage('Gagal menghapus notifikasi: ' + (e?.message || 'Network error'));
@@ -172,7 +281,6 @@ export default function NotificationPage() {
                 type="button"
                 onClick={() => {
                   setModalMessage(`Hapus semua notifikasi di tab "${type}"?`);
-                  // === FIX: simpan fungsi, bukan hasil eksekusinya ===
                   setConfirmAction(() => () => doClearAll(type));
                   setShowConfirmModal(true);
                 }}
@@ -206,7 +314,8 @@ export default function NotificationPage() {
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
                 }`}
-                onClick={() => { setType('hunter'); setVersion((v) => v + 1); }}
+                onClick={() => handleTabChange('hunter')}
+                disabled={loading && initialLoad}
               >
                 Hunter
               </button>
@@ -217,7 +326,8 @@ export default function NotificationPage() {
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
                 }`}
-                onClick={() => { setType('merchant'); setVersion((v) => v + 1); }}
+                onClick={() => handleTabChange('merchant')}
+                disabled={loading && initialLoad}
               >
                 Merchant
               </button>
@@ -227,9 +337,103 @@ export default function NotificationPage() {
           {/* List */}
           <div className="px-4">
             <div className="space-y-4">
-              {loading ? (
+              {localItems.length > 0 ? (
                 <>
-                  {[1,2,3].map((i) => (
+                  {localItems.map((item, idx) => {
+                    const { img, title, isVoucher } = cardMeta(item);
+                    const isUnread = !item.read_at;
+
+                    return (
+                      <div
+                        className={`bg-white rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
+                          isUnread ? 'border-l-4 border-primary' : ''
+                        }`}
+                        key={item?.id ?? `notif-${idx}`}
+                      >
+                        <div className="flex gap-4">
+                          <div className="relative flex-shrink-0">
+                            <div className="w-16 h-16 overflow-hidden rounded-xl bg-gray-100 flex items-center justify-center">
+                              {img ? (
+                                <img
+                                  src={img}
+                                  className="w-full h-full object-cover"
+                                  alt={title}
+                                  onError={(e) => { e.currentTarget.src = '/icons/icon-192x192.png'; }}
+                                />
+                              ) : (
+                                <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                              </svg>
+                              )}
+                            </div>
+                            {isUnread && (
+                              <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full border-2 border-white"></div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="mb-2">
+                              <h3 className={`font-semibold ${isUnread ? 'text-gray-900' : 'text-gray-700'} line-clamp-2`}>
+                                {title}
+                              </h3>
+                            </div>
+
+                            <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                              {item?.message || 'Tidak ada pesan'}
+                            </p>
+
+                            <div className="flex items-center justify-between">
+                              <p className="text-gray-400 text-xs">
+                                <DateFormatComponent date={item?.created_at} />
+                              </p>
+
+                              {isVoucher && item?.target_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => claimVoucher(item.target_id, item.id)}
+                                  className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark transition-colors"
+                                >
+                                  Klaim voucher
+                                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Loading indicator untuk infinite scroll */}
+                  {loading && !initialLoad && (
+                    <div className="bg-white rounded-2xl p-4 shadow-sm">
+                      <div className="flex gap-4">
+                        <div className="w-16 h-16 rounded-xl bg-gray-200 animate-pulse flex-shrink-0" />
+                        <div className="flex-1 space-y-3">
+                          <div className="h-4 bg-gray-200 rounded-lg animate-pulse" />
+                          <div className="h-3 bg-gray-100 rounded-lg animate-pulse" />
+                          <div className="h-3 w-2/3 bg-gray-100 rounded-lg animate-pulse" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* End indicator */}
+                  {!hasMore && !loading && localItems.length > 0 && (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-8 h-px bg-gray-300"></div>
+                        <span>Semua notifikasi telah dimuat</span>
+                        <div className="w-8 h-px bg-gray-300"></div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : loading && initialLoad ? (
+                <>
+                  {[1,2,3,4,5].map((i) => (
                     <div key={i} className="bg-white rounded-2xl p-4 shadow-sm">
                       <div className="flex gap-4">
                         <div className="w-16 h-16 rounded-xl bg-gray-200 animate-pulse flex-shrink-0" />
@@ -242,83 +446,6 @@ export default function NotificationPage() {
                     </div>
                   ))}
                 </>
-              ) : httpCode && Number(httpCode) >= 400 ? (
-                <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-red-600 font-medium">Gagal memuat notifikasi</p>
-                  <p className="text-gray-500 text-sm mt-1">Kode error: {httpCode}</p>
-                </div>
-              ) : localItems.length > 0 ? (
-                localItems.map((item, idx) => {
-                  const { img, title, isVoucher } = cardMeta(item);
-                  const isUnread = !item.read_at;
-
-                  return (
-                    <div
-                      className={`bg-white rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
-                        isUnread ? 'border-l-4 border-primary' : ''
-                      }`}
-                      key={item?.id ?? `notif-${idx}`}
-                    >
-                      <div className="flex gap-4">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-16 h-16 overflow-hidden rounded-xl bg-gray-100 flex items-center justify-center">
-                            {img ? (
-                              <img
-                                src={img}
-                                className="w-full h-full object-cover"
-                                alt={title}
-                                onError={(e) => { e.currentTarget.src = '/icons/icon-192x192.png'; }}
-                              />
-                            ) : (
-                              <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                          {isUnread && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full border-2 border-white"></div>
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="mb-2">
-                            <h3 className={`font-semibold ${isUnread ? 'text-gray-900' : 'text-gray-700'} line-clamp-2`}>
-                              {title}
-                            </h3>
-                          </div>
-
-                          <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                            {item?.message || 'Tidak ada pesan'}
-                          </p>
-
-                          <div className="flex items-center justify-between">
-                            <p className="text-gray-400 text-xs">
-                              <DateFormatComponent date={item?.created_at} />
-                            </p>
-
-                            {isVoucher && item?.target_id && (
-                              <button
-                                type="button"
-                                onClick={() => claimVoucher(item.target_id, item.id)}
-                                className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark transition-colors"
-                              >
-                                Klaim voucher
-                                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
               ) : (
                 <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -338,39 +465,44 @@ export default function NotificationPage() {
         {/* Modals */}
         {showSuccessModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-8 shadow-md">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <FontAwesomeIcon icon={faCheckCircle} className="w-8 h-8 text-green-600" />
+            <div className="bg-white rounded-2xl p-8 shadow-md mx-4 max-w-sm w-full">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FontAwesomeIcon icon={faCheckCircle} className="w-8 h-8 text-green-600" />
+                </div>
+                <p className="text-green-600 font-medium mb-4">{modalMessage}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowSuccessModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 transition"
+                >
+                  Tutup
+                </button>
               </div>
-              <p className="text-green-600 font-medium">{modalMessage}</p>
-              <button
-                type="button"
-                onClick={() => setShowSuccessModal(false)}
-                className="px-3 py-2 rounded-lg text-sm font-semibold border border-green-400 text-green-600 hover:bg-green-100 transition"
-              >
-                Tutup
-              </button>
             </div>
           </div>
         )}
+
         {showErrorModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-8 shadow-md">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                <FontAwesomeIcon icon={faExclamationTriangle} className="w-8 h-8 text-red-600" />
+            <div className="bg-white rounded-2xl p-8 shadow-md mx-4 max-w-sm w-full">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FontAwesomeIcon icon={faExclamationTriangle} className="w-8 h-8 text-red-600" />
+                </div>
+                <p className="text-red-600 font-medium mb-4">{modalMessage}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowErrorModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition"
+                >
+                  Tutup
+                </button>
               </div>
-              <p className="text-red-600 font-medium">{modalMessage}</p>
-              <button
-                type="button"
-                onClick={() => setShowErrorModal(false)}
-                className="px-3 py-2 rounded-lg text-sm font-semibold border border-red-400 text-red-600 hover:bg-red-100 transition"
-              >
-                Tutup
-              </button>
             </div>
           </div>
         )}
-        {/* Confirmation Modal for Delete All */}
+
         {showConfirmModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-6 shadow-lg mx-4 max-w-sm w-full">
@@ -387,7 +519,7 @@ export default function NotificationPage() {
                     onClick={() => {
                       const fn = confirmAction;
                       setShowConfirmModal(false);
-                      fn && fn();          // jalankan aksi final (DELETE) saat ini
+                      fn && fn();
                     }}
                     disabled={clearing}
                     className={`px-6 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition ${
@@ -410,7 +542,6 @@ export default function NotificationPage() {
           </div>
         )}
 
-        {/* Voucher Out of Stock Modal */}
         {showVoucherOutOfStockModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 shadow-lg mx-4 max-w-sm w-full">
