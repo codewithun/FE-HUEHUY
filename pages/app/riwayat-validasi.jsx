@@ -15,7 +15,15 @@ export default function RiwayatValidasi() {
   const { id, type } = router.query;
   const ready = router.isReady;
   const { profile } = useUserContext?.() || {};
-  const isTenant = profile?.role_id === 6; // 6 = Manager Tenant
+  const isTenantByRole =
+    String(profile?.role_id ?? '') === '6' ||
+    ['tenant', 'tenant_manager', 'manager_tenant']
+      .includes(String(profile?.role_slug ?? profile?.role ?? '').toLowerCase()) ||
+    (Array.isArray(profile?.roles) &&
+      profile.roles.some((r) =>
+        ['tenant', 'tenant_manager', 'manager_tenant']
+          .includes(String(r?.slug ?? r?.name ?? '').toLowerCase())
+      ));
 
   // API URL untuk base URL gambar
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -149,7 +157,9 @@ export default function RiwayatValidasi() {
 
                 <div className="col-span-3">
                   {(() => {
-                    const isSameValidator = String(v?.user?.id ?? '') === String(profile?.id ?? '');
+                    // per-baris: apakah user yang login adalah validator pada baris ini?
+                    const isValidatorOfThisRow =
+                      String(v?.user?.id ?? '') === String(profile?.id ?? '');
                     return (
                       <>
                         <p className="font-semibold">
@@ -158,7 +168,7 @@ export default function RiwayatValidasi() {
                             : (v.promo?.title ?? 'Promo')}
                         </p>
                         <p className="text-slate-600 text-sm mb-1">
-                          {isTenant
+                          {(isValidatorOfThisRow || isTenantByRole)
                             ? <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
                             : <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>}
                         </p>
