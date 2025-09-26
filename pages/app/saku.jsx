@@ -939,6 +939,7 @@ export default function Save() {
                               // ⛔️ JANGAN pakai fallback selain voucher_item.id
                               item_id: selected?.voucher_item?.id || null,
                               user_id: selected?.voucher_item?.user_id || null,
+                              item_owner_id: selected?.voucher_item?.user_id || null,
                               owner_validation: true,
                               timestamp: Date.now(),
                               validation_purpose: 'tenant_scan',
@@ -1061,6 +1062,7 @@ export default function Save() {
                             // ⛔️ Hanya promo_item.id
                             item_id: selected?.promo_item?.id || null,
                             user_id: selected?.promo_item?.user_id || null,
+                            item_owner_id: selected?.promo_item?.user_id || null,
                             owner_validation: true,
                             timestamp: Date.now(),
                             validation_purpose: 'tenant_scan',
