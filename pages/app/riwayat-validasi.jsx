@@ -15,6 +15,17 @@ export default function RiwayatValidasi() {
   const { id, type } = router.query;
   const ready = router.isReady;
   const { profile } = useUserContext?.() || {};
+  // ===== DEBUG SWITCH =====
+  const DEBUG = true;
+  // eslint-disable-next-line no-console
+  const dlog = (...args) => { if (DEBUG) console.log(...args); };
+  const dgrp = (label, fn) => {
+    if (!DEBUG) return fn?.();
+    // eslint-disable-next-line no-console
+    console.groupCollapsed(label);
+    // eslint-disable-next-line no-console
+    try { fn?.(); } finally { console.groupEnd(); }
+  };
   const _norm = (v) =>
     String(v ?? '')
       .toLowerCase()
@@ -45,6 +56,14 @@ export default function RiwayatValidasi() {
     ) ||
     (typeof window !== 'undefined' &&
       /tenant/i.test(String(window.location?.pathname || ''))); // fallback dari URL
+
+  // LOG sesudah nilai boolean-nya jadi
+  dgrp('[RiwayatValidasi] context', () => {
+    dlog('router.query =>', { id, type, ready });
+    dlog('profile =>', profile);
+    dlog('tenantHints =>', tenantHints);
+    dlog('isTenantContext =>', isTenantContext);
+  });
 
   // API URL untuk base URL gambar
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -118,6 +137,13 @@ export default function RiwayatValidasi() {
     params: undefined,
   });
 
+  dgrp('[RiwayatValidasi] fetch status', () => {
+    dlog('promoLoading, promoStatus =>', promoLoading, promoStatus);
+    dlog('voucherLoading, voucherStatus =>', voucherLoading, voucherStatus);
+    dlog('promoRes (raw) =>', promoRes);
+    dlog('voucherRes (raw) =>', voucherRes);
+  });
+
   const extractList = (res) => {
     if (!res) return [];
     if (Array.isArray(res)) return res; // array langsung
@@ -135,6 +161,12 @@ export default function RiwayatValidasi() {
     ...item,
     itemType: 'voucher',
   }));
+
+  // LOG sesudah dua-duanya siap
+  dgrp('[RiwayatValidasi] items', () => {
+    dlog('promoItems.length =>', promoItems.length, promoItems);
+    dlog('voucherItems.length =>', voucherItems.length, voucherItems);
+  });
 
   // If viewing specific item, show only that type
   const allItems =
@@ -206,6 +238,23 @@ export default function RiwayatValidasi() {
                   {(() => {
                     const isValidatorOfThisRow =
                       String(v?.user?.id ?? '') === String(profile?.id ?? '');
+                    const isOwnerOfThisRow =
+                      String(v?.owner?.id ?? '') === String(profile?.id ?? '');
+                    // Tampilkan "Promo milik ..." jika:
+                    // - kamu tenant (isTenantContext), atau
+                    // - kamu validator baris ini, atau
+                    // - baris punya owner dan kamu BUKAN owner (tipikal tampilan sisi tenant)
+                    const showOwner =
+                      isTenantContext || isValidatorOfThisRow || (!!v.owner && !isOwnerOfThisRow);
+
+                    dlog('[RiwayatValidasi] row debug =>', {
+                      currentProfileId: profile?.id,
+                      validatorId: v?.user?.id,
+                      ownerId: v?.owner?.id,
+                      isTenantContext,
+                      v,
+                    });
+
                     return (
                       <>
                         <p className="font-semibold">
@@ -213,12 +262,10 @@ export default function RiwayatValidasi() {
                             ? v.voucher?.title ?? v.voucher?.name ?? 'Voucher'
                             : v.promo?.title ?? 'Promo'}
                         </p>
+
                         <p className="text-slate-600 text-sm mb-1">
-                          {isValidatorOfThisRow || isTenantContext ? (
-                            <>
-                              Promo milik:{' '}
-                              {v.owner?.name ?? v.owner_name ?? '-'}
-                            </>
+                          {showOwner ? (
+                            <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
                           ) : (
                             <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>
                           )}
