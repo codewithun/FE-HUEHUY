@@ -14,16 +14,27 @@ export default function RiwayatValidasi() {
   const router = useRouter();
   const { id, type } = router.query;
   const ready = router.isReady;
+
+  // state khusus agar ctxTenant stabil setelah router ready
+  const [ctxTenant, setCtxTenant] = React.useState(false);
+
+  // hitung ctxTenant setelah router siap (baca URL + localStorage di client)
+  React.useEffect(() => {
+    if (!router.isReady) return;
+    try {
+      const q = (new URLSearchParams(window.location.search).get('ctx') || '').toLowerCase();
+      const ls = localStorage.getItem('tenant_view') === '1';
+      setCtxTenant(q === 'tenant' || ls);
+    } catch {
+      setCtxTenant(false);
+    }
+  }, [router.isReady, router.query?.ctx]);
+
   // --- paksa mode tenant berdasarkan URL/route, lebih stabil dari window ---
   const forceTenantView =
     /(^|\/)(tenant|merchant)(\/|$)/i.test(router.pathname || '') ||
     /(^|\/)(tenant|merchant)(\/|$)/i.test(router.asPath || '') ||
     (typeof window !== 'undefined' && /^tenant\./i.test(window.location.host || ''));
-
-  // --- paksa via query/localStorage (datang dari halaman Validasi)
-  const ctxTenant =
-    String(router.query?.ctx || '').toLowerCase() === 'tenant' ||
-    (typeof window !== 'undefined' && localStorage.getItem('tenant_view') === '1');
 
   const { profile } = useUserContext() || {};
   // ===== DEBUG SWITCH =====
@@ -72,7 +83,12 @@ export default function RiwayatValidasi() {
     /(tenant|merchant|manager-tenant|tenant-manager)/i.test(path) ||  // cocokkan segmen path
     /^tenant\./i.test(host);                                         // cocokkan subdomain "tenant."
 
-  const isTenantContext = isTenantByRole || isTenantByUrl || ctxTenant;
+  const isTenantContext =
+    String(profile?.role_id ?? '') === '6' ||
+    tenantHints.some((t) => /(tenant|manager_tenant|managertenant|merchant)/i.test(String(t))) ||
+    /(tenant|merchant|manager-tenant|tenant-manager)/i.test(path) ||
+    /^tenant\./i.test(host) ||
+    ctxTenant; // ← pakai state di sini
 
   // LOG sesudah nilai boolean-nya jadi
   dgrp('[RiwayatValidasi] context', () => {
