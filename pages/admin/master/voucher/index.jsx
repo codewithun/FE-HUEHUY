@@ -441,12 +441,32 @@ function VoucherCrud() {
 
   const topBarActions = null;
 
-  // Transform payload sebelum submit
+  // Transform payload sebelum submit - PERBAIKAN
   const transformData = useCallback(
     (data) => {
-      // Wajib sertakan owner_user_id
+      console.log('🔄 Transform data input:', {
+        owner_user_id: data.owner_user_id,
+        id: data.id,
+        isUpdate: !!data.id
+      });
+
+      // Pastikan owner_user_id ada dan valid
       if (data.owner_user_id) {
         data.owner_user_id = String(data.owner_user_id);
+        
+        // TAMBAH: Log untuk memastikan manager tenant yang dipilih
+        const selectedManager = merchantManagers.find(m => String(m.id) === data.owner_user_id);
+        if (selectedManager) {
+          console.log('✅ Selected manager tenant:', {
+            id: selectedManager.id,
+            name: getDisplayName(selectedManager),
+            phone: getPhone(selectedManager)
+          });
+        } else {
+          console.error('❌ Manager tenant not found in list:', data.owner_user_id);
+        }
+      } else {
+        console.error('❌ owner_user_id is missing:', data.owner_user_id);
       }
 
       data.target_type = data.target_type || 'all';
@@ -467,6 +487,12 @@ function VoucherCrud() {
         console.log('🗑️ No image data');
         delete data.image;
       }
+
+      // PERBAIKAN: Hapus field yang tidak perlu dikirim ke server
+      delete data.image_url_versioned;
+      delete data.image_url;
+      delete data.image_updated_at;
+      delete data.updated_at;
 
       if (!data.valid_until) delete data.valid_until;
 
@@ -503,9 +529,19 @@ function VoucherCrud() {
 
       data.stock = Number(data.stock ?? 0);
 
+      console.log('📤 Final transformed data before send:', {
+        owner_user_id: data.owner_user_id,
+        hasOwnerUserId: !!data.owner_user_id,
+        id: data.id,
+        target_type: data.target_type,
+        validation_type: data.validation_type,
+        hasImage: !!data.image,
+        imageType: typeof data.image
+      });
+
       return data;
     },
-    [onlyUsers]
+    [onlyUsers, merchantManagers] // TAMBAH merchantManagers ke dependency
   );
 
   return (
@@ -621,6 +657,13 @@ function VoucherCrud() {
           image: '', // create selalu kosong
         }}
         beforeSubmit={(payload) => {
+          console.log('🚀 Before submit payload:', {
+            owner_user_id: payload.owner_user_id,
+            id: payload.id,
+            isUpdate: !!payload.id,
+            fullPayload: payload
+          });
+
           // Wajib: Manager Tenant harus dipilih
           if (!payload.owner_user_id) {
             alert('Manager tenant wajib dipilih.');
@@ -905,6 +948,16 @@ function VoucherCrud() {
                   value: String(u.id),
                   label: `${getDisplayName(u)}${getPhone(u) ? ' — ' + getPhone(u) : ''}`,
                 }));
+
+                // PERBAIKAN: Pastikan onChange bekerja
+                const handleChange = (selectedValue) => {
+                  console.log('👤 Manager tenant changed:', {
+                    from: fc.value,
+                    to: selectedValue
+                  });
+                  fc.onChange(selectedValue);
+                };
+
                 return (
                   <SelectComponent
                     name="owner_user_id"
@@ -917,7 +970,8 @@ function VoucherCrud() {
                         : 'Pilih manager tenant...'
                     }
                     required
-                    {...fc}
+                    value={fc.value}
+                    onChange={handleChange}
                     options={options}
                     disabled={managersLoading || options.length === 0}
                   />
@@ -1067,67 +1121,62 @@ function VoucherCrud() {
           customDefaultValue: (data) => {
             console.log('🔧 Setting form default values for edit:', {
               id: data?.id,
-              owner_user_id: data?.owner_user_id,
               owner_name: data?.owner_name,
               owner_phone: data?.owner_phone,
-              hasCurrentFile: currentImageFile ? 'YES' : 'NO',
-              hasImageUrl: data?.image_url ? 'YES' : 'NO',
               merchantManagersCount: merchantManagers.length,
             });
 
-            // PERBAIKAN: Fallback owner_user_id dari merchantManagers
-            let resolvedOwnerUserId = data?.owner_user_id ? String(data.owner_user_id) : '';
+            // PERBAIKAN: Resolve berdasarkan nama dan phone yang tersimpan
+            let resolvedOwnerUserId = '';
             
-            // Jika owner_user_id kosong, coba resolve dari nama atau phone
-            if (!resolvedOwnerUserId && (data?.owner_name || data?.owner_phone)) {
+            if (data?.owner_name || data?.owner_phone) {
               const matchedManager = merchantManagers.find(manager => {
+                const managerName = getDisplayName(manager).toLowerCase();
+                const managerPhone = getPhone(manager).replace(/[^\d+]/g, '');
+                
+                // Match berdasarkan nama
                 const nameMatch = data.owner_name && 
-                  getDisplayName(manager).toLowerCase().includes(data.owner_name.toLowerCase());
-                const phoneMatch = data.owner_phone && 
-                  getPhone(manager).replace(/[^\d+]/g, '').includes(data.owner_phone.replace(/[^\d+]/g, ''));
+                  managerName.includes(data.owner_name.toLowerCase());
+                
+                // Match berdasarkan phone (normalisasi dulu)
+                const phoneMatch = data.owner_phone && managerPhone && 
+                  managerPhone.includes(data.owner_phone.replace(/[^\d+]/g, ''));
                 
                 return nameMatch || phoneMatch;
               });
               
               if (matchedManager) {
                 resolvedOwnerUserId = String(matchedManager.id);
-                console.log('🔍 Resolved owner_user_id from name/phone:', {
-                  name: data.owner_name,
-                  phone: data.owner_phone,
+                console.log('🔍 Resolved manager tenant:', {
+                  stored_name: data.owner_name,
+                  stored_phone: data.owner_phone,
                   resolved_id: resolvedOwnerUserId,
-                  manager: getDisplayName(matchedManager)
+                  manager_name: getDisplayName(matchedManager),
+                  manager_phone: getPhone(matchedManager)
+                });
+              } else {
+                console.warn('⚠️ Could not resolve owner from stored name/phone:', {
+                  stored_name: data.owner_name,
+                  stored_phone: data.owner_phone,
+                  available_managers: merchantManagers.length
                 });
               }
             }
 
-            // Jika masih kosong, coba cari berdasarkan exact match ID di merchantManagers
-            if (!resolvedOwnerUserId && data?.owner_user_id) {
-              const existsInManagers = merchantManagers.some(manager => 
-                String(manager.id) === String(data.owner_user_id)
-              );
-              if (existsInManagers) {
-                resolvedOwnerUserId = String(data.owner_user_id);
-                console.log('✅ Verified owner_user_id exists in managers:', resolvedOwnerUserId);
-              } else {
-                console.warn('⚠️ owner_user_id not found in merchantManagers:', data.owner_user_id);
-              }
-            }
-
-            return {
+            const result = {
               id: data?.id,
               ...data,
               valid_until: toDateInput(data?.valid_until),
 
-              // Prioritas File object yang sudah ada
-              image:
-                currentImageFile ||
+              // Image handling
+              image: currentImageFile ||
                 data?.image_url_versioned ||
                 data?.image_url ||
                 data?.image?.url ||
                 data?.image ||
                 '',
 
-              // field bantuan untuk preview/versioning (tidak dikirim)
+              // Image versioning fields
               image_url_versioned: data?.image_url_versioned || null,
               image_url: data?.image_url || null,
               image_updated_at: data?.image_updated_at || null,
@@ -1146,6 +1195,15 @@ function VoucherCrud() {
               target_type: data?.target_type || 'all',
               stock: data?.stock ?? 0,
             };
+
+            console.log('📋 Final form default values:', {
+              owner_user_id: result.owner_user_id,
+              owner_name: result.owner_name,
+              owner_phone: result.owner_phone,
+              id: result.id
+            });
+
+            return result;
           },
         }}
       />
