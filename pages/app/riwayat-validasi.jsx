@@ -15,18 +15,39 @@ export default function RiwayatValidasi() {
   const { id, type } = router.query;
   const ready = router.isReady;
   const { profile } = useUserContext?.() || {};
-  const isTenantByRole =
-    String(profile?.role_id ?? '') === '6' ||
-    ['tenant', 'tenant_manager', 'manager_tenant']
-      .includes(String(profile?.role_slug ?? profile?.role ?? '').toLowerCase()) ||
-    (Array.isArray(profile?.roles) &&
-      profile.roles.some((r) =>
-        ['tenant', 'tenant_manager', 'manager_tenant']
-          .includes(String(r?.slug ?? r?.name ?? '').toLowerCase())
-      ));
+  const _norm = (v) =>
+    String(v ?? '')
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+
+  const tenantHints = [
+    _norm(profile?.role_id),
+    _norm(profile?.role),
+    _norm(profile?.role_name),
+    _norm(profile?.role_slug),
+    _norm(profile?.user_role),
+    _norm(profile?.tenant_id),
+    _norm(profile?.merchant_id),
+    _norm(profile?.managed_tenant_id),
+    _norm(profile?.managed_merchant_id),
+    ...(Array.isArray(profile?.roles)
+      ? profile.roles.map((r) => _norm(r?.slug ?? r?.name ?? r?.id ?? r))
+      : []),
+    ...(Array.isArray(profile?.permissions)
+      ? profile.permissions.map((p) => _norm(p))
+      : []),
+  ];
+
+  const isTenantContext =
+    String(profile?.role_id ?? '') === '6' || // legacy
+    tenantHints.some((t) =>
+      /(tenant|manager_tenant|managertenant|merchant)/.test(String(t))
+    ) ||
+    (typeof window !== 'undefined' &&
+      /tenant/i.test(String(window.location?.pathname || ''))); // fallback dari URL
 
   // API URL untuk base URL gambar
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
   const baseUrl = apiUrl.replace(/\/api$/, ''); // remove trailing /api for images
 
   // Fungsi untuk normalisasi URL gambar promo
@@ -78,34 +99,54 @@ export default function RiwayatValidasi() {
   // Jika ada ID dan type, ambil history item tertentu
   // Jika tidak ada ID, ambil semua history user yang login (promo dan voucher)
   const [promoLoading, promoStatus, promoRes] = useGet({
-    path: (ready && id && type === 'promo') ? `promos/${id}/history` : (ready ? 'user/promo-validations' : null), params: undefined,
+    path:
+      ready && id && type === 'promo'
+        ? `promos/${id}/history`
+        : ready
+          ? 'user/promo-validations'
+          : null,
+    params: undefined,
   });
 
   const [voucherLoading, voucherStatus, voucherRes] = useGet({
-    path: (ready && id && type === 'voucher')
-      ? `vouchers/${id}/history`
-      : (ready ? 'user/voucher-validations' : null),
+    path:
+      ready && id && type === 'voucher'
+        ? `vouchers/${id}/history`
+        : ready
+          ? 'user/voucher-validations'
+          : null,
     params: undefined,
   });
 
   const extractList = (res) => {
     if (!res) return [];
-    if (Array.isArray(res)) return res;                // array langsung
-    if (Array.isArray(res?.data)) return res.data;     // { data: [...] }
+    if (Array.isArray(res)) return res; // array langsung
+    if (Array.isArray(res?.data)) return res.data; // { data: [...] }
     if (Array.isArray(res?.data?.data)) return res.data.data; // { data: { data: [...] } }
     return [];
   };
 
   // Combine and sort items by date
-  const promoItems = extractList(promoRes).map(item => ({ ...item, itemType: 'promo' }));
-  const voucherItems = extractList(voucherRes).map(item => ({ ...item, itemType: 'voucher' }));
+  const promoItems = extractList(promoRes).map((item) => ({
+    ...item,
+    itemType: 'promo',
+  }));
+  const voucherItems = extractList(voucherRes).map((item) => ({
+    ...item,
+    itemType: 'voucher',
+  }));
 
   // If viewing specific item, show only that type
-  const allItems = id && type
-    ? (type === 'promo' ? promoItems : voucherItems)
-    : [...promoItems, ...voucherItems].sort((a, b) =>
-      new Date(b.validated_at || b.created_at) - new Date(a.validated_at || a.created_at)
-    );
+  const allItems =
+    id && type
+      ? type === 'promo'
+        ? promoItems
+        : voucherItems
+      : [...promoItems, ...voucherItems].sort(
+        (a, b) =>
+          new Date(b.validated_at || b.created_at) -
+          new Date(a.validated_at || a.created_at)
+      );
 
   const loading = promoLoading || voucherLoading;
 
@@ -123,9 +164,7 @@ export default function RiwayatValidasi() {
                 onClick={() => router.back()}
               />
             </div>
-            <div className="font-semibold w-full text-lg">
-              Riwayat Validasi
-            </div>
+            <div className="font-semibold w-full text-lg">Riwayat Validasi</div>
           </div>
 
           {/* tunggu router ready dulu */}
@@ -141,7 +180,15 @@ export default function RiwayatValidasi() {
               >
                 <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                   <img
-                    src={v.itemType === 'voucher' ? normalizeVoucherImage(v.voucher?.image ?? v.voucher?.picture_source) : normalizePromoImage(v.promo?.image ?? v.promo?.picture_source)}
+                    src={
+                      v.itemType === 'voucher'
+                        ? normalizeVoucherImage(
+                          v.voucher?.image ?? v.voucher?.picture_source
+                        )
+                        : normalizePromoImage(
+                          v.promo?.image ?? v.promo?.picture_source
+                        )
+                    }
                     alt=""
                     style={{
                       width: '100%',
@@ -157,20 +204,24 @@ export default function RiwayatValidasi() {
 
                 <div className="col-span-3">
                   {(() => {
-                    // per-baris: apakah user yang login adalah validator pada baris ini?
                     const isValidatorOfThisRow =
                       String(v?.user?.id ?? '') === String(profile?.id ?? '');
                     return (
                       <>
                         <p className="font-semibold">
                           {v.itemType === 'voucher'
-                            ? (v.voucher?.title ?? v.voucher?.name ?? 'Voucher')
-                            : (v.promo?.title ?? 'Promo')}
+                            ? v.voucher?.title ?? v.voucher?.name ?? 'Voucher'
+                            : v.promo?.title ?? 'Promo'}
                         </p>
                         <p className="text-slate-600 text-sm mb-1">
-                          {(isValidatorOfThisRow || isTenantByRole)
-                            ? <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
-                            : <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>}
+                          {isValidatorOfThisRow || isTenantContext ? (
+                            <>
+                              Promo milik:{' '}
+                              {v.owner?.name ?? v.owner_name ?? '-'}
+                            </>
+                          ) : (
+                            <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>
+                          )}
                         </p>
                       </>
                     );
@@ -186,11 +237,12 @@ export default function RiwayatValidasi() {
                     />
                   </p>
                   {v.notes ? (
-                    <p className="text-slate-600 text-xs">
-                      Catatan: {v.notes}
-                    </p>
+                    <p className="text-slate-600 text-xs">Catatan: {v.notes}</p>
                   ) : null}
-                  <div className={`badge ${v.itemType === 'voucher' ? 'badge-voucher' : 'badge-promo'}`}>
+                  <div
+                    className={`badge ${v.itemType === 'voucher' ? 'badge-voucher' : 'badge-promo'
+                      }`}
+                  >
                     {v.itemType === 'voucher' ? 'Voucher' : 'Promo'}
                   </div>
                 </div>
