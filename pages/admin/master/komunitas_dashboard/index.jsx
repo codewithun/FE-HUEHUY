@@ -2,7 +2,7 @@
 import { faPlus, faUsers } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ButtonComponent,
   FloatingPageComponent,
@@ -10,9 +10,9 @@ import {
   TableSupervisionComponent,
 } from "../../../../components/base.components";
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
+import MultiSelectDropdown from "../../../../components/form/MultiSelectDropdown";
 import { token_cookie_name } from "../../../../helpers";
 import { Decrypt } from "../../../../helpers/encryption.helpers";
-import MultiSelectDropdown from "../../../../components/form/MultiSelectDropdown";
 
 // ===== Helpers: BASES & URL JOINERS (AMAN) =====
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1024,16 +1024,9 @@ export default function KomunitasDashboard() {
               {selectedPromoList?.promos?.map((promo) => (
                 <div
                   key={promo.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                  className="p-3 bg-gray-50 rounded-lg border"
                 >
-                  <div>
-                    <h4 className="font-medium text-gray-900">{promo.title}</h4>
-                  </div>
-                  <div className="text-right">
-                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                      Aktif
-                    </span>
-                  </div>
+                  <h4 className="font-medium text-gray-900">{promo.title}</h4>
                 </div>
               ))}
             </div>
