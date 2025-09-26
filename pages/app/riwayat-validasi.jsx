@@ -236,16 +236,15 @@ export default function RiwayatValidasi() {
 
                 <div className="col-span-3">
                   {(() => {
-                    const isValidatorOfThisRow =
-                      String(v?.user?.id ?? '') === String(profile?.id ?? '');
-                    const isOwnerOfThisRow =
-                      String(v?.owner?.id ?? '') === String(profile?.id ?? '');
+                    const currentUserId = String(profile?.id ?? profile?.user_id ?? profile?.user?.id ?? '');
+
+                    const isValidatorOfThisRow = String(v?.user?.id ?? '') === currentUserId;
+                    const isOwnerOfThisRow = String(v?.owner?.id ?? '') === currentUserId;
                     // Tampilkan "Promo milik ..." jika:
                     // - kamu tenant (isTenantContext), atau
                     // - kamu validator baris ini, atau
                     // - baris punya owner dan kamu BUKAN owner (tipikal tampilan sisi tenant)
-                    const showOwner =
-                      isTenantContext || isValidatorOfThisRow || (!!v.owner && !isOwnerOfThisRow);
+                    const showOwner = isTenantContext || isValidatorOfThisRow;
 
                     dlog('[RiwayatValidasi] row debug =>', {
                       currentProfileId: profile?.id,
