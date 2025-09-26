@@ -14,6 +14,12 @@ export default function RiwayatValidasi() {
   const router = useRouter();
   const { id, type } = router.query;
   const ready = router.isReady;
+  // --- paksa mode tenant berdasarkan URL/route, lebih stabil dari window ---
+  const forceTenantView =
+    /(^|\/)(tenant|merchant)(\/|$)/i.test(router.pathname || '') ||
+    /(^|\/)(tenant|merchant)(\/|$)/i.test(router.asPath || '') ||
+    (typeof window !== 'undefined' && /^tenant\./i.test(window.location.host || ''));
+
   const { profile } = useUserContext() || {};
   // ===== DEBUG SWITCH =====
   const DEBUG = true;
@@ -242,33 +248,32 @@ export default function RiwayatValidasi() {
 
                 <div className="col-span-3">
                   {(() => {
-                    // id user yang login (pakai fallback beberapa kemungkinan)
+                    // Ambil ID login (kalau ada)
                     const currentUserId = String(
                       profile?.id ?? profile?.user_id ?? profile?.user?.id ?? ''
                     );
 
-                    // dari backend:
-                    // v.user  = validator (TENANT)
-                    // v.owner = end-user (PEMILIK ITEM)
+                    // dari BE:
+                    // v.user  = validator (TENANT/merchant)
+                    // v.owner = end-user pemilik item
                     const validatorId = String(v?.user?.id ?? '');
                     const ownerId = String(v?.owner?.id ?? '');
 
-                    // Tentukan "mode tampilan" berdasar ID.
-                    // Ini membuatnya tetap benar walau isTenantContext gagal.
-                    let view = 'guest';
-                    if (currentUserId && currentUserId === validatorId) {
-                      view = 'tenant';  // kamu adalah validator
+                    // Penentuan mode final (sederhana & deterministik):
+                    // 1) Kalau kita di halaman tenant -> paksa 'tenant'
+                    // 2) Atau kalau ID kita = validator -> 'tenant'
+                    // 3) Atau kalau ID kita = owner -> 'owner'
+                    // 4) Fallback: anggap user biasa -> 'owner'
+                    let view = 'owner';
+                    if (forceTenantView || (currentUserId && currentUserId === validatorId)) {
+                      view = 'tenant';
                     } else if (currentUserId && currentUserId === ownerId) {
-                      view = 'owner';   // kamu adalah end-user pemilik item
-                    } else if (isTenantContext) {
-                      view = 'tenant';  // tidak cocok ID tapi url/role mengindikasikan tenant
-                    } else {
-                      view = 'owner';   // fallback: anggap user biasa
+                      view = 'owner';
                     }
 
-                    // Debug cepat
+                    // Debug
                     dlog('[RiwayatValidasi] row =>', {
-                      currentUserId, validatorId, ownerId, isTenantContext, view, v,
+                      forceTenantView, currentUserId, validatorId, ownerId, view, v,
                     });
 
                     return (
@@ -281,10 +286,8 @@ export default function RiwayatValidasi() {
 
                         <p className="text-slate-600 text-sm mb-1">
                           {view === 'tenant' ? (
-                            // tenant/validator melihat siapa end-user yang pakai
                             <>Promo milik: {v.owner?.name ?? '-'}</>
                           ) : (
-                            // end-user melihat siapa validator (tenant)
                             <>Divalidasi oleh: {v.user?.name ?? '—'}</>
                           )}
                         </p>
