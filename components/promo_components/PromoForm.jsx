@@ -38,8 +38,6 @@ export default function PromoForm({
       stock: 0,
       promo_type: 'offline',
       location: '',
-      owner_name: '',
-      owner_contact: '',
       code: '',
       image: '',
       community_id: initialData?.community_id ?? '', // pastikan ada
@@ -47,9 +45,14 @@ export default function PromoForm({
 
     // If we have initialData, merge it with defaults
     if (initialData) {
+      // Remove owner_name and owner_contact as backend extracts them from owner_user_id
+      const filteredInitialData = { ...initialData };
+      delete filteredInitialData.owner_name;
+      delete filteredInitialData.owner_contact;
+      
       return {
         ...defaults,
-        ...initialData,
+        ...filteredInitialData,
         community_id: initialData.community_id || '',
         start_date: toDateInputValue(initialData.start_date),
         end_date: toDateInputValue(initialData.end_date),
@@ -63,9 +66,14 @@ export default function PromoForm({
     console.log('UseEffect triggered with initialData:', initialData);
     
     if (initialData) {
+      // Remove owner_name and owner_contact as backend extracts them from owner_user_id
+      const filteredInitialData = { ...initialData };
+      delete filteredInitialData.owner_name;
+      delete filteredInitialData.owner_contact;
+      
       setFormData((s) => ({
         ...s,
-        ...initialData,
+        ...filteredInitialData,
         community_id: initialData.community_id || '',   // Ensure community_id is always set
         start_date: toDateInputValue(initialData.start_date),
         end_date: toDateInputValue(initialData.end_date),
@@ -133,8 +141,6 @@ export default function PromoForm({
     // Required fields - always send
     body.append('title', formData.title || '');
     body.append('description', formData.description || '');
-    body.append('owner_name', formData.owner_name || '');
-    body.append('owner_contact', formData.owner_contact || '');
     body.append('promo_type', formData.promo_type || 'offline');
     
     // wajib sertakan community_id saat update
