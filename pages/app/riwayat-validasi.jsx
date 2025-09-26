@@ -15,15 +15,15 @@ export default function RiwayatValidasi() {
   const { id, type } = router.query;
   const ready = router.isReady;
 
-const ctxTenant = React.useMemo(() => {
-  const fromQuery =
-    String(router.query?.ctx || '').toLowerCase() === 'tenant';
-  let fromLS = false;
-  if (typeof window !== 'undefined') {
-    try { fromLS = localStorage.getItem('tenant_view') === '1'; } catch {}
-  }
-  return fromQuery || fromLS;
-}, [router.query?.ctx]);
+  const ctxTenant = React.useMemo(() => {
+    const fromQuery =
+      String(router.query?.ctx || '').toLowerCase() === 'tenant';
+    let fromLS = false;
+    if (typeof window !== 'undefined') {
+      try { fromLS = localStorage.getItem('tenant_view') === '1'; } catch { }
+    }
+    return fromQuery || fromLS;
+  }, [router.query?.ctx]);
 
   // --- paksa mode tenant berdasarkan URL/route, lebih stabil dari window ---
   const forceTenantView =
@@ -76,7 +76,15 @@ const ctxTenant = React.useMemo(() => {
 
   const isTenantByUrl =
     /(tenant|merchant|manager-tenant|tenant-manager)/i.test(path) ||  // cocokkan segmen path
-    /^tenant\./i.test(host);                                         // cocokkan subdomain "tenant."
+    /^tenant\./i.test(host);
+
+  // Simpan flag tenant_view agar bertahan setelah reload
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (forceTenantView || isTenantByUrl) {
+      try { localStorage.setItem('tenant_view', '1'); } catch { }
+    }
+  }, [forceTenantView, isTenantByUrl]);
 
   const isTenantContext =
     String(profile?.role_id ?? '') === '6' ||
@@ -84,6 +92,10 @@ const ctxTenant = React.useMemo(() => {
     /(tenant|merchant|manager-tenant|tenant-manager)/i.test(path) ||
     /^tenant\./i.test(host) ||
     ctxTenant; // ← pakai state di sini
+
+  // Sinyal gabungan: kita kemungkinan besar lagi di konteks tenant
+  const isProbablyTenant =
+    isTenantContext || forceTenantView || ctxTenant || isTenantByUrl || isTenantByRole;
 
   // LOG sesudah nilai boolean-nya jadi
   dgrp('[RiwayatValidasi] context', () => {
@@ -210,6 +222,37 @@ const ctxTenant = React.useMemo(() => {
 
   const loading = promoLoading || voucherLoading;
 
+  // Ready checks supaya view nggak salah default
+  const profileReady = !!(
+    profile &&
+    (profile.id || profile.user_id || profile?.user?.id || profile?.data?.id)
+  );
+
+  const safeTenantSignal = isTenantByUrl || forceTenantView || ctxTenant;
+
+  // Kalau router belum siap ATAU profil belum siap & tak ada sinyal tenant → tampilkan loading dulu
+  if (!ready || (!profileReady && !safeTenantSignal)) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="bg-primary h-10"></div>
+        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20">
+          <div className="flex items-center gap-2 p-2 sticky top-0 bg-white border-b z-50">
+            <div className="px-2">
+              <IconButtonComponent
+                icon={faArrowLeftLong}
+                variant="simple"
+                size="lg"
+                onClick={() => router.back()}
+              />
+            </div>
+            <div className="font-semibold w-full text-lg">Riwayat Validasi</div>
+          </div>
+          <div className="p-4 text-center">Memuat...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
@@ -288,14 +331,13 @@ const ctxTenant = React.useMemo(() => {
                     // 4) Fallback: anggap user biasa -> 'owner'
                     let view = 'owner';
                     // Prioritas: konteks tenant → paksa 'tenant'
-                    if (isTenantContext || forceTenantView || ctxTenant) {
+                    if (isProbablyTenant) {
                       view = 'tenant';
                     } else if (currentUserId && validatorId && String(currentUserId) === String(validatorId)) {
                       view = 'tenant';
                     } else if (currentUserId && ownerId && String(currentUserId) === String(ownerId)) {
                       view = 'owner';
                     }
-
                     dlog('[RiwayatValidasi] row =>', { forceTenantView, ctxTenant, isTenantContext, currentUserId, validatorId, ownerId, view, v });
 
                     return (
@@ -326,9 +368,6 @@ const ctxTenant = React.useMemo(() => {
                       format="YYYY MMM DD HH:mm:ss"
                     />
                   </p>
-                  {v.notes ? (
-                    <p className="text-slate-600 text-xs">Catatan: {v.notes}</p>
-                  ) : null}
                   <div
                     className={`badge ${v.itemType === 'voucher' ? 'badge-voucher' : 'badge-promo'
                       }`}
