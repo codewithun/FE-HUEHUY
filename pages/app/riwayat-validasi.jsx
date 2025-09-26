@@ -264,9 +264,11 @@ export default function RiwayatValidasi() {
 
                         <p className="text-slate-600 text-sm mb-1">
                           {showOwner ? (
-                            <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
+                            // Tenant/validator view: tunjukkan pemilik *item* (user yang pakai)
+                            <>Item milik: {v.owner?.name ?? '-'}</>
                           ) : (
-                            <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>
+                            // User view: tunjukkan validator/tenant (pemilik promo)
+                            <>Divalidasi oleh: {v.user?.name ?? v.promo?.owner_name ?? 'Guest'}</>
                           )}
                         </p>
                       </>
