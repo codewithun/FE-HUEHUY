@@ -15,6 +15,9 @@ export default function RiwayatValidasi() {
   const { id, type } = router.query;
   const ready = router.isReady;
 
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
+
   const ctxTenant = React.useMemo(() => {
     const fromQuery =
       String(router.query?.ctx || '').toLowerCase() === 'tenant';
@@ -32,6 +35,15 @@ export default function RiwayatValidasi() {
     (typeof window !== 'undefined' && /^tenant\./i.test(window.location.host || ''));
 
   const { profile } = useUserContext() || {};
+
+  // NEW: fallback profil kalau context belum ada
+  const [loadingAccount, codeAccount, dataAccount] = useGet({
+    path: 'account',
+  }, !ready); // mulai fetch setelah router ready
+
+  // gunakan profil gabungan
+  const effectiveProfile = profile || dataAccount?.data?.profile || null;
+
   // ===== DEBUG SWITCH =====
   const DEBUG = true;
   // eslint-disable-next-line no-console
@@ -49,20 +61,20 @@ export default function RiwayatValidasi() {
       .replace(/[\s-]+/g, '_');
 
   const tenantHints = [
-    _norm(profile?.role_id),
-    _norm(profile?.role),
-    _norm(profile?.role_name),
-    _norm(profile?.role_slug),
-    _norm(profile?.user_role),
-    _norm(profile?.tenant_id),
-    _norm(profile?.merchant_id),
-    _norm(profile?.managed_tenant_id),
-    _norm(profile?.managed_merchant_id),
-    ...(Array.isArray(profile?.roles)
-      ? profile.roles.map((r) => _norm(r?.slug ?? r?.name ?? r?.id ?? r))
+    _norm(effectiveProfile?.role_id),
+    _norm(effectiveProfile?.role),
+    _norm(effectiveProfile?.role_name),
+    _norm(effectiveProfile?.role_slug),
+    _norm(effectiveProfile?.user_role),
+    _norm(effectiveProfile?.tenant_id),
+    _norm(effectiveProfile?.merchant_id),
+    _norm(effectiveProfile?.managed_tenant_id),
+    _norm(effectiveProfile?.managed_merchant_id),
+    ...(Array.isArray(effectiveProfile?.roles)
+      ? effectiveProfile.roles.map((r) => _norm(r?.slug ?? r?.name ?? r?.id ?? r))
       : []),
-    ...(Array.isArray(profile?.permissions)
-      ? profile.permissions.map((p) => _norm(p))
+    ...(Array.isArray(effectiveProfile?.permissions)
+      ? effectiveProfile.permissions.map((p) => _norm(p))
       : []),
   ];
 
@@ -71,7 +83,7 @@ export default function RiwayatValidasi() {
   const host = typeof window !== 'undefined' ? String(window.location?.host || '') : '';
 
   const isTenantByRole =
-    String(profile?.role_id ?? '') === '6' ||
+    String(effectiveProfile?.role_id ?? '') === '6' ||
     tenantHints.some((t) => /(tenant|manager_tenant|managertenant|merchant)/i.test(String(t)));
 
   const isTenantByUrl =
@@ -87,11 +99,11 @@ export default function RiwayatValidasi() {
   }, [forceTenantView, isTenantByUrl]);
 
   const isTenantContext =
-    String(profile?.role_id ?? '') === '6' ||
+    String(effectiveProfile?.role_id ?? '') === '6' ||
     tenantHints.some((t) => /(tenant|manager_tenant|managertenant|merchant)/i.test(String(t))) ||
     /(tenant|merchant|manager-tenant|tenant-manager)/i.test(path) ||
     /^tenant\./i.test(host) ||
-    ctxTenant; // ← pakai state di sini
+    ctxTenant;
 
   // Sinyal gabungan: kita kemungkinan besar lagi di konteks tenant
   const isProbablyTenant =
@@ -100,9 +112,10 @@ export default function RiwayatValidasi() {
   // LOG sesudah nilai boolean-nya jadi
   dgrp('[RiwayatValidasi] context', () => {
     dlog('router.query =>', { id, type, ready });
-    dlog('profile =>', profile);
+    dlog('effectiveProfile =>', effectiveProfile);
     dlog('tenantHints =>', tenantHints);
-    dlog('isTenantContext =>', isTenantContext);
+    dlog('isTenantContext =>', isTenantContext, 'isProbablyTenant =>', isProbablyTenant);
+
   });
 
   // API URL untuk base URL gambar
@@ -224,33 +237,24 @@ export default function RiwayatValidasi() {
 
   // Ready checks supaya view nggak salah default
   const profileReady = !!(
-    profile &&
-    (profile.id || profile.user_id || profile?.user?.id || profile?.data?.id)
+    effectiveProfile &&
+    (effectiveProfile.id ||
+      effectiveProfile.user_id ||
+      effectiveProfile?.user?.id ||
+      effectiveProfile?.data?.id)
   );
 
   const safeTenantSignal = isTenantByUrl || forceTenantView || ctxTenant;
 
-  // Kalau router belum siap ATAU profil belum siap & tak ada sinyal tenant → tampilkan loading dulu
-  if (!ready || (!profileReady && !safeTenantSignal)) {
-    return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md">
-        <div className="bg-primary h-10"></div>
-        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20">
-          <div className="flex items-center gap-2 p-2 sticky top-0 bg-white border-b z-50">
-            <div className="px-2">
-              <IconButtonComponent
-                icon={faArrowLeftLong}
-                variant="simple"
-                size="lg"
-                onClick={() => router.back()}
-              />
-            </div>
-            <div className="font-semibold w-full text-lg">Riwayat Validasi</div>
-          </div>
-          <div className="p-4 text-center">Memuat...</div>
-        </div>
-      </div>
-    );
+  // block cuma kalau: router belum siap ATAU
+  // (profil belum siap & nggak ada sinyal tenant & masih loading data riwayat)
+  const hardBlock =
+    !mounted ||
+    !ready ||
+    (!safeTenantSignal && !profileReady && (promoLoading || voucherLoading || loadingAccount));
+
+  if (hardBlock) {
+    return <div className="p-4 text-center">Memuat...</div>;
   }
 
   return (
@@ -309,12 +313,12 @@ export default function RiwayatValidasi() {
                   {(() => {
                     // Ambil ID login (kalau ada)
                     const currentUserId = String(
-                      profile?.id
-                      ?? profile?.user_id
-                      ?? profile?.user?.id
-                      ?? profile?.data?.id
-                      ?? profile?.payload?.id
-                      ?? profile?.account?.id
+                      effectiveProfile?.id
+                      ?? effectiveProfile?.user_id
+                      ?? effectiveProfile?.user?.id
+                      ?? effectiveProfile?.data?.id
+                      ?? effectiveProfile?.payload?.id
+                      ?? effectiveProfile?.account?.id
                       ?? ''
                     );
 
