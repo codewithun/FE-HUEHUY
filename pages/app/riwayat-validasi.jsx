@@ -20,6 +20,11 @@ export default function RiwayatValidasi() {
     /(^|\/)(tenant|merchant)(\/|$)/i.test(router.asPath || '') ||
     (typeof window !== 'undefined' && /^tenant\./i.test(window.location.host || ''));
 
+  // --- paksa via query/localStorage (datang dari halaman Validasi)
+  const ctxTenant =
+    String(router.query?.ctx || '').toLowerCase() === 'tenant' ||
+    (typeof window !== 'undefined' && localStorage.getItem('tenant_view') === '1');
+
   const { profile } = useUserContext() || {};
   // ===== DEBUG SWITCH =====
   const DEBUG = true;
@@ -67,7 +72,7 @@ export default function RiwayatValidasi() {
     /(tenant|merchant|manager-tenant|tenant-manager)/i.test(path) ||  // cocokkan segmen path
     /^tenant\./i.test(host);                                         // cocokkan subdomain "tenant."
 
-  const isTenantContext = isTenantByRole || isTenantByUrl;
+  const isTenantContext = isTenantByRole || isTenantByUrl || ctxTenant;
 
   // LOG sesudah nilai boolean-nya jadi
   dgrp('[RiwayatValidasi] context', () => {
@@ -272,7 +277,7 @@ export default function RiwayatValidasi() {
                     // 4) Fallback: anggap user biasa -> 'owner'
                     let view = 'owner';
                     // Prioritas: konteks tenant → paksa 'tenant'
-                    if (isTenantContext || forceTenantView) {
+                    if (isTenantContext || forceTenantView || ctxTenant) {
                       view = 'tenant';
                     } else if (currentUserId && validatorId && String(currentUserId) === String(validatorId)) {
                       view = 'tenant';
@@ -280,10 +285,7 @@ export default function RiwayatValidasi() {
                       view = 'owner';
                     }
 
-                    // Debug
-                    dlog('[RiwayatValidasi] row =>', {
-                      forceTenantView, currentUserId, validatorId, ownerId, view, v,
-                    });
+                    dlog('[RiwayatValidasi] row =>', { forceTenantView, ctxTenant, isTenantContext, currentUserId, validatorId, ownerId, view, v });
 
                     return (
                       <>
