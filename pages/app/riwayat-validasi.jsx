@@ -250,7 +250,13 @@ export default function RiwayatValidasi() {
                   {(() => {
                     // Ambil ID login (kalau ada)
                     const currentUserId = String(
-                      profile?.id ?? profile?.user_id ?? profile?.user?.id ?? ''
+                      profile?.id
+                      ?? profile?.user_id
+                      ?? profile?.user?.id
+                      ?? profile?.data?.id
+                      ?? profile?.payload?.id
+                      ?? profile?.account?.id
+                      ?? ''
                     );
 
                     // dari BE:
@@ -265,9 +271,12 @@ export default function RiwayatValidasi() {
                     // 3) Atau kalau ID kita = owner -> 'owner'
                     // 4) Fallback: anggap user biasa -> 'owner'
                     let view = 'owner';
-                    if (forceTenantView || (currentUserId && currentUserId === validatorId)) {
+                    // Prioritas: konteks tenant → paksa 'tenant'
+                    if (isTenantContext || forceTenantView) {
                       view = 'tenant';
-                    } else if (currentUserId && currentUserId === ownerId) {
+                    } else if (currentUserId && validatorId && String(currentUserId) === String(validatorId)) {
+                      view = 'tenant';
+                    } else if (currentUserId && ownerId && String(currentUserId) === String(ownerId)) {
                       view = 'owner';
                     }
 
