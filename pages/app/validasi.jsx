@@ -23,7 +23,7 @@ const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').repl
 export default function Validasi() {
   const router = useRouter();
   const { profile, loading, fetchProfile } = useUserContext();
-  
+
   const [code, setCode] = useState('');
   const [modalSuccess, setModalSuccess] = useState(false);
   const [modalFailed, setModalFailed] = useState(false);
@@ -34,7 +34,7 @@ export default function Validasi() {
 
   useEffect(() => {
     const token = Cookies.get(token_cookie_name);
-    
+
     if (token && !profile && !loading) {
       fetchProfile();
     }
@@ -82,7 +82,7 @@ export default function Validasi() {
       // This allows tenant to validate items that belong to users
 
       const codeToValidate = parsingCode || code;
-      
+
       // Validasi kode tidak boleh kosong
       if (!codeToValidate || codeToValidate.trim() === '') {
         setModalFailedMessage('Kode validasi tidak boleh kosong.');
@@ -122,10 +122,10 @@ export default function Validasi() {
           message: result?.message,
           result: result
         };
-        
+
         // eslint-disable-next-line no-console
         console.log('🔍 Trying voucher validation...');
-        
+
         res = await fetch(`${apiUrl}/api/vouchers/validate`, {
           method: 'POST',
           headers,
@@ -137,7 +137,7 @@ export default function Validasi() {
 
         result = await res.json().catch(() => null);
         itemType = 'voucher';
-        
+
         // eslint-disable-next-line no-console
         console.log('📡 Voucher validation response:', {
           status: res.status,
@@ -154,10 +154,10 @@ export default function Validasi() {
         setLastItemId(itemId);
         setLastItemType(itemType);
         setModalSuccess(true);
-        
+
         // Clear kode setelah validasi berhasil
         setCode('');
-        
+
         // eslint-disable-next-line no-console
         console.log('✅ Validation successful:', {
           itemType,
@@ -167,29 +167,29 @@ export default function Validasi() {
       } else {
         // Handle specific error cases dengan pesan yang lebih informatif
         let errorMsg = 'Kode tidak valid atau tidak ditemukan';
-        
+
         // Check if this is likely a validation of already used item
         const isAlreadyValidated = (status, message) => {
-          return status === 400 || 
-                 status === 409 || 
-                 (message && (
-                   message.toLowerCase().includes('sudah') ||
-                   message.toLowerCase().includes('digunakan') ||
-                   message.toLowerCase().includes('divalidasi') ||
-                   message.toLowerCase().includes('already') ||
-                   message.toLowerCase().includes('used')
-                 ));
+          return status === 400 ||
+            status === 409 ||
+            (message && (
+              message.toLowerCase().includes('sudah') ||
+              message.toLowerCase().includes('digunakan') ||
+              message.toLowerCase().includes('divalidasi') ||
+              message.toLowerCase().includes('already') ||
+              message.toLowerCase().includes('used')
+            ));
         };
-        
+
         const isNotFound = (status, message) => {
-          return status === 404 || 
-                 (message && (
-                   message.toLowerCase().includes('tidak ditemukan') ||
-                   message.toLowerCase().includes('not found') ||
-                   message.toLowerCase().includes('invalid')
-                 ));
+          return status === 404 ||
+            (message && (
+              message.toLowerCase().includes('tidak ditemukan') ||
+              message.toLowerCase().includes('not found') ||
+              message.toLowerCase().includes('invalid')
+            ));
         };
-        
+
         // Prioritize "already validated" messages over "not found"
         if (promoError && isAlreadyValidated(promoError.status, promoError.message)) {
           errorMsg = `Promo dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
@@ -205,7 +205,7 @@ export default function Validasi() {
         } else if (result?.message) {
           errorMsg = result.message;
         }
-        
+
         setModalFailedMessage(errorMsg);
         setModalFailed(true);
       }
@@ -292,11 +292,12 @@ export default function Validasi() {
         title={`Selamat, ${lastItemType === 'promo' ? 'Promo' : 'Voucher'} Berhasil di validasi`}
         onSubmit={async () => {
           setModalSuccess(false);
-          if (lastItemId) {
-            router.push(`/app/riwayat-validasi?id=${lastItemId}&type=${lastItemType}`);
-          } else {
-            router.push('/app/riwayat-validasi');
-          }
+          try { localStorage.setItem('tenant_view', '1'); } catch { }
+          const base = '/app/riwayat-validasi';
+          const q = lastItemId
+            ? `?id=${encodeURIComponent(lastItemId)}&type=${encodeURIComponent(lastItemType)}&ctx=tenant`
+            : `?ctx=tenant`;
+          router.push(`${base}${q}`);
         }}
       />
 
