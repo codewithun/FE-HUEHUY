@@ -44,28 +44,43 @@ const DetailVoucherPage = () => {
   const [claimLoading, setClaimLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Helper function to construct proper image URLs
-  const getImageUrl = (imagePath) => {
+  // Helper functions untuk menampilkan info manager tenant - DIPERBAIKI
+  const getManagerInfo = (voucher) => {
+    if (!voucher) return null;
+    
+    return {
+      // PERBAIKAN: Gunakan field yang benar dari API
+      name: voucher.owner_name || voucher.manager_name || voucher.tenant_manager_name || '',
+      phone: voucher.owner_phone || voucher.manager_phone || voucher.tenant_manager_phone || '',
+      location: voucher.tenant_location || voucher.manager_location || '',
+    };
+  };
+
+  // PERBAIKAN: Helper function untuk construct image URL
+  const getImageUrl = (voucher) => {
+    if (!voucher) return '/default-avatar.png';
+
+    // Prioritas: image_url_versioned > image_url > image
+    const imagePath = 
+      voucher.image_url_versioned || 
+      voucher.image_url || 
+      voucher.image;
+
     if (!imagePath) return '/default-avatar.png';
 
     // Sudah absolut? langsung balikin
     if (/^https?:\/\//i.test(imagePath)) return imagePath;
 
-    // Sudah root-relative? langsung pakai (opsional: prefix-kan base jika perlu)
+    // Sudah root-relative? langsung pakai
     if (imagePath.startsWith('/')) return imagePath;
 
-    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
-    const u = new URL(raw); // aman untuk hostname & protokol
-    const origin = u.origin; // contoh: https://api-159-223-48-146.nip.io
+    const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const u = new URL(raw);
+    const origin = u.origin;
 
-    // Hapus path "/api" di akhir (hanya path, bukan subdomain)
-    // Misal: https://.../api → tetap origin yang sama, kita build path sendiri
-    const cleaned = `${origin}/storage/${String(imagePath).replace(
-      /^storage\//,
-      ''
-    )}`;
-
-    return cleaned;
+    // Build URL yang benar
+    const cleanPath = imagePath.replace(/^storage\//, '');
+    return `${origin}/storage/${cleanPath}`;
   };
 
   // --- MODIFIED: fetchVoucherDetails now returns fetched data (or null) ---
@@ -644,24 +659,21 @@ const DetailVoucherPage = () => {
       {/* Content */}
       <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
         <div className="lg:mx-auto lg:max-w-md">
-          {/* Voucher Image */}
+          {/* Voucher Image - PERBAIKAN */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] shadow-lg overflow-hidden border border-slate-100">
               <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
                 <div className="relative w-full h-full">
                   <Image
-                    src={getImageUrl(voucher?.image)}
+                    src={getImageUrl(voucher)} // GUNAKAN HELPER YANG DIPERBAIKI
                     alt={voucher?.name || 'Voucher'}
                     className="object-cover"
                     fill
                     sizes="(max-width: 768px) 100vw, 500px"
                     placeholder="blur"
                     blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
-                    onError={() => {
-                      const img = document.querySelector(
-                        `img[alt='${voucher?.name}']`
-                      );
-                      if (img) img.src = '/default-avatar.png';
+                    onError={(e) => {
+                      e.target.src = '/default-avatar.png';
                     }}
                   />
                 </div>
@@ -727,32 +739,118 @@ const DetailVoucherPage = () => {
             </div>
           </div>
 
-          {/* Location Info */}
-          {voucher.tenant_location && (
-            <div className="mb-4">
-              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                  Lokasi Tenant
-                </h4>
-                <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                  {voucher.tenant_location}
-                </p>
-                <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
-                  <FontAwesomeIcon
-                    icon={faMapMarkerAlt}
-                    className="mr-2 text-sm"
-                  />
-                  Rute
-                </button>
+          {/* Manager Tenant Info - MENGGUNAKAN HELPER YANG DIPERBAIKI */}
+          {(() => {
+            const managerInfo = getManagerInfo(voucher);
+            if (!managerInfo || (!managerInfo.name && !managerInfo.phone && !managerInfo.location)) {
+              return null;
+            }
+            
+            return (
+              <div className="mb-4">
+                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                  <h4 className="font-semibold text-slate-900 mb-3 text-sm flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Manager Tenant
+                  </h4>
+                  <div className="space-y-2">
+                    {managerInfo.name && (
+                      <div className="flex items-center">
+                        <span className="text-xs text-slate-500 w-16">Nama:</span>
+                        <span className="text-xs font-medium text-slate-900">{managerInfo.name}</span>
+                      </div>
+                    )}
+                    {managerInfo.phone && (
+                      <div className="flex items-center">
+                        <span className="text-xs text-slate-500 w-16">Telepon:</span>
+                        <a 
+                          href={`tel:${managerInfo.phone}`}
+                          className="text-xs text-primary font-medium hover:underline"
+                        >
+                          {managerInfo.phone}
+                        </a>
+                      </div>
+                    )}
+                    {managerInfo.location && (
+                      <div className="flex items-start">
+                        <span className="text-xs text-slate-500 w-16 mt-0.5">Lokasi:</span>
+                        <span className="text-xs text-slate-600 leading-relaxed flex-1">{managerInfo.location}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Tombol Kontak Manager */}
+                  {managerInfo.phone && (
+                    <div className="mt-4 flex gap-2">
+                      <a
+                        href={`tel:${managerInfo.phone}`}
+                        className="flex-1 bg-green-500 text-white py-2 px-4 rounded-[12px] hover:bg-green-600 transition-colors text-xs font-semibold flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        Telepon
+                      </a>
+                      <a
+                        href={`https://wa.me/${managerInfo.phone.replace(/[^\d]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-green-600 text-white py-2 px-4 rounded-[12px] hover:bg-green-700 transition-colors text-xs font-semibold flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                        </svg>
+                        WhatsApp
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
+          {/* Location Info - MENGGUNAKAN HELPER YANG DIPERBAIKI */}
+          {(() => {
+            const managerInfo = getManagerInfo(voucher);
+            const location = voucher.tenant_location || managerInfo?.location;
+            
+            if (!location) return null;
+            
+            return (
+              <div className="mb-4">
+                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                  <h4 className="font-semibold text-slate-900 mb-3 text-sm flex items-center">
+                    <FontAwesomeIcon
+                      icon={faMapMarkerAlt}
+                      className="mr-2 text-primary text-sm"
+                    />
+                    Lokasi Tenant
+                  </h4>
+                  <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                    {location}
+                  </p>
+                  <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
+                    <FontAwesomeIcon
+                      icon={faMapMarkerAlt}
+                      className="mr-2 text-sm"
+                    />
+                    Rute
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Community Info */}
           {voucher.community && (
             <div className="mb-4">
               <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 009.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
                   Komunitas
                 </h4>
                 <div className="space-y-2">

@@ -79,6 +79,22 @@ const formatDateID = (raw) => {
 
 const formatStockVoucher = (n) => `${Number(n ?? 0)} voucher`;
 
+const getDisplayName = (u) =>
+  u?.name || u?.full_name || u?.username || u?.display_name || `User #${u?.id}`;
+const getPhone = (u) =>
+  u?.phone || u?.phone_number || u?.telp || u?.telpon || u?.mobile || u?.contact || '';
+const norm = (v) => String(v ?? '').toLowerCase().replace(/[-\s]+/g, '_');
+const isManagerTenant = (u) => {
+  const target = 'manager_tenant';
+  if (norm(u?.role?.name) === target) return true;
+  if (norm(u?.role) === target) return true;
+  if (norm(u?.user_role) === target) return true;
+  if (Array.isArray(u?.roles)) {
+    return u.roles.some((r) => norm(r?.name ?? r) === target);
+  }
+  return false;
+};
+
 /* -------------------- Page -------------------- */
 function VoucherCrud() {
   const [modalDelete, setModalDelete] = useState(false);
@@ -86,6 +102,11 @@ function VoucherCrud() {
   const [refreshToggle, setRefreshToggle] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [users, setUsers] = useState([]);
+
+  /* State Manager Tenant */
+  const [merchantManagers, setMerchantManagers] = useState([]);
+  const [managersLoading, setManagersLoading] = useState(true);
+  const [managersError, setManagersError] = useState(null);
 
   // Crop states
   const [cropOpen, setCropOpen] = useState(false);
@@ -107,6 +128,12 @@ function VoucherCrud() {
     const token = enc ? Decrypt(enc) : '';
     return { Authorization: `Bearer ${token}` };
   }, []);
+
+  /* Endpoint Manager Tenant */
+  const MANAGERS_ENDPOINT = useMemo(
+    () => `${apiBase}/api/admin/users?roles[]=manager_tenant&roles[]=manager%20tenant&paginate=all`,
+    [apiBase]
+  );
 
   const getCommunityLabel = useCallback(
     (id) => {
@@ -252,6 +279,49 @@ function VoucherCrud() {
     })();
   }, [apiBase, authHeader]);
 
+  /* Fetch Manager Tenant */
+  useEffect(() => {
+    const fetchManagers = async () => {
+      setManagersLoading(true);
+      setManagersError(null);
+      try {
+        const res = await fetch(MANAGERS_ENDPOINT, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...authHeader(),
+          },
+        });
+        if (res.ok) {
+          const result = await res.json();
+          let usersData = [];
+          if (result?.success && Array.isArray(result?.data)) usersData = result.data;
+          else if (Array.isArray(result?.data)) usersData = result.data;
+          else if (Array.isArray(result?.users)) usersData = result.users;
+          else if (Array.isArray(result)) usersData = result;
+
+          usersData = usersData.filter(isManagerTenant);
+          usersData.sort((a, b) =>
+            (getDisplayName(a) || '').localeCompare(getDisplayName(b) || '', 'id')
+          );
+
+          setMerchantManagers(usersData);
+        } else {
+          const errorText = await res.text();
+          setManagersError(`Gagal ambil manager tenant: ${res.status} ${errorText?.slice?.(0, 120) || ''}`);
+          setMerchantManagers([]);
+        }
+      } catch (e) {
+        setManagersError(`Network error: ${e.message}`);
+        setMerchantManagers([]);
+      } finally {
+        setManagersLoading(false);
+      }
+    };
+    fetchManagers();
+  }, [MANAGERS_ENDPOINT, authHeader]);
+
   // Delete
   const handleDelete = async () => {
     if (!selectedVoucher) return;
@@ -374,12 +444,10 @@ function VoucherCrud() {
   // Transform payload sebelum submit
   const transformData = useCallback(
     (data) => {
-      console.log('🔄 Transform START:', {
-        imagePresent: !!data.image,
-        imageType: typeof data.image,
-        isFile: data.image instanceof File,
-        fileName: data.image?.name || 'N/A',
-      });
+      // Wajib sertakan owner_user_id
+      if (data.owner_user_id) {
+        data.owner_user_id = String(data.owner_user_id);
+      }
 
       data.target_type = data.target_type || 'all';
       data.validation_type = data.validation_type || 'auto';
@@ -434,12 +502,6 @@ function VoucherCrud() {
       }
 
       data.stock = Number(data.stock ?? 0);
-
-      console.log('🔄 Transform END:', {
-        hasImage: !!data.image,
-        imageType: typeof data.image,
-        isFile: data.image instanceof File,
-      });
 
       return data;
     },
@@ -559,16 +621,11 @@ function VoucherCrud() {
           image: '', // create selalu kosong
         }}
         beforeSubmit={(payload) => {
-          console.log('🚀 FINAL Before submit analysis:', {
-            hasImage: !!payload.image,
-            imageType: typeof payload.image,
-            isFile: payload.image instanceof File,
-            fileName: payload.image?.name || 'N/A',
-            fileSize: payload.image?.size || 'N/A',
-            allKeys: Object.keys(payload || {}),
-            currentImageFileState: currentImageFile?.name || 'NULL',
-            previewUrlState: previewUrl ? 'EXISTS' : 'EMPTY',
-          });
+          // Wajib: Manager Tenant harus dipilih
+          if (!payload.owner_user_id) {
+            alert('Manager tenant wajib dipilih.');
+            return false;
+          }
 
           const tt = payload?.target_type || 'all';
           if (tt === 'user' && (!payload.target_user_ids || payload.target_user_ids.length === 0)) {
@@ -838,6 +895,36 @@ function VoucherCrud() {
                 />
               ),
             },
+
+            /* Dropdown Manager Tenant (WAJIB) */
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                const fc = formControl('owner_user_id');
+                const options = merchantManagers.map((u) => ({
+                  value: String(u.id),
+                  label: `${getDisplayName(u)}${getPhone(u) ? ' — ' + getPhone(u) : ''}`,
+                }));
+                return (
+                  <SelectComponent
+                    name="owner_user_id"
+                    label="Manager Tenant *"
+                    placeholder={
+                      managersLoading
+                        ? 'Loading manager tenant...'
+                        : options.length === 0
+                        ? 'Tidak ada manager tenant'
+                        : 'Pilih manager tenant...'
+                    }
+                    required
+                    {...fc}
+                    options={options}
+                    disabled={managersLoading || options.length === 0}
+                  />
+                );
+              },
+            },
+
             {
               type: 'custom',
               custom: ({ formControl }) => {
@@ -980,9 +1067,51 @@ function VoucherCrud() {
           customDefaultValue: (data) => {
             console.log('🔧 Setting form default values for edit:', {
               id: data?.id,
+              owner_user_id: data?.owner_user_id,
+              owner_name: data?.owner_name,
+              owner_phone: data?.owner_phone,
               hasCurrentFile: currentImageFile ? 'YES' : 'NO',
               hasImageUrl: data?.image_url ? 'YES' : 'NO',
+              merchantManagersCount: merchantManagers.length,
             });
+
+            // PERBAIKAN: Fallback owner_user_id dari merchantManagers
+            let resolvedOwnerUserId = data?.owner_user_id ? String(data.owner_user_id) : '';
+            
+            // Jika owner_user_id kosong, coba resolve dari nama atau phone
+            if (!resolvedOwnerUserId && (data?.owner_name || data?.owner_phone)) {
+              const matchedManager = merchantManagers.find(manager => {
+                const nameMatch = data.owner_name && 
+                  getDisplayName(manager).toLowerCase().includes(data.owner_name.toLowerCase());
+                const phoneMatch = data.owner_phone && 
+                  getPhone(manager).replace(/[^\d+]/g, '').includes(data.owner_phone.replace(/[^\d+]/g, ''));
+                
+                return nameMatch || phoneMatch;
+              });
+              
+              if (matchedManager) {
+                resolvedOwnerUserId = String(matchedManager.id);
+                console.log('🔍 Resolved owner_user_id from name/phone:', {
+                  name: data.owner_name,
+                  phone: data.owner_phone,
+                  resolved_id: resolvedOwnerUserId,
+                  manager: getDisplayName(matchedManager)
+                });
+              }
+            }
+
+            // Jika masih kosong, coba cari berdasarkan exact match ID di merchantManagers
+            if (!resolvedOwnerUserId && data?.owner_user_id) {
+              const existsInManagers = merchantManagers.some(manager => 
+                String(manager.id) === String(data.owner_user_id)
+              );
+              if (existsInManagers) {
+                resolvedOwnerUserId = String(data.owner_user_id);
+                console.log('✅ Verified owner_user_id exists in managers:', resolvedOwnerUserId);
+              } else {
+                console.warn('⚠️ owner_user_id not found in merchantManagers:', data.owner_user_id);
+              }
+            }
 
             return {
               id: data?.id,
@@ -1003,6 +1132,9 @@ function VoucherCrud() {
               image_url: data?.image_url || null,
               image_updated_at: data?.image_updated_at || null,
               updated_at: data?.updated_at || null,
+
+              // PERBAIKAN: Set owner_user_id yang sudah di-resolve
+              owner_user_id: resolvedOwnerUserId,
 
               target_user_ids: Array.isArray(data?.target_user_ids)
                 ? data.target_user_ids
