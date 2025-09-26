@@ -19,6 +19,7 @@ module.exports = withPWA({
       { source: '/storage/:path*',      destination: `${FILE_BASE}/storage/:path*` },
       { source: '/promos/:path*',       destination: `${FILE_BASE}/promos/:path*` },
       { source: '/api/storage/:path*',  destination: `${FILE_BASE}/storage/:path*` },
+      { source: '/images/:path*',       destination: `${FILE_BASE}/images/:path*` },
     ];
   },
 
