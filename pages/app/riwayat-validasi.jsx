@@ -158,7 +158,7 @@ export default function RiwayatValidasi() {
                             : (v.promo?.title ?? 'Promo')}
                         </p>
                         <p className="text-slate-600 text-sm mb-1">
-                          {isSameValidator
+                          {isTenant
                             ? <>Promo milik: {v.owner?.name ?? v.owner_name ?? '-'}</>
                             : <>Divalidasi oleh: {v.user?.name ?? 'Guest'}</>}
                         </p>
