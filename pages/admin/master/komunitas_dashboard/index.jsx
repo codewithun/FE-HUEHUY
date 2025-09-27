@@ -213,7 +213,7 @@ export default function KomunitasDashboard() {
   };
 
   // Fetch categories for a community
-  const fetchCategories = async (communityId) => {
+  const fetchCategories = async (communityId, { preserveOrder = true } = {}) => {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     const res = await fetch(apiJoin(`communities/${communityId}/categories`), {
@@ -226,28 +226,41 @@ export default function KomunitasDashboard() {
     const cats = Array.isArray(result) ? result : result.data || [];
     setCategoryList(cats);
 
-    // Try build promos map from API response if tersedia
     setCategoryPromosMap((prev) => {
       const next = { ...prev };
+
       cats.forEach((cat) => {
         const fromPromos = Array.isArray(cat.promos) ? cat.promos : [];
         const fromItems = Array.isArray(cat.items)
           ? cat.items.filter((it) => (it.type || it.item_type) === "promo")
           : [];
-        let promos = fromPromos.length ? fromPromos : fromItems;
-        
-        // PERBAIKAN: Urutkan promo berdasarkan ID descending (terbaru di atas)
-        promos = promos.sort((a, b) => (b.id || 0) - (a.id || 0));
-        
-        if (promos.length) {
-          next[cat.id] = promos.map((p) => ({
-            id: p.id,
-            title: p.title || p.name || `Promo #${p.id}`,
-          }));
-        } else if (!(cat.id in next)) {
-          next[cat.id] = [];
+
+        // Ambil urutan dari server apa adanya (NO sorting)
+        const incoming = (fromPromos.length ? fromPromos : fromItems).map((p) => ({
+          id: p.id,
+          title: p.title || p.name || `Promo #${p.id}`,
+        }));
+
+        if (!preserveOrder) {
+          // kalau kamu mau reset penuh ke urutan server
+          next[cat.id] = incoming;
+          return;
         }
+
+        const prevList = Array.isArray(prev[cat.id]) ? prev[cat.id] : [];
+
+        // 1) Buang item yang sudah tidak ada di server
+        const incomingIds = new Set(incoming.map((p) => p.id));
+        let merged = prevList.filter((p) => incomingIds.has(p.id));
+
+        // 2) Tambahkan item baru dari server di BAWAH (agar hasil unshift tetap di atas)
+        for (const p of incoming) {
+          if (!merged.some((x) => x.id === p.id)) merged.push(p);
+        }
+
+        next[cat.id] = merged;
       });
+
       return next;
     });
   };
@@ -390,7 +403,7 @@ export default function KomunitasDashboard() {
         setCategoryPromosMap((prev) => {
           const current = prev[catIdNum] ? [...prev[catIdNum]] : [];
           if (addedPromo && !current.some((p) => p.id === addedPromo.id)) {
-            // PERBAIKAN: Tambahkan promo baru di paling atas (unshift)
+            // Tambahkan promo baru di paling atas (unshift)
             current.unshift({
               id: addedPromo.id,
               title: addedPromo.title || addedPromo.name || `Promo #${addedPromo.id}`,
