@@ -600,18 +600,23 @@ function PromoDashboard() {
             }
             formData.append("owner_user_id", String(data.owner_user_id));
 
-            // Required fields
-            if (data.title?.trim()) formData.append("title", data.title.trim());
-            if (data.description?.trim()) formData.append("description", data.description.trim());
+            // Required fields - ALWAYS send for both create and edit
+            formData.append("title", (data.title || "").trim());
+            formData.append("description", (data.description || "").trim());
 
-            // Promo type
-            if (data.promo_type) formData.append("promo_type", data.promo_type);
+            // Promo type - ALWAYS send
+            formData.append("promo_type", data.promo_type || "offline");
 
-            // Community ID (create wajib)
+            // Community ID - ALWAYS send for both create and edit
             let communityId = data.community_id;
             if (mode === "edit" && !communityId && originalData) communityId = originalData.community_id;
-            if (communityId) formData.append("community_id", String(communityId));
-            else if (mode === "create") throw new Error("Community ID is required");
+            formData.append("community_id", String(communityId || ""));
+            if (mode === "create" && !communityId) throw new Error("Community ID is required for creating promo");
+
+            // Owner fields - BE will extract from user if owner_user_id exists
+            // But we still need to send them for validation
+            if (data.owner_name?.trim()) formData.append("owner_name", data.owner_name.trim());
+            if (data.owner_contact?.trim()) formData.append("owner_contact", data.owner_contact.trim());
 
             // Optional text fields
             if (data.detail?.trim()) formData.append("detail", data.detail.trim());
