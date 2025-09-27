@@ -37,7 +37,9 @@ const USED_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 hari
 
 // === ADD: key unik per item (code + item_id + user_id) ===
 const buildUsedKey = ({ code, item_id, user_id }) => {
-  const c = String(code || '').toUpperCase().trim();
+  const c = String(code || '')
+    .toUpperCase()
+    .trim();
   const item = item_id != null ? `I:${item_id}` : 'I:-';
   const owner = user_id != null ? `U:${user_id}` : 'U:-';
   return `${c}__${item}__${owner}`;
@@ -69,13 +71,16 @@ const saveUsedCodes = (obj) => {
 const normalizeServerMsg = (rawMsg, fallback) => {
   if (!rawMsg) return fallback;
   const m = String(rawMsg).toLowerCase();
+
+  if (m.includes('qr ini hanya dapat divalidasi oleh tenant'))
+    return 'QR ini hanya bisa divalidasi oleh tenant pemilik.';
+
   if (m.includes('not your') || (m.includes('bukan') && m.includes('tenant')))
     return 'Kode ini tidak terdaftar di tenant Anda.';
-  if (
-    m.includes('owner') &&
-    (m.includes('mismatch') || m.includes('different'))
-  )
-    return 'Kode ini bukan milik tenant Anda.';
+
+  if (m.includes('owner') && (m.includes('mismatch') || m.includes('different')))
+    return 'Kode tidak sesuai pemilik.';
+
   if (
     (m.includes('sudah') &&
       (m.includes('dipakai') || m.includes('divalidasi'))) ||
@@ -83,12 +88,14 @@ const normalizeServerMsg = (rawMsg, fallback) => {
     m.includes('used')
   )
     return 'Kode ini sudah pernah divalidasi.';
+
   if (
     m.includes('not found') ||
     m.includes('tidak ditemukan') ||
     m.includes('invalid')
   )
     return 'Kode tidak ditemukan atau tidak valid.';
+
   return rawMsg || fallback;
 };
 
@@ -313,14 +320,19 @@ export default function ScanValidasi() {
       if (hasStrongId) {
         const key = buildUsedKey({
           code: codeToValidate,
-          item_id: itemId,   // dari QR structured
-          user_id: userId,   // dari QR structured
+          item_id: itemId, // dari QR structured
+          user_id: userId, // dari QR structured
         });
         const usedMap = loadUsedCodes();
         const usedEntry = usedMap[key];
 
-        if (usedEntry && String(usedEntry.tenantId ?? '') === String(profile?.id ?? '')) {
-          setModalFailedMessage(`Kode "${codeToValidate}" sudah pernah divalidasi untuk item ini oleh akun ini di perangkat ini.`);
+        if (
+          usedEntry &&
+          String(usedEntry.tenantId ?? '') === String(profile?.id ?? '')
+        ) {
+          setModalFailedMessage(
+            `Kode "${codeToValidate}" sudah pernah divalidasi untuk item ini oleh akun ini di perangkat ini.`
+          );
           setModalFailed(true);
           setSubmitLoading(false);
           setIsScanning(true);
@@ -366,7 +378,13 @@ export default function ScanValidasi() {
         if (status === 404) return true;
         if (status === 422) {
           // fallback hanya jika indikasi salah endpoint / tipe
-          return m.includes('type') || m.includes('tipe') || m.includes('promo') || m.includes('voucher') || m.includes('format');
+          return (
+            m.includes('type') ||
+            m.includes('tipe') ||
+            m.includes('promo') ||
+            m.includes('voucher') ||
+            m.includes('format')
+          );
         }
         return false;
       };
@@ -379,39 +397,57 @@ export default function ScanValidasi() {
       if (hitVoucherFirst) {
         primaryType = 'voucher';
         primaryRes = await fetch(`${apiUrl}/api/vouchers/validate`, {
-          method: 'POST', headers, body: JSON.stringify(tenantPayload),
+          method: 'POST',
+          headers,
+          body: JSON.stringify(tenantPayload),
         });
         primaryResult = await primaryRes.json().catch(() => null);
 
         // fallback bila perlu
-        if (!primaryRes.ok && shouldFallback(primaryRes.status, primaryResult?.message)) {
+        if (
+          !primaryRes.ok &&
+          shouldFallback(primaryRes.status, primaryResult?.message)
+        ) {
           fallbackType = 'promo';
           fallbackRes = await fetch(`${apiUrl}/api/promos/validate`, {
-            method: 'POST', headers, body: JSON.stringify(tenantPayload),
+            method: 'POST',
+            headers,
+            body: JSON.stringify(tenantPayload),
           });
           fallbackResult = await fallbackRes.json().catch(() => null);
         }
       } else {
         primaryType = 'promo';
         primaryRes = await fetch(`${apiUrl}/api/promos/validate`, {
-          method: 'POST', headers, body: JSON.stringify(tenantPayload),
+          method: 'POST',
+          headers,
+          body: JSON.stringify(tenantPayload),
         });
         primaryResult = await primaryRes.json().catch(() => null);
 
         // fallback bila perlu
-        if (!primaryRes.ok && shouldFallback(primaryRes.status, primaryResult?.message)) {
+        if (
+          !primaryRes.ok &&
+          shouldFallback(primaryRes.status, primaryResult?.message)
+        ) {
           fallbackType = 'voucher';
           fallbackRes = await fetch(`${apiUrl}/api/vouchers/validate`, {
-            method: 'POST', headers, body: JSON.stringify(tenantPayload),
+            method: 'POST',
+            headers,
+            body: JSON.stringify(tenantPayload),
           });
           fallbackResult = await fallbackRes.json().catch(() => null);
         }
       }
 
       // Pilih hasil akhir:
-      let finalRes = primaryRes, finalResult = primaryResult, itemType = primaryType;
+      let finalRes = primaryRes,
+        finalResult = primaryResult,
+        itemType = primaryType;
       if (!primaryRes.ok && fallbackRes?.ok) {
-        finalRes = fallbackRes; finalResult = fallbackResult; itemType = fallbackType;
+        finalRes = fallbackRes;
+        finalResult = fallbackResult;
+        itemType = fallbackType;
       }
 
       dlog('❌ FINAL SNAPSHOT', {
@@ -459,7 +495,11 @@ export default function ScanValidasi() {
         setModalSuccess(true);
 
         try {
-          const usedKey = buildUsedKey({ code: codeToValidate, item_id: itemId, user_id: userId });
+          const usedKey = buildUsedKey({
+            code: codeToValidate,
+            item_id: itemId,
+            user_id: userId,
+          });
           const map = loadUsedCodes();
           map[usedKey] = {
             ts: Date.now(),
@@ -519,17 +559,29 @@ export default function ScanValidasi() {
 
         if (finalRes?.status === 401) {
           errorMsg = 'Sesi login berakhir. Silakan login kembali.';
-        } else if (finalRes?.status === 403 || (itemTenantId && profile?.id && String(itemTenantId) !== String(profile.id))) {
+        } else if (
+          finalRes?.status === 403 ||
+          (itemTenantId &&
+            profile?.id &&
+            String(itemTenantId) !== String(profile.id))
+        ) {
           // tenant mismatch HARUS diutamakan
           errorMsg = 'Kode ini bukan milik tenant Anda.';
-        } else if (validatedByTenantId && profile?.id && String(validatedByTenantId) !== String(profile.id)) {
+        } else if (
+          validatedByTenantId &&
+          profile?.id &&
+          String(validatedByTenantId) !== String(profile.id)
+        ) {
           errorMsg = 'Kode ini sudah divalidasi oleh tenant lain.';
         } else if (alreadyByStatus) {
-          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" sudah pernah divalidasi.`;
+          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'
+            } dengan kode "${codeToValidate}" sudah pernah divalidasi.`;
         } else if (notFoundByStatus) {
-          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" tidak ditemukan.`;
+          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'
+            } dengan kode "${codeToValidate}" tidak ditemukan.`;
         } else if (finalRes?.status === 422) {
-          errorMsg = srvMsg || `Kode "${codeToValidate}" tidak valid atau format salah.`;
+          errorMsg =
+            srvMsg || `Kode "${codeToValidate}" tidak valid atau format salah.`;
         } else if (srvMsg) {
           errorMsg = srvMsg;
         }
@@ -753,8 +805,8 @@ export default function ScanValidasi() {
               <button
                 onClick={() => setFlashOn(!flashOn)}
                 className={`flex-1 py-3 px-3 rounded-[15px] flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${flashOn
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
+                    ? 'bg-yellow-500 text-white'
+                    : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
                   }`}
               >
                 <FontAwesomeIcon
@@ -823,7 +875,7 @@ export default function ScanValidasi() {
           resetScanner();
         }}
         paint="danger"
-        icon={faShieldCheck}   // <-- ganti ini
+        icon={faShieldCheck} // <-- ganti ini
         title={modalFailedMessage}
         onSubmit={async () => {
           setModalFailed(false);
