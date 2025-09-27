@@ -427,7 +427,7 @@ function VoucherCrud() {
             return `${names.join(', ')}${rest > 0 ? ` +${rest} lainnya` : ''}`;
           }
           if (target_type === 'community') return getCommunityLabel(community_id);
-          return 'Semua (role: user)';
+          return 'Semua User';
         },
       },
       {
