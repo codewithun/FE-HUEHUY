@@ -67,6 +67,36 @@ export default function PromoDetailUnified() {
 
   const [promoData, setPromoData] = useState(null);
 
+// Tambah: status "belum mulai" dan "mulai besok"
+const { isNotStarted, isStartTomorrow } = useMemo(() => {
+  if (!promoData) return { isNotStarted: false, isStartTomorrow: false };
+
+  const raw =
+    promoData.start_date ||
+    promoData.starts_at ||
+    promoData.start_at ||
+    promoData.valid_from ||
+    promoData.validFrom ||
+    promoData.start ||
+    null;
+
+  if (!raw) return { isNotStarted: false, isStartTomorrow: false };
+
+  const start = new Date(raw);
+  if (Number.isNaN(start.getTime())) return { isNotStarted: false, isStartTomorrow: false };
+
+  const now = new Date();
+  const isNotStarted = start.getTime() > now.getTime();
+
+  const startDateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrowDateOnly = new Date(todayDateOnly.getTime() + 24 * 60 * 60 * 1000);
+
+  const isStartTomorrow = isNotStarted && startDateOnly.getTime() === tomorrowDateOnly.getTime();
+
+  return { isNotStarted, isStartTomorrow };
+}, [promoData]);
+
   // Apakah promo sudah kadaluwarsa?
   const isExpired = useMemo(() => {
     if (!promoData) return false;
@@ -378,7 +408,10 @@ export default function PromoDetailUnified() {
           originalPrice: data.original_price ?? null,
           discountPrice: data.discount_price ?? null,
           discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
-          // Tambah: simpan end_date/expires_at untuk deteksi kadaluwarsa
+          // Tambah: tanggal mulai & always_available
+          start_date: data.start_date || data.start_at || data.starts_at || data.valid_from || null,
+          always_available: Boolean(data.always_available),
+          // Tambah: tanggal selesai
           expires_at: data.end_date || data.expires_at || data.valid_until || null,
           end_date: data.end_date || null,
           schedule: {
@@ -724,9 +757,15 @@ export default function PromoDetailUnified() {
   const handleClaimPromo = async () => {
     if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
 
-    // Cegah klaim jika sudah kadaluwarsa
-    if (isExpired) {
-      setErrorMessage('Promo sudah kadaluwarsa.');
+    // Blok klaim jika expired atau belum mulai
+    if (isExpired || isNotStarted) {
+      setErrorMessage(
+        isExpired
+          ? 'Promo sudah kadaluwarsa.'
+          : isStartTomorrow
+          ? 'Promo mulai besok.'
+          : 'Promo belum dimulai.'
+      );
       setShowErrorModal(true);
       return;
     }
@@ -1092,9 +1131,9 @@ export default function PromoDetailUnified() {
         <div className="lg:max-w-sm lg:mx-auto">
           <button
             onClick={handleClaimPromo}
-            disabled={isExpired || isClaimedLoading || isAlreadyClaimed}
+            disabled={isExpired || isNotStarted || isClaimedLoading || isAlreadyClaimed}
             className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-              isExpired
+              isExpired || isNotStarted
                 ? 'bg-gray-400 text-white cursor-not-allowed'
                 : isAlreadyClaimed
                 ? 'bg-gray-400 text-white cursor-not-allowed'
@@ -1105,6 +1144,8 @@ export default function PromoDetailUnified() {
           >
             {isExpired ? (
               'Promo sudah kadaluwarsa'
+            ) : isNotStarted ? (
+              isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai'
             ) : isAlreadyClaimed ? (
               <div className="flex items-center justify-center">
                 <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
