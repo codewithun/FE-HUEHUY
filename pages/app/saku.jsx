@@ -243,6 +243,28 @@ export default function Save() {
     fetchData();
   }, [fetchData, refreshTrigger]);
 
+  // Polling khusus QR (validation_type !== 'manual') saat modal terbuka
+  useEffect(() => {
+    if (!modalValidation || !selected) return;
+    const vt = getValidationType(selected);
+    const isManual = vt === 'manual';
+    if (isManual) return;
+
+    // Skip polling saat tab tidak aktif untuk hemat beban
+    let intervalId = null;
+    const tick = () => {
+      if (document.hidden) return;
+      setRefreshTrigger((p) => p + 1);
+    };
+
+    // Poll tiap 3 detik
+    intervalId = setInterval(tick, 3000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [modalValidation, selected]);
+
   // Auto-refresh saat focus & route change
   useEffect(() => {
     const handleFocus = () => setRefreshTrigger((p) => p + 1);
@@ -256,6 +278,38 @@ export default function Save() {
       router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, [router.events]);
+
+  useEffect(() => {
+    if (!modalValidation || !selected) return;
+    const vt = getValidationType(selected);
+    const isManual = vt === 'manual'; // hanya QR yang auto-redirect
+    if (isManual) return;
+
+    const selVoucherId = selected?.voucher_item?.id;
+    const selPromoId = selected?.promo_item?.id;
+
+    // Cari item yang sama di state terbaru
+    const found = (data?.data || []).find((it) => {
+      if (selVoucherId) return String(it?.voucher_item?.id) === String(selVoucherId);
+      if (selPromoId) return String(it?.promo_item?.id) === String(selPromoId);
+      return false;
+    });
+
+    // Jika ditemukan & sudah validated → redirect
+    if (found && isItemValidated(found)) {
+      setModalValidation(false);
+      setSelected(null);
+      router.replace('/app/riwayat-validasi');
+      return;
+    }
+
+    // Jika tidak ditemukan lagi → anggap sudah diproses (BE bisa menghapus dari saku)
+    if (!found) {
+      setModalValidation(false);
+      setSelected(null);
+      router.replace('/app/riwayat-validasi');
+    }
+  }, [data, modalValidation, selected, router]);
 
   // ====== Helpers ======
   const isItemValidatable = (item) => {
@@ -292,6 +346,23 @@ export default function Save() {
     const hasPromoStock = promo?.stock === undefined || promo?.stock > 0;
 
     return isPromoActive && hasPromoStock;
+  };
+
+  // Cek status validated pada item (voucher/promo)
+  const isItemValidated = (item) => {
+    if (!item) return false;
+    return Boolean(
+      item?.validated_at ||
+      // Voucher
+      item?.voucher_item?.used_at ||
+      (item?.type === 'voucher' && (item?.used_at || item?.status === 'used')) ||
+      // Promo
+      item?.promo_item?.redeemed_at ||
+      (item?.type === 'promo' && item?.promo_item?.status === 'redeemed') ||
+      // Fallback
+      item?.promo_item?.status === 'redeemed' ||
+      item?.status === 'redeemed'
+    );
   };
 
   const getTimeRemaining = (expiredAt) => {
