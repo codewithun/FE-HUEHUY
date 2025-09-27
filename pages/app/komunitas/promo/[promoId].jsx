@@ -66,6 +66,26 @@ export default function PromoDetailUnified() {
   }, [router.query.autoRegister, router.query.source]);
 
   const [promoData, setPromoData] = useState(null);
+
+  // Apakah promo sudah kadaluwarsa?
+  const isExpired = useMemo(() => {
+    if (!promoData) return false;
+
+    // always_available? anggap tidak expired
+    if (promoData.always_available === true) return false;
+
+    // ambil expiry dari end_date dulu, lalu fallback ke expires_at
+    const raw = promoData.end_date || promoData.expires_at;
+    if (!raw) return false;
+
+    // Normalisasi ke timestamp. Jika parse gagal → anggap belum expired agar aman.
+    const ts = new Date(raw).getTime();
+    if (Number.isNaN(ts)) return false;
+
+    // bandingkan dengan "sekarang"
+    return ts < Date.now();
+  }, [promoData]);
+
   const [loading, setLoading] = useState(true);
 
   const [isClaimedLoading, setIsClaimedLoading] = useState(false);
@@ -291,6 +311,8 @@ export default function PromoDetailUnified() {
       originalPrice: src.originalPrice ?? null,
       discountPrice: src.discountedPrice ?? null,
       discount: src.discount ?? null,
+      // Tambah: simpan tanggal kadaluwarsa jika ada (legacy bisa null)
+      expires_at: src.validUntil || null,
       schedule: {
         day: 'Everyday',
         details: src.validUntil ? `Berlaku hingga ${src.validUntil}` : 'Berlaku',
@@ -356,6 +378,9 @@ export default function PromoDetailUnified() {
           originalPrice: data.original_price ?? null,
           discountPrice: data.discount_price ?? null,
           discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
+          // Tambah: simpan end_date/expires_at untuk deteksi kadaluwarsa
+          expires_at: data.end_date || data.expires_at || data.valid_until || null,
+          end_date: data.end_date || null,
           schedule: {
             day: data.always_available ? 'Setiap Hari' : 'Weekday',
             details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}` : 'Berlaku',
@@ -698,6 +723,13 @@ export default function PromoDetailUnified() {
   // --- Claim promo manual ---
   const handleClaimPromo = async () => {
     if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
+
+    // Cegah klaim jika sudah kadaluwarsa
+    if (isExpired) {
+      setErrorMessage('Promo sudah kadaluwarsa.');
+      setShowErrorModal(true);
+      return;
+    }
 
     // Prevent multiple simultaneous calls
     if (handleClaimPromo.isRunning) {
@@ -1060,16 +1092,20 @@ export default function PromoDetailUnified() {
         <div className="lg:max-w-sm lg:mx-auto">
           <button
             onClick={handleClaimPromo}
-            disabled={isClaimedLoading || isAlreadyClaimed}
+            disabled={isExpired || isClaimedLoading || isAlreadyClaimed}
             className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-              isAlreadyClaimed
+              isExpired
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : isAlreadyClaimed
                 ? 'bg-gray-400 text-white cursor-not-allowed'
                 : isClaimedLoading
                 ? 'bg-slate-400 text-white cursor-not-allowed'
                 : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
             }`}
           >
-            {isAlreadyClaimed ? (
+            {isExpired ? (
+              'Promo sudah kadaluwarsa'
+            ) : isAlreadyClaimed ? (
               <div className="flex items-center justify-center">
                 <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
                 Sudah Direbut
