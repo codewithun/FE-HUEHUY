@@ -35,6 +35,14 @@ const dlog = (...args) => dev && console.log(...args);
 const USED_CODES_KEY = 'validated_codes_v2';
 const USED_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 hari
 
+// === ADD: key unik per item (code + item_id + user_id) ===
+const buildUsedKey = ({ code, item_id, user_id }) => {
+  const c = String(code || '').toUpperCase().trim();
+  const item = item_id != null ? `I:${item_id}` : 'I:-';
+  const owner = user_id != null ? `U:${user_id}` : 'U:-';
+  return `${c}__${item}__${owner}`;
+};
+
 const loadUsedCodes = () => {
   try {
     const raw = localStorage.getItem(USED_CODES_KEY);
@@ -55,29 +63,6 @@ const saveUsedCodes = (obj) => {
   try {
     localStorage.setItem(USED_CODES_KEY, JSON.stringify(obj));
   } catch { }
-};
-const isCodeUsed = (code) => {
-  if (!code) return false;
-  const map = loadUsedCodes();
-  return !!map[String(code).toUpperCase()];
-};
-const markCodeUsed = (code, meta = {}) => {
-  if (!code) return;
-  const map = loadUsedCodes();
-  map[String(code).toUpperCase()] = { ts: Date.now(), ...meta };
-  saveUsedCodes(map);
-};
-
-const getUsedEntry = (code) => {
-  if (!code) return null;
-  const map = loadUsedCodes();
-  return map[String(code).toUpperCase()] || null;
-};
-
-const isCodeUsedForTenant = (code, tenantId) => {
-  const e = getUsedEntry(code);
-  if (!e) return false;
-  return String(e.tenantId ?? e.tenant_id ?? '') === String(tenantId ?? '');
 };
 
 // ===== Normalizer pesan server =====
@@ -323,19 +308,24 @@ export default function ScanValidasi() {
         setIsScanning(true);
         return;
       }
-      // ===== Single-use pre-check (local) =====
-      // Hanya blokir kalau kode ini sudah dipakai oleh TENANT yang sama (akun ini).
-      const usedEntry = getUsedEntry(codeToValidate);
-      if (usedEntry) {
-        const sameTenant = String(usedEntry.tenantId ?? usedEntry.tenant_id ?? '') === String(profile?.id ?? '');
-        if (sameTenant) {
-          setModalFailedMessage(`Kode "${codeToValidate}" sudah pernah divalidasi dari perangkat ini oleh akun ini.`);
+      // === only block locally if QR membawa ID kuat (item_id atau user_id) ===
+      const hasStrongId = itemId != null || userId != null;
+      if (hasStrongId) {
+        const key = buildUsedKey({
+          code: codeToValidate,
+          item_id: itemId,   // dari QR structured
+          user_id: userId,   // dari QR structured
+        });
+        const usedMap = loadUsedCodes();
+        const usedEntry = usedMap[key];
+
+        if (usedEntry && String(usedEntry.tenantId ?? '') === String(profile?.id ?? '')) {
+          setModalFailedMessage(`Kode "${codeToValidate}" sudah pernah divalidasi untuk item ini oleh akun ini di perangkat ini.`);
           setModalFailed(true);
           setSubmitLoading(false);
           setIsScanning(true);
           return;
         }
-        // Tenant berbeda → BIARKAN LANJUT KE API supaya dapat pesan "bukan milik tenant Anda"
       }
 
       dlog('🔍 Validating code:', codeToValidate);
@@ -481,11 +471,17 @@ export default function ScanValidasi() {
         setModalSuccess(true);
 
         try {
-          markCodeUsed(codeToValidate, {
+          const usedKey = buildUsedKey({ code: codeToValidate, item_id: itemId, user_id: userId });
+          const map = loadUsedCodes();
+          map[usedKey] = {
+            ts: Date.now(),
             itemType,
             tenantId: profile?.id,
+            item_id: itemId ?? null,
+            user_id: userId ?? null,
             at: new Date().toISOString(),
-          });
+          };
+          saveUsedCodes(map);
         } catch { }
 
         dlog('✅ VALIDATION SUCCESSFUL:', {
