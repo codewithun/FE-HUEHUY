@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { faGift, faSearch, faTag } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
@@ -83,7 +84,7 @@ const CommunityPromoPage = () => {
   };
 
   const normalizePromos = (arr = []) => {
-    return (Array.isArray(arr) ? arr : []).map((p) => {
+    let promos = (Array.isArray(arr) ? arr : []).map((p) => {
       const raw =
         p.image_url ??
         p.image ??
@@ -98,9 +99,21 @@ const CommunityPromoPage = () => {
         merchant: p.merchant ?? p.community?.name ?? 'Merchant',
         distance: p.distance ?? '0 KM',
         location: p.location ?? p.community?.location ?? 'Location',
-        image
+        image,
+        created_at: p.created_at,
+        updated_at: p.updated_at
       };
     });
+
+    // DEBUG: Log data tanpa sorting (urutan asli dari backend)
+    console.log('📊 Promo data (original order from backend):', promos.map(p => ({
+      id: p.id,
+      title: p.title,
+      created_at: p.created_at
+    })));
+
+    // HAPUS: Tidak ada sorting, kembalikan urutan asli
+    return promos;
   };
 
   useEffect(() => {

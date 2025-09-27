@@ -234,7 +234,11 @@ export default function KomunitasDashboard() {
         const fromItems = Array.isArray(cat.items)
           ? cat.items.filter((it) => (it.type || it.item_type) === "promo")
           : [];
-        const promos = fromPromos.length ? fromPromos : fromItems;
+        let promos = fromPromos.length ? fromPromos : fromItems;
+        
+        // PERBAIKAN: Urutkan promo berdasarkan ID descending (terbaru di atas)
+        promos = promos.sort((a, b) => (b.id || 0) - (a.id || 0));
+        
         if (promos.length) {
           next[cat.id] = promos.map((p) => ({
             id: p.id,
@@ -386,7 +390,8 @@ export default function KomunitasDashboard() {
         setCategoryPromosMap((prev) => {
           const current = prev[catIdNum] ? [...prev[catIdNum]] : [];
           if (addedPromo && !current.some((p) => p.id === addedPromo.id)) {
-            current.push({
+            // PERBAIKAN: Tambahkan promo baru di paling atas (unshift)
+            current.unshift({
               id: addedPromo.id,
               title: addedPromo.title || addedPromo.name || `Promo #${addedPromo.id}`,
             });
