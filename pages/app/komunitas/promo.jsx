@@ -105,14 +105,20 @@ const CommunityPromoPage = () => {
       };
     });
 
-    // DEBUG: Log data tanpa sorting (urutan asli dari backend)
-    console.log('📊 Promo data (original order from backend):', promos.map(p => ({
-      id: p.id,
-      title: p.title,
-      created_at: p.created_at
+    // Sort terbaru dulu: updated_at -> created_at; fallback id desc
+    promos.sort((a, b) => {
+      const ta = new Date(a.updated_at || a.created_at || 0).getTime() || 0;
+      const tb = new Date(b.updated_at || b.created_at || 0).getTime() || 0;
+      if (tb !== ta) return tb - ta;
+      const ia = Number(a.id), ib = Number(b.id);
+      if (!Number.isNaN(ia) && !Number.isNaN(ib)) return ib - ia;
+      return 0;
+    });
+
+    console.log('📊 Promo data (sorted desc by date):', promos.map(p => ({
+      id: p.id, title: p.title, created_at: p.created_at, updated_at: p.updated_at
     })));
 
-    // HAPUS: Tidak ada sorting, kembalikan urutan asli
     return promos;
   };
 
