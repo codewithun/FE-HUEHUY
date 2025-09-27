@@ -337,12 +337,6 @@ export default function ScanValidasi() {
       });
       dlog('🔐 Validation request headers:', headers);
 
-      let res,
-        result,
-        itemType = 'promo',
-        promoError = null,
-        voucherError = null;
-
       const tenantPayload = {
         code: codeToValidate.trim(),
         tenant_id: profile?.id,
@@ -362,82 +356,77 @@ export default function ScanValidasi() {
 
       dlog('🏢 Enhanced tenant validation payload:', tenantPayload);
 
-      if (qrItemType === 'voucher') {
-        dlog('🎫 QR indicates voucher - trying voucher validation first...');
-        res = await fetch(`${apiUrl}/api/vouchers/validate`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(tenantPayload),
-        });
-        result = await res.json().catch(() => null);
-        itemType = 'voucher';
-        dlog('📡 Voucher validation response:', {
-          status: res.status,
-          ok: res.ok,
-          result,
-        });
+      let primaryRes, primaryResult, primaryType;
+      let fallbackRes, fallbackResult, fallbackType;
 
-        if (!res.ok) {
-          voucherError = {
-            status: res.status,
-            message: result?.message,
-            result,
-          };
-          dlog('🔍 Voucher failed, trying promo validation as fallback...');
-          res = await fetch(`${apiUrl}/api/promos/validate`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(tenantPayload),
+      // helper: cuma fallback kalau "not found / type salah"
+      const shouldFallback = (status, msg) => {
+        const m = String(msg || '').toLowerCase();
+        if ([401, 403, 409].includes(status)) return false; // error spesifik: JANGAN fallback
+        if (status === 404) return true;
+        if (status === 422) {
+          // fallback hanya jika indikasi salah endpoint / tipe
+          return m.includes('type') || m.includes('tipe') || m.includes('promo') || m.includes('voucher') || m.includes('format');
+        }
+        return false;
+      };
+
+      // --- pilih endpoint utama berdasarkan hint QR ---
+      const hitVoucherFirst = qrItemType === 'voucher';
+      const hitPromoFirst = qrItemType === 'promo' || !hitVoucherFirst;
+
+      // 1) HIT UTAMA
+      if (hitVoucherFirst) {
+        primaryType = 'voucher';
+        primaryRes = await fetch(`${apiUrl}/api/vouchers/validate`, {
+          method: 'POST', headers, body: JSON.stringify(tenantPayload),
+        });
+        primaryResult = await primaryRes.json().catch(() => null);
+
+        // fallback bila perlu
+        if (!primaryRes.ok && shouldFallback(primaryRes.status, primaryResult?.message)) {
+          fallbackType = 'promo';
+          fallbackRes = await fetch(`${apiUrl}/api/promos/validate`, {
+            method: 'POST', headers, body: JSON.stringify(tenantPayload),
           });
-          result = await res.json().catch(() => null);
-          itemType = 'promo';
-          dlog('📡 Promo validation response (fallback):', {
-            status: res.status,
-            ok: res.ok,
-            result,
-          });
+          fallbackResult = await fallbackRes.json().catch(() => null);
         }
       } else {
-        dlog(
-          '🎁 Trying promo validation first (default or QR indicates promo)...'
-        );
-        res = await fetch(`${apiUrl}/api/promos/validate`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(tenantPayload),
+        primaryType = 'promo';
+        primaryRes = await fetch(`${apiUrl}/api/promos/validate`, {
+          method: 'POST', headers, body: JSON.stringify(tenantPayload),
         });
-        result = await res.json().catch(() => null);
-        itemType = 'promo';
-        dlog('📡 Promo validation response:', {
-          status: res.status,
-          ok: res.ok,
-          result,
-        });
+        primaryResult = await primaryRes.json().catch(() => null);
 
-        if (!res.ok) {
-          promoError = { status: res.status, message: result?.message, result };
-          dlog('🔍 Promo failed, trying voucher validation...');
-          res = await fetch(`${apiUrl}/api/vouchers/validate`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(tenantPayload),
+        // fallback bila perlu
+        if (!primaryRes.ok && shouldFallback(primaryRes.status, primaryResult?.message)) {
+          fallbackType = 'voucher';
+          fallbackRes = await fetch(`${apiUrl}/api/vouchers/validate`, {
+            method: 'POST', headers, body: JSON.stringify(tenantPayload),
           });
-          result = await res.json().catch(() => null);
-          itemType = 'voucher';
-          dlog('📡 Voucher validation response:', {
-            status: res.status,
-            ok: res.ok,
-            result,
-          });
+          fallbackResult = await fallbackRes.json().catch(() => null);
         }
       }
 
-      if (res?.status === 401) {
+      // Pilih hasil akhir:
+      let finalRes = primaryRes, finalResult = primaryResult, itemType = primaryType;
+      if (!primaryRes.ok && fallbackRes?.ok) {
+        finalRes = fallbackRes; finalResult = fallbackResult; itemType = fallbackType;
+      }
+
+      dlog('❌ FINAL SNAPSHOT', {
+        status: finalRes?.status,
+        itemType,
+        message: finalResult?.message,
+        data: finalResult?.data || null,
+      });
+
+      if (finalRes?.status === 401) {
         setModalFailedMessage('Sesi login berakhir. Silakan login kembali.');
         setModalFailed(true);
-      } else if (res?.ok) {
+      } else if (finalRes?.ok) {
         // === SUKSES VALIDASI TENANT ===
-        const respItemId = getRespItemId(result);
+        const respItemId = getRespItemId(finalResult);
         if (
           isStructured &&
           itemId &&
@@ -451,8 +440,7 @@ export default function ScanValidasi() {
           });
         }
 
-        // Safety guard: jika BE tidak konsisten dan tetap mengembalikan 200 padahal sudah divalidasi
-        const dd = result?.data || result;
+        const dd = finalResult?.data || finalResult;
         const already =
           dd?.already_validated ||
           dd?.validated_at ||
@@ -491,31 +479,16 @@ export default function ScanValidasi() {
           tenantId: profile?.id,
           tenantName: profile?.fullname,
           timestamp: new Date().toISOString(),
-          validationResponse: result,
+          validationResponse: finalResult,
         });
       } else {
-        let errorMsg = 'Kode tidak valid atau tidak ditemukan';
-        if (res?.status === 403) {
-          errorMsg = 'Kode ini bukan milik tenant Anda.';
-        }
-
+        // --- gunakan finalRes/finalResult dari PATCH 1 ---
         const lower = (s) => (s ? String(s).toLowerCase() : '');
-        const srvMsg = normalizeServerMsg(result?.message, '');
+        const srvMsg = normalizeServerMsg(finalResult?.message, '');
 
-        const alreadyByStatus =
-          [400, 409].includes(res?.status) ||
-          lower(result?.message).includes('already') ||
-          lower(result?.message).includes('used') ||
-          lower(result?.message).includes('divalidasi') ||
-          lower(result?.message).includes('sudah');
+        // ambil detail
+        const d = finalResult?.data || finalResult;
 
-        const notFoundByStatus =
-          res?.status === 404 ||
-          lower(result?.message).includes('not found') ||
-          lower(result?.message).includes('tidak ditemukan') ||
-          lower(result?.message).includes('invalid');
-
-        const d = result?.data || result;
         const validatedByTenantId =
           d?.validated_by_tenant_id ||
           d?.voucher_item?.validated_by_tenant_id ||
@@ -527,15 +500,35 @@ export default function ScanValidasi() {
           d?.voucher_item?.tenant_id ||
           d?.promo_item?.tenant_id;
 
-        if (validatedByTenantId && profile?.id && String(validatedByTenantId) !== String(profile.id)) {
-          errorMsg = `Kode ini sudah divalidasi oleh tenant lain.`;
-        } else if (itemTenantId && profile?.id && String(itemTenantId) !== String(profile.id)) {
-          errorMsg = `Kode ini bukan milik tenant Anda.`;
+        // flags status
+        const alreadyByStatus =
+          [400, 409].includes(finalRes?.status) ||
+          lower(finalResult?.message).includes('already') ||
+          lower(finalResult?.message).includes('used') ||
+          lower(finalResult?.message).includes('divalidasi') ||
+          lower(finalResult?.message).includes('sudah');
+
+        const notFoundByStatus =
+          finalRes?.status === 404 ||
+          lower(finalResult?.message).includes('not found') ||
+          lower(finalResult?.message).includes('tidak ditemukan') ||
+          lower(finalResult?.message).includes('invalid');
+
+        // --- PRIORITAS PESAN ---
+        let errorMsg = 'Kode tidak valid atau tidak ditemukan';
+
+        if (finalRes?.status === 401) {
+          errorMsg = 'Sesi login berakhir. Silakan login kembali.';
+        } else if (finalRes?.status === 403 || (itemTenantId && profile?.id && String(itemTenantId) !== String(profile.id))) {
+          // tenant mismatch HARUS diutamakan
+          errorMsg = 'Kode ini bukan milik tenant Anda.';
+        } else if (validatedByTenantId && profile?.id && String(validatedByTenantId) !== String(profile.id)) {
+          errorMsg = 'Kode ini sudah divalidasi oleh tenant lain.';
         } else if (alreadyByStatus) {
           errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" sudah pernah divalidasi.`;
         } else if (notFoundByStatus) {
           errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'} dengan kode "${codeToValidate}" tidak ditemukan.`;
-        } else if (res?.status === 422) {
+        } else if (finalRes?.status === 422) {
           errorMsg = srvMsg || `Kode "${codeToValidate}" tidak valid atau format salah.`;
         } else if (srvMsg) {
           errorMsg = srvMsg;
