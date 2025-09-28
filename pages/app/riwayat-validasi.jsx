@@ -221,17 +221,64 @@ export default function RiwayatValidasi() {
     dlog('voucherItems.length =>', voucherItems.length, voucherItems);
   });
 
+  // Dedup riwayat untuk konteks tenant
+  const dedupeTenantHistory = (items) => {
+    const seen = new Map();
+
+    for (const it of items) {
+      // Prefer key per-item jika tersedia
+      const perItemKey = it.voucher_item_id || it.promo_item_id;
+      let key;
+      if (perItemKey) {
+        key = `${it.itemType}|item|${perItemKey}`;
+      } else {
+        // Fallback (tanpa schema baru):
+        // bedakan minimal per voucher + code + owner (pemilik item)
+        const voucherId = it?.voucher?.id ?? it?.voucher_id ?? '0';
+        const ownerId = it?.owner?.id ?? '0';
+        key = `${it.itemType}|vc:${voucherId}|code:${String(it.code || '').toString()}|owner:${ownerId}`;
+      }
+
+      // Jika belum ada, set. Jika sudah ada, tentukan mana yang dipilih:
+      if (!seen.has(key)) {
+        seen.set(key, it);
+      } else {
+        const prev = seen.get(key);
+        // Heuristik: pilih yang paling "valid"
+        // 1) yang punya voucher_item_id diprioritaskan
+        const prevHasItem = !!(prev.voucher_item_id || prev.promo_item_id);
+        const curHasItem = !!(it.voucher_item_id || it.promo_item_id);
+
+        if (!prevHasItem && curHasItem) {
+          seen.set(key, it);
+        } else if (prevHasItem === curHasItem) {
+          // 2) pilih yang validated_at paling baru
+          const prevTs = new Date(prev.validated_at || prev.created_at || 0).getTime();
+          const curTs = new Date(it.validated_at || it.created_at || 0).getTime();
+          if (curTs > prevTs) seen.set(key, it);
+        }
+      }
+    }
+    return Array.from(seen.values());
+  };
+
   // If viewing specific item, show only that type
-  const allItems =
+  let allItems =
     id && type
-      ? type === 'promo'
-        ? promoItems
-        : voucherItems
-      : [...promoItems, ...voucherItems].sort(
-        (a, b) =>
-          new Date(b.validated_at || b.created_at) -
-          new Date(a.validated_at || a.created_at)
-      );
+      ? (type === 'promo' ? promoItems : voucherItems)
+      : [...promoItems, ...voucherItems];
+
+  if (isProbablyTenant) {
+    // 🔒 dedupe khusus tampilan tenant
+    allItems = dedupeTenantHistory(allItems);
+  }
+
+  // Urutkan terbaru dulu SETELAH dedupe
+  allItems = allItems.sort(
+    (a, b) =>
+      new Date(b.validated_at || b.created_at) -
+      new Date(a.validated_at || a.created_at)
+  );
 
   const loading = promoLoading || voucherLoading;
 
