@@ -34,6 +34,8 @@ export default function NotificationPage() {
 
   // NEW: modal expired
   const [showVoucherExpiredModal, setShowVoucherExpiredModal] = useState(false);
+  // NEW: disable button while verifying/claiming
+  const [claimingId, setClaimingId] = useState(null);
 
   const authHeader = () => {
     const enc = Cookies.get(token_cookie_name);
@@ -54,10 +56,16 @@ export default function NotificationPage() {
     return Number.isFinite(t.getTime()) ? t : null;
   };
 
+  // Update getVoucherEndDate untuk prioritaskan data live
   const getVoucherEndDate = (n) => {
     if (!n || typeof n !== 'object') return null;
 
-    // Safe parse meta jika string JSON
+    // PRIORITAS 1: Data live dari backend (paling akurat)
+    if (n.live_valid_until) {
+      return n.live_valid_until;
+    }
+
+    // PRIORITAS 2: Meta dari notifikasi (bisa stale)
     let meta = n?.meta;
     if (typeof meta === 'string') {
       try { meta = JSON.parse(meta); } catch { meta = null; }
@@ -72,18 +80,39 @@ export default function NotificationPage() {
       n?.expiry_date ||
       n?.voucher?.valid_until ||
       n?.voucher?.end_date ||
-      meta?.valid_until ||           // baca dari meta
-      meta?.end_date ||              // baca dari meta
-      meta?.voucher?.valid_until ||  // nested di meta.voucher
-      meta?.voucher?.end_date ||     // nested di meta.voucher
+      meta?.valid_until ||
+      meta?.end_date ||
+      meta?.voucher?.valid_until ||
+      meta?.voucher?.end_date ||
       null
     );
   };
 
   const isVoucherExpired = (n) => {
+    // PRIORITAS 1: Gunakan status live dari backend
+    if (typeof n?.live_expired === 'boolean') {
+      return n.live_expired;
+    }
+
+    // PRIORITAS 2: Fallback ke parsing manual
     const raw = getVoucherEndDate(n);
     const dt = parseExpiry(raw);
     return !!dt && dt.getTime() < Date.now();
+  };
+
+  const isVoucherAvailable = (n) => {
+    // PRIORITAS 1: Gunakan status live dari backend (kombinasi semua faktor)
+    if (typeof n?.live_available === 'boolean') {
+      return n.live_available;
+    }
+
+    // PRIORITAS 2: Fallback ke cek manual
+    if (n?.live_expired === true) return false;
+    if (n?.live_out_of_stock === true) return false;
+    if (n?.live_inactive === true) return false;
+    
+    // Fallback ke logika lama
+    return !isVoucherExpired(n);
   };
 
   // Reset data saat ganti tab
@@ -206,21 +235,86 @@ export default function NotificationPage() {
     });
   }, [type, loading, hasMore, cursor, localItems.length, initialLoad, version]);
 
+  // NEW: fetch live voucher detail to avoid stale meta in notifications
+  const fetchVoucherDetail = useCallback(async (voucherId) => {
+    if (!voucherId) return null;
+    try {
+      const res = await fetch(`${apiBase}/api/vouchers/${voucherId}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
+      });
+      if (!res.ok) return null;
+      const data = await res.json().catch(() => null);
+      const voucher = data?.data || data || null;
+      
+      // Konsistensi dengan format live dari notifikasi
+      if (voucher) {
+        const validUntil = voucher.valid_until;
+        const expired = validUntil ? new Date(validUntil).getTime() < Date.now() : false;
+        const stock = voucher.stock ?? 0;
+        const outOfStock = !isNaN(stock) && stock <= 0;
+        
+        voucher.live_expired = expired;
+        voucher.live_out_of_stock = outOfStock;
+        voucher.live_available = !expired && !outOfStock;
+      }
+      
+      return voucher;
+    } catch {
+      return null;
+    }
+  }, []);
+
   async function claimVoucher(voucherId, notificationId) {
     try {
       console.log('Claiming voucher:', { voucherId, notificationId });
+      setClaimingId(notificationId);
 
-      // NEW: pre-check FE jika notifikasi sudah kadaluwarsa
+      // Pre-check dari payload notifikasi (mungkin stale)
       const notif = localItems.find((n) => n.id === notificationId);
       if (notif && isVoucherExpired(notif)) {
         setShowVoucherExpiredModal(true);
-        // Auto close + remove notif
         setTimeout(() => {
           setShowVoucherExpiredModal(false);
           setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
           setVersion((v) => v + 1);
         }, 3000);
         return;
+      }
+
+      // NEW: cek status voucher terbaru dari server
+      const live = await fetchVoucherDetail(voucherId);
+      if (live) {
+        const expiredLive =
+          isVoucherExpired(live) ||
+          live?.expired === true ||
+          live?.is_expired === true ||
+          String(live?.status || '').toLowerCase() === 'expired';
+        if (expiredLive) {
+          setShowVoucherExpiredModal(true);
+          setTimeout(() => {
+            setShowVoucherExpiredModal(false);
+            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+            setVersion((v) => v + 1);
+          }, 3000);
+          return;
+        }
+
+        // Optional: guard jika stok sudah habis
+        const stockLeft = Number(live?.stock ?? live?.remaining ?? live?.quota_remaining ?? NaN);
+        if (Number.isFinite(stockLeft) && stockLeft <= 0) {
+          setShowVoucherOutOfStockModal(true);
+          setTimeout(() => {
+            setShowVoucherOutOfStockModal(false);
+            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+            setVersion((v) => v + 1);
+          }, 3000);
+          return;
+        }
       }
 
       const res = await fetch(`${apiBase}/api/vouchers/${voucherId}/claim`, {
@@ -235,18 +329,20 @@ export default function NotificationPage() {
 
       const text = await res.text();
       console.log('Response status:', res.status, 'Response text:', text);
-      
       let json = {};
       try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
 
       if (!res.ok) {
         console.error('Claim failed:', { status: res.status, response: json });
+        const msg = String(json?.message || '').toLowerCase();
 
-        // NEW: tangani error voucher kadaluwarsa dari API
+        // NEW: treat 422/403 as expired too
         if (
-          String(json?.message || '').toLowerCase().includes('expired') ||
-          String(json?.message || '').toLowerCase().includes('kadaluwarsa') ||
-          String(json?.message || '').toLowerCase().includes('kadaluarsa')
+          res.status === 422 ||
+          res.status === 403 ||
+          msg.includes('expired') ||
+          msg.includes('kadaluwarsa') ||
+          msg.includes('kadaluarsa')
         ) {
           setShowVoucherExpiredModal(true);
           setTimeout(() => {
@@ -257,7 +353,6 @@ export default function NotificationPage() {
           return;
         }
 
-        // Existing: out of stock
         if (
           json?.message?.includes('out of stock') || 
           json?.message?.includes('stok habis') || 
@@ -272,26 +367,22 @@ export default function NotificationPage() {
           }, 3000);
           return;
         }
-        
-        // Handle specific SQL truncation error
-        if (json?.message?.includes('Data too long for column')) {
-          setModalMessage('Terjadi kesalahan sistem. Tim teknis sedang memperbaiki masalah ini.');
-        } else {
-          setModalMessage(json?.message || `HTTP ${res.status}: ${text || 'Server error'}`);
-        }
+
+        setModalMessage(json?.message || `HTTP ${res.status}: ${text || 'Server error'}`);
         setShowErrorModal(true);
         return;
       }
 
       setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
       setVersion((v) => v + 1);
-
       setModalMessage('Voucher berhasil diklaim! Cek di Saku.');
       setShowSuccessModal(true);
     } catch (e) {
       console.error('Network error:', e);
       setModalMessage('Gagal klaim: ' + (e?.message || 'Network error'));
       setShowErrorModal(true);
+    } finally {
+      setClaimingId(null);
     }
   }
 
@@ -419,8 +510,10 @@ export default function NotificationPage() {
                     const { img, title, isVoucher } = cardMeta(item);
                     const isUnread = !item.read_at;
 
-                    // NEW: status expired
+                    // NEW: gunakan status live yang lebih akurat
                     const expired = isVoucher && isVoucherExpired(item);
+                    const available = isVoucher ? isVoucherAvailable(item) : true;
+                    const outOfStock = isVoucher && item.live_out_of_stock === true;
 
                     return (
                       <div
@@ -437,12 +530,15 @@ export default function NotificationPage() {
                                   src={img}
                                   className="w-full h-full object-cover"
                                   alt={title}
-                                  onError={(e) => { e.currentTarget.src = '/icons/icon-192x192.png'; }}
+                                  onError={(e) => { 
+                                    // Gunakan base64 placeholder atau SVG inline untuk menghindari 404 berulang
+                                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNCAzQTIgMiAwIDAwMiA1VjE5QTIgMiAwIDAwNCAyMUgyMEEyIDIgMCAwMDIyIDE5VjVBMiAyIDAgMDAyMCAzSDRaTTIwIDE5SDRWNUgyMFYxOVoiIGZpbGw9IiM5Q0E0QjAiLz4KPHBhdGggZD0iTTggOUMxMC4yMDkxIDkgMTIgMTAuNzkwOSAxMiAxM0MxMiAxNS4yMDkxIDEwLjIwOTEgMTcgOCAxN0M1Ljc5MDg2IDE3IDQgMTUuMjA5MSA0IDEzQzQgMTAuNzkwOSA1Ljc5MDg2IDkgOCA9WiIgZmlsbD0iIzlDQTNCMCIvPgo8L3N2Zz4K';
+                                  }}
                                 />
                               ) : (
                                 <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                              </svg>
+                                </svg>
                               )}
                             </div>
                             {isUnread && (
@@ -453,7 +549,7 @@ export default function NotificationPage() {
                           <div className="flex-1 min-w-0">
                             <div className="mb-2">
                               <h3 className={`font-semibold ${isUnread ? 'text-gray-900' : 'text-gray-700'} line-clamp-2`}>
-                                {title}
+                                {item.live_voucher_name || title}
                               </h3>
                             </div>
 
@@ -466,23 +562,29 @@ export default function NotificationPage() {
                                 <DateFormatComponent date={item?.created_at} />
                               </p>
 
-                              {/* NEW: sembunyikan tombol klaim jika kadaluwarsa */}
-                              {isVoucher && item?.target_id && !expired && (
+                              {/* Kondisi tombol berdasarkan status live */}
+                              {isVoucher && item?.target_id && available && (
                                 <button
                                   type="button"
                                   onClick={() => claimVoucher(item.target_id, item.id)}
-                                  className="inline-flex items-center text-primary font-medium text-sm hover:text-primary-dark transition-colors"
+                                  disabled={claimingId === item.id}
+                                  className={`inline-flex items-center font-medium text-sm transition-colors ${
+                                    claimingId === item.id ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:text-primary-dark'
+                                  }`}
                                 >
-                                  Klaim voucher
+                                  {claimingId === item.id ? 'Memproses…' : 'Klaim voucher'}
                                   <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                   </svg>
                                 </button>
                               )}
 
-                              {isVoucher && expired && (
+                              {/* Status indicator berdasarkan kondisi live */}
+                              {isVoucher && !available && (
                                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-500">
-                                  Voucher kadaluwarsa
+                                  {expired ? 'Voucher kadaluwarsa' : 
+                                   outOfStock ? 'Voucher habis' : 
+                                   'Voucher tidak tersedia'}
                                 </span>
                               )}
                             </div>
