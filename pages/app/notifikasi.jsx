@@ -530,7 +530,10 @@ export default function NotificationPage() {
                                   src={img}
                                   className="w-full h-full object-cover"
                                   alt={title}
-                                  onError={(e) => { e.currentTarget.src = '/icons/icon-192x192.png'; }}
+                                  onError={(e) => { 
+                                    // Gunakan base64 placeholder atau SVG inline untuk menghindari 404 berulang
+                                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNCAzQTIgMiAwIDAwMiA1VjE5QTIgMiAwIDAwNCAyMUgyMEEyIDIgMCAwMDIyIDE5VjVBMiAyIDAgMDAyMCAzSDRaTTIwIDE5SDRWNUgyMFYxOVoiIGZpbGw9IiM5Q0E0QjAiLz4KPHBhdGggZD0iTTggOUMxMC4yMDkxIDkgMTIgMTAuNzkwOSAxMiAxM0MxMiAxNS4yMDkxIDEwLjIwOTEgMTcgOCAxN0M1Ljc5MDg2IDE3IDQgMTUuMjA5MSA0IDEzQzQgMTAuNzkwOSA1Ljc5MDg2IDkgOCA9WiIgZmlsbD0iIzlDQTNCMCIvPgo8L3N2Zz4K';
+                                  }}
                                 />
                               ) : (
                                 <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
