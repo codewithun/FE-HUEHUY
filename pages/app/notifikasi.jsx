@@ -32,10 +32,58 @@ export default function NotificationPage() {
   const [modalMessage, setModalMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState(null);
 
+  // NEW: modal expired
+  const [showVoucherExpiredModal, setShowVoucherExpiredModal] = useState(false);
+
   const authHeader = () => {
     const enc = Cookies.get(token_cookie_name);
     const token = enc ? Decrypt(enc) : '';
     return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  // helper tanggal kadaluwarsa (ambil dari berbagai kemungkinan field)
+  const parseExpiry = (raw) => {
+    if (!raw) return null;
+    const s = String(raw).trim();
+    // Jika format hanya YYYY-MM-DD, anggap akhir hari lokal
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(y, m - 1, d, 23, 59, 59, 999);
+    }
+    const t = new Date(s);
+    return Number.isFinite(t.getTime()) ? t : null;
+  };
+
+  const getVoucherEndDate = (n) => {
+    if (!n || typeof n !== 'object') return null;
+
+    // Safe parse meta jika string JSON
+    let meta = n?.meta;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch { meta = null; }
+    }
+
+    return (
+      n?.voucher_end_date ||
+      n?.valid_until ||
+      n?.end_date ||
+      n?.expired_at ||
+      n?.expires_at ||
+      n?.expiry_date ||
+      n?.voucher?.valid_until ||
+      n?.voucher?.end_date ||
+      meta?.valid_until ||           // baca dari meta
+      meta?.end_date ||              // baca dari meta
+      meta?.voucher?.valid_until ||  // nested di meta.voucher
+      meta?.voucher?.end_date ||     // nested di meta.voucher
+      null
+    );
+  };
+
+  const isVoucherExpired = (n) => {
+    const raw = getVoucherEndDate(n);
+    const dt = parseExpiry(raw);
+    return !!dt && dt.getTime() < Date.now();
   };
 
   // Reset data saat ganti tab
@@ -161,7 +209,20 @@ export default function NotificationPage() {
   async function claimVoucher(voucherId, notificationId) {
     try {
       console.log('Claiming voucher:', { voucherId, notificationId });
-      
+
+      // NEW: pre-check FE jika notifikasi sudah kadaluwarsa
+      const notif = localItems.find((n) => n.id === notificationId);
+      if (notif && isVoucherExpired(notif)) {
+        setShowVoucherExpiredModal(true);
+        // Auto close + remove notif
+        setTimeout(() => {
+          setShowVoucherExpiredModal(false);
+          setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+          setVersion((v) => v + 1);
+        }, 3000);
+        return;
+      }
+
       const res = await fetch(`${apiBase}/api/vouchers/${voucherId}/claim`, {
         method: 'POST',
         headers: {
@@ -180,15 +241,30 @@ export default function NotificationPage() {
 
       if (!res.ok) {
         console.error('Claim failed:', { status: res.status, response: json });
-        
-        // Handle specific voucher out of stock error
-        if (json?.message?.includes('out of stock') || 
-            json?.message?.includes('stok habis') || 
-            json?.message?.includes('voucher habis') || 
-            res.status === 410) {
+
+        // NEW: tangani error voucher kadaluwarsa dari API
+        if (
+          String(json?.message || '').toLowerCase().includes('expired') ||
+          String(json?.message || '').toLowerCase().includes('kadaluwarsa') ||
+          String(json?.message || '').toLowerCase().includes('kadaluarsa')
+        ) {
+          setShowVoucherExpiredModal(true);
+          setTimeout(() => {
+            setShowVoucherExpiredModal(false);
+            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+            setVersion((v) => v + 1);
+          }, 3000);
+          return;
+        }
+
+        // Existing: out of stock
+        if (
+          json?.message?.includes('out of stock') || 
+          json?.message?.includes('stok habis') || 
+          json?.message?.includes('voucher habis') || 
+          res.status === 410
+        ) {
           setShowVoucherOutOfStockModal(true);
-          
-          // Auto close after 3 seconds and remove notification
           setTimeout(() => {
             setShowVoucherOutOfStockModal(false);
             setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
@@ -343,6 +419,9 @@ export default function NotificationPage() {
                     const { img, title, isVoucher } = cardMeta(item);
                     const isUnread = !item.read_at;
 
+                    // NEW: status expired
+                    const expired = isVoucher && isVoucherExpired(item);
+
                     return (
                       <div
                         className={`bg-white rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
@@ -387,7 +466,8 @@ export default function NotificationPage() {
                                 <DateFormatComponent date={item?.created_at} />
                               </p>
 
-                              {isVoucher && item?.target_id && (
+                              {/* NEW: sembunyikan tombol klaim jika kadaluwarsa */}
+                              {isVoucher && item?.target_id && !expired && (
                                 <button
                                   type="button"
                                   onClick={() => claimVoucher(item.target_id, item.id)}
@@ -398,6 +478,12 @@ export default function NotificationPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                   </svg>
                                 </button>
+                              )}
+
+                              {isVoucher && expired && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-500">
+                                  Voucher kadaluwarsa
+                                </span>
                               )}
                             </div>
                           </div>
@@ -554,6 +640,26 @@ export default function NotificationPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Voucher Sudah Habis</h3>
                 <p className="text-gray-600 text-sm mb-4">Maaf, voucher ini sudah tidak tersedia lagi. Notifikasi akan dihapus otomatis.</p>
                 <div className="text-orange-600 text-xs font-medium">
+                  Popup akan tertutup otomatis dalam 3 detik
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NEW: modal voucher kadaluwarsa */}
+        {showVoucherExpiredModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 shadow-lg mx-4 max-w-sm w-full">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Voucher Kadaluwarsa</h3>
+                <p className="text-gray-600 text-sm mb-2">Maaf, voucher ini sudah tidak berlaku.</p>
+                <div className="text-gray-500 text-xs font-medium">
                   Popup akan tertutup otomatis dalam 3 detik
                 </div>
               </div>
