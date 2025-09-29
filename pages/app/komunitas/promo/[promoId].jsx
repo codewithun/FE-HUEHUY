@@ -824,9 +824,10 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       const apiUrl = rawApi.replace(/\/+$/, '');
 
       // Try primary endpoint first, then fallback
+      // In [promoId].jsx, replace the endpoints array with:
       const endpoints = [
-        `${apiUrl}/promos/${promoData.id}/items`,
-        `${apiUrl}/admin/promos/${promoData.id}/items`
+        `${apiUrl}/admin/promos/${promoData.id}/items`, // matches storeForPromo()
+        `${apiUrl}/admin/promo-items` // matches store() - add promo_id in payload
       ];
 
       const claimHeaders = {
