@@ -335,7 +335,8 @@ export default function KomunitasDashboard() {
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     (async () => {
       try {
-        const resP = await fetch(apiJoin("admin/promos"), {
+        // ✅ Add ?all=true to get all promos without pagination
+        const resP = await fetch(apiJoin("admin/promos?all=true"), {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
