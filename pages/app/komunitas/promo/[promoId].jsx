@@ -123,6 +123,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showDetailExpanded, setShowDetailExpanded] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
 
@@ -408,6 +409,8 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           originalPrice: data.original_price ?? null,
           discountPrice: data.discount_price ?? null,
           discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
+          // Tambah: detail promo dari backend
+          detail: data.detail || '',
           // Tambah: tanggal mulai & always_available
           start_date: data.start_date || data.start_at || data.starts_at || data.valid_from || null,
           always_available: Boolean(data.always_available),
@@ -1076,25 +1079,34 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
               <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
 
-              {/* Harga ringkas */}
-              <div className="flex items-center justify-between bg-slate-50 p-3 rounded-[12px] mb-3">
-                <div className="text-sm text-slate-600">Harga Promo</div>
-                <div className="text-right">
-                  {promoData.discountPrice != null && (
-                    <div className="text-lg font-bold text-primary">Rp {Number(promoData.discountPrice).toLocaleString()}</div>
-                  )}
-                  {promoData.originalPrice != null && (
-                    <div className="text-xs text-slate-500 line-through">
-                      Rp {Number(promoData.originalPrice).toLocaleString()}
+              <div className="text-left">
+                <button 
+                  onClick={() => setShowDetailExpanded(!showDetailExpanded)}
+                  className="bg-primary text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:bg-opacity-90 transition-all flex items-center"
+                >
+                  {showDetailExpanded ? 'Tutup Detail' : 'Selengkapnya'}
+                  <span className={`ml-2 transition-transform duration-300 ${showDetailExpanded ? 'rotate-180' : ''}`}>
+                    ▼
+                  </span>
+                </button>
+              </div>
+              
+              {/* Expandable Detail Section */}
+              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
+              }`}>
+                <div className="border-t border-slate-200 pt-4">
+                  {promoData?.detail && (
+                    <div className="mb-4">
+                      <h5 className="font-semibold text-slate-900 mb-2 text-sm">Detail Lengkap:</h5>
+                      <div className="bg-slate-50 p-3 rounded-[12px]">
+                        <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
+                          {promoData.detail}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="text-left">
-                <button className="bg-primary text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:bg-opacity-90 transition-all">
-                  Selengkapnya
-                </button>
               </div>
             </div>
           </div>
