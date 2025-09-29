@@ -837,7 +837,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       
       const payload = {
         promo_id: promoData.id,
-        status: 'reserved',
+        claim: true, // signal claim action; backend will set status and decrement stock transactionally
         expires_at: promoData.expires_at || null,
       };
 
