@@ -1,204 +1,56 @@
-import React, { useEffect, useRef, useState } from 'react';
+/* eslint-disable no-console */
+import { faBuilding, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { useEffect, useState } from 'react';
 import {
   ButtonComponent,
-  FloatingPageComponent,
-  FormSupervisionComponent,
   InputComponent,
-  ModalConfirmComponent,
-  TableSupervisionComponent,
+  TableSupervisionComponent
 } from '../../../components/base.components';
 import { CorporateLayout } from '../../../components/construct.components/layout/Corporate.layout';
 import UserDetailComponent from '../../../components/construct.components/partial-page/UserDetail.component';
 import { useUserContext } from '../../../context/user.context';
-// import { useAccessContext } from '../../../context';
-import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../../helpers';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
-export default function CManageUser({ token }) {
-  const [modalForm, setModalForm] = useState(false);
-  const [refresh, setRefresh] = useState(false);
-  const [confirmNew, setConfirmNew] = useState(false);
-  const [isNew, setIsNew] = useState(false);
-  const inputEmail = useRef(null);
+
+export default function CorporateManageUser() {
   const { profile: Profile } = useUserContext();
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
-      if (!Profile?.corporate_user?.corporate_id) {
-        Cookies.remove(token_cookie_name);
-        window.location.href = '/corporate';
-      }
-    }
+    if (!Profile) return;
+    const corpUser = Profile?.corporate_user;
+    const corpRoleId = Number(corpUser?.role_id ?? corpUser?.role?.id);
+    const isCorporateMember = !!corpUser;
+    const allow = isCorporateMember && [3, 4, 5].includes(corpRoleId);
+    setAccessDenied(!allow);
   }, [Profile]);
 
-  const role = Profile?.corporate_user?.role?.id;
+  if (accessDenied) {
+    return (
+      <div className="p-6">
+        <h1 className="text-lg font-semibold mb-2">Access denied</h1>
+        <p className="text-sm text-gray-600">Akun Anda tidak terdaftar sebagai anggota corporate.</p>
+      </div>
+    );
+  }
 
-  const formAddByEmail = [
-    {
-      type: 'custom',
-      custom: ({ values, setValues, errors }) => {
-        return (
-          <InputComponent
-            name="email"
-            label="email"
-            placeholder="Masukan email..."
-            validations={{ required: true, email: true }}
-            onChange={(e) => {
-              inputEmail.current = e;
-              setValues([
-                ...values.filter((i) => i.name != 'email'),
-                { name: 'email', value: e },
-              ]);
-            }}
-            value={
-              values.find((i) => i.name == 'email')?.value
-                ? values.find((i) => i.name == 'email')?.value
-                : ''
-            }
-            errors={errors.filter((i) => i.name == 'email')?.error}
-          />
-        );
-      },
-    },
-    {
-      type: 'select',
-      construction: {
-        // multiple: true,
-        name: 'role_id',
-        label: 'Role (Mitra)',
-        placeholder: 'Pilih role..',
-        validations: {
-          required: true,
-        },
-        serverOptionControl: {
-          path: 'corporate/options/role?isCorporate=true',
-        },
-      },
-    },
-  ];
+  // Handle corporate assignment
+  const handleAssignCorporate = (data) => {
+    console.log('Assign corporate to user:', data);
+    // Implementation would go here
+  };
 
-  const formAddNewUser = [
-    {
-      construction: {
-        name: 'name',
-        label: 'Nama',
-        placeholder: 'Masukkan Nama...',
-        validations: {
-          required: true,
-        },
-      },
-    },
-    {
-      type: 'custom',
-      custom: ({ values, setValues, errors }) => {
-        return (
-          <InputComponent
-            name="email"
-            label="email"
-            placeholder="Masukan email..."
-            validations={{ required: true, email: true }}
-            onChange={(e) => {
-              setValues([
-                ...values.filter((i) => i.name != 'email'),
-                { name: 'email', value: e },
-              ]);
-            }}
-            value={
-              values.find((i) => i.name == 'email')?.value
-                ? values.find((i) => i.name == 'email')?.value
-                : ''
-            }
-            errors={errors.filter((i) => i.name == 'email')?.error}
-          />
-        );
-      },
-    },
-    {
-      construction: {
-        name: 'phone',
-        label: 'No. Telepon (Opsional)',
-        placeholder: 'Tambahkan No Telepon...',
-        validations: {
-          required: true,
-          min: 10,
-        },
-      },
-    },
-    {
-      type: 'custom',
-      custom: ({ formControl }) => {
-        return (
-          <InputComponent
-            {...formControl('password')}
-            type="password"
-            name="password"
-            label="password"
-            placeholder="Masukan password..."
-            validations={{ required: true, min: 8 }}
-          />
-        );
-      },
-    },
-    {
-      type: 'custom',
-      custom: ({ formControl }) => {
-        return (
-          <InputComponent
-            {...formControl('password_confirmation')}
-            type="password"
-            name="password_confirmation"
-            label="password"
-            placeholder="Masukan ulang password..."
-            validations={{ required: true, min: 8 }}
-          />
-        );
-      },
-    },
-    {
-      type: 'select',
-      construction: {
-        // multiple: true,
-        name: 'role_id',
-        label: 'Role',
-        placeholder: 'Pilih role..',
-        serverOptionControl: {
-          path: 'corporate/options/role?isCorporate=true',
-          bearer: token || null,
-        },
-      },
-    },
-    {
-      type: 'image',
-      col: 3,
-      construction: {
-        name: 'image',
-        label: 'Foto Profil',
-      },
-    },
-  ];
+  // Handle corporate removal
+  const handleRemoveCorporate = (data) => {
+    console.log('Remove corporate from user:', data);
+    // Implementation would go here
+  };
 
   return (
     <>
       <TableSupervisionComponent
-        title={`Admin`}
+        title="Tim Mitra"
         fetchControl={{
-          path: `corporate/users`,
-          bearer: token || null,
+          path: 'corporate/users',
         }}
-        // updateEndpoint="/update-role"
-        setToRefresh={refresh}
-        customTopBar={
-          <>
-            <div className="flex justify-between items-center">
-              <ButtonComponent
-                label="Tambah Baru"
-                icon={faPlus}
-                size="sm"
-                onClick={() => setModalForm(true)}
-              />
-            </div>
-          </>
-        }
         columnControl={{
           custom: [
             {
@@ -206,16 +58,7 @@ export default function CManageUser({ token }) {
               label: 'Nama',
               sortable: true,
               width: '250px',
-              item: ({ name }) => {
-                return (
-                  <>
-                    {name}
-                    {/* <p className={!user ? 'text-danger font-bold' : ''}>
-                      {user ? user?.name : 'User telah dihapus!'}
-                    </p> */}
-                  </>
-                );
-              },
+              item: ({ name }) => name,
             },
             {
               selector: 'email',
@@ -226,34 +69,187 @@ export default function CManageUser({ token }) {
             },
             {
               selector: 'role',
-              label: 'Role',
-              sortable: true,
-              width: '200px',
-              item: ({ corporate_user }) => corporate_user?.role?.name,
+              label: 'Role Global', // ✅ Hanya menampilkan role sistem
+              width: '180px',
+              item: ({ role }) => role?.name,
+            },
+            {
+              selector: 'corporate_user', 
+              label: 'Corporate Assignment', // ✅ Info corporate terpisah
+              width: '250px',
+              item: ({ corporate_user }) => 
+                corporate_user 
+                  ? `${corporate_user.corporate_name} (${corporate_user.corporate_role_name})` 
+                  : '- Tidak di Corporate -',
+            },
+          ],
+        }}
+        formControl={{
+          contentType: 'multipart/form-data',
+          custom: [
+            {
+              construction: {
+                name: 'name',
+                label: 'Nama',
+                placeholder: 'Masukkan Nama...',
+                validations: {
+                  required: true,
+                },
+              },
+            },
+            {
+              construction: {
+                name: 'email',
+                label: 'Email',
+                placeholder: 'Masukkan email...',
+                validations: {
+                  required: true,
+                  email: true,
+                },
+              },
+            },
+            {
+              construction: {
+                name: 'phone',
+                label: 'No. Telepon (Opsional)',
+                placeholder: 'Tambahkan No Telepon...',
+                validations: {
+                  required: false,
+                  min: 10,
+                },
+              },
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                return (
+                  <InputComponent
+                    {...formControl('password')}
+                    type="password"
+                    name="password"
+                    label="password"
+                    placeholder="Masukan password..."
+                    validations={{ required: true, min: 8 }}
+                  />
+                );
+              },
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                return (
+                  <InputComponent
+                    {...formControl('password_confirmation')}
+                    type="password"
+                    name="password_confirmation"
+                    label="password confirmation"
+                    placeholder="Masukan ulang password..."
+                    validations={{ required: true, min: 8 }}
+                  />
+                );
+              },
+            },
+            // ✅ HANYA corporate_role_id untuk Corporate form
+            {
+              type: 'select', 
+              construction: {
+                name: 'corporate_role_id', // ✅ BENAR! Hanya role corporate
+                label: 'Role di Corporate',
+                placeholder: 'Pilih role corporate..',
+                serverOptionControl: {
+                  path: 'corporate/options/role?isCorporate=1', // ✅ BENAR endpoint corporate
+                },
+                validations: { required: true }
+              },
+            },
+            {
+              type: 'image',
+              col: 3,
+              construction: {
+                name: 'image',
+                label: 'Foto Profil',
+              },
             },
           ],
         }}
         formUpdateControl={{
           customDefaultValue: (data) => {
             return {
-              role_id: data?.corporate_user?.role?.id,
+              name: data?.name,
+              email: data?.email,
+              phone: data?.phone,
+              // ❌ JANGAN include role_id dan corporate_role_id di update form
+              image: data?.picture_source,
             };
           },
+          contentType: 'multipart/form-data',
           custom: [
             {
-              type: 'select',
               construction: {
-                // multiple: true,
-                name: 'role_id',
-                label: 'Role (Mitra)',
-                placeholder: 'Pilih role..',
+                name: 'name',
+                label: 'Nama',
+                placeholder: 'Masukkan Nama...',
                 validations: {
                   required: true,
                 },
-                serverOptionControl: {
-                  path: 'corporate/options/role?isCorporate=true',
-                  bearer: token || null,
+              },
+            },
+            {
+              construction: {
+                name: 'email',
+                label: 'Email',
+                placeholder: 'Masukkan email...',
+                validations: {
+                  required: true,
+                  email: true,
                 },
+              },
+            },
+            {
+              construction: {
+                name: 'phone',
+                label: 'No. Telepon (Opsional)',
+                placeholder: 'Tambahkan No Telepon...',
+                validations: {
+                  required: false,
+                  min: 10,
+                },
+              },
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                return (
+                  <InputComponent
+                    {...formControl('password')}
+                    type="password"
+                    name="password"
+                    label="password"
+                    placeholder="Masukan password..."
+                  />
+                );
+              },
+            },
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                return (
+                  <InputComponent
+                    {...formControl('password_confirmation')}
+                    type="password"
+                    name="password_confirmation"
+                    label="password"
+                    placeholder="Masukan ulang password..."
+                  />
+                );
+              },
+            },
+            {
+              type: 'image',
+              col: 3,
+              construction: {
+                name: 'image',
+                label: 'Foto Profil',
               },
             },
           ],
@@ -262,57 +258,51 @@ export default function CManageUser({ token }) {
           return <UserDetailComponent data={data} />;
         }}
         actionControl={{
-          except: role == 5 ? ['detail', 'edit', 'delete'] : null,
-          //
+          include: (data) => {
+            return (
+              <>
+                {/* Existing Beri Kubus button */}
+                {/* <ButtonComponent
+                  icon={faHandHoldingHand}
+                  label={'Beri Kubus'}
+                  variant="outline"
+                  paint="secondary"
+                  size={'xs'}
+                  rounded
+                  onClick={() => handleGiveCube(data)}
+                /> */}
+                
+                {/* New Corporate Management */}
+                {!data.corporate_user ? (
+                  <ButtonComponent
+                    icon={faBuilding}
+                    label={'Assign Corporate'}
+                    variant="outline"
+                    paint="primary"
+                    size={'xs'}
+                    rounded
+                    onClick={() => handleAssignCorporate(data)}
+                  />
+                ) : (
+                  <ButtonComponent
+                    icon={faTrash}
+                    label={'Remove Corporate'}
+                    variant="outline"
+                    paint="danger"
+                    size={'xs'}
+                    rounded
+                    onClick={() => handleRemoveCorporate(data)}
+                  />
+                )}
+              </>
+            );
+          },
         }}
       />
-
-      <FloatingPageComponent
-        show={modalForm}
-        title={isNew ? 'Daftarkan User Baru' : `Tambah User`}
-        onClose={() => {
-          setModalForm(false);
-          setIsNew(false);
-          // setRefresh(!refresh);
-          inputEmail.current = null;
-        }}
-      >
-        <ModalConfirmComponent
-          show={confirmNew}
-          title="Email belum terdaftar, Daftarkan user baru?"
-          onClose={() => {
-            setConfirmNew(false);
-          }}
-          onSubmit={() => {
-            setIsNew(true);
-            setConfirmNew(false);
-          }}
-        />
-
-        <div className="px-6 pt-4 pb-20 h-full overflow-scroll scroll_control">
-          <FormSupervisionComponent
-            forms={isNew ? formAddNewUser : formAddByEmail}
-            defaultValue={isNew && { email: inputEmail.current }}
-            submitControl={{
-              path: isNew ? `corporate/users-new` : `corporate/users`,
-              contentType: !isNew ? 'application/json' : 'multipart/form-data',
-              bearer: token || null,
-            }}
-            onError={() => {
-              !isNew && setConfirmNew(true);
-            }}
-            onSuccess={() => {
-              setModalForm(false);
-              setRefresh(!refresh);
-              inputEmail.current = null;
-            }}
-          />
-        </div>
-      </FloatingPageComponent>
     </>
   );
 }
 
-CManageUser.getLayout = function getLayout(page) {
+CorporateManageUser.getLayout = function getLayout(page) {
   return <CorporateLayout>{page}</CorporateLayout>;
 };

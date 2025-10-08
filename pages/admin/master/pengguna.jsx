@@ -1,6 +1,6 @@
 import { faHandHoldingHand } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ButtonComponent,
   InputComponent,
@@ -11,9 +11,8 @@ import GiveCubeModal from '../../../components/construct.components/modal/GiveCu
 import UserDetailComponent from '../../../components/construct.components/partial-page/UserDetail.component';
 import { useUserContext } from '../../../context/user.context';
 import { token_cookie_name } from '../../../helpers';
-// import { useAccessContext } from '../../../context';
+
 export default function ManageUser() {
-  // const { accessActive, loading } = useAccessContext();
   const [selected, setSelected] = useState(null);
   const [modalGive, setModalGive] = useState(false);
   const { profile: Profile } = useUserContext();
@@ -52,7 +51,7 @@ export default function ManageUser() {
             },
             {
               selector: 'role',
-              label: 'Role',
+              label: 'Role (Global)',
               sortable: true,
               width: '200px',
               item: ({ role }) => role?.name,
@@ -127,12 +126,11 @@ export default function ManageUser() {
             {
               type: 'select',
               construction: {
-                // multiple: true,
                 name: 'role_id',
-                label: 'Role',
-                placeholder: 'Pilih role..',
+                label: 'Role Global',
+                placeholder: 'Pilih role global..',
                 serverOptionControl: {
-                  path: 'admin/options/role?isCorporate=',
+                  path: 'admin/options/role?isCorporate=0',
                 },
               },
             },
@@ -200,7 +198,6 @@ export default function ManageUser() {
                     name="password"
                     label="password"
                     placeholder="Masukan password..."
-                    // validations={{ required: true, min: 8 }}
                   />
                 );
               },
@@ -215,7 +212,6 @@ export default function ManageUser() {
                     name="password_confirmation"
                     label="password"
                     placeholder="Masukan ulang password..."
-                    // validations={{ required: true, min: 8 }}
                   />
                 );
               },
@@ -223,12 +219,11 @@ export default function ManageUser() {
             {
               type: 'select',
               construction: {
-                // multiple: true,
                 name: 'role_id',
-                label: 'Role',
-                placeholder: 'Pilih role..',
+                label: 'Role Global',
+                placeholder: 'Pilih role global..',
                 serverOptionControl: {
-                  path: 'admin/options/role?isCorporate=',
+                  path: 'admin/options/role?isCorporate=0',
                 },
               },
             },
