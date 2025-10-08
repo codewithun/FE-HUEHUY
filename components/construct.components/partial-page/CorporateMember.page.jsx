@@ -48,7 +48,7 @@ const CorporateMemberPage = ({ data }) => {
       type: 'select',
       construction: {
         // multiple: true,
-        name: 'role_id',
+        name: 'corporate_role_id', // ✅ BENAR! Hanya role corporate
         label: 'Role (Mitra)',
         placeholder: 'Pilih role..',
         validations: {
@@ -142,7 +142,7 @@ const CorporateMemberPage = ({ data }) => {
       type: 'select',
       construction: {
         // multiple: true,
-        name: 'role_id',
+        name: 'corporate_role_id', // ✅ BENAR! Hanya role corporate
         label: 'Role',
         placeholder: 'Pilih role..',
         serverOptionControl: {
@@ -217,7 +217,7 @@ const CorporateMemberPage = ({ data }) => {
         formUpdateControl={{
           customDefaultValue: (data) => {
             return {
-              role_id: data?.role?.id,
+              corporate_role_id: data?.role?.id, // ✅ BENAR! Hanya role corporate
             };
           },
           custom: [
@@ -225,7 +225,7 @@ const CorporateMemberPage = ({ data }) => {
               type: 'select',
               construction: {
                 // multiple: true,
-                name: 'role_id',
+                name: 'corporate_role_id', // ✅ BENAR! Hanya role corporate
                 label: 'Role (Mitra)',
                 placeholder: 'Pilih role..',
                 validations: {
