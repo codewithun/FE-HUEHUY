@@ -19,16 +19,33 @@ export default function Login() {
   const router = useRouter();
   const [loadingScreen, setLoadingScreen] = useState(true);
 
-  const onSuccess = (data) => {
+  const onSuccess = async (data) => {
     Cookies.set(
       token_cookie_name,
       Encrypt(data.data?.token),
       { expires: 365 },
       { secure: true }
     );
-
-    if (data?.data?.role?.id == 3 || 4) {
-      window.location.href = 'corporate/dashboard/';
+    // Prefer scope-based redirect from login response
+    if (data?.data?.scope === 'corporate') {
+      router.push('/corporate/dashboard');
+      return;
+    }
+    // Fallback: verify account and check corporate membership
+    try {
+      const res = await get({ path: 'auth/account' });
+      const acct = res?.data?.data;
+      const isCorporateMember = !!acct?.corporate_user;
+      const corporateRoleId =
+        acct?.corporate_user?.role_id ?? acct?.corporate_user?.role?.id;
+      const allow =
+        (isCorporateMember && [3, 4, 5].includes(Number(corporateRoleId))) ||
+        acct?.corporate_user?.role?.is_corporate === 1;
+      if (allow) {
+        router.push('/corporate/dashboard');
+      }
+    } catch (e) {
+      // ignore and stay on page
     }
   };
 
@@ -41,11 +58,37 @@ export default function Login() {
   );
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name)) {
-      router.push('/corporate/dashboard');
-    } else {
+    // Ensure scope is always set for this form
+    setValues((vs) => [
+      ...vs.filter((i) => i.name !== 'scope'),
+      { name: 'scope', value: 'corporate' },
+    ]);
+
+    // Avoid blind redirect; verify corporate membership first
+    const token = Cookies.get(token_cookie_name);
+    if (!token) {
       setLoadingScreen(false);
+      return;
     }
+    (async () => {
+      try {
+        const res = await get({ path: 'auth/account' });
+        const acct = res?.data?.data;
+        const isCorporateMember = !!acct?.corporate_user;
+        const corporateRoleId =
+          acct?.corporate_user?.role_id ?? acct?.corporate_user?.role?.id;
+        const allow =
+          (isCorporateMember && [3, 4, 5].includes(Number(corporateRoleId))) ||
+          acct?.corporate_user?.role?.is_corporate === 1;
+        if (allow) {
+          router.replace('/corporate/dashboard');
+        } else {
+          setLoadingScreen(false);
+        }
+      } catch (err) {
+        setLoadingScreen(false);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

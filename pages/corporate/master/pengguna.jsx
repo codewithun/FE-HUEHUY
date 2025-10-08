@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 import { faBuilding, faTrash } from '@fortawesome/free-solid-svg-icons';
-import Cookies from 'js-cookie';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ButtonComponent,
   InputComponent,
@@ -10,20 +9,28 @@ import {
 import { CorporateLayout } from '../../../components/construct.components/layout/Corporate.layout';
 import UserDetailComponent from '../../../components/construct.components/partial-page/UserDetail.component';
 import { useUserContext } from '../../../context/user.context';
-import { token_cookie_name } from '../../../helpers';
 
 export default function CorporateManageUser() {
   const { profile: Profile } = useUserContext();
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
-      const isCorporateRole = [3, 4, 5].includes(Profile?.role_id);
-      if (!isCorporateRole) {
-        Cookies.remove(token_cookie_name);
-        window.location.href = '/corporate';
-      }
-    }
+    if (!Profile) return;
+    const corpUser = Profile?.corporate_user;
+    const corpRoleId = Number(corpUser?.role_id ?? corpUser?.role?.id);
+    const isCorporateMember = !!corpUser;
+    const allow = isCorporateMember && [3, 4, 5].includes(corpRoleId);
+    setAccessDenied(!allow);
   }, [Profile]);
+
+  if (accessDenied) {
+    return (
+      <div className="p-6">
+        <h1 className="text-lg font-semibold mb-2">Access denied</h1>
+        <p className="text-sm text-gray-600">Akun Anda tidak terdaftar sebagai anggota corporate.</p>
+      </div>
+    );
+  }
 
   // Handle corporate assignment
   const handleAssignCorporate = (data) => {
