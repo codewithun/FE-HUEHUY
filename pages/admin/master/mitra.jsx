@@ -1,27 +1,21 @@
 import {
-    faCubes,
-    faHandHoldingHand,
-    faUsers,
+  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    ButtonComponent,
-    FloatingPageComponent,
-    TableSupervisionComponent,
+  ButtonComponent,
+  FloatingPageComponent,
+  TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
-import GiveCubeModal from '../../../components/construct.components/modal/GiveCube.modal';
 import CorporateMemberPage from '../../../components/construct.components/partial-page/CorporateMember.page';
-import ManageCubePage from '../../../components/construct.components/partial-page/ManageCube.page';
 // import { useAccessContext } from '../../../context';
 
 export default function ManageCorporate() {
   // const { accessActive, loading } = useAccessContext();
   const [selected, setSelected] = useState(null);
   const [modalMember, setModalMember] = useState(false);
-  const [modalCube, setModalCube] = useState(false);
   const [refresh, setRefresh] = useState(false);
-  const [modalGive, setModalGive] = useState(false);
 
   return (
     <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
@@ -131,30 +125,6 @@ export default function ManageCorporate() {
                     setModalMember(true);
                   }}
                 />
-                <ButtonComponent
-                  icon={faCubes}
-                  label={'Kubus'}
-                  variant="outline"
-                  paint="secondary"
-                  size={'sm'}
-                  rounded
-                  onClick={() => {
-                    setSelected(data);
-                    setModalCube(true);
-                  }}
-                />
-                <ButtonComponent
-                  icon={faHandHoldingHand}
-                  label={'Beri Kubus'}
-                  variant="outline"
-                  paint="secondary"
-                  size={'xs'}
-                  rounded
-                  onClick={() => {
-                    setModalGive(true);
-                    setSelected(data);
-                  }}
-                />
               </>
             );
           },
@@ -175,29 +145,6 @@ export default function ManageCorporate() {
           <CorporateMemberPage panel={'admin'} data={selected} />
         </div>
       </FloatingPageComponent>
-
-      <FloatingPageComponent
-        show={modalCube}
-        onClose={() => {
-          setModalCube(false);
-          setSelected(false);
-          setRefresh(!refresh);
-        }}
-        size="xl"
-        className="bg-background"
-      >
-        <div className="px-8">
-          <ManageCubePage scope={{ corporate_id: selected?.id }} />
-        </div>
-      </FloatingPageComponent>
-      <GiveCubeModal
-        data={selected}
-        panel={'admin'}
-        show={modalGive}
-        setShow={setModalGive}
-        scope={{ corporate_id: selected?.id }}
-        giftToCorp={true}
-      />
     </div>
   );
 }

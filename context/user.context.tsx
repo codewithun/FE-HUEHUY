@@ -9,6 +9,7 @@ interface UserContextInterface {
   loading: boolean;
   error: string | null;
   fetchProfile: () => Promise<void>;
+  forceRefreshProfile: () => Promise<void>;
 }
 
 export const UserContext = React.createContext<UserContextInterface>(
@@ -72,13 +73,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [apiUrl]);
 
+  const forceRefreshProfile = React.useCallback(async () => {
+    // Clear any cached data and force a fresh fetch
+    setProfile(null);
+    await fetchProfile();
+  }, [fetchProfile]);
+
   const value = React.useMemo(() => ({ 
     profile, 
     setProfile, 
     loading, 
     error, 
-    fetchProfile 
-  }), [profile, loading, error, fetchProfile]);
+    fetchProfile,
+    forceRefreshProfile
+  }), [profile, loading, error, fetchProfile, forceRefreshProfile]);
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
