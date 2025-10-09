@@ -2,15 +2,14 @@
 import { faPlus, faUsers } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
-import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+// import { useRouter } from "next/router";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   ButtonComponent,
   FloatingPageComponent,
   TableSupervisionComponent,
 } from "../../../../components/base.components";
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
-import MultiSelectDropdown from "../../../../components/form/MultiSelectDropdown";
 import InputHexColor from "../../../../components/construct.components/input/InputHexColor";
 import { token_cookie_name } from "../../../../helpers";
 import { Decrypt } from "../../../../helpers/encryption.helpers";
@@ -46,8 +45,7 @@ export default function KomunitasDashboard() {
   const [corporateOptions, setCorporateOptions] = useState([]);
   const [corporateLoading, setCorporateLoading] = useState(false);
 
-  /** CATEGORIES modal state */
-  const [modalCategory, setModalCategory] = useState(false);
+  // Aktif komunitas yang dipilih (untuk modal anggota)
   const [activeCommunity, setActiveCommunity] = useState(null);
 
   /** MEMBERS modal state */
@@ -55,16 +53,12 @@ export default function KomunitasDashboard() {
   const [memberList, setMemberList] = useState([]);
   const [memberLoading, setMemberLoading] = useState(false);
   const [memberError, setMemberError] = useState("");
+  // Simpan AbortController & timer agar bisa dibatalkan saat modal ditutup
+  const memberReqRef = useRef({ ac: null, timer: null });
 
-  /** Promo dropdown (opsional lampirkan saat create kategori) */
-  const [existingPromoList, setExistingPromoList] = useState([]);
-  const [promoLoading, setPromoLoading] = useState(false);
+  // const router = useRouter();
 
-  const router = useRouter();
-  const goPromoHome = () => {
-    const q = activeCommunity?.id ? `?communityId=${activeCommunity.id}` : "";
-    router.push(`/admin/promos${q}`);
-  };
+  // Debug logs removed - member modal now working with manual table
 
   /** ============ FETCH ADMIN CONTACTS removed in new design ============ */
 
@@ -96,7 +90,7 @@ export default function KomunitasDashboard() {
   const authHeaders = (method = "GET") => {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    const base = { Authorization: `Bearer ${token}` };
+    const base = { Authorization: `Bearer ${token}`, Accept: "application/json" };
     // Hanya kirim Content-Type untuk method yang punya body JSON
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
       return { ...base, "Content-Type": "application/json" };
@@ -110,79 +104,78 @@ export default function KomunitasDashboard() {
     return { Authorization: `Bearer ${token}` };
   };
 
-  /** Prefetch daftar promo ketika modal kategori dibuka */
-  useEffect(() => {
-    if (!modalCategory) return;
-
-    let ignore = false;
-    (async () => {
-      try {
-        setPromoLoading(true);
-        const url = apiJoin("admin/promos?all=true");
-        const resP = await fetch(url, { headers: authHeaders("GET") });
-
-        if (!resP.ok) {
-          const body = await resP.text().catch(() => "");
-          console.error("Fetch promos failed", { url, status: resP.status, statusText: resP.statusText, body });
-          if (!ignore) setExistingPromoList([]);
-          return;
-        }
-
-        const jsonP = await resP.json().catch(() => ({}));
-        // normalisasi ke bentuk { value, label } yang dibutuhkan MultiSelectDropdown
-        const promosRaw = Array.isArray(jsonP.data) ? jsonP.data : Array.isArray(jsonP) ? jsonP : [];
-        const promoOptions = promosRaw.map((p) => ({
-          value: String(p.id ?? p.value ?? ""),
-          label:
-            (p.title && String(p.title)) ||
-            (p.name && String(p.name)) ||
-            (p.code && String(p.code)) ||
-            (p.description && String(p.description).slice(0, 60)) ||
-            `Promo #${p.id ?? ''}`,
-          _raw: p,
-        }));
-        if (!ignore) {
-          setExistingPromoList(promoOptions);
-          console.log("Loaded promo options:", promoOptions.length, promoOptions.slice(0,3));
-        }
-      } catch (e) {
-        console.error("Error fetching promos", e);
-        if (!ignore) setExistingPromoList([]);
-      } finally {
-        if (!ignore) setPromoLoading(false);
-      }
-    })();
-
-    return () => {
-      ignore = true;
-    };
-  }, [modalCategory]);
+  // Kategori modal dan prefetch promo dihapus; tidak dibutuhkan lagi.
 
   /** ============ MEMBERS MODAL ACTIONS ============ */
+  const tryFetch = async (url, signal) =>
+    fetch(url, { method: "GET", headers: authHeaders("GET"), signal });
+
   const openMemberModal = async (communityRow) => {
+    // cegah double request untuk komunitas yang sama saat masih loading
+    if (memberLoading && activeCommunity?.id === communityRow.id) return;
+
+    // batalkan request sebelumnya jika ada
+    if (memberReqRef.current.ac) {
+      try { memberReqRef.current.ac.abort(); } catch {}
+      if (memberReqRef.current.timer) clearTimeout(memberReqRef.current.timer);
+      memberReqRef.current = { ac: null, timer: null };
+    }
+
     setActiveCommunity(communityRow);
     setModalMember(true);
     setMemberLoading(true);
     setMemberError("");
     setMemberList([]);
 
-    // Ganti tryFetch agar GET tidak kirim Content-Type
-    const tryFetch = async (url) =>
-      fetch(url, { method: "GET", headers: authHeaders("GET") });
+    const ac = new AbortController();
+    const timer = setTimeout(() => {
+      // abort hanya jika ini masih request aktif
+      if (memberReqRef.current.ac === ac) ac.abort();
+    }, 10000); // 10s timeout
+    memberReqRef.current = { ac, timer };
 
     try {
-      let res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/members`));
+      let res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/members`), ac.signal);
       if (res.status === 404) {
-        res = await tryFetch(apiJoin(`communities/${communityRow.id}/members`));
+        res = await tryFetch(apiJoin(`communities/${communityRow.id}/members`), ac.signal);
+      }
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status}: ${txt}`);
       }
       const json = await res.json().catch(() => ({}));
-      const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      console.log('[Members Debug] Raw response:', json);
+      
+      // Robust extract: handle arrays or nested structures (data, members, users, pagination)
+      let rows = [];
+      const d = json?.data ?? json;
+      if (Array.isArray(d)) rows = d;
+      else if (Array.isArray(d?.data)) rows = d.data;
+      else if (Array.isArray(d?.members)) rows = d.members;
+      else if (Array.isArray(d?.users)) rows = d.users;
+      else if (Array.isArray(json?.members)) rows = json.members;
+      else if (Array.isArray(json?.users)) rows = json.users;
+      else if (d?.data && Array.isArray(d.data?.data)) rows = d.data.data; // laravel paginated {data:{data:[]}}
+      // Optional normalization: ensure objects have id
+      rows = Array.isArray(rows) ? rows : [];
+      
+      console.log('[Members Debug] Extracted rows:', rows);
+      console.log('[Members Debug] Setting memberList with', rows.length, 'items');
       setMemberList(rows);
     } catch (err) {
-      console.error("Gagal memuat anggota:", err);
-      setMemberError("Tidak bisa memuat daftar anggota");
+      if (ac.signal.aborted || err?.name === "AbortError") {
+        setMemberError("Permintaan timeout (10s). Coba lagi.");
+      } else {
+        console.error("Gagal memuat anggota:", err);
+        setMemberError("Tidak bisa memuat daftar anggota");
+      }
     } finally {
-      setMemberLoading(false);
+      // bersihkan hanya jika ini masih request aktif
+      if (memberReqRef.current.ac === ac) {
+        clearTimeout(timer);
+        memberReqRef.current = { ac: null, timer: null };
+        setMemberLoading(false);
+      }
     }
   };
 
@@ -330,7 +323,10 @@ export default function KomunitasDashboard() {
                 paint="secondary"
                 variant="solid"
                 rounded
-                onClick={() => openMemberModal(row)}
+                disabled={memberLoading}                 // cegah spam click
+                onClick={() => {
+                  if (!memberLoading) openMemberModal(row); // guard race
+                }}
               />
             </div>
           ),
@@ -511,194 +507,19 @@ export default function KomunitasDashboard() {
         }}
       />
 
-      {/* CATEGORIES MODAL */}
-      <FloatingPageComponent
-        show={modalCategory}
-        onClose={() => {
-          setModalCategory(false);
-          setActiveCommunity(null);
-        }}
-        title={`Kategori Komunitas: ${activeCommunity?.name || "-"}`}
-        size="lg"
-      >
-        {activeCommunity && (
-          <div className="p-4">
-            {/* Segmented: Beranda (aktif) & Beranda Promo */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="inline-flex items-center bg-white p-1 rounded-full border border-purple-300">
-                <button
-                  type="button"
-                  className="px-4 py-1.5 text-sm font-medium rounded-full
-                             bg-purple-700 text-white ring-1 ring-purple-700/20
-                             hover:bg-purple-800 transition"
-                >
-                  Beranda
-                </button>
-                <button
-                  type="button"
-                  onClick={goPromoHome}
-                  className="px-4 py-1.5 text-sm font-medium rounded-full
-                             text-purple-700 hover:bg-purple-50 transition"
-                >
-                  Beranda Promo
-                </button>
-              </div>
-            </div>
-
-            <TableSupervisionComponent
-              title="Daftar Kategori"
-              data={[]}
-              columnControl={{
-                custom: [
-                  { selector: "title", label: "Judul", sortable: true, item: ({ title }) => title || "-" },
-                  { selector: "description", label: "Deskripsi", item: ({ description }) => description || "-" },
-                  {
-                    selector: "promos_count",
-                    label: "Jumlah Promo",
-                    width: "140px",
-                    item: (row) => {
-                      const count = Array.isArray(row?.promos)
-                        ? row.promos.length
-                        : Array.isArray(row?.items)
-                        ? row.items.filter((i) => (i.type || i.item_type) === "promo").length
-                        : row?.promos_count || 0;
-                      return <span className="font-semibold">{count}</span>;
-                    },
-                  },
-                ],
-              }}
-              searchable
-              noControlBar={false}
-              fetchControl={{
-                path: `communities/${activeCommunity.id}/categories`,
-                method: "GET",
-                headers: () => authHeaders("GET"),
-                mapData: (result) => {
-                  const cats = Array.isArray(result) ? result : result?.data || [];
-                  return { data: cats, totalRow: cats.length };
-                },
-              }}
-              actionControl={{ except: ["detail"] }}
-              tableKey={`categories-${activeCommunity.id}-${existingPromoList.length}`}
-              formControl={{
-                /** Tambah Kategori + (opsional) lampirkan promo ke kategori yang baru dibuat */
-                custom: [
-                  {
-                    construction: {
-                      name: "title",
-                      label: "Judul Kategori",
-                      placeholder: "cth. Diskon Makanan",
-                      validations: { required: true },
-                    },
-                  },
-                  {
-                    type: "textarea",
-                    construction: {
-                      name: "description",
-                      label: "Deskripsi",
-                      rows: 3,
-                    },
-                  },
-                  {
-  type: "component",
-  construction: {
-    name: "_attach_promo_ids",
-    label: "Lampirkan Promo (opsional)",
-    render: ({ value, onChange }) => {
-      // Normalisasi value ke array of string
-      const normalizedValue = Array.isArray(value) ? value.map(String) : [];
-      console.log('Render attach promo field', {
-        value,
-        normalizedValue,
-        options: existingPromoList,
-      });
-      return promoLoading ? (
-        <div className="text-sm text-gray-500">Memuat daftar promo…</div>
-      ) : (
-        <MultiSelectDropdown
-          key={`promo-${activeCommunity?.id}-${existingPromoList.length}`}
-          options={existingPromoList}
-          value={normalizedValue}
-          onChange={onChange}
-          placeholder={
-            existingPromoList.length === 0
-              ? "Belum ada promo tersedia"
-              : "Pilih promo yang ingin dilampirkan..."
-          }
-          maxHeight={260}
-        />
-      );
-    },
-  },
-}
-
-                ],
-                submit: async ({ payload, isUpdate, row }) => {
-                  if (isUpdate) {
-                    // Update kategori
-                    const urlU = apiJoin(`communities/${activeCommunity.id}/categories/${row.id}`);
-                    await fetch(urlU, {
-                      method: "PUT",
-                      headers: authHeaders("PUT"),
-                      body: JSON.stringify({
-                        title: payload.title,
-                        description: payload.description || "",
-                      }),
-                    });
-                    return true;
-                  }
-
-                  // Create kategori
-                  const urlC = apiJoin(`communities/${activeCommunity.id}/categories`);
-                  const res = await fetch(urlC, {
-                    method: "POST",
-                    headers: authHeaders("POST"),
-                    body: JSON.stringify({
-                      title: payload.title,
-                      description: payload.description || "",
-                    }),
-                  });
-                  const json = await res.json().catch(() => ({}));
-
-                  // Ambil ID kategori baru dari berbagai kemungkinan bentuk response
-                  const createdId =
-                    json?.id ||
-                    json?.data?.id ||
-                    json?.category?.id ||
-                    json?.result?.id;
-
-                  // Jika user pilih promo, lampirkan semua promo yang dipilih
-                  if (createdId && Array.isArray(payload._attach_promo_ids) && payload._attach_promo_ids.length > 0) {
-                    for (const promoId of payload._attach_promo_ids) {
-                      const urlA = apiJoin(
-                        `communities/${activeCommunity.id}/categories/${createdId}/attach`
-                      );
-                      await fetch(urlA, {
-                        method: "POST",
-                        headers: authHeaders("POST"),
-                        body: JSON.stringify({ type: "promo", id: Number(promoId) }), // cast ke number saat kirim
-                      });
-                    }
-                  }
-                  return true;
-                },
-              }}
-              formUpdateControl={{
-                customDefaultValue: (data) => ({
-                  title: data?.title || "",
-                  description: data?.description || "",
-                  _attach_promo_ids: [],
-                }),
-              }}
-            />
-          </div>
-        )}
-      </FloatingPageComponent>
+      {/* Kategori modal telah dihapus (tidak digunakan lagi) */}
 
       {/* MEMBERS MODAL */}
       <FloatingPageComponent
         show={modalMember}
         onClose={() => {
+          // batalkan request berjalan saat modal ditutup
+          if (memberReqRef.current.ac) {
+            try { memberReqRef.current.ac.abort(); } catch {}
+          }
+          if (memberReqRef.current.timer) clearTimeout(memberReqRef.current.timer);
+          memberReqRef.current = { ac: null, timer: null };
+
           setModalMember(false);
           setMemberList([]);
           setMemberError("");
@@ -715,24 +536,90 @@ export default function KomunitasDashboard() {
             <div className="py-10 text-center text-gray-500 font-medium">Belum ada anggota.</div>
           ) : (
             <TableSupervisionComponent
-              title="Daftar Anggota"
-              data={memberList}
+              key={`member-table-${activeCommunity?.id}-${memberList.length}`}
+              title={`Daftar Anggota (${memberList.length})`}
+              fetchControl={{
+                path: `admin/communities/${activeCommunity?.id}/members`,
+                includeHeaders: authHeaders("GET"),
+              }}
+              searchable={true}
+              noControlBar={true}
+              unUrlPage={true}
               columnControl={{
                 custom: [
-                  { selector: "name", label: "Nama", item: (m) => m.name || m.full_name || "-" },
-                  { selector: "email", label: "Email", item: ({ email }) => email || "-" },
-                  { selector: "phone", label: "Telepon", item: ({ phone }) => phone || "-" },
-                  { selector: "role", label: "Role", item: (m) => m.role?.name || m.role || "-" },
+                  {
+                    selector: "name",
+                    label: "Nama",
+                    sortable: true,
+                    item: (member) => (
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium text-white">
+                            {(member.name || member.full_name || "?").charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">
+                            {member.name || member.full_name || "-"}
+                          </div>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    selector: "email",
+                    label: "Email",
+                    sortable: true,
+                    item: (member) => (
+                      <span className="text-sm text-gray-600">
+                        {member.email || "-"}
+                      </span>
+                    ),
+                  },
+                  {
+                    selector: "phone",
+                    label: "Telepon",
+                    item: (member) => (
+                      <span className="text-sm text-gray-600">
+                        {member.phone || "-"}
+                      </span>
+                    ),
+                  },
+                  {
+                    selector: "role",
+                    label: "Role",
+                    item: (member) => (
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        (member.role?.name || member.role || "").toLowerCase() === 'admin' 
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {member.role?.name || member.role || "-"}
+                      </span>
+                    ),
+                  },
                   {
                     selector: "joined_at",
                     label: "Bergabung",
-                    item: (m) =>
-                      m.joined_at ? new Date(m.joined_at).toLocaleDateString("id-ID") : "-",
+                    sortable: true,
+                    item: (member) => (
+                      <span className="text-sm text-gray-600">
+                        {member.joined_at 
+                          ? new Date(member.joined_at).toLocaleDateString("id-ID", {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })
+                          : "-"
+                        }
+                      </span>
+                    ),
                   },
                 ],
               }}
-              searchable
-              noControlBar
+              actionControl={{
+                except: ["edit", "delete", "detail"], // Member modal hanya untuk view
+              }}
             />
           )}
         </div>

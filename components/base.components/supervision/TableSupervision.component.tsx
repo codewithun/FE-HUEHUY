@@ -249,16 +249,27 @@ export function TableSupervisionComponent({
     if (loading) return;
 
     if (code === 200 || code === 204) {
-      const originalData: any[] = Array.isArray(data?.data) ? data.data : [];
+      // Normalisasi payload agar tahan segala bentuk (array langsung, laravel paginator, dsb)
+      let originalData: any[] = [];
+      const payload = (data && typeof data === 'object') ? (data.data ?? data) : data;
+
+      if (Array.isArray(payload)) originalData = payload;
+      else if (Array.isArray(payload?.data)) originalData = payload.data;        // { data: [...] }
+      else if (Array.isArray(payload?.items)) originalData = payload.items;      // { items: [...] }
+      else if (Array.isArray(data?.data?.data)) originalData = data.data.data;   // { data: { data: [...] } }
+
       const newColumns: any[] = [];
       const newData: any[] = [];
 
+      // Total row: coba beberapa jalur umum
       const apiTotal =
         data?.totalRow ??
         data?.total_row ??
-        data?.total ??            // <— penting: Laravel paginator
-        data?.meta?.total ??      // <— kalau pakai bentuk meta
-        0;
+        data?.total ??
+        data?.meta?.total ??
+        data?.data?.total ??
+        payload?.total ??
+        originalData.length;
 
       setTotalRow(Number(apiTotal) || 0);
 
