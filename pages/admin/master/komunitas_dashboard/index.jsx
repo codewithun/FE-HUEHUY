@@ -1,23 +1,24 @@
 /* eslint-disable no-console */
-import { faPlus, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faUsers, faTags } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ButtonComponent,
   FloatingPageComponent,
-  ModalConfirmComponent,
   TableSupervisionComponent,
 } from "../../../../components/base.components";
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
 import MultiSelectDropdown from "../../../../components/form/MultiSelectDropdown";
+import InputHexColor from "../../../../components/construct.components/input/InputHexColor";
 import { token_cookie_name } from "../../../../helpers";
 import { Decrypt } from "../../../../helpers/encryption.helpers";
 
-// ===== Helpers: BASES & URL JOINERS (AMAN) =====
+/** =============================
+ *  Helpers
+ *  ============================= */
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-/** origin untuk file (tanpa /api) → https://api-159-223-48-146.nip.io */
 const FILE_ORIGIN = (() => {
   try {
     return new URL(API_BASE).origin;
@@ -25,437 +26,154 @@ const FILE_ORIGIN = (() => {
     return API_BASE.replace(/\/+$/, "");
   }
 })();
-
-/** pastikan base API selalu mengandung /api tepat satu kali */
 const apiJoin = (path = "") => {
   const base = API_BASE.replace(/\/+$/, "");
   const ensured = /\/api$/i.test(base) ? base : `${base}/api`;
   return `${ensured}/${String(path).replace(/^\/+/, "")}`;
 };
-
-/** normalisasi path ke /storage/... */
 const toStoragePath = (p = "") =>
   `storage/${String(p).replace(/^\/+/, "").replace(/^storage\/+/, "")}`;
+const fileUrl = (relativePath = "") => `${FILE_ORIGIN}/${toStoragePath(relativePath)}`;
 
-/** URL gambar/file publik */
-const fileUrl = (relativePath = "") =>
-  `${FILE_ORIGIN}/${toStoragePath(relativePath)}`;
-
-// =================================================
-
+/** =============================
+ *  Page
+ *  ============================= */
 export default function KomunitasDashboard() {
-  const [communityList, setCommunityList] = useState([]);
-  const [modalForm, setModalForm] = useState(false);
-  const [modalDelete, setModalDelete] = useState(false);
-  const [selectedCommunity, setSelectedCommunity] = useState(null);
+  /** MAIN: communities table state */
   const [refreshToggle, setRefreshToggle] = useState(false);
-  const [adminContacts, setAdminContacts] = useState([]);
-  const [selectedAdminIds, setSelectedAdminIds] = useState([]);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    logo: "",
-    admin_contact_ids: [],
-  });
 
-  // === Attach Promo Only ===
-  const [modalAdd, setModalAdd] = useState(false);
-  const [selectedCommunityForAdd, setSelectedCommunityForAdd] = useState(null);
-  const [existingPromoList, setExistingPromoList] = useState([]);
-  const [selectedPromoId, setSelectedPromoId] = useState(null);
-  const [selectedAttachCategoryId, setSelectedAttachCategoryId] = useState(null);
+  /** CORPORATE (Mitra) options */
+  const [corporateOptions, setCorporateOptions] = useState([]);
+  const [corporateLoading, setCorporateLoading] = useState(false);
 
-  // === Kategori ===
+  /** CATEGORIES modal state */
   const [modalCategory, setModalCategory] = useState(false);
-  const [categoryList, setCategoryList] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [categoryForm, setCategoryForm] = useState({ title: "", description: "" });
-  const [activeCommunityId, setActiveCommunityId] = useState(null);
-  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [activeCommunity, setActiveCommunity] = useState(null);
 
-  // Map kategori -> daftar promo {id,title}
-  const [categoryPromosMap, setCategoryPromosMap] = useState({});
-
-  // === Anggota (members) ===
+  /** MEMBERS modal state */
   const [modalMember, setModalMember] = useState(false);
   const [memberList, setMemberList] = useState([]);
   const [memberLoading, setMemberLoading] = useState(false);
   const [memberError, setMemberError] = useState("");
 
-  // Tambahkan state untuk modal detail promo
-  const [modalDetailPromo, setModalDetailPromo] = useState(false);
-  const [selectedPromoList, setSelectedPromoList] = useState([]);
+  /** Promo dropdown (opsional lampirkan saat create kategori) */
+  const [existingPromoList, setExistingPromoList] = useState([]);
+  const [promoLoading, setPromoLoading] = useState(false);
 
-  // =========================
-  // Fetch community list (refetch on refreshToggle)
-  // =========================
+  const router = useRouter();
+  const goPromoHome = () => {
+    const q = activeCommunity?.id ? `?communityId=${activeCommunity.id}` : "";
+    router.push(`/admin/promos${q}`);
+  };
+
+  /** ============ FETCH ADMIN CONTACTS removed in new design ============ */
+
+  // Fetch Mitra (Corporates) untuk dropdown "Mitra"
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCorporates = async () => {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : "";
       try {
-        const res = await fetch(apiJoin("admin/communities"), {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const result = await res.json();
-        setCommunityList(Array.isArray(result.data) ? result.data : []);
-      } catch {
-        setCommunityList([]);
+        setCorporateLoading(true);
+        const url = apiJoin("admin/corporates?paginate=all");
+        const res = await fetch(url, { method: "GET", headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json().catch(() => ({}));
+        const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+        const opts = list.map((c) => ({ value: c.id, label: c.name || `Mitra #${c.id}` }));
+        setCorporateOptions(opts);
+      } catch (e) {
+        console.error("Failed to fetch corporates (mitra)", e);
+        setCorporateOptions([]);
+      } finally {
+        setCorporateLoading(false);
       }
     };
-    fetchData();
-  }, [refreshToggle]);
-
-  // =========================
-  // Fetch admin contacts (pakai endpoint baru, tanpa filter di FE)
-  // =========================
-  useEffect(() => {
-    const fetchAdminContacts = async () => {
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : "";
-      try {
-        // ambil semua admin contacts: admin + manager tenant
-        const url = apiJoin("admin/users?only_admin_contacts=true&paginate=all");
-        const res = await fetch(url, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const result = await res.json();
-
-        const users = Array.isArray(result.data)
-          ? result.data
-          : Array.isArray(result)
-          ? result
-          : [];
-
-        // langsung mapping ke opsi dropdown
-        const formattedContacts = users.map((user) => ({
-          value: user.id,
-          label: `${user.name} - ${user.role?.name || "No Role"} (${user.phone || user.email || "No Contact"})`,
-        }));
-
-        setAdminContacts(formattedContacts);
-      } catch (error) {
-        console.error("Failed to fetch admin contacts:", error);
-        setAdminContacts([]);
-      }
-    };
-    fetchAdminContacts();
+    fetchCorporates();
   }, []);
 
-  // Add or update community
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  /** ============ HELPERS ============ */
+  // Ganti helper headers agar GET tidak kirim Content-Type
+  const authHeaders = (method = "GET") => {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    const method = selectedCommunity ? "PUT" : "POST";
-    const url = selectedCommunity
-      ? apiJoin(`admin/communities/${selectedCommunity.id}`)
-      : apiJoin("admin/communities");
-
-    const formPayload = new FormData();
-    formPayload.append("name", formData.name);
-    formPayload.append("description", formData.description);
-
-    // Tambahkan admin contact IDs (array)
-    if (formData.admin_contact_ids && formData.admin_contact_ids.length > 0) {
-      formData.admin_contact_ids.forEach((id, index) => {
-        formPayload.append(`admin_contact_ids[${index}]`, id);
-      });
+    const base = { Authorization: `Bearer ${token}` };
+    // Hanya kirim Content-Type untuk method yang punya body JSON
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
+      return { ...base, "Content-Type": "application/json" };
     }
-
-    if (formData.logo && typeof formData.logo !== "string") {
-      formPayload.append("logo", formData.logo);
-    } else if (typeof formData.logo === "string" && formData.logo !== "") {
-      formPayload.append("logo", formData.logo);
-    }
-
-    try {
-      await fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}` },
-        body: formPayload,
-      });
-
-      setModalForm(false);
-      setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
-      setSelectedCommunity(null);
-      setSelectedAdminIds([]);
-      setRefreshToggle((s) => !s);
-    } catch (error) {
-      console.error("Failed to submit form:", error);
-      alert("Gagal menyimpan komunitas");
-    }
+    return base; // GET/HEAD: simple request → no preflight
   };
 
-  // Delete community
-  const handleDelete = async () => {
+  const authHeadersMultipart = () => {
     const encryptedToken = Cookies.get(token_cookie_name);
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    await fetch(apiJoin(`admin/communities/${selectedCommunity.id}`), {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    setCommunityList((prev) => prev.filter((c) => c.id !== selectedCommunity.id));
-    setRefreshToggle((s) => !s);
-    setModalDelete(false);
-    setSelectedCommunity(null);
+    return { Authorization: `Bearer ${token}` };
   };
 
-  // Fetch categories for a community
-  const fetchCategories = async (communityId, { preserveOrder = true } = {}) => {
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    const res = await fetch(apiJoin(`communities/${communityId}/categories`), {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const result = await res.json();
-    const cats = Array.isArray(result) ? result : result.data || [];
-    setCategoryList(cats);
+  /** Prefetch daftar promo ketika modal kategori dibuka */
+  useEffect(() => {
+    if (!modalCategory) return;
 
-    setCategoryPromosMap((prev) => {
-      const next = { ...prev };
+    let ignore = false;
+    (async () => {
+      try {
+        setPromoLoading(true);
+        const url = apiJoin("admin/promos?all=true");
+        const resP = await fetch(url, { headers: authHeaders("GET") });
 
-      cats.forEach((cat) => {
-        const fromPromos = Array.isArray(cat.promos) ? cat.promos : [];
-        const fromItems = Array.isArray(cat.items)
-          ? cat.items.filter((it) => (it.type || it.item_type) === "promo")
-          : [];
-
-        // Ambil urutan dari server apa adanya (NO sorting)
-        const incoming = (fromPromos.length ? fromPromos : fromItems).map((p) => ({
-          id: p.id,
-          title: p.title || p.name || `Promo #${p.id}`,
-        }));
-
-        if (!preserveOrder) {
-          // kalau kamu mau reset penuh ke urutan server
-          next[cat.id] = incoming;
+        if (!resP.ok) {
+          const body = await resP.text().catch(() => "");
+          console.error("Fetch promos failed", { url, status: resP.status, statusText: resP.statusText, body });
+          if (!ignore) setExistingPromoList([]);
           return;
         }
 
-        const prevList = Array.isArray(prev[cat.id]) ? prev[cat.id] : [];
-
-        // 1) Buang item yang sudah tidak ada di server
-        const incomingIds = new Set(incoming.map((p) => p.id));
-        let merged = prevList.filter((p) => incomingIds.has(p.id));
-
-        // 2) Tambahkan item baru dari server di BAWAH (agar hasil unshift tetap di atas)
-        for (const p of incoming) {
-          if (!merged.some((x) => x.id === p.id)) merged.push(p);
-        }
-
-        next[cat.id] = merged;
-      });
-
-      return next;
-    });
-  };
-
-  // Open category modal
-  const handleOpenCategory = (community) => {
-    setActiveCommunityId(community.id);
-    fetchCategories(community.id);
-    setModalCategory(true);
-  };
-
-  // Add or update category
-  const handleCategorySubmit = async (e) => {
-    e.preventDefault();
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    const method = selectedCategory ? "PUT" : "POST";
-    const url = selectedCategory
-      ? apiJoin(`communities/${activeCommunityId}/categories/${selectedCategory.id}`)
-      : apiJoin(`communities/${activeCommunityId}/categories`);
-
-    try {
-      await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(categoryForm),
-      });
-
-      // Broadcast event ke home.jsx
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('communityDataUpdated', {
-          detail: {
-            communityId: activeCommunityId,
-            action: 'category_added',
-            category: {
-              title: categoryForm.title,
-              description: categoryForm.description
-            }
-          }
-        }));
-      }
-
-      setCategoryForm({ title: "", description: "" });
-      setSelectedCategory(null);
-      fetchCategories(activeCommunityId);
-    } catch {
-      // noop
-    }
-  };
-
-  // Delete category
-  const handleCategoryDelete = async (category) => {
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    await fetch(apiJoin(`communities/${activeCommunityId}/categories/${category.id}`), {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    fetchCategories(activeCommunityId);
-  };
-
-  // Fetch existing PROMOS saat modal attach dibuka (voucher dihapus)
-  useEffect(() => {
-    if (!modalAdd) return;
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-    (async () => {
-      try {
-        // ✅ Add ?all=true to get all promos without pagination
-        const resP = await fetch(apiJoin("admin/promos?all=true"), {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
         const jsonP = await resP.json().catch(() => ({}));
-        setExistingPromoList(
-          Array.isArray(jsonP.data) ? jsonP.data : Array.isArray(jsonP) ? jsonP : []
-        );
-      } catch {
-        setExistingPromoList([]);
+        // normalisasi ke bentuk { value, label } yang dibutuhkan MultiSelectDropdown
+        const promosRaw = Array.isArray(jsonP.data) ? jsonP.data : Array.isArray(jsonP) ? jsonP : [];
+        const promoOptions = promosRaw.map((p) => ({
+          value: String(p.id ?? p.value ?? ""),
+          label:
+            (p.title && String(p.title)) ||
+            (p.name && String(p.name)) ||
+            (p.code && String(p.code)) ||
+            (p.description && String(p.description).slice(0, 60)) ||
+            `Promo #${p.id ?? ''}`,
+          _raw: p,
+        }));
+        if (!ignore) {
+          setExistingPromoList(promoOptions);
+          console.log("Loaded promo options:", promoOptions.length, promoOptions.slice(0,3));
+        }
+      } catch (e) {
+        console.error("Error fetching promos", e);
+        if (!ignore) setExistingPromoList([]);
+      } finally {
+        if (!ignore) setPromoLoading(false);
       }
     })();
-  }, [modalAdd]);
 
-  // Open add modal (PROMO only)
-  const openAddModal = (community) => {
-    setSelectedCommunityForAdd(community);
-    setSelectedPromoId(null);
-    setSelectedAttachCategoryId(null);
-    if (community && community.id) {
-      setActiveCommunityId(community.id);
-      fetchCategories(community.id);
-    }
-    setModalAdd(true);
-  };
+    return () => {
+      ignore = true;
+    };
+  }, [modalCategory]);
 
-  // Submit attach PROMO
-  const handleAddSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedCommunityForAdd) return;
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-
-    if (!selectedPromoId) {
-      alert("Pilih promo yang ingin ditambahkan");
-      return;
-    }
-    if (!selectedAttachCategoryId) {
-      alert("Pilih kategori komunitas untuk promo ini");
-      return;
-    }
-
-    try {
-      const endpoint = apiJoin(
-        `communities/${selectedCommunityForAdd.id}/categories/${selectedAttachCategoryId}/attach`
-      );
-      const payload = { type: "promo", id: Number(selectedPromoId) };
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (res.ok || (json && json.success)) {
-        // Update map lokal untuk menampilkan langsung di tabel
-        const addedPromo = existingPromoList.find(
-          (p) => String(p.id) === String(selectedPromoId)
-        );
-        const catIdNum = Number(selectedAttachCategoryId);
-        setCategoryPromosMap((prev) => {
-          const current = prev[catIdNum] ? [...prev[catIdNum]] : [];
-          if (addedPromo && !current.some((p) => p.id === addedPromo.id)) {
-            // Tambahkan promo baru di paling atas (unshift)
-            current.unshift({
-              id: addedPromo.id,
-              title: addedPromo.title || addedPromo.name || `Promo #${addedPromo.id}`,
-            });
-          }
-          return { ...prev, [catIdNum]: current };
-        });
-
-        // Tutup modal dan refresh kategori untuk sinkron server
-        setModalAdd(false);
-        setSelectedCommunityForAdd(null);
-        setSelectedPromoId(null);
-
-        if (activeCommunityId) {
-          fetchCategories(activeCommunityId);
-        }
-      } else {
-        alert(json.message || "Gagal menambahkan promo ke komunitas");
-      }
-    } catch {
-      alert("Terjadi kesalahan saat menambahkan promo");
-    }
-  };
-
-  // === MEMBERS: fetch & open modal ===
-  const openMemberModal = async (community) => {
-    setSelectedCommunity(community);
+  /** ============ MEMBERS MODAL ACTIONS ============ */
+  const openMemberModal = async (communityRow) => {
+    setActiveCommunity(communityRow);
     setModalMember(true);
     setMemberLoading(true);
     setMemberError("");
     setMemberList([]);
 
-    const encryptedToken = Cookies.get(token_cookie_name);
-    const token = encryptedToken ? Decrypt(encryptedToken) : "";
-
-    // Coba endpoint admin dulu → fallback ke non-admin bila 404
-    const tryFetch = async (url) => {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return res;
-    };
+    // Ganti tryFetch agar GET tidak kirim Content-Type
+    const tryFetch = async (url) =>
+      fetch(url, { method: "GET", headers: authHeaders("GET") });
 
     try {
-      let res = await tryFetch(apiJoin(`admin/communities/${community.id}/members`));
+      let res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/members`));
       if (res.status === 404) {
-        res = await tryFetch(apiJoin(`communities/${community.id}/members`));
+        res = await tryFetch(apiJoin(`communities/${communityRow.id}/members`));
       }
       const json = await res.json().catch(() => ({}));
       const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
@@ -468,85 +186,101 @@ export default function KomunitasDashboard() {
     }
   };
 
-  // Function untuk membuka detail promo
-  const openPromoDetail = (promos, categoryTitle) => {
-    setSelectedPromoList({ promos, categoryTitle });
-    setModalDetailPromo(true);
-  };
+  /** =============================
+   *  TABLE DEFS: Communities (MAIN)
+   *  ============================= */
+  const communityColumns = useMemo(
+    () => [
+      {
+        selector: "name",
+        label: "Nama Komunitas",
+        sortable: true,
+        item: ({ name }) => <span className="font-semibold">{name}</span>,
+      },
+      {
+        selector: "description",
+        label: "Deskripsi",
+        item: ({ description }) => description || "-",
+      },
+      {
+        selector: "logo",
+        label: "Logo",
+        width: "100px",
+        item: ({ logo }) =>
+          logo ? (
+            <Image
+              src={logo?.startsWith?.("http") ? logo : fileUrl(logo)}
+              alt="Logo Komunitas"
+              width={48}
+              height={48}
+              className="rounded"
+            />
+          ) : (
+            <span className="text-gray-400">-</span>
+          ),
+      },
+    ],
+    []
+  );
 
-  const columns = [
-    {
-      selector: "name",
-      label: "Nama Komunitas",
-      sortable: true,
-      item: ({ name }) => <span className="font-semibold">{name}</span>,
-    },
-    {
-      selector: "description",
-      label: "Deskripsi",
-      item: ({ description }) => description || "-",
-    },
-    {
-      selector: "logo",
-      label: "Logo",
-      width: "100px",
-      item: ({ logo }) =>
-        logo ? (
-          <Image
-            src={logo?.startsWith?.("http") ? logo : fileUrl(logo)}
-            alt="Logo Komunitas"
-            width={48}
-            height={48}
-            className="rounded"
-          />
-        ) : (
-          <span className="text-gray-400">-</span>
-        ),
-    },
-  ];
-
-  const topBarActions = (
+  // Topbar menggunakan API TableSupervision: customTopBarWithForm
+  // supaya tombol dapat membuka form modal langsung (tanpa event custom)
+  const renderCommunityTopbar = ({ setModalForm }) => (
     <ButtonComponent
       label="Tambah Komunitas"
       icon={faPlus}
       paint="primary"
-      onClick={() => {
-        setSelectedCommunity(null);
-        setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
-        setSelectedAdminIds([]);
-        setModalForm(true);
-      }}
+      onClick={() => setModalForm(true)}
     />
   );
 
+  /** =============================
+   *  RENDER
+   *  ============================= */
   return (
     <>
+      {/* COMMUNITIES as main table */}
       <TableSupervisionComponent
         title="Manajemen Komunitas"
-        data={communityList}
-        columnControl={{ custom: columns }}
-        customTopBar={topBarActions}
+        data={[]}
+        columnControl={{ custom: communityColumns }}
+        customTopBarWithForm={renderCommunityTopbar}
+        searchable
         noControlBar={false}
-        searchable={true}
         setToRefresh={refreshToggle}
+        fetchControl={{
+          path: "admin/communities",
+          includeHeaders: authHeadersMultipart(),
+          method: "GET",
+          headers: () => authHeaders("GET"),
+          mapData: (result) => {
+            if (Array.isArray(result?.data)) {
+              return { data: result.data, totalRow: result.total_row || result.data.length };
+            }
+            return { data: [], totalRow: 0 };
+          },
+        }}
         actionControl={{
           except: ["detail"],
-          include: (row, actions, hasPermissions) => (
+          include: (row) => (
             <div className="flex items-center gap-2">
               <ButtonComponent
-                label="Tambah Kategori"
-                paint="primary"
+                label="Kategori"
+                icon={faTags}
                 size="xs"
+                paint="primary"
                 variant="outline"
                 rounded
-                onClick={() => handleOpenCategory(row)}
+                onClick={() => {
+                  setActiveCommunity(row);
+                  setModalCategory(true);
+                }}
               />
-              {/* Tombol Anggota (Member) */}
               <ButtonComponent
                 label="Anggota"
                 icon={faUsers}
-                paint="secondary"
                 size="xs"
+                paint="secondary"
                 variant="solid"
                 rounded
                 onClick={() => openMemberModal(row)}
@@ -554,439 +288,376 @@ export default function KomunitasDashboard() {
             </div>
           ),
         }}
-        fetchControl={{
-          path: "admin/communities",
-          method: "GET",
-          headers: () => {
-            const encryptedToken = Cookies.get(token_cookie_name);
-            const token = encryptedToken ? Decrypt(encryptedToken) : "";
-            return {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            };
-          },
-          mapData: (result) => {
-            if (Array.isArray(result.data)) {
-              return { data: result.data, totalRow: result.total_row || result.data.length };
-            }
-            return { data: [], totalRow: 0 };
-          },
-        }}
         formControl={{
           contentType: "multipart/form-data",
+          triggerEventKey: "tsc-open-create",
           custom: [
+            // Mitra
+            {
+              type: "select",
+              construction: {
+                name: "corporate_id",
+                label: "Mitra",
+                placeholder: corporateLoading ? "Memuat Mitra.." : "Pilih Mitra..",
+                options: corporateOptions,
+                searchable: true,
+              },
+              col: 12,
+            },
+            // Nama
             {
               construction: {
                 name: "name",
-                label: "Name",
-                placeholder: "Masukkan nama komunitas...",
+                label: "Nama",
+                placeholder: "Masukkan Nama..",
                 validations: { required: true },
               },
+              col: 12,
+            },
+            // Logo + Deskripsi (2 kolom)
+            {
+              type: "image",
+              construction: {
+                name: "logo",
+                label: "Logo",
+                accept: "image/*",
+              },
+              col: 3,
             },
             {
               type: "textarea",
               construction: {
                 name: "description",
-                label: "Description",
-                placeholder: "Masukkan deskripsi...",
-                rows: 4,
-                validations: { required: true },
+                label: "Deskripsi",
+                placeholder: "Masukkan Deskripsi...",
+                rows: 6,
               },
+              col: 9,
+            },
+            // Warna Background 1 & 2 (2 kolom)
+            {
+              type: "custom",
+              col: 6,
+              custom: ({ values, setValues, errors }) => (
+                <InputHexColor
+                  name="bg_color_1"
+                  label="Warna Background 1"
+                  values={values}
+                  setValues={setValues}
+                  errors={errors}
+                />
+              ),
             },
             {
-              type: "file",
+              type: "custom",
+              col: 6,
+              custom: ({ values, setValues, errors }) => (
+                <InputHexColor
+                  name="bg_color_2"
+                  label="Warna Background 2"
+                  values={values}
+                  setValues={setValues}
+                  errors={errors}
+                />
+              ),
+            },
+            // Jenis Dunia
+            {
+              type: "select",
               construction: {
-                name: "logo",
-                label: "Logo (opsional)",
-                accept: "image/*",
+                name: "world_type",
+                label: "Jenis Dunia",
+                placeholder: "Pilih Jenis Dunia..",
+                options: [
+                  { label: "Pribadi", value: "pribadi" },
+                  { label: "Private", value: "private" },
+                ],
+                searchable: false,
               },
+              col: 12,
+            },
+            // Aktif
+            {
+              type: "check",
+              construction: {
+                name: "is_active",
+                label: "Aktif",
+                options: [{ label: "Aktif", value: 1 }],
+              },
+              col: 12,
             },
           ],
+          submit: async ({ payload, isUpdate, row }) => {
+            try {
+              const form = new FormData();
+              form.append("name", payload.name || "");
+              form.append("description", payload.description || "");
+
+              // Mitra (corporate)
+              if (payload.corporate_id) form.append("corporate_id", String(payload.corporate_id));
+
+              // Warna background
+              if (payload.bg_color_1) form.append("bg_color_1", payload.bg_color_1);
+              if (payload.bg_color_2) form.append("bg_color_2", payload.bg_color_2);
+
+              // Jenis dunia
+              if (payload.world_type) {
+                form.append("world_type", payload.world_type);
+                // fallback field name if backend expects 'type'
+                form.append("type", payload.world_type);
+              }
+
+              // Aktif
+              if (Array.isArray(payload.is_active)) {
+                form.append("is_active", payload.is_active.includes(1) ? "1" : "0");
+              } else if (typeof payload.is_active === "boolean") {
+                form.append("is_active", payload.is_active ? "1" : "0");
+              }
+
+              // Logo
+              if (payload.logo && typeof payload.logo !== "string") form.append("logo", payload.logo);
+              
+              const url = isUpdate
+                ? apiJoin(`admin/communities/${row.id}`)
+                : apiJoin("admin/communities");
+              const method = isUpdate ? "PUT" : "POST";
+              
+              console.log('Submitting community:', { url, method, payload });
+              
+              const response = await fetch(url, { 
+                method, 
+                headers: authHeadersMultipart(), 
+                body: form 
+              });
+              
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Community submit failed:', { 
+                  status: response.status, 
+                  statusText: response.statusText, 
+                  body: errorText 
+                });
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+              }
+              
+              const result = await response.json().catch(() => ({}));
+              console.log('Community submit success:', result);
+              
+              setRefreshToggle((s) => !s);
+              return true;
+            } catch (error) {
+              console.error('Error submitting community:', error);
+              throw error;
+            }
+          },
         }}
         formUpdateControl={{
           customDefaultValue: (data) => ({
-            name: data.name || "",
-            description: data.description || "",
-            admin_contact_ids: data.admin_contact_ids || [],
+            name: data?.name || "",
+            description: data?.description || "",
+            corporate_id: data?.corporate_id || data?.corporate?.id || "",
+            bg_color_1: data?.bg_color_1 || data?.color || "",
+            bg_color_2: data?.bg_color_2 || "",
+            world_type: data?.world_type || data?.type || "",
+            is_active: data?.is_active ? [1] : [],
           }),
         }}
       />
 
-      {/* Modal Form (custom) */}
-      <FloatingPageComponent
-        show={modalForm}
-        onClose={() => {
-          setModalForm(false);
-          setSelectedCommunity(null);
-          setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
-          setSelectedAdminIds([]);
-        }}
-        title={selectedCommunity ? "Ubah Komunitas" : "Tambah Komunitas"}
-        size="md"
-        className="bg-gradient-to-br from-white to-gray-50"
-      >
-        <div className="px-8 py-6">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Nama */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Nama Komunitas<span className="text-danger ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/20"
-                placeholder="Masukkan nama komunitas"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-            </div>
-
-            {/* Deskripsi */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Deskripsi
-              </label>
-              <textarea
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
-                placeholder="Masukkan deskripsi komunitas"
-                rows={4}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-
-            {/* Kontak Admin */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Kontak Admin<span className="text-danger ml-1">*</span>
-              </label>
-              <MultiSelectDropdown
-                options={adminContacts}
-                value={formData.admin_contact_ids}
-                onChange={(selectedIds) => {
-                  setFormData({ ...formData, admin_contact_ids: selectedIds });
-                  setSelectedAdminIds(selectedIds);
-                }}
-                placeholder="Pilih pengguna admin/manager tenant untuk komunitas ini..."
-                maxHeight={200}
-              />
-              {adminContacts.length === 0 && (
-                <p className="text-sm text-gray-500 mt-1">
-                  Belum ada pengguna dengan role Admin atau Manager Tenant tersedia.
-                </p>
-              )}
-            </div>
-
-            {/* Logo */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Logo (opsional)
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20"
-                onChange={(e) => setFormData({ ...formData, logo: e.target.files[0] })}
-              />
-            </div>
-
-            <div className="flex gap-3 pt-6 border-t border-gray-200">
-              <ButtonComponent
-                label="Batal"
-                paint="secondary"
-                variant="outline"
-                onClick={() => {
-                  setModalForm(false);
-                  setSelectedCommunity(null);
-                  setFormData({ name: "", description: "", logo: "", admin_contact_ids: [] });
-                  setSelectedAdminIds([]);
-                }}
-              />
-              <ButtonComponent
-                label={selectedCommunity ? "Perbarui Komunitas" : "Buat Komunitas"}
-                paint="primary"
-                type="submit"
-              />
-            </div>
-          </form>
-        </div>
-      </FloatingPageComponent>
-
-      {/* Modal Delete Confirmation */}
-      <ModalConfirmComponent
-        open={modalDelete}
-        onClose={() => {
-          setModalDelete(false);
-          setSelectedCommunity(null);
-        }}
-        onConfirm={handleDelete}
-        title="Hapus Komunitas"
-        message={`Apakah Anda yakin ingin menghapus komunitas "${selectedCommunity?.name}"?`}
-      />
-
-      {/* Modal Kategori Komunitas */}
+      {/* CATEGORIES MODAL */}
       <FloatingPageComponent
         show={modalCategory}
         onClose={() => {
           setModalCategory(false);
-          setCategoryList([]);
-          setActiveCommunityId(null);
-          setSelectedCategory(null);
-          setCategoryForm({ title: "", description: "" });
-          setShowCategoryForm(false);
+          setActiveCommunity(null);
         }}
-        title="Kategori Komunitas"
-        size="md"
+        title={`Kategori Komunitas: ${activeCommunity?.name || "-"}`}
+        size="lg"
       >
-        <div className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <ButtonComponent
-                label="Tambah Kategori"
-                paint="primary"
-                onClick={() => {
-                  setSelectedCategory(null);
-                  setCategoryForm({ title: "", description: "" });
-                  setShowCategoryForm(true);
-                }}
-              />
+        {activeCommunity && (
+          <div className="p-4">
+            {/* Segmented: Beranda (aktif) & Beranda Promo */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="inline-flex items-center bg-white p-1 rounded-full border border-purple-300">
+                <button
+                  type="button"
+                  className="px-4 py-1.5 text-sm font-medium rounded-full
+                             bg-purple-700 text-white ring-1 ring-purple-700/20
+                             hover:bg-purple-800 transition"
+                >
+                  Beranda
+                </button>
+                <button
+                  type="button"
+                  onClick={goPromoHome}
+                  className="px-4 py-1.5 text-sm font-medium rounded-full
+                             text-purple-700 hover:bg-purple-50 transition"
+                >
+                  Beranda Promo
+                </button>
+              </div>
             </div>
 
-            <div>
-              <ButtonComponent
-                label="Tambah Promo ke Komunitas"
-                paint="primary"
-                onClick={() => {
-                  if (!activeCommunityId) {
-                    alert("Pilih komunitas terlebih dahulu.");
-                    return;
+            <TableSupervisionComponent
+              title="Daftar Kategori"
+              data={[]}
+              columnControl={{
+                custom: [
+                  { selector: "title", label: "Judul", sortable: true, item: ({ title }) => title || "-" },
+                  { selector: "description", label: "Deskripsi", item: ({ description }) => description || "-" },
+                  {
+                    selector: "promos_count",
+                    label: "Jumlah Promo",
+                    width: "140px",
+                    item: (row) => {
+                      const count = Array.isArray(row?.promos)
+                        ? row.promos.length
+                        : Array.isArray(row?.items)
+                        ? row.items.filter((i) => (i.type || i.item_type) === "promo").length
+                        : row?.promos_count || 0;
+                      return <span className="font-semibold">{count}</span>;
+                    },
+                  },
+                ],
+              }}
+              searchable
+              noControlBar={false}
+              fetchControl={{
+                path: `communities/${activeCommunity.id}/categories`,
+                method: "GET",
+                headers: () => authHeaders("GET"),
+                mapData: (result) => {
+                  const cats = Array.isArray(result) ? result : result?.data || [];
+                  return { data: cats, totalRow: cats.length };
+                },
+              }}
+              actionControl={{ except: ["detail"] }}
+              tableKey={`categories-${activeCommunity.id}-${existingPromoList.length}`}
+              formControl={{
+                /** Tambah Kategori + (opsional) lampirkan promo ke kategori yang baru dibuat */
+                custom: [
+                  {
+                    construction: {
+                      name: "title",
+                      label: "Judul Kategori",
+                      placeholder: "cth. Diskon Makanan",
+                      validations: { required: true },
+                    },
+                  },
+                  {
+                    type: "textarea",
+                    construction: {
+                      name: "description",
+                      label: "Deskripsi",
+                      rows: 3,
+                    },
+                  },
+                  {
+  type: "component",
+  construction: {
+    name: "_attach_promo_ids",
+    label: "Lampirkan Promo (opsional)",
+    render: ({ value, onChange }) => {
+      // Normalisasi value ke array of string
+      const normalizedValue = Array.isArray(value) ? value.map(String) : [];
+      console.log('Render attach promo field', {
+        value,
+        normalizedValue,
+        options: existingPromoList,
+      });
+      return promoLoading ? (
+        <div className="text-sm text-gray-500">Memuat daftar promo…</div>
+      ) : (
+        <MultiSelectDropdown
+          key={`promo-${activeCommunity?.id}-${existingPromoList.length}`}
+          options={existingPromoList}
+          value={normalizedValue}
+          onChange={onChange}
+          placeholder={
+            existingPromoList.length === 0
+              ? "Belum ada promo tersedia"
+              : "Pilih promo yang ingin dilampirkan..."
+          }
+          maxHeight={260}
+        />
+      );
+    },
+  },
+}
+
+                ],
+                submit: async ({ payload, isUpdate, row }) => {
+                  if (isUpdate) {
+                    // Update kategori
+                    const urlU = apiJoin(`communities/${activeCommunity.id}/categories/${row.id}`);
+                    await fetch(urlU, {
+                      method: "PUT",
+                      headers: authHeaders("PUT"),
+                      body: JSON.stringify({
+                        title: payload.title,
+                        description: payload.description || "",
+                      }),
+                    });
+                    return true;
                   }
-                  openAddModal({ id: activeCommunityId });
-                }}
-              />
-            </div>
-          </div>
 
-          {/* Form Kategori */}
-          {showCategoryForm && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold mb-4">
-                {selectedCategory ? "Edit Kategori" : "Tambah Kategori"}
-              </h4>
-              <form onSubmit={handleCategorySubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Judul Kategori<span className="text-red-500 ml-1">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Masukkan judul kategori"
-                    value={categoryForm.title}
-                    onChange={(e) => setCategoryForm({ ...categoryForm, title: e.target.value })}
-                    required
-                  />
-                </div>
+                  // Create kategori
+                  const urlC = apiJoin(`communities/${activeCommunity.id}/categories`);
+                  const res = await fetch(urlC, {
+                    method: "POST",
+                    headers: authHeaders("POST"),
+                    body: JSON.stringify({
+                      title: payload.title,
+                      description: payload.description || "",
+                    }),
+                  });
+                  const json = await res.json().catch(() => ({}));
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Deskripsi
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Masukkan deskripsi kategori"
-                    rows={3}
-                    value={categoryForm.description}
-                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                  />
-                </div>
+                  // Ambil ID kategori baru dari berbagai kemungkinan bentuk response
+                  const createdId =
+                    json?.id ||
+                    json?.data?.id ||
+                    json?.category?.id ||
+                    json?.result?.id;
 
-                <div className="flex gap-2">
-                  <ButtonComponent
-                    label="Batal"
-                    paint="secondary"
-                    variant="outline"
-                    type="button"
-                    onClick={() => {
-                      setShowCategoryForm(false);
-                      setSelectedCategory(null);
-                      setCategoryForm({ title: "", description: "" });
-                    }}
-                  />
-                  <ButtonComponent
-                    label={selectedCategory ? "Update Kategori" : "Simpan Kategori"}
-                    paint="primary"
-                    type="submit"
-                  />
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Daftar Kategori */}
-          <div className="overflow-x-auto">
-            <table className="table w-full">
-              <thead>
-                <tr>
-                  <th>Judul</th>
-                  <th>Deskripsi</th>
-                  <th>Promo Terhubung</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categoryList.map((cat) => {
-                  const promos = categoryPromosMap[cat.id] || [];
-                  return (
-                    <tr key={cat.id}>
-                      <td>{cat.title}</td>
-                      <td>{cat.description || "-"}</td>
-                      <td>
-                        {promos.length === 0 ? (
-                          <span className="text-gray-400">-</span>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <div className="flex flex-wrap gap-1">
-                              {promos.slice(0, 2).map((p) => (
-                                <span
-                                  key={p.id}
-                                  className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800"
-                                >
-                                  {p.title}
-                                </span>
-                              ))}
-                            </div>
-                            {promos.length > 2 && (
-                              <button
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                onClick={() => openPromoDetail(promos, cat.title)}
-                              >
-                                Lihat semua ({promos.length})
-                              </button>
-                            )}
-                            {promos.length <= 2 && promos.length > 0 && (
-                              <button
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                onClick={() => openPromoDetail(promos, cat.title)}
-                              >
-                                Detail
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <div className="flex gap-2">
-                          <ButtonComponent
-                            label="Edit"
-                            size="sm"
-                            paint="warning"
-                            onClick={() => {
-                              setSelectedCategory(cat);
-                              setCategoryForm({
-                                title: cat.title,
-                                description: cat.description || "",
-                              });
-                              setShowCategoryForm(true);
-                            }}
-                          />
-                          <ButtonComponent
-                            label="Hapus"
-                            size="sm"
-                            paint="danger"
-                            onClick={() => handleCategoryDelete(cat)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </FloatingPageComponent>
-
-      {/* Modal Tambah PROMO (voucher dihapus) */}
-      <FloatingPageComponent
-        show={modalAdd}
-        onClose={() => {
-          setModalAdd(false);
-          setSelectedCommunityForAdd(null);
-        }}
-        title="Tambah Promo ke Komunitas"
-        size="md"
-        className="bg-background"
-      >
-        <form className="flex flex-col gap-4 p-6" onSubmit={handleAddSubmit}>
-          <div>
-            <label className="font-semibold">Kategori Komunitas</label>
-            <select
-              className="select select-bordered w-full"
-              value={selectedAttachCategoryId || ""}
-              onChange={(e) => setSelectedAttachCategoryId(e.target.value)}
-              required
-            >
-              <option value="">-- Pilih Kategori --</option>
-              {categoryList.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Hanya PROMO */}
-          <div>
-            <label className="font-semibold">Pilih Promo</label>
-            <select
-              className="select select-bordered w-full"
-              value={selectedPromoId || ""}
-              onChange={(e) => setSelectedPromoId(e.target.value)}
-              required
-            >
-              <option value="">-- Pilih Promo --</option>
-              {existingPromoList.map((promo) => (
-                <option key={promo.id} value={promo.id}>
-                  {promo.title} - {promo.stock ?? "-"} stok
-                </option>
-              ))}
-            </select>
-            {existingPromoList.length === 0 && (
-              <p className="text-sm text-gray-500 mt-2">
-                Belum ada promo tersedia. Buat promo terlebih dahulu di menu master.
-              </p>
-            )}
-          </div>
-
-          <div className="flex gap-2 justify-end mt-4">
-            <ButtonComponent
-              label="Batal"
-              paint="secondary"
-              variant="outline"
-              onClick={() => {
-                setModalAdd(false);
-                setSelectedCommunityForAdd(null);
+                  // Jika user pilih promo, lampirkan semua promo yang dipilih
+                  if (createdId && Array.isArray(payload._attach_promo_ids) && payload._attach_promo_ids.length > 0) {
+                    for (const promoId of payload._attach_promo_ids) {
+                      const urlA = apiJoin(
+                        `communities/${activeCommunity.id}/categories/${createdId}/attach`
+                      );
+                      await fetch(urlA, {
+                        method: "POST",
+                        headers: authHeaders("POST"),
+                        body: JSON.stringify({ type: "promo", id: Number(promoId) }), // cast ke number saat kirim
+                      });
+                    }
+                  }
+                  return true;
+                },
+              }}
+              formUpdateControl={{
+                customDefaultValue: (data) => ({
+                  title: data?.title || "",
+                  description: data?.description || "",
+                  _attach_promo_ids: [],
+                }),
               }}
             />
-            <ButtonComponent label="Tambahkan Promo" paint="primary" type="submit" />
           </div>
-        </form>
+        )}
       </FloatingPageComponent>
 
-      {/* Modal Anggota Komunitas */}
+      {/* MEMBERS MODAL */}
       <FloatingPageComponent
         show={modalMember}
         onClose={() => {
           setModalMember(false);
-          setSelectedCommunity(null);
           setMemberList([]);
           setMemberError("");
         }}
-        title={`Anggota: ${selectedCommunity?.name || "-"}`}
+        title={`Anggota: ${activeCommunity?.name || "-"}`}
         size="lg"
-        className="bg-background"
       >
         <div className="p-6">
           {memberLoading ? (
@@ -996,71 +667,27 @@ export default function KomunitasDashboard() {
           ) : memberList.length === 0 ? (
             <div className="py-10 text-center text-gray-500 font-medium">Belum ada anggota.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table w-full">
-                <thead>
-                  <tr>
-                    <th>Nama</th>
-                    <th>Email</th>
-                    <th>Telepon</th>
-                    <th>Role</th>
-                    <th>Bergabung</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {memberList.map((m) => (
-                    <tr key={m.id}>
-                      <td>{m.name || m.full_name || '-'}</td>
-                      <td>{m.email || '-'}</td>
-                      <td>{m.phone || '-'}</td>
-                      <td>{m.role?.name || m.role || '-'}</td>
-                      <td>{m.joined_at ? new Date(m.joined_at).toLocaleDateString('id-ID') : '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </FloatingPageComponent>
-
-      {/* Modal Detail Promo */}
-      <FloatingPageComponent
-        show={modalDetailPromo}
-        onClose={() => {
-          setModalDetailPromo(false);
-          setSelectedPromoList([]);
-        }}
-        title={`Daftar Promo - ${selectedPromoList?.categoryTitle || ''}`}
-        size="md"
-        className="bg-background"
-      >
-        <div className="p-6">
-          {selectedPromoList?.promos?.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">Tidak ada promo</div>
-          ) : (
-            <div className="space-y-3">
-              {selectedPromoList?.promos?.map((promo) => (
-                <div
-                  key={promo.id}
-                  className="p-3 bg-gray-50 rounded-lg border"
-                >
-                  <h4 className="font-medium text-gray-900">{promo.title}</h4>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <div className="flex justify-end mt-6">
-            <ButtonComponent
-              label="Tutup"
-              paint="secondary"
-              onClick={() => {
-                setModalDetailPromo(false);
-                setSelectedPromoList([]);
+            <TableSupervisionComponent
+              title="Daftar Anggota"
+              data={memberList}
+              columnControl={{
+                custom: [
+                  { selector: "name", label: "Nama", item: (m) => m.name || m.full_name || "-" },
+                  { selector: "email", label: "Email", item: ({ email }) => email || "-" },
+                  { selector: "phone", label: "Telepon", item: ({ phone }) => phone || "-" },
+                  { selector: "role", label: "Role", item: (m) => m.role?.name || m.role || "-" },
+                  {
+                    selector: "joined_at",
+                    label: "Bergabung",
+                    item: (m) =>
+                      m.joined_at ? new Date(m.joined_at).toLocaleDateString("id-ID") : "-",
+                  },
+                ],
               }}
+              searchable
+              noControlBar
             />
-          </div>
+          )}
         </div>
       </FloatingPageComponent>
     </>
