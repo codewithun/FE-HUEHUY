@@ -160,11 +160,17 @@ export default function ManageSlider() {
           </div>
         ) : (
           data?.data.map((item, key) => {
+            const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api$/, '');
+            const bgUrl = item?.picture_source
+              ? (String(item.picture_source).startsWith('http')
+                  ? item.picture_source
+                  : `${apiBase}/storage/${item.picture_source}`)
+              : '';
             return (
               <div
                 className=" col-span-3 h-40 bg-white rounded-lg"
                 style={{
-                  backgroundImage: `url(${item?.picture_source})`,
+                  backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
                   backgroundSize: 'cover',
                 }}
                 key={key}
@@ -251,7 +257,12 @@ export default function ManageSlider() {
             defaultValue={
               selected && {
                 _method: 'PUT',
-                image: selected?.picture_source,
+                image:
+                  selected?.picture_source
+                    ? (String(selected.picture_source).startsWith('http')
+                        ? selected.picture_source
+                        : `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api$/, '')}/storage/${selected.picture_source}`)
+                    : '',
               }
             }
           />
