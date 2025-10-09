@@ -300,3 +300,5 @@ inputImageProps) {
     </>
   );
 }
+
+export default InputImageComponent;
