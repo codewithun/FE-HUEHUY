@@ -7,16 +7,14 @@ import {
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import React, { useEffect, useState } from 'react';
-import {
-  ButtonComponent,
-  FloatingPageComponent,
-  FormSupervisionComponent,
-  IconButtonComponent,
-  InputComponent,
-  ModalConfirmComponent,
-  SelectComponent,
-} from '../../../components/base.components';
-import InputImageComponent from '../../../components/base.components/input/InputImage.component';
+import { ButtonComponent } from '../../../components/base.components/button/Button.component';
+import { FloatingPageComponent } from '../../../components/base.components/modal/FloatingPage.component';
+import { FormSupervisionComponent } from '../../../components/base.components/supervision/FormSupervision.component';
+import { IconButtonComponent } from '../../../components/base.components/button/IconButton.component';
+import { InputComponent } from '../../../components/base.components/input/Input.component';
+import { ModalConfirmComponent } from '../../../components/base.components/modal/ModalConfirm.component';
+import { SelectComponent } from '../../../components/base.components/input/Select.component';
+import { InputImageComponent } from '../../../components/base.components/input/InputImage.component';
 import PaginateComponent from '../../../components/base.components/table/Paginate.component';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { destroy, useGet } from '../../../helpers';
@@ -52,7 +50,7 @@ export default function ManageSlider() {
     },
   });
   useEffect(() => {
-    setTotalRow(data?.total);
+    setTotalRow(data?.total_row ?? data?.total ?? data?.data?.length ?? 0);
   }, [fetchLoading, data]);
 
   return (
