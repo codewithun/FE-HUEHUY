@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { faPlus, faUsers, faTags } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faUsers } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
 import { useRouter } from "next/router";
@@ -322,18 +322,7 @@ export default function KomunitasDashboard() {
           except: ["detail"],
           include: (row) => (
             <div className="flex items-center gap-2">
-              <ButtonComponent
-                label="Kategori"
-                icon={faTags}
-                size="xs"
-                paint="primary"
-                variant="outline"
-                rounded
-                onClick={() => {
-                  setActiveCommunity(row);
-                  setModalCategory(true);
-                }}
-              />
+              {/* Hapus tombol Kategori */}
               <ButtonComponent
                 label="Anggota"
                 icon={faUsers}
