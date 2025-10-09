@@ -20,6 +20,17 @@ import { AdminLayout } from '../../../components/construct.components/layout/Adm
 import { destroy, useGet } from '../../../helpers';
 
 export default function ManageSlider() {
+  const toStoragePath = (s) => {
+    const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api$/, '');
+    if (!s) return '';
+    if (typeof s !== 'string') return '';
+    const str = s.trim();
+    if (/^https?:\/\//i.test(str)) return str; // already absolute
+    if (str.startsWith('/storage/')) return `${base}${str}`;
+    const trimmed = str.replace(/^\/+/, '');
+    if (trimmed.startsWith('storage/')) return `${base}/${trimmed}`;
+    return `${base}/storage/${trimmed}`;
+  };
   // const { accessActive, loading } = useAccessContext();
   const [paginate, setPaginate] = useState(9);
   const [page, setPage] = useState(1);
@@ -160,12 +171,8 @@ export default function ManageSlider() {
           </div>
         ) : (
           data?.data.map((item, key) => {
-            const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api$/, '');
-            const bgUrl = item?.picture_source
-              ? (String(item.picture_source).startsWith('http')
-                  ? item.picture_source
-                  : `${apiBase}/storage/${item.picture_source}`)
-              : '';
+            const rawUrl = toStoragePath(item?.picture_source);
+            const bgUrl = rawUrl ? `${rawUrl}?v=${encodeURIComponent(item?.updated_at || item?.id || '')}` : '';
             return (
               <div
                 className=" col-span-3 h-40 bg-white rounded-lg"
@@ -257,12 +264,7 @@ export default function ManageSlider() {
             defaultValue={
               selected && {
                 _method: 'PUT',
-                image:
-                  selected?.picture_source
-                    ? (String(selected.picture_source).startsWith('http')
-                        ? selected.picture_source
-                        : `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api$/, '')}/storage/${selected.picture_source}`)
-                    : '',
+                image: toStoragePath(selected?.picture_source),
               }
             }
           />
