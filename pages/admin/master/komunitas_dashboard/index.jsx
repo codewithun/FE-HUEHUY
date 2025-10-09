@@ -219,6 +219,64 @@ export default function KomunitasDashboard() {
             <span className="text-gray-400">-</span>
           ),
       },
+      // Tambahan: Warna Background (1 & 2)
+      {
+        selector: "bg_colors",
+        label: "Warna BG",
+        width: "200px",
+        item: (row) => {
+          const c1 = row?.bg_color_1 || row?.color || "";
+          const c2 = row?.bg_color_2 || "";
+          const Box = ({ c }) => (
+            <span className="inline-flex items-center gap-1 mr-3">
+              <span
+                className="inline-block w-4 h-4 rounded border border-gray-300"
+                style={{ backgroundColor: c || "#fff" }}
+                title={c || "-"}
+              />
+              <span className="text-xs text-gray-700">{c || "-"}</span>
+            </span>
+          );
+          return (
+            <div className="flex items-center">
+              <Box c={c1} />
+              <Box c={c2} />
+            </div>
+          );
+        },
+      },
+      // Tambahan: Jenis Dunia
+      {
+        selector: "world_type",
+        label: "Jenis Dunia",
+        width: "130px",
+        item: (row) => {
+          const raw = String(row?.world_type || row?.type || "").toLowerCase();
+          const label = raw === "private" ? "Private" : raw === "pribadi" ? "Pribadi" : (row?.world_type || row?.type || "-");
+          return (
+            <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-200">
+              {label}
+            </span>
+          );
+        },
+      },
+      // Tambahan: Status Komunitas
+      {
+        selector: "is_active",
+        label: "Status",
+        width: "110px",
+        item: (row) => {
+          const active = !!(row?.is_active || row?.status === "active" || row?.active);
+          const cls = active
+            ? "bg-green-100 text-green-700 border-green-200"
+            : "bg-red-100 text-red-700 border-red-200";
+          return (
+            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs border ${cls}`}>
+              {active ? "Aktif" : "Nonaktif"}
+            </span>
+          );
+        },
+      },
     ],
     []
   );
