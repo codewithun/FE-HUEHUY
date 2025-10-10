@@ -1,10 +1,10 @@
 import { faEdit, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { useState } from 'react';
 import {
-    ButtonComponent,
-    FloatingPageComponent,
-    FormSupervisionComponent,
-    TableSupervisionComponent,
+  ButtonComponent,
+  FloatingPageComponent,
+  FormSupervisionComponent,
+  TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { useGet } from '../../../helpers';
@@ -181,7 +181,7 @@ export default function ManageAdsCategories() {
             return {
               name: data?.name,
               parent_id: data?.parent_id || '',
-              image: data?.picture_source || '',
+              // Don't set image field with URL - let the component handle preview internally
               is_primary_parent: data?.is_primary_parent ? 1 : 0,
               is_home_display: data?.is_home_display ? 1 : 0,
             };
