@@ -8,7 +8,6 @@ import {
   faBell,
   faChevronRight,
   faGlobe,
-  faGripVertical,
   faLocationDot,
   faMagnifyingGlass,
   faMessage,
@@ -264,13 +263,28 @@ export default function Index() {
                           );
                         })}
                         <Link href={`/app/category`}>
-                          <div className="w-full aspect-square bg-primary rounded-[12px] relative overflow-hidden flex justify-center items-center">
-                            {/* Modern grid icon */}
-                            <FontAwesomeIcon
-                              icon={faGripVertical}
-                              className="text-5xl text-teal-100"
-                            />
-                            <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs">
+                          <div className="w-full aspect-square bg-primary rounded-[12px] relative overflow-hidden flex justify-center items-center group hover:bg-primary-dark transition-colors duration-200">
+                            {/* Icon Grid Custom dengan hover effect */}
+                            <div className="grid grid-cols-2 gap-2 group-hover:scale-110 transition-transform duration-200">
+                              <div className="w-3 h-3 bg-white rounded-md opacity-80"></div>
+                              <div className="w-3 h-3 bg-white rounded-md opacity-60"></div>
+                              <div className="w-3 h-3 bg-white rounded-md opacity-60"></div>
+                              <div className="w-3 h-3 bg-white rounded-md opacity-40 relative">
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="text-primary text-xs font-bold">+</div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Alternatif: Icon dengan border */}
+                            {/* <div className="w-8 h-8 border-2 border-white border-dashed rounded-lg flex items-center justify-center">
+                              <FontAwesomeIcon
+                                icon={faPlus}
+                                className="text-lg text-white"
+                              />
+                            </div> */}
+                            
+                            <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs font-medium">
                               Lainnya
                             </div>
                           </div>
