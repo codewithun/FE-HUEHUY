@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { faPlus, faUsers, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faUsers, faTrash, faUserPlus, faHistory, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
 // import { useRouter } from "next/router";
@@ -56,6 +56,18 @@ export default function KomunitasDashboard() {
   // Simpan AbortController & timer agar bisa dibatalkan saat modal ditutup
   const memberReqRef = useRef({ ac: null, timer: null });
 
+  /** MEMBER REQUESTS modal state */
+  const [modalMemberRequests, setModalMemberRequests] = useState(false);
+  const [memberRequestsList, setMemberRequestsList] = useState([]);
+  const [memberRequestsLoading, setMemberRequestsLoading] = useState(false);
+  const [memberRequestsError, setMemberRequestsError] = useState("");
+
+  /** MEMBER HISTORY modal state */
+  const [modalMemberHistory, setModalMemberHistory] = useState(false);
+  const [memberHistoryList, setMemberHistoryList] = useState([]);
+  const [memberHistoryLoading, setMemberHistoryLoading] = useState(false);
+  const [memberHistoryError, setMemberHistoryError] = useState("");
+
   // const router = useRouter();
 
   // Debug logs removed - member modal now working with manual table
@@ -109,6 +121,71 @@ export default function KomunitasDashboard() {
   /** ============ MEMBERS MODAL ACTIONS ============ */
   const tryFetch = async (url, signal) =>
     fetch(url, { method: "GET", headers: authHeaders("GET"), signal });
+
+  const openMemberRequestsModal = async (communityRow) => {
+    setActiveCommunity(communityRow);
+    setModalMemberRequests(true);
+    setMemberRequestsLoading(true);
+    setMemberRequestsError("");
+    setMemberRequestsList([]);
+
+    try {
+      const res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/member-requests`));
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const json = await res.json().catch(() => ({}));
+      const rows = Array.isArray(json?.data) ? json.data : [];
+      setMemberRequestsList(rows);
+    } catch (err) {
+      console.error("Gagal memuat permintaan bergabung:", err);
+      setMemberRequestsError("Tidak bisa memuat daftar permintaan bergabung");
+    } finally {
+      setMemberRequestsLoading(false);
+    }
+  };
+
+  const openMemberHistoryModal = async (communityRow) => {
+    setActiveCommunity(communityRow);
+    setModalMemberHistory(true);
+    setMemberHistoryLoading(true);
+    setMemberHistoryError("");
+    setMemberHistoryList([]);
+
+    try {
+      const res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/member-history`));
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const json = await res.json().catch(() => ({}));
+      const rows = Array.isArray(json?.data) ? json.data : [];
+      setMemberHistoryList(rows);
+    } catch (err) {
+      console.error("Gagal memuat riwayat member:", err);
+      setMemberHistoryError("Tidak bisa memuat riwayat member");
+    } finally {
+      setMemberHistoryLoading(false);
+    }
+  };
+
+  const handleMemberRequest = async (requestId, action) => {
+    try {
+      const res = await fetch(apiJoin(`admin/member-requests/${requestId}/${action}`), {
+        method: "POST",
+        headers: authHeaders("POST"),
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      // Refresh the requests list
+      if (activeCommunity) {
+        openMemberRequestsModal(activeCommunity);
+      }
+    } catch (err) {
+      console.error(`Gagal ${action} permintaan:`, err);
+      alert(`Gagal ${action === 'approve' ? 'menyetujui' : 'menolak'} permintaan`);
+    }
+  };
 
   const openMemberModal = async (communityRow) => {
     // cegah double request untuk komunitas yang sama saat masih loading
@@ -528,6 +605,13 @@ export default function KomunitasDashboard() {
         size="lg"
       >
         <div className="p-6">
+          {/* Header */}
+          <div className="mb-6 pb-4 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Manajemen Anggota: {activeCommunity?.name || "-"}
+            </h2>
+          </div>
+
           {memberLoading ? (
             <div className="py-10 text-center text-gray-500 font-medium">Memuat anggota…</div>
           ) : memberError ? (
@@ -546,6 +630,37 @@ export default function KomunitasDashboard() {
               searchable={true}
               noControlBar={true}
               unUrlPage={true}
+              customTopBar={
+                <div className="flex items-center justify-between w-full">
+                  <ButtonComponent
+                    label="Tambah Baru"
+                    icon={faPlus}
+                    size="sm"
+                    paint="primary"
+                    onClick={() => {/* Implementasi tambah anggota baru */}}
+                  />
+                  <div className="flex items-center gap-3">
+                    <ButtonComponent
+                      label="Permintaan Bergabung"
+                      icon={faUserPlus}
+                      size="sm"
+                      paint="warning"
+                      variant="outline"
+                      rounded
+                      onClick={() => openMemberRequestsModal(activeCommunity)}
+                    />
+                    <ButtonComponent
+                      label="Riwayat Member"
+                      icon={faHistory}
+                      size="sm"
+                      paint="info"
+                      variant="outline"
+                      rounded
+                      onClick={() => openMemberHistoryModal(activeCommunity)}
+                    />
+                  </div>
+                </div>
+              }
               columnControl={{
                 custom: [
                   {
@@ -624,6 +739,193 @@ export default function KomunitasDashboard() {
                   <div className="flex items-center gap-2">
                   </div>
                 ),
+              }}
+            />
+          )}
+        </div>
+      </FloatingPageComponent>
+
+      {/* MEMBER REQUESTS MODAL */}
+      <FloatingPageComponent
+        show={modalMemberRequests}
+        onClose={() => {
+          setModalMemberRequests(false);
+          setMemberRequestsList([]);
+          setMemberRequestsError("");
+        }}
+        title={`Permintaan Bergabung: ${activeCommunity?.name || "-"}`}
+        size="lg"
+      >
+        <div className="p-6">
+          {memberRequestsLoading ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Memuat permintaan bergabung…</div>
+          ) : memberRequestsError ? (
+            <div className="py-10 text-center text-red-600 font-semibold">{memberRequestsError}</div>
+          ) : memberRequestsList.length === 0 ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Tidak ada permintaan bergabung.</div>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-6">
+                Daftar Permintaan Bergabung ({memberRequestsList.length})
+              </h3>
+              
+              <div className="space-y-3">
+                {memberRequestsList.map((request, index) => (
+                  <div key={request.id || index} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-white">
+                            {(request.user?.name || request.name || "?").charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {request.user?.name || request.name || "-"}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {request.user?.email || request.email || "-"}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Diminta pada: {request.created_at 
+                              ? new Date(request.created_at).toLocaleDateString("id-ID", {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                              : "-"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <ButtonComponent
+                          label="Setujui"
+                          icon={faCheck}
+                          size="xs"
+                          paint="success"
+                          variant="solid"
+                          rounded
+                          onClick={() => handleMemberRequest(request.id, 'approve')}
+                        />
+                        <ButtonComponent
+                          label="Tolak"
+                          icon={faTimes}
+                          size="xs"
+                          paint="danger"
+                          variant="outline"
+                          rounded
+                          onClick={() => handleMemberRequest(request.id, 'reject')}
+                        />
+                      </div>
+                    </div>
+                    {request.message && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">Pesan:</span> {request.message}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </FloatingPageComponent>
+
+      {/* MEMBER HISTORY MODAL */}
+      <FloatingPageComponent
+        show={modalMemberHistory}
+        onClose={() => {
+          setModalMemberHistory(false);
+          setMemberHistoryList([]);
+          setMemberHistoryError("");
+        }}
+        title={`Riwayat Member: ${activeCommunity?.name || "-"}`}
+        size="lg"
+      >
+        <div className="p-6">
+          {memberHistoryLoading ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Memuat riwayat member…</div>
+          ) : memberHistoryError ? (
+            <div className="py-10 text-center text-red-600 font-semibold">{memberHistoryError}</div>
+          ) : memberHistoryList.length === 0 ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Tidak ada riwayat member.</div>
+          ) : (
+            <TableSupervisionComponent
+              key={`member-history-${activeCommunity?.id}-${memberHistoryList.length}`}
+              title={`Riwayat Member (${memberHistoryList.length})`}
+              fetchControl={{
+                path: `admin/communities/${activeCommunity?.id}/member-history`,
+                includeHeaders: authHeaders("GET"),
+              }}
+              searchable={true}
+              noControlBar={true}
+              unUrlPage={true}
+              columnControl={{
+                custom: [
+                  {
+                    selector: "user_name",
+                    label: "Nama",
+                    sortable: true,
+                    item: (history) => (
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 bg-gradient-to-r from-gray-500 to-gray-700 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium text-white">
+                            {(history.user?.name || history.user_name || "?").charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">
+                            {history.user?.name || history.user_name || "-"}
+                          </div>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    selector: "action",
+                    label: "Aksi",
+                    item: (history) => (
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        history.action === 'joined' 
+                          ? 'bg-green-100 text-green-800'
+                          : history.action === 'left'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {history.action === 'joined' ? 'Bergabung' : 
+                         history.action === 'left' ? 'Keluar' : 
+                         history.action || '-'}
+                      </span>
+                    ),
+                  },
+                  {
+                    selector: "created_at",
+                    label: "Waktu",
+                    sortable: true,
+                    item: (history) => (
+                      <span className="text-sm text-gray-600">
+                        {history.created_at 
+                          ? new Date(history.created_at).toLocaleDateString("id-ID", {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : "-"
+                        }
+                      </span>
+                    ),
+                  },
+                ],
+              }}
+              actionControl={{
+                except: ["edit", "delete", "detail"],
               }}
             />
           )}
