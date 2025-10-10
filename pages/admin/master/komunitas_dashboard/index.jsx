@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { faPlus, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faUsers, faTrash } from "@fortawesome/free-solid-svg-icons";
 import Cookies from "js-cookie";
 import Image from "next/image";
 // import { useRouter } from "next/router";
@@ -542,6 +542,7 @@ export default function KomunitasDashboard() {
                 path: `admin/communities/${activeCommunity?.id}/members`,
                 includeHeaders: authHeaders("GET"),
               }}
+              updateEndpoint="" // Untuk delete: /admin/communities/{id}/members/{member_id}
               searchable={true}
               noControlBar={true}
               unUrlPage={true}
@@ -618,7 +619,11 @@ export default function KomunitasDashboard() {
                 ],
               }}
               actionControl={{
-                except: ["edit", "delete", "detail"], // Member modal hanya untuk view
+                except: ["edit", "detail"], // Hanya disable edit dan detail, izinkan delete
+                include: () => (
+                  <div className="flex items-center gap-2">
+                  </div>
+                ),
               }}
             />
           )}
