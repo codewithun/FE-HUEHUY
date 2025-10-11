@@ -5,18 +5,17 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
 import {
+  faBell,
   faChevronRight,
   faGlobe,
-  faIcons,
   faLocationDot,
   faMagnifyingGlass,
   faMessage,
-  faUsers,
-  faBell, // Tambahkan icon bell untuk notifikasi
+  faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Autoplay, Navigation } from 'swiper';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import {
@@ -101,11 +100,6 @@ export default function Index() {
     dataPrimaryCategories,
   ] = useGet({
     path: `primary-category`,
-  }, !apiReady);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [configLoading, codeConfig, dataConfig, resetConfig] = useGet({
-    path: 'admin/app-config/2',
   }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -269,27 +263,28 @@ export default function Index() {
                           );
                         })}
                         <Link href={`/app/category`}>
-                          <div className="w-full aspect-square bg-primary rounded-[12px] relative overflow-hidden flex justify-center items-center">
-                            {dataPrimaryCategories?.other_category_icon
-                              ?.picture_source ? (
-                              <img
-                                src={
-                                  dataPrimaryCategories?.other_category_icon
-                                    ?.picture_source
-                                }
-                                height={1000}
-                                width={1000}
-                                alt=""
-                                className="h-full aspect-square brightness-90"
-                              />
-                            ) : (
+                          <div className="w-full aspect-square bg-primary rounded-[12px] relative overflow-hidden flex justify-center items-center group hover:bg-primary-dark transition-colors duration-200">
+                            {/* Icon Grid Custom dengan hover effect */}
+                            <div className="grid grid-cols-2 gap-2 group-hover:scale-110 transition-transform duration-200">
+                              <div className="w-3 h-3 bg-white rounded-md opacity-80"></div>
+                              <div className="w-3 h-3 bg-white rounded-md opacity-60"></div>
+                              <div className="w-3 h-3 bg-white rounded-md opacity-60"></div>
+                              <div className="w-3 h-3 bg-white rounded-md opacity-40 relative">
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="text-primary text-xs font-bold">+</div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Alternatif: Icon dengan border */}
+                            {/* <div className="w-8 h-8 border-2 border-white border-dashed rounded-lg flex items-center justify-center">
                               <FontAwesomeIcon
-                                icon={faIcons}
-                                className="text-5xl text-teal-100"
+                                icon={faPlus}
+                                className="text-lg text-white"
                               />
-                            )}
-
-                            <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs">
+                            </div> */}
+                            
+                            <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs font-medium">
                               Lainnya
                             </div>
                           </div>
@@ -583,62 +578,46 @@ export default function Index() {
                 {
                   construction: {
                     name: 'phone',
-                    label: 'No Hp/WA',
-                    validations: { min: 10 },
+                    label: 'Nomor HP/WA',
+                    placeholder: 'Masukkan nomor HP/WA',
+                    validations: {
+                      required: true,
+                    },
                   },
                 },
               ]}
             />
-            
-            {/* TAMBAHAN: Button untuk skip form phone */}
-            <div className="mt-4">
-              <button 
+
+            <div className="mt-4 flex gap-2">
+              <ButtonComponent
+                type="button"
+                variant="outline"
+                label="Lewati"
                 onClick={() => {
-                  // Skip dengan mengupdate state atau redirect
                   localStorage.setItem('phone_form_skipped', 'true');
                   window.location.reload();
                 }}
-                className="w-full py-3 px-4 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
-              >
-                Lewati untuk sekarang
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  } else if (!loadingUser && !userProfile) {
-    // PERBAIKAN: Jika tidak ada user profile, redirect ke login
-    return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md">
-        <div className="container mx-auto relative z-10 pb-28">
-          <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 p-4 text-center">
-            <h1 className="text-lg mb-4">Sesi login telah berakhir</h1>
-            <p className="text-sm text-slate-600 mb-4">Silakan login kembali</p>
-            
-            <button 
-              onClick={() => window.location.href = '/'}
-              className="w-full py-3 px-4 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-colors"
-            >
-              Login Kembali
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  } else {
-    // Loading state
-    return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md">
-        <div className="container mx-auto relative z-10 pb-28">
-          <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 p-4 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-slate-600">Memuat profil...</p>
+              />
             </div>
           </div>
         </div>
       </div>
     );
   }
+
+  // Loading state atau belum ada data user
+  return (
+    <div className="lg:mx-auto lg:relative lg:max-w-md">
+      <div className="container mx-auto relative z-10 pb-28">
+        <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-pulse">
+              <div className="w-12 h-12 bg-primary rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-500">Memuat...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
