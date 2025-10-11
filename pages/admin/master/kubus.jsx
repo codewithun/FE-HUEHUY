@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
+import Image from 'next/image';
 
 import {
   ButtonComponent,
@@ -33,8 +34,10 @@ import ToggleComponent from '../../../components/construct.components/input/Togl
 import UpdateCubeStatusModal from '../../../components/construct.components/modal/UpdateCubeStatus.modal';
 import VoucherModal from '../../../components/construct.components/modal/Voucher.modal';
 import GrabListComponent from '../../../components/construct.components/partial-page/GrabList.component';
+import CropperDialog from '../../../components/crop.components/CropperDialog';
+import MultiSelectDropdown from '../../../components/form/MultiSelectDropdown';
 import { useUserContext } from '../../../context/user.context';
-import { token_cookie_name } from '../../../helpers';
+import { token_cookie_name, Decrypt } from '../../../helpers';
 
 // Tambahkan debug untuk komponen yang bermasalah
 if (typeof window !== 'undefined') {
@@ -66,8 +69,54 @@ function Kubus() {
     values.find(i => i.name === 'content_type')?.value || 'promo';
   const isInfo = (values) =>
     !!values.find(i => i.name === 'is_information')?.value?.at?.(0);
-  const isCT = (values, key) => getCT(values) === key;
   const isPromoOrVoucher = (values) => ['promo', 'voucher'].includes(getCT(values));
+
+  // Helper functions untuk Manager Tenant
+  const getDisplayName = useCallback((u) =>
+    u?.name || u?.full_name || u?.username || u?.display_name || `User #${u?.id}`, []);
+  const getPhone = useCallback((u) =>
+    u?.phone || u?.phone_number || u?.telp || u?.telpon || u?.mobile || u?.contact || "", []);
+
+  // normalisasi role → 'manager_tenant'
+  const norm = useCallback((v) =>
+    String(v ?? "").toLowerCase().replace(/[-\s]+/g, "_"), []);
+  const isManagerTenant = useCallback((u) => {
+    const target = "manager_tenant";
+    if (norm(u?.role?.name) === target) return true;   // { role: { name: '...' } }
+    if (norm(u?.role) === target) return true;         // { role: '...' }
+    if (norm(u?.user_role) === target) return true;    // { user_role: '...' }
+    if (Array.isArray(u?.roles)) {                     // ['...'] / [{ name:'...' }]
+      return u.roles.some((r) => norm(r?.name ?? r) === target);
+    }
+    return false;
+  }, [norm]);
+
+  // ROLE FILTER: hanya user (exclude admin/manager) - sama seperti di index.jsx
+  const isUserRole = useCallback((u) => {
+    if (!u) return false;
+    const denyList = [
+      'admin','superadmin','manager','tenant','tenant_manager','manager_tenant','staff','owner','operator','moderator'
+    ];
+
+    if (u.role && typeof u.role === 'object' && u.role.name) {
+      return !denyList.includes(u.role.name.toLowerCase());
+    }
+    if (typeof u.role === 'string') {
+      return !denyList.includes(u.role.toLowerCase());
+    }
+    if (Array.isArray(u.roles)) {
+      return !u.roles.some((r) => 
+        denyList.includes((r?.name ?? r)?.toLowerCase?.() ?? '')
+      );
+    }
+    const boolTrue = (v) => v === true || v === 1 || v === '1';
+    if (boolTrue(u.is_admin) || boolTrue(u.is_superadmin) || boolTrue(u.is_staff) || boolTrue(u.is_manager) || boolTrue(u.is_tenant_manager) || boolTrue(u.tenant_manager)) {
+      return false;
+    }
+    if (typeof u.level === 'string' && denyList.includes(u.level.toLowerCase())) return false;
+    if (typeof u.type === 'string' && denyList.includes(u.type.toLowerCase())) return false;
+    return true; // fallback permisif
+  }, []);
 
   const [selected, setSelected] = useState(null);
   const [formAds, setFormAds] = useState(false);
@@ -75,6 +124,189 @@ function Kubus() {
   const [updateStatus, setUpdateStatus] = useState(false);
   const [voucherModal, setVoucherModal] = useState(false);
   const { profile: Profile } = useUserContext();
+
+  // Manager Tenant states
+  const [merchantManagers, setMerchantManagers] = useState([]);
+  const [managersLoading, setManagersLoading] = useState(true);
+  const [managersError, setManagersError] = useState(null);
+
+  // User states untuk target penerima voucher
+  const [users, setUsers] = useState([]);
+
+  // Computed value untuk filtered users - harus setelah deklarasi users state
+  const onlyUsers = useMemo(() => (users || []).filter(isUserRole), [users, isUserRole]);
+
+  // Crop states
+  const [cropOpen, setCropOpen] = useState(false);
+  const [rawImageUrl, setRawImageUrl] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [currentFormControl, setCurrentFormControl] = useState(null);
+  // Owner key to tie a blob preview to a specific form instance
+  const [previewOwnerKey, setPreviewOwnerKey] = useState('');
+
+  // Form/list session (untuk remount TERKONTROL)
+  const [formSessionId] = useState(0);
+
+  // API helpers
+  const getApiBase = () => {
+    const raw = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    return raw.replace(/\/api\/?$/, "");
+  };
+
+  const authHeader = useCallback(() => {
+    const enc = Cookies.get(token_cookie_name);
+    const token = enc ? Decrypt(enc) : "";
+    return { Authorization: `Bearer ${token}` };
+  }, []);
+
+  const apiBase = getApiBase();
+  const MANAGERS_ENDPOINT = `${apiBase}/api/admin/users?roles[]=manager_tenant&roles[]=manager%20tenant&paginate=all`;
+
+  // Helper functions untuk crop functionality (sama seperti di voucher)
+  const toStoragePath = useCallback((raw) => {
+    if (!raw) return '';
+
+    const s = String(raw).trim();
+
+    // Sudah berupa path absolut FE
+    if (s.startsWith('/')) return s;
+
+    // Bentuk absolut ke BE → petakan ke path FE
+    // contoh: http://localhost:8000/storage/xxx → /storage/xxx
+    const m1 = s.match(/^https?:\/\/[^/]+\/(api\/)?storage\/(.+)$/i);
+    if (m1) return `/storage/${m1[2]}`;
+
+    // Kasus BE kirim "api/storage/xxx" → /storage/xxx
+    if (/^api\/storage\//i.test(s)) return `/${s.replace(/^api\//i, '')}`;
+
+    // Kasus BE kirim "storage/xxx" → /storage/xxx
+    if (/^storage\//i.test(s)) return `/${s}`;
+
+    // Kasus BE kirim hanya "vouchers/xxx" → /storage/vouchers/xxx
+    return `/storage/${s.replace(/^\/+/, '')}`;
+  }, []);
+
+  /** Tambahkan query param versing k=... */
+  const withVersion = useCallback((base, ver) =>
+    !base ? '' : `${base}${base.includes('?') ? '&' : '?'}k=${encodeURIComponent(String(ver ?? Date.now()))}`, []);
+
+  // File input handlers (crop)
+  const handleFileInput = useCallback((e, formControl, formKey) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(file);
+      setRawImageUrl(url);
+      setCurrentFormControl(formControl);
+      setPreviewOwnerKey(formKey);
+      setCropOpen(true);
+    } catch (err) {
+      alert('Error loading image: ' + err.message);
+    }
+  }, []);
+
+  const handleCropSave = useCallback(async (croppedFile) => {
+    setCropOpen(false);
+
+    // Cleanup blob URL lama
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    // Buat preview baru
+    const newPreviewUrl = URL.createObjectURL(croppedFile);
+    setPreviewUrl(newPreviewUrl);
+
+    // Set ke form control (immediate + delayed guard)
+    if (currentFormControl) {
+      currentFormControl.onChange(croppedFile);
+      // Delayed guard untuk memastikan form state ter-update
+      setTimeout(() => {
+        if (currentFormControl.value !== croppedFile) {
+          currentFormControl.onChange(croppedFile);
+        }
+      }, 100);
+    }
+  }, [previewUrl, currentFormControl]);
+
+  const handleRecrop = useCallback((formControl) => {
+    const existingValue = formControl.value;
+    let imageUrl = '';
+    if (previewUrl) {
+      imageUrl = previewUrl;
+    } else if (existingValue && typeof existingValue === 'string') {
+      imageUrl = toStoragePath(existingValue);
+    }
+    if (imageUrl) {
+      setRawImageUrl(imageUrl);
+      setCurrentFormControl(formControl);
+      setCropOpen(true);
+    }
+  }, [previewUrl, toStoragePath]);
+
+  // Helper untuk mendapatkan URL gambar dari server berdasarkan field name
+  const getServerImageUrl = useCallback((fieldName, values, selectedData) => {
+    const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
+    
+    let rawFromValues = '';
+    
+    // Mapping untuk different field names
+    if (fieldName === 'image') {
+      // Untuk cube logo
+      rawFromValues = valMap('image_url_versioned') || 
+                     valMap('image_url') || 
+                     valMap('image') || 
+                     selectedData?.image || '';
+    } else if (fieldName === 'ads[image]') {
+      // Banner image
+      rawFromValues = valMap('ads[image]') || 
+                     selectedData?.ads?.[0]?.image || 
+                     selectedData?.ads?.[0]?.picture_source || '';
+    } else if (fieldName === 'ads[image_1]') {
+      rawFromValues = valMap('ads[image_1]') || 
+                     selectedData?.ads?.[0]?.image_1 || 
+                     selectedData?.ads?.[0]?.image_1_source || '';
+    } else if (fieldName === 'ads[image_2]') {
+      rawFromValues = valMap('ads[image_2]') || 
+                     selectedData?.ads?.[0]?.image_2 || 
+                     selectedData?.ads?.[0]?.image_2_source || '';
+    } else if (fieldName === 'ads[image_3]') {
+      rawFromValues = valMap('ads[image_3]') || 
+                     selectedData?.ads?.[0]?.image_3 || 
+                     selectedData?.ads?.[0]?.image_3_source || '';
+    } else {
+      // Fallback untuk field lain seperti main form ads[image_1], ads[image_2], ads[image_3]
+      // Cek juga selectedData jika ada
+      rawFromValues = valMap(`${fieldName}_url_versioned`) || 
+                     valMap(`${fieldName}_url`) || 
+                     valMap(fieldName) || '';
+      
+      // Untuk main form, ads data mungkin ada di selectedData.ads[0]
+      if (!rawFromValues && selectedData?.ads?.[0]) {
+        const adData = selectedData.ads[0];
+        if (fieldName === 'ads[image_1]') {
+          rawFromValues = adData.image_1 || adData.image_1_source || '';
+        } else if (fieldName === 'ads[image_2]') {
+          rawFromValues = adData.image_2 || adData.image_2_source || '';
+        } else if (fieldName === 'ads[image_3]') {
+          rawFromValues = adData.image_3 || adData.image_3_source || '';
+        } else if (fieldName === 'ads[image]') {
+          rawFromValues = adData.image || adData.picture_source || '';
+        }
+      }
+    }
+
+    if (!rawFromValues) return '';
+    return toStoragePath(rawFromValues);
+  }, [toStoragePath]);
 
   useEffect(() => {
     if (Cookies.get(token_cookie_name) && Profile) {
@@ -84,6 +316,82 @@ function Kubus() {
       }
     }
   }, [Profile]);
+
+  // Fetch Manager Tenant
+  useEffect(() => {
+    const fetchManagers = async () => {
+      setManagersLoading(true);
+      setManagersError(null);
+      try {
+        const res = await fetch(MANAGERS_ENDPOINT, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            ...authHeader(),
+          },
+        });
+        if (res.ok) {
+          const result = await res.json();
+          let usersData = [];
+          if (result?.success && Array.isArray(result?.data)) usersData = result.data;
+          else if (Array.isArray(result?.data)) usersData = result.data;
+          else if (Array.isArray(result?.users)) usersData = result.users;
+          else if (Array.isArray(result)) usersData = result;
+
+          // Filter Manager Tenant
+          usersData = usersData.filter(isManagerTenant);
+          // Sort by name
+          usersData.sort((a, b) => (getDisplayName(a) || "").localeCompare(getDisplayName(b) || "", "id"));
+
+          setMerchantManagers(usersData);
+        } else {
+          const errorText = await res.text();
+          setManagersError(
+            `Gagal ambil manager tenant: ${res.status} ${errorText?.slice?.(0, 120) || ""}`
+          );
+          setMerchantManagers([]);
+        }
+      } catch (e) {
+        setManagersError(`Network error: ${e.message}`);
+        setMerchantManagers([]);
+      } finally {
+        setManagersLoading(false);
+      }
+    };
+    fetchManagers();
+  }, [MANAGERS_ENDPOINT, isManagerTenant, getDisplayName, authHeader]);
+
+  // Fetch Users untuk target penerima voucher
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/admin/users?paginate=all`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            ...authHeader(),
+          },
+        });
+        if (res.ok) {
+          const result = await res.json();
+          let usersData = [];
+          if (result?.success && Array.isArray(result?.data)) usersData = result.data;
+          else if (Array.isArray(result?.data)) usersData = result.data;
+          else if (Array.isArray(result?.users)) usersData = result.users;
+          else if (Array.isArray(result)) usersData = result;
+
+          setUsers(usersData);
+        } else {
+          setUsers([]);
+        }
+      } catch (e) {
+        setUsers([]);
+      }
+    };
+    fetchUsers();
+  }, [apiBase, authHeader]);
 
   let validate =
     selected?.ads?.at(0)?.start_validate &&
@@ -204,7 +512,7 @@ function Kubus() {
             },
             {
               selector: 'owner',
-              label: 'Pemilik',
+              label: 'Manager Tenant',
               sortable: true,
               width: '250px',
               item: ({ user, cube_type_id, corporate }) => {
@@ -232,7 +540,22 @@ function Kubus() {
         }}
         formControl={{
           contentType: 'multipart/form-data',
-          customDefaultValue: { 'ads[is_daily_grab]': 0, 'content_type': 'promo', 'cube_type_id': 1 },
+          customDefaultValue: { 
+            'ads[is_daily_grab]': 0, 
+            'content_type': 'promo', 
+            'cube_type_id': 1, 
+            'owner_user_id': '', 
+            'ads[validation_type]': 'auto',
+            'target_type': 'all',
+            'target_user_ids': [],
+            'community_id': ''
+          },
+          onModalOpen: (isEdit) => {
+            // Reset selected ketika mode add (bukan edit)
+            if (!isEdit) {
+              setSelected(null);
+            }
+          },
           custom: [
             // Content Type Selection (Radio Buttons)
             // === JENIS KONTEN (radio bulat hijau, sama gaya dgn "Hanya Di Waktu Tertentu") ===
@@ -366,7 +689,7 @@ function Kubus() {
               },
             },
 
-            // Pemilik Section
+            // Manager Tenant Section
             {
               type: 'custom',
               custom: ({ formControl, values }) => {
@@ -380,21 +703,37 @@ function Kubus() {
                     {cubeType == 2 ? (
                       <SelectComponent
                         name="corporate_id"
-                        label="Pemilik (Mitra)"
+                        label="Manager Tenant (Mitra)"
                         placeholder="Pilih Mitra..."
                         serverOptionControl={{ path: `admin/options/corporate` }}
                         {...formControl('corporate_id')}
                         searchable
                       />
                     ) : (
-                      <SelectComponent
-                        name="user_id"
-                        label="Pemilik"
-                        placeholder="Pilih user..."
-                        serverOptionControl={{ path: `admin/options/user` }}
-                        {...formControl('user_id')}
-                        searchable
-                      />
+                      <div>
+                        <SelectComponent
+                          name="owner_user_id"
+                          label="Manager Tenant *"
+                          placeholder={
+                            managersLoading
+                              ? "Loading manager tenant..."
+                              : merchantManagers.length === 0
+                                ? "Tidak ada manager tenant"
+                                : "Pilih manager tenant..."
+                          }
+                          required
+                          {...formControl('owner_user_id')}
+                          options={merchantManagers.map((u) => ({
+                            value: String(u.id),
+                            label: `${getDisplayName(u)}${getPhone(u) ? " — " + getPhone(u) : ""}`,
+                          }))}
+                          disabled={managersLoading}
+                          validations={{ required: true }}
+                        />
+                        {managersError && (
+                          <p className="text-red-500 text-sm mt-1">{managersError}</p>
+                        )}
+                      </div>
                     )}
                   </>
                 );
@@ -410,28 +749,131 @@ function Kubus() {
                   (i) => i.name == 'cube_type_id'
                 )?.value;
 
-                if (!InputImageComponent) {
-                  // eslint-disable-next-line no-console
-                  console.error('InputImageComponent is undefined');
-                  return <div>Error: InputImageComponent not found</div>;
+                // Tidak render jika bukan kubus merah/hijau
+                if (cubeType != 2 && cubeType != 4) {
+                  return null;
                 }
 
+                const fc = formControl('image');
+                const formId = values?.find?.((v) => v.name === 'id')?.value;
+                const cubeKey = `cube-${formSessionId}-${formId || 'new'}`;
+                const isEditMode = Boolean(formId && formId !== 'new');
+
+                // Server image - hanya untuk edit mode, tidak untuk create
+                const serverImageUrl = isEditMode ? getServerImageUrl('image', values, selected) : null;
+
+                const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
+                const imageVersion =
+                  valMap('image_updated_at') ||
+                  valMap('updated_at') ||
+                  formId ||
+                  Date.now();
+
+                const serverSrc = serverImageUrl ? withVersion(serverImageUrl, imageVersion) : '';
+
+                // Prioritas File object dan blob preview
+                const currentValue = fc.value;
+                const hasFileObject = currentValue instanceof File;
+                const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(cubeKey);
+
+                let finalPreviewSrc = '';
+                if (hasFileObject && canUseBlob) {
+                  finalPreviewSrc = previewUrl;
+                } else if (hasFileObject) {
+                  // Fallback: buat blob baru untuk File object
+                  finalPreviewSrc = URL.createObjectURL(currentValue);
+                } else if (serverSrc) {
+                  finalPreviewSrc = serverSrc;
+                }
+
+                // File input handler
+                const handleFileChange = (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  
+                  // Set ke form dan trigger crop
+                  fc.onChange(file);
+                  setPreviewOwnerKey(cubeKey);
+                  handleFileInput(e, fc, cubeKey);
+                };
+
+                const fileInfo = hasFileObject ? `File: ${currentValue.name} (${(currentValue.size / 1024).toFixed(1)}KB)` : '';
+                const label = cubeType == 2 ? 'Logo Kubus Merah' : 'Logo Kubus Hijau';
+
                 return (
-                  <>
-                    {cubeType == 2 ? (
-                      <InputImageComponent
-                        name="image"
-                        label="logo Kubus Merah"
-                        {...formControl('image')}
+                  <div className="form-control" key={`cube-img-field-${cubeKey}`}>
+                    <label className="label">
+                      <span className="label-text font-medium">{label}</span>
+                      {hasFileObject && (
+                        <span className="label-text-alt text-green-600 text-xs">📁 {fileInfo}</span>
+                      )}
+                    </label>
+
+                    <div className="mb-4">
+                      {finalPreviewSrc ? (
+                        <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                          <Image
+                            src={finalPreviewSrc}
+                            alt="Preview"
+                            width={192}
+                            height={192}
+                            className="max-w-full max-h-full object-contain"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-48 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                          <div className="text-center">
+                            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-gray-500 text-sm">Belum ada gambar dipilih</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="file-input file-input-bordered flex-1"
+                        onChange={handleFileChange}
+                        key={`cube-file-input-${cubeKey}-${imageVersion}`}
                       />
-                    ) : cubeType == 4 ? (
-                      <InputImageComponent
-                        name="image"
-                        label="logo Kubus Hijau"
-                        {...formControl('image')}
-                      />
-                    ) : null}
-                  </>
+                      {finalPreviewSrc && (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleRecrop(fc)}
+                            title="Crop ulang untuk menyesuaikan gambar"
+                          >
+                            Crop Ulang
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-error btn-sm"
+                            onClick={() => {
+                              // Clear preview dan form value
+                              if (previewUrl?.startsWith('blob:')) {
+                                URL.revokeObjectURL(previewUrl);
+                              }
+                              setPreviewUrl('');
+                              setPreviewOwnerKey('');
+                              fc.onChange('');
+                            }}
+                            title="Hapus gambar"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500 mt-1">
+                      PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
+                    </span>
+                  </div>
                 );
               },
             },
@@ -816,19 +1258,139 @@ function Kubus() {
                   ct === 'promo' || ct === 'voucher' || ct === 'iklan' || isInfo(values);
                 if (!show) return null;
 
+                // Helper untuk membuat field gambar dengan crop
+                const createImageField = (fieldName, label) => {
+                  const fc = formControl(fieldName);
+                  const formId = values?.find?.((v) => v.name === 'id')?.value;
+                  const imageKey = `${fieldName}-${formSessionId}-${formId || 'new'}`;
+                  const isEditMode = Boolean(formId && formId !== 'new');
+
+                  // Server image - hanya untuk edit mode, tidak untuk create
+                  const serverImageUrl = isEditMode ? getServerImageUrl(fieldName, values, selected) : null;
+
+                  const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
+                  const imageVersion =
+                    valMap(`${fieldName}_updated_at`) ||
+                    valMap('updated_at') ||
+                    formId ||
+                    Date.now();
+
+                  const serverSrc = serverImageUrl ? withVersion(serverImageUrl, imageVersion) : '';
+
+                  // Prioritas File object dan blob preview
+                  const currentValue = fc.value;
+                  const hasFileObject = currentValue instanceof File;
+                  const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(imageKey);
+
+                  let finalPreviewSrc = '';
+                  if (hasFileObject && canUseBlob) {
+                    finalPreviewSrc = previewUrl;
+                  } else if (hasFileObject) {
+                    // Fallback: buat blob baru untuk File object
+                    finalPreviewSrc = URL.createObjectURL(currentValue);
+                  } else if (serverSrc) {
+                    finalPreviewSrc = serverSrc;
+                  }
+
+                  // File input handler
+                  const handleFileChange = (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    // Set ke form dan trigger crop
+                    fc.onChange(file);
+                    setPreviewOwnerKey(imageKey);
+                    handleFileInput(e, fc, imageKey);
+                  };
+
+                  const fileInfo = hasFileObject ? `File: ${currentValue.name} (${(currentValue.size / 1024).toFixed(1)}KB)` : '';
+
+                  return (
+                    <div className="form-control" key={`${fieldName}-field-${imageKey}`}>
+                      <label className="label">
+                        <span className="label-text font-medium">{label}</span>
+                        {hasFileObject && (
+                          <span className="label-text-alt text-green-600 text-xs">📁 {fileInfo}</span>
+                        )}
+                      </label>
+
+                      <div className="mb-4">
+                        {finalPreviewSrc ? (
+                          <div className="w-full h-32 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                            <Image
+                              src={finalPreviewSrc}
+                              alt="Preview"
+                              width={128}
+                              height={128}
+                              className="max-w-full max-h-full object-contain"
+                              unoptimized
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-full h-32 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                            <div className="text-center">
+                              <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <p className="text-gray-500 text-xs">Belum ada gambar</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="file-input file-input-bordered file-input-sm"
+                          onChange={handleFileChange}
+                          key={`${fieldName}-file-input-${imageKey}-${imageVersion}`}
+                        />
+                        {finalPreviewSrc && (
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-xs"
+                              onClick={() => handleRecrop(fc)}
+                              title="Crop ulang"
+                            >
+                              Crop
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-error btn-xs"
+                              onClick={() => {
+                                // Clear preview dan form value
+                                if (previewUrl?.startsWith('blob:')) {
+                                  URL.revokeObjectURL(previewUrl);
+                                }
+                                setPreviewUrl('');
+                                setPreviewOwnerKey('');
+                                fc.onChange('');
+                              }}
+                              title="Hapus gambar"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500 mt-1">
+                        PNG/JPG/WEBP, maks 10MB
+                      </span>
+                    </div>
+                  );
+                };
+
                 return (
                   <div className="mt-6 space-y-4">
                     <div className="font-semibold text-base text-slate-700">
                       {isInfo(values) ? 'Gambar Kubus Informasi' : 'Gambar Konten'}
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                      {InputImageComponent && (
-                        <>
-                          <InputImageComponent name="ads[image_1]" label="Gambar 1" {...formControl('ads[image_1]')} />
-                          <InputImageComponent name="ads[image_2]" label="Gambar 2" {...formControl('ads[image_2]')} />
-                          <InputImageComponent name="ads[image_3]" label="Gambar 3" {...formControl('ads[image_3]')} />
-                        </>
-                      )}
+                      {createImageField('ads[image_1]', 'Gambar 1')}
+                      {createImageField('ads[image_2]', 'Gambar 2')}
+                      {createImageField('ads[image_3]', 'Gambar 3')}
                     </div>
                   </div>
                 );
@@ -838,13 +1400,51 @@ function Kubus() {
             // Banner Image
             {
               type: 'custom',
-              custom: ({ formControl }) => {
+              custom: ({ formControl, values }) => {
+                const fc = formControl('ads[image]');
+                const formId = values?.find?.((v) => v.name === 'id')?.value;
+                const bannerKey = `ads-image-${formSessionId}-${formId || 'new'}`;
+                const isEditMode = Boolean(formId && formId !== 'new');
 
-                if (!InputImageComponent) {
-                  // eslint-disable-next-line no-console
-                  console.error('InputImageComponent is undefined');
-                  return <div>Error: InputImageComponent not found</div>;
+                // Server image - hanya untuk edit mode, tidak untuk create
+                const serverImageUrl = isEditMode ? getServerImageUrl('ads[image]', values, selected) : null;
+
+                const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
+                const imageVersion =
+                  valMap('ads[image]_updated_at') ||
+                  valMap('updated_at') ||
+                  formId ||
+                  Date.now();
+
+                const serverSrc = serverImageUrl ? withVersion(serverImageUrl, imageVersion) : '';
+
+                // Prioritas File object dan blob preview
+                const currentValue = fc.value;
+                const hasFileObject = currentValue instanceof File;
+                const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(bannerKey);
+
+                let finalPreviewSrc = '';
+                if (hasFileObject && canUseBlob) {
+                  finalPreviewSrc = previewUrl;
+                } else if (hasFileObject) {
+                  // Fallback: buat blob baru untuk File object
+                  finalPreviewSrc = URL.createObjectURL(currentValue);
+                } else if (serverSrc) {
+                  finalPreviewSrc = serverSrc;
                 }
+
+                // File input handler
+                const handleFileChange = (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  
+                  // Set ke form dan trigger crop
+                  fc.onChange(file);
+                  setPreviewOwnerKey(bannerKey);
+                  handleFileInput(e, fc, bannerKey);
+                };
+
+                const fileInfo = hasFileObject ? `File: ${currentValue.name} (${(currentValue.size / 1024).toFixed(1)}KB)` : '';
 
                 return (
                   <div className="mt-6">
@@ -852,11 +1452,79 @@ function Kubus() {
                       Banner Gambar (Opsional)
                     </div>
                     <div className="px-32">
-                      <InputImageComponent
-                        name="ads[image]"
-                        label="Banner"
-                        {...formControl('ads[image]')}
-                      />
+                      <div className="form-control" key={`banner-field-${bannerKey}`}>
+                        <label className="label">
+                          <span className="label-text font-medium">Banner</span>
+                          {hasFileObject && (
+                            <span className="label-text-alt text-green-600 text-xs">📁 {fileInfo}</span>
+                          )}
+                        </label>
+
+                        <div className="mb-4">
+                          {finalPreviewSrc ? (
+                            <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                              <Image
+                                src={finalPreviewSrc}
+                                alt="Banner Preview"
+                                width={384}
+                                height={192}
+                                className="max-w-full max-h-full object-contain"
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-full h-48 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                              <div className="text-center">
+                                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <p className="text-gray-500 text-sm">Belum ada banner dipilih</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="file-input file-input-bordered flex-1"
+                            onChange={handleFileChange}
+                            key={`banner-file-input-${bannerKey}-${imageVersion}`}
+                          />
+                          {finalPreviewSrc && (
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() => handleRecrop(fc)}
+                                title="Crop ulang untuk menyesuaikan gambar"
+                              >
+                                Crop Ulang
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-error btn-sm"
+                                onClick={() => {
+                                  // Clear preview dan form value
+                                  if (previewUrl?.startsWith('blob:')) {
+                                    URL.revokeObjectURL(previewUrl);
+                                  }
+                                  setPreviewUrl('');
+                                  setPreviewOwnerKey('');
+                                  fc.onChange('');
+                                }}
+                                title="Hapus gambar"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1">
+                          PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -864,6 +1532,81 @@ function Kubus() {
             },
 
             // === PROMO/VOUCHER SPECIFIC SECTIONS ===
+
+            // Validation Type (for promo/voucher only)
+            {
+              type: 'custom',
+              custom: ({ values, setValues }) => {
+                const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
+                const isInformation = values.find((i) => i.name === 'is_information')?.value?.at?.(0);
+                if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
+
+                return (
+                  <div className="space-y-3">
+                    <SelectComponent
+                      name="ads[validation_type]"
+                      label="Tipe Validasi *"
+                      placeholder="Pilih tipe validasi..."
+                      required
+                      options={[
+                        { label: "Generate Otomatis (QR Code)", value: "auto" },
+                        { label: "Masukan Kode Unik", value: "manual" },
+                      ]}
+                      value={values.find((i) => i.name == 'ads[validation_type]')?.value || 'auto'}
+                      onChange={(value) => {
+                        setValues([
+                          ...values.filter((i) => i.name != 'ads[validation_type]'),
+                          { name: 'ads[validation_type]', value: value },
+                        ]);
+                        
+                        // Clear kode unik jika beralih ke auto
+                        if (value === 'auto') {
+                          setValues(prev => [
+                            ...prev.filter((i) => i.name != 'ads[code]'),
+                            { name: 'ads[code]', value: '' },
+                          ]);
+                        }
+                      }}
+                      validations={{ required: true }}
+                    />
+                  </div>
+                );
+              },
+            },
+
+            // Kode Unik (hanya tampil jika validation_type = manual)
+            {
+              type: 'custom',
+              custom: ({ values, setValues, errors }) => {
+                const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
+                const isInformation = values.find((i) => i.name === 'is_information')?.value?.at?.(0);
+                const validationType = values.find((i) => i.name == 'ads[validation_type]')?.value;
+                
+                if (isInformation || !['promo', 'voucher'].includes(contentType) || validationType !== 'manual') {
+                  return null;
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <InputComponent
+                      name="ads[code]"
+                      label="Kode Unik *"
+                      placeholder="Masukan kode unik untuk validasi manual..."
+                      required
+                      value={values.find((i) => i.name == 'ads[code]')?.value || ''}
+                      onChange={(e) => {
+                        setValues([
+                          ...values.filter((i) => i.name != 'ads[code]'),
+                          { name: 'ads[code]', value: e.target.value },
+                        ]);
+                      }}
+                      error={errors.find((i) => i.name == 'ads[code]')?.error}
+                      validations={{ required: true }}
+                    />
+                  </div>
+                );
+              },
+            },
 
             // Promo Settings (Unlimited, Daily, Quantity)
             {
@@ -1140,6 +1883,116 @@ function Kubus() {
               },
             },
 
+            // === VOUCHER TARGET RECIPIENT SECTION ===
+
+            // Target Type Selection for Voucher
+            {
+  type: 'custom',
+  custom: ({ formControl, values, setValues }) => {
+    const contentType = getCT(values);
+    if (contentType !== 'voucher') return null;
+
+    const fc = formControl('target_type');
+    const current = fc.value ?? 'all';
+
+    // Normalisasi onChange apapun bentuknya (event / {value,label} / string)
+    const handleChange = (valOrEvent) => {
+      const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
+
+      // 1) Update field target_type via formControl (biar konsisten dengan TableSupervision)
+      fc.onChange(newValue);
+
+      // 2) Hanya bersihkan field turunan, JANGAN set { name:'target_type' } lagi
+      setValues(prev =>
+        prev.filter(v => !['target_user_ids', 'community_id'].includes(v.name))
+      );
+    };
+
+    return (
+      <div className="space-y-3">
+        <div className="font-semibold text-base text-slate-700">Target Penerima Voucher</div>
+        <SelectComponent
+          name="target_type"
+          label="Siapa Yang Bisa Menggunakan Voucher?"
+          required
+          value={current}
+          onChange={handleChange}
+          options={[
+            { label: 'Semua User', value: 'all' },
+            { label: 'User Tertentu', value: 'user' },
+            { label: 'Komunitas Tertentu', value: 'community' },
+          ]}
+        />
+      </div>
+    );
+  },
+},
+
+            // Community Selection for Voucher
+            {
+              type: 'custom',
+              custom: ({ values, setValues }) => {
+                const contentType = getCT(values);
+                const targetType = values.find(i => i.name === 'target_type')?.value;
+                if (contentType !== 'voucher' || targetType !== 'community') return null;
+
+                const currentValue = values?.find(i => i.name === 'community_id')?.value || '';
+
+                return (
+                  <SelectComponent
+                    name="community_id"
+                    label="Pilih Komunitas"
+                    placeholder="Pilih komunitas yang bisa menggunakan voucher"
+                    required
+                    value={currentValue}
+                    onChange={(selectedValue) => {
+                      setValues([
+                        ...values.filter(i => i.name !== 'community_id'),
+                        { name: 'community_id', value: selectedValue }
+                      ]);
+                    }}
+                    serverOptionControl={{
+                      path: 'admin/options/community',
+                    }}
+                  />
+                );
+              },
+            },
+
+            // User Selection for Voucher
+            {
+              type: 'custom',
+              custom: ({ formControl, values }) => {
+                const contentType = getCT(values);
+                const targetType = values.find(i => i.name === 'target_type')?.value;
+                if (contentType !== 'voucher' || targetType !== 'user') return null;
+
+                return (
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text font-medium">Pilih Pengguna</span>
+                      <span className="label-text-alt text-red-500">*</span>
+                    </label>
+                    <MultiSelectDropdown
+                      options={onlyUsers.map((u) => ({
+                        label: `${u.name || u.email || `#${u.id}`}`,
+                        value: u.id,
+                      }))}
+                      value={formControl('target_user_ids').value || []}
+                      onChange={formControl('target_user_ids').onChange}
+                      placeholder="Pilih satu atau lebih pengguna..."
+                      maxHeight={200}
+                    />
+                    <label className="label">
+                      <span className="label-text-alt text-gray-500">
+                        Anda dapat memilih beberapa pengguna sekaligus
+                      </span>
+                    </label>
+                  </div>
+                );
+              },
+            },
+
             // === OPENING HOURS SECTION ===
 
             // Opening Hours Toggle and Input
@@ -1183,8 +2036,11 @@ function Kubus() {
         }}
         formUpdateControl={{
           customDefaultValue: (data) => {
+            // Set selected ke data yang sedang diedit
+            setSelected(data);
+            
             let worldID = data.world_id ? { world_id: data.world_id } : null;
-            let userID = data.user_id ? { user_id: data.user_id } : null;
+            let ownerUserID = data.user_id ? { owner_user_id: data.user_id } : null;
             let corporateID = data.corporate_id ? { corporate_id: data.corporate_id } : null;
 
             // tentukan content_type dari data
@@ -1203,25 +2059,42 @@ function Kubus() {
               is_recommendation: data?.is_recommendation ? 1 : 0,
               is_information: data?.is_information ? 1 : 0,
               link_information: data?.link_information || '',
-              map_lat: data?.map_lat,
-              map_lng: data?.map_lng,
+              // Simpan data map original untuk ditampilkan saat toggle aktif
+              _original_map_lat: data?.map_lat,
+              _original_map_lng: data?.map_lng,
+              _original_address: data?.address,
               status: data?.status,
 
               // penting: prefill untuk kondisi link
               content_type: contentType,
               'ads[promo_type]': ad?.promo_type || '',
 
+              // prefill validation type dan code (untuk promo/voucher)
+              'ads[validation_type]': ad?.validation_type || 'auto',
+              'ads[code]': ad?.code || '',
+
               // prefill link dari tag pertama
               'cube_tags[0][link]': data?.tags?.at(0)?.link || '',
 
+              // Kembalikan data map existing untuk menjaga konsistensi
+              // Server akan mengabaikan perubahan lokasi jika update_location = 0
+              'cube_tags[0][map_lat]': data?.tags?.at(0)?.map_lat || data?.map_lat || '',
+              'cube_tags[0][map_lng]': data?.tags?.at(0)?.map_lng || data?.map_lng || '',
+              'cube_tags[0][address]': data?.tags?.at(0)?.address || data?.address || '',
+
+              // Default value untuk field voucher target penerima
+              target_type: ad?.target_type || 'all',
+              target_user_ids: ad?.target_user_ids || [],
+              community_id: ad?.community_id || '',
+
               ...worldID,
-              ...userID,
+              ...ownerUserID,
               ...corporateID,
             };
           },
           contentType: 'multipart/form-data',
           custom: [
-            // --- PEMILIK (bisa diubah) ---
+            // --- MANAGER TENANT (bisa diubah) ---
             {
               type: 'custom',
               custom: ({ formControl, values }) => {
@@ -1235,21 +2108,37 @@ function Kubus() {
                     {cubeType == 2 ? (
                       <SelectComponent
                         name="corporate_id"
-                        label="Pemilik (Mitra)"
+                        label="Manager Tenant (Mitra)"
                         placeholder="Pilih Mitra..."
                         serverOptionControl={{ path: `admin/options/corporate` }}
                         {...formControl('corporate_id')}
                         searchable
                       />
                     ) : (
-                      <SelectComponent
-                        name="user_id"
-                        label="Pemilik"
-                        placeholder="Pilih user..."
-                        serverOptionControl={{ path: `admin/options/user` }}
-                        {...formControl('user_id')}
-                        searchable
-                      />
+                      <div>
+                        <SelectComponent
+                          name="owner_user_id"
+                          label="Manager Tenant *"
+                          placeholder={
+                            managersLoading
+                              ? "Loading manager tenant..."
+                              : merchantManagers.length === 0
+                                ? "Tidak ada manager tenant"
+                                : "Pilih manager tenant..."
+                          }
+                          required
+                          {...formControl('owner_user_id')}
+                          options={merchantManagers.map((u) => ({
+                            value: String(u.id),
+                            label: `${getDisplayName(u)}${getPhone(u) ? " — " + getPhone(u) : ""}`,
+                          }))}
+                          disabled={managersLoading}
+                          validations={{ required: true }}
+                        />
+                        {managersError && (
+                          <p className="text-red-500 text-sm mt-1">{managersError}</p>
+                        )}
+                      </div>
                     )}
                   </>
                 );
@@ -1269,22 +2158,40 @@ function Kubus() {
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
-                const isInfo = !!values?.find((i) => i.name == 'is_information')?.value;
+                const isInfo = !!values?.find(i => i.name == 'is_information')?.value;
                 if (isInfo) return null;
+
+                const changeMapActive = values?.find(i => i.name == 'change_map')?.value;
+
+                // ✅ Pastikan nilai lama tetap dikirim saat toggle off
+                const ensure = (name, fallbackName) => {
+                  const exists = values.some(i => i.name === name);
+                  if (!exists) {
+                    const fallback = values.find(i => i.name === fallbackName)?.value || '';
+                    if (fallback !== '') {
+                      setValues([...values, { name, value: fallback }]);
+                    }
+                  }
+                };
+
+                // Ambil data lokasi asli dari default
+                ensure('map_lat', '_original_map_lat');
+                ensure('map_lng', '_original_map_lng');
+                ensure('address', '_original_address');
+                ensure('cube_tags[0][map_lat]', '_original_map_lat');
+                ensure('cube_tags[0][map_lng]', '_original_map_lng');
+                ensure('cube_tags[0][address]', '_original_address');
 
                 return (
                   <ToggleComponent
                     label="Ubah Lokasi Kubus"
                     onChange={() =>
                       setValues([
-                        ...values.filter((i) => i.name != 'change_map'),
-                        {
-                          name: 'change_map',
-                          value: !values.find((i) => i.name == 'change_map')?.value,
-                        },
+                        ...values.filter(i => i.name != 'change_map'),
+                        { name: 'change_map', value: !changeMapActive },
                       ])
                     }
-                    checked={values?.find((i) => i.name == 'change_map')?.value}
+                    checked={!!changeMapActive}
                   />
                 );
               },
@@ -1295,35 +2202,114 @@ function Kubus() {
                 const isInfo = !!values?.find((i) => i.name == 'is_information')?.value;
                 if (isInfo) return null;
 
+                const change = values?.find(i => i.name == 'change_map')?.value;
+                const lat0 = values?.find(i => i.name == '_original_map_lat')?.value;
+                const lng0 = values?.find(i => i.name == '_original_map_lng')?.value;
+                const addr0 = values?.find(i => i.name == '_original_address')?.value;
+
+                if (!change) return null;
+
                 return (
-                  values?.find((i) => i.name == 'change_map')?.value === true && (
-                    <div className="mx-10 hover:mx-8 hover:border-4 border-green-500 rounded-lg">
-                      <InputMapComponent
-                        name="map"
-                        onChange={(e) => {
-                          setValues([
-                            ...values.filter(
-                              (i) =>
-                                ![
-                                  'map_lat',
-                                  'map_lng',
-                                  'address',
-                                  'cube_tags[0][map_lat]',
-                                  'cube_tags[0][map_lng]',
-                                  'cube_tags[0][address]',
-                                ].includes(i.name)
-                            ),
-                            { name: 'map_lat', value: e?.lat },
-                            { name: 'map_lng', value: e?.lng },
-                            { name: 'address', value: e?.address },
-                            { name: 'cube_tags[0][map_lat]', value: e?.lat },
-                            { name: 'cube_tags[0][map_lng]', value: e?.lng },
-                            { name: 'cube_tags[0][address]', value: e?.address },
+                  <div className="mx-10 hover:mx-8 hover:border-4 border-green-500 rounded-lg">
+                    <InputMapComponent
+                      name="map"
+                      initialLat={lat0}
+                      initialLng={lng0}
+                      initialAddress={addr0}
+                      onChange={(e) => {
+                        const keep = (arr, names) => arr.filter(i => !names.includes(i.name));
+                        const rm = [
+                          'map_lat', 'map_lng', 'address',
+                          'cube_tags[0][map_lat]', 'cube_tags[0][map_lng]', 'cube_tags[0][address]'
+                        ];
+                        setValues([
+                          ...keep(values, rm),
+                          { name: 'map_lat', value: e?.lat },
+                          { name: 'map_lng', value: e?.lng },
+                          { name: 'address', value: e?.address },
+                          { name: 'cube_tags[0][map_lat]', value: e?.lat },
+                          { name: 'cube_tags[0][map_lng]', value: e?.lng },
+                          { name: 'cube_tags[0][address]', value: e?.address },
+                        ]);
+                      }}
+                    />
+                  </div>
+                );
+              },
+            },
+
+            // --- TIPE VALIDASI (untuk promo/voucher saja) ---
+            {
+              type: 'custom',
+              custom: ({ values, setValues }) => {
+                const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
+                const isInformation = values?.find(i => i.name === 'is_information')?.value;
+                
+                if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
+
+                return (
+                  <div className="space-y-3">
+                    <SelectComponent
+                      name="ads[validation_type]"
+                      label="Tipe Validasi *"
+                      placeholder="Pilih tipe validasi..."
+                      required
+                      options={[
+                        { label: "Generate Otomatis (QR Code)", value: "auto" },
+                        { label: "Masukan Kode Unik", value: "manual" },
+                      ]}
+                      value={values?.find((i) => i.name == 'ads[validation_type]')?.value || 'auto'}
+                      onChange={(value) => {
+                        setValues([
+                          ...values.filter((i) => i.name != 'ads[validation_type]'),
+                          { name: 'ads[validation_type]', value: value },
+                        ]);
+                        
+                        // Clear kode unik jika beralih ke auto
+                        if (value === 'auto') {
+                          setValues(prev => [
+                            ...prev.filter((i) => i.name != 'ads[code]'),
+                            { name: 'ads[code]', value: '' },
                           ]);
-                        }}
-                      />
-                    </div>
-                  )
+                        }
+                      }}
+                      validations={{ required: true }}
+                    />
+                  </div>
+                );
+              },
+            },
+
+            // --- KODE UNIK (hanya tampil jika validation_type = manual) ---
+            {
+              type: 'custom',
+              custom: ({ values, setValues, errors }) => {
+                const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
+                const isInformation = values?.find(i => i.name === 'is_information')?.value;
+                const validationType = values?.find((i) => i.name == 'ads[validation_type]')?.value;
+                
+                if (isInformation || !['promo', 'voucher'].includes(contentType) || validationType !== 'manual') {
+                  return null;
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <InputComponent
+                      name="ads[code]"
+                      label="Kode Unik *"
+                      placeholder="Masukan kode unik untuk validasi manual..."
+                      required
+                      value={values?.find((i) => i.name == 'ads[code]')?.value || ''}
+                      onChange={(e) => {
+                        setValues([
+                          ...values.filter((i) => i.name != 'ads[code]'),
+                          { name: 'ads[code]', value: e.target.value },
+                        ]);
+                      }}
+                      error={errors?.find((i) => i.name == 'ads[code]')?.error}
+                      validations={{ required: true }}
+                    />
+                  </div>
                 );
               },
             },
@@ -1356,6 +2342,136 @@ function Kubus() {
                     }}
                     value={values.find((i) => i.name === 'cube_tags[0][link]')?.value || ''}
                   />
+                );
+              },
+            },
+
+            // --- HIDDEN FIELDS UNTUK MEMASTIKAN KONSISTENSI DATA ---
+            {
+              type: 'custom',
+              custom: ({ values, setValues }) => {
+                const changeMapActive = values?.find((i) => i.name == 'change_map')?.value;
+
+                // Tambahkan flag untuk server mengetahui apakah lokasi perlu diupdate
+                const hasUpdateLocationFlag = values.some((i) => i.name === 'update_location');
+
+                if (!hasUpdateLocationFlag) {
+                  setValues([
+                    ...values,
+                    { name: 'update_location', value: changeMapActive ? 1 : 0 }
+                  ]);
+                }
+
+                return null; // Hidden component
+              },
+            },
+
+            // === VOUCHER TARGET RECIPIENT SECTION FOR UPDATE ===
+
+            // Target Type Selection for Voucher (Update Mode)
+            {
+  type: 'custom',
+  custom: ({ formControl, values, setValues }) => {
+    const contentType = getCT(values);
+    if (contentType !== 'voucher') return null;
+
+    const fc = formControl('target_type');
+    const current = fc.value ?? 'all';
+
+    // Normalisasi onChange apapun bentuknya (event / {value,label} / string)
+    const handleChange = (valOrEvent) => {
+      const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
+
+      // 1) Update field target_type via formControl (biar konsisten dengan TableSupervision)
+      fc.onChange(newValue);
+
+      // 2) Hanya bersihkan field turunan, JANGAN set { name:'target_type' } lagi
+      setValues(prev =>
+        prev.filter(v => !['target_user_ids', 'community_id'].includes(v.name))
+      );
+    };
+
+    return (
+      <div className="space-y-3">
+        <div className="font-semibold text-base text-slate-700">Target Penerima Voucher</div>
+        <SelectComponent
+          name="target_type"
+          label="Siapa Yang Bisa Menggunakan Voucher?"
+          required
+          value={current}
+          onChange={handleChange}
+          options={[
+            { label: 'Semua User', value: 'all' },
+            { label: 'User Tertentu', value: 'user' },
+            { label: 'Komunitas Tertentu', value: 'community' },
+          ]}
+        />
+      </div>
+    );
+  },
+},
+
+            // Community Selection for Voucher (Update Mode)
+            {
+              type: 'custom',
+              custom: ({ values, setValues }) => {
+                const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
+                const targetType = values?.find(i => i.name === 'target_type')?.value;
+                if (contentType !== 'voucher' || targetType !== 'community') return null;
+
+                const currentValue = values?.find(i => i.name === 'community_id')?.value || '';
+
+                return (
+                  <SelectComponent
+                    name="community_id"
+                    label="Pilih Komunitas"
+                    placeholder="Pilih komunitas yang bisa menggunakan voucher"
+                    required
+                    value={currentValue}
+                    onChange={(selectedValue) => {
+                      setValues([
+                        ...values.filter(i => i.name !== 'community_id'),
+                        { name: 'community_id', value: selectedValue }
+                      ]);
+                    }}
+                    serverOptionControl={{
+                      path: 'admin/options/community',
+                    }}
+                  />
+                );
+              },
+            },
+
+            // User Selection for Voucher (Update Mode)
+            {
+              type: 'custom',
+              custom: ({ formControl, values }) => {
+                const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
+                const targetType = values?.find(i => i.name === 'target_type')?.value;
+                if (contentType !== 'voucher' || targetType !== 'user') return null;
+
+                return (
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text font-medium">Pilih Pengguna</span>
+                      <span className="label-text-alt text-red-500">*</span>
+                    </label>
+                    <MultiSelectDropdown
+                      options={onlyUsers.map((u) => ({
+                        label: `${u.name || u.email || `#${u.id}`}`,
+                        value: u.id,
+                      }))}
+                      value={formControl('target_user_ids').value || []}
+                      onChange={formControl('target_user_ids').onChange}
+                      placeholder="Pilih satu atau lebih pengguna..."
+                      maxHeight={200}
+                    />
+                    <label className="label">
+                      <span className="label-text-alt text-gray-500">
+                        Anda dapat memilih beberapa pengguna sekaligus
+                      </span>
+                    </label>
+                  </div>
                 );
               },
             }
@@ -1456,6 +2572,20 @@ function Kubus() {
             );
           },
         }}
+        onStoreSuccess={() => {
+          // Reset selected setelah berhasil create
+          setSelected(null);
+          setRefresh(!refresh);
+        }}
+        onUpdateSuccess={() => {
+          // Reset selected setelah berhasil update
+          setSelected(null);
+          setRefresh(!refresh);
+        }}
+        onModalClose={() => {
+          // Reset selected ketika modal ditutup
+          setSelected(null);
+        }}
       />
 
       <FloatingPageComponent
@@ -1524,6 +2654,8 @@ function Kubus() {
                   max_production_per_day: selected?.ads[0].max_production_per_day || '',
                   sell_per_day: selected?.ads[0].sell_per_day || '',
                   validation_time_limit: selected?.ads[0].validation_time_limit || '',
+                  validation_type: selected?.ads[0].validation_type || 'auto',
+                  code: selected?.ads[0].code || '',
                   content_type:
                     selected?.ads[0]?.type === 'voucher'
                       ? 'voucher'
@@ -1537,6 +2669,7 @@ function Kubus() {
                   // pakai nilai tab yang barusan di-set dari tombol (formAds)
                   type: formAds || 'promo',
                   is_daily_grab: 0,
+                  validation_type: 'auto',
                   content_type:
                     formAds === 'iklan' ? 'iklan' :
                       formAds === 'voucher' ? 'voucher' :
@@ -1604,44 +2737,362 @@ function Kubus() {
                   />
                 ),
               },
+
+              // --- TIPE VALIDASI (untuk promo/voucher saja) ---
+              {
+                col: 12,
+                type: 'custom',
+                custom: ({ formControl, values }) => {
+                  const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
+                  
+                  if (!['promo', 'voucher'].includes(contentType)) return null;
+
+                  return (
+                    <SelectComponent
+                      name="validation_type"
+                      label="Tipe Validasi *"
+                      placeholder="Pilih tipe validasi..."
+                      required
+                      {...formControl('validation_type')}
+                      options={[
+                        { label: "Generate Otomatis (QR Code)", value: "auto" },
+                        { label: "Masukan Kode Unik", value: "manual" },
+                      ]}
+                      validations={{ required: true }}
+                    />
+                  );
+                },
+              },
+
+              // --- KODE UNIK (hanya tampil jika validation_type = manual) ---
+              {
+                col: 12,
+                type: 'custom',
+                custom: ({ formControl, values }) => {
+                  const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
+                  const validationType = values?.find(i => i.name === 'validation_type')?.value;
+                  
+                  if (!['promo', 'voucher'].includes(contentType) || validationType !== 'manual') {
+                    return null;
+                  }
+
+                  return (
+                    <InputComponent
+                      name="code"
+                      label="Kode Unik *"
+                      placeholder="Masukan kode unik untuk validasi manual..."
+                      required
+                      {...formControl('code')}
+                      validations={{ required: true }}
+                    />
+                  );
+                },
+              },
+
               // 3 gambar konten
               // 3 gambar konten (tampil untuk semua jenis termasuk iklan)
               {
                 type: 'custom',
-                custom: ({ formControl }) => (
-                  <div className="mt-6 space-y-4">
-                    <div className="font-semibold text-base text-slate-700">Gambar</div>
-                    <div className="grid grid-cols-3 gap-4 px-6">
-                      <InputImageComponent name="ads[image_1]" label="Gambar 1" {...formControl('ads[image_1]')} />
-                      <InputImageComponent name="ads[image_2]" label="Gambar 2" {...formControl('ads[image_2]')} />
-                      <InputImageComponent name="ads[image_3]" label="Gambar 3" {...formControl('ads[image_3]')} />
+                custom: ({ formControl, values }) => {
+                  // Helper untuk membuat field gambar dengan crop di form ads
+                  const createAdsImageField = (fieldName, label) => {
+                    const fc = formControl(fieldName);
+                    const formId = values?.find?.((v) => v.name === 'id')?.value;
+                    const adsImageKey = `ads-${fieldName}-${formSessionId}-${formId || 'new'}`;
+                    const isEditMode = Boolean(selected?.ads?.at(0)?.id);
+
+                    // Debug: lihat data yang tersedia (hanya di development)
+                    // eslint-disable-next-line no-console
+                    if (process.env.NODE_ENV === 'development' && selected?.ads?.at(0)) {
+                      // eslint-disable-next-line no-console
+                      console.log('🔍 ADS DEBUG:', {
+                        fieldName,
+                        selectedAds: selected.ads[0],
+                        currentFormValue: fc.value,
+                        allValues: values,
+                        isEditMode
+                      });
+                    }
+
+                    // Server image - hanya untuk edit mode, tidak untuk create
+                    const serverImageUrl = isEditMode ? getServerImageUrl(fieldName, values, selected) : null;
+
+                    const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
+                    const imageVersion =
+                      valMap(`${fieldName}_updated_at`) ||
+                      valMap('updated_at') ||
+                      selected?.ads?.[0]?.updated_at ||
+                      formId ||
+                      Date.now();
+
+                    const serverSrc = serverImageUrl ? withVersion(serverImageUrl, imageVersion) : '';
+
+                    // Debug server image (hanya di development)
+                    // eslint-disable-next-line no-console
+                    if (process.env.NODE_ENV === 'development' && serverSrc) {
+                      // eslint-disable-next-line no-console
+                      console.log('🖼️ Server image:', {
+                        fieldName,
+                        serverImageUrl,
+                        serverSrc
+                      });
+                    }
+
+                    // Prioritas File object dan blob preview
+                    const currentValue = fc.value;
+                    const hasFileObject = currentValue instanceof File;
+                    const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(adsImageKey);
+
+                    let finalPreviewSrc = '';
+                    if (hasFileObject && canUseBlob) {
+                      finalPreviewSrc = previewUrl;
+                    } else if (hasFileObject) {
+                      // Fallback: buat blob baru untuk File object
+                      finalPreviewSrc = URL.createObjectURL(currentValue);
+                    } else if (serverSrc) {
+                      finalPreviewSrc = serverSrc;
+                    }
+
+                    // File input handler
+                    const handleFileChange = (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      // Set ke form dan trigger crop
+                      fc.onChange(file);
+                      setPreviewOwnerKey(adsImageKey);
+                      handleFileInput(e, fc, adsImageKey);
+                    };
+
+                    const fileInfo = hasFileObject ? `File: ${currentValue.name} (${(currentValue.size / 1024).toFixed(1)}KB)` : '';
+
+                    return (
+                      <div className="form-control" key={`${fieldName}-ads-field-${adsImageKey}`}>
+                        <label className="label">
+                          <span className="label-text font-medium">{label}</span>
+                          {hasFileObject && (
+                            <span className="label-text-alt text-green-600 text-xs">📁 {fileInfo}</span>
+                          )}
+                        </label>
+
+                        <div className="mb-4">
+                          {finalPreviewSrc ? (
+                            <div className="w-full h-32 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                              <Image
+                                src={finalPreviewSrc}
+                                alt="Preview"
+                                width={128}
+                                height={128}
+                                className="max-w-full max-h-full object-contain"
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-full h-32 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                              <div className="text-center">
+                                <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <p className="text-gray-500 text-xs">Belum ada gambar</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="file-input file-input-bordered file-input-sm"
+                            onChange={handleFileChange}
+                            key={`${fieldName}-ads-file-input-${adsImageKey}-${imageVersion}`}
+                          />
+                          {finalPreviewSrc && (
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-xs"
+                                onClick={() => handleRecrop(fc)}
+                                title="Crop ulang"
+                              >
+                                Crop
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-error btn-xs"
+                                onClick={() => {
+                                  // Clear preview dan form value
+                                  if (previewUrl?.startsWith('blob:')) {
+                                    URL.revokeObjectURL(previewUrl);
+                                  }
+                                  setPreviewUrl('');
+                                  setPreviewOwnerKey('');
+                                  fc.onChange('');
+                                }}
+                                title="Hapus gambar"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1">
+                          PNG/JPG/WEBP, maks 10MB
+                        </span>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div className="mt-6 space-y-4">
+                      <div className="font-semibold text-base text-slate-700">Gambar</div>
+                      <div className="grid grid-cols-3 gap-4 px-6">
+                        {createAdsImageField('ads[image_1]', 'Gambar 1')}
+                        {createAdsImageField('ads[image_2]', 'Gambar 2')}
+                        {createAdsImageField('ads[image_3]', 'Gambar 3')}
+                      </div>
                     </div>
-                  </div>
-                ),
+                  );
+                },
               },
 
               // Banner
               {
                 type: 'custom',
-                custom: ({ formControl }) => (
-                  <div className="mt-6">
-                    <div className="font-semibold text-base text-slate-700 mb-4">Banner Gambar (Opsional)</div>
-                    <div className="px-32">
-                      <InputImageComponent
-                        name="ads[image]"
-                        label="Banner"
-                        {...formControl('ads[image]')}
-                      />
+                custom: ({ formControl, values }) => {
+                  const fc = formControl('ads[image]');
+                  const formId = values?.find?.((v) => v.name === 'id')?.value;
+                  const adsBannerKey = `ads-banner-${formSessionId}-${formId || 'new'}`;
+
+                  // Server image - menggunakan helper function
+                  const serverImageUrl = getServerImageUrl('ads[image]', values, selected);
+                                       
+                  const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
+                  const imageVersion =
+                    valMap('ads[image]_updated_at') ||
+                    valMap('updated_at') ||
+                    selected?.ads?.[0]?.updated_at ||
+                    formId ||
+                    Date.now();
+
+                  const serverSrc = serverImageUrl ? withVersion(serverImageUrl, imageVersion) : '';
+
+                  // Prioritas File object dan blob preview
+                  const currentValue = fc.value;
+                  const hasFileObject = currentValue instanceof File;
+                  const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(adsBannerKey);
+
+                  let finalPreviewSrc = '';
+                  if (hasFileObject && canUseBlob) {
+                    finalPreviewSrc = previewUrl;
+                  } else if (hasFileObject) {
+                    // Fallback: buat blob baru untuk File object
+                    finalPreviewSrc = URL.createObjectURL(currentValue);
+                  } else if (serverSrc) {
+                    finalPreviewSrc = serverSrc;
+                  }
+
+                  // File input handler
+                  const handleFileChange = (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    // Set ke form dan trigger crop
+                    fc.onChange(file);
+                    setPreviewOwnerKey(adsBannerKey);
+                    handleFileInput(e, fc, adsBannerKey);
+                  };
+
+                  const fileInfo = hasFileObject ? `File: ${currentValue.name} (${(currentValue.size / 1024).toFixed(1)}KB)` : '';
+
+                  return (
+                    <div className="mt-6">
+                      <div className="font-semibold text-base text-slate-700 mb-4">Banner Gambar (Opsional)</div>
+                      <div className="px-32">
+                        <div className="form-control" key={`ads-banner-field-${adsBannerKey}`}>
+                          <label className="label">
+                            <span className="label-text font-medium">Banner</span>
+                            {hasFileObject && (
+                              <span className="label-text-alt text-green-600 text-xs">📁 {fileInfo}</span>
+                            )}
+                          </label>
+
+                          <div className="mb-4">
+                            {finalPreviewSrc ? (
+                              <div className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                                <Image
+                                  src={finalPreviewSrc}
+                                  alt="Banner Preview"
+                                  width={384}
+                                  height={192}
+                                  className="max-w-full max-h-full object-contain"
+                                  unoptimized
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-full h-48 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                <div className="text-center">
+                                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <p className="text-gray-500 text-sm">Belum ada banner dipilih</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="file-input file-input-bordered flex-1"
+                              onChange={handleFileChange}
+                              key={`ads-banner-file-input-${adsBannerKey}-${imageVersion}`}
+                            />
+                            {finalPreviewSrc && (
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  onClick={() => handleRecrop(fc)}
+                                  title="Crop ulang untuk menyesuaikan gambar"
+                                >
+                                  Crop Ulang
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-error btn-sm"
+                                  onClick={() => {
+                                    // Clear preview dan form value
+                                    if (previewUrl?.startsWith('blob:')) {
+                                      URL.revokeObjectURL(previewUrl);
+                                    }
+                                    setPreviewUrl('');
+                                    setPreviewOwnerKey('');
+                                    fc.onChange('');
+                                  }}
+                                  title="Hapus gambar"
+                                >
+                                  Hapus
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1">
+                            PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ),
+                  );
+                },
               },
 
               // Promo tak terbatas & Promo harian
               {
                 col: 12,
                 type: 'custom',
-                custom: ({ values, setValues, errors }) => {
+                custom: ({ values, setValues }) => {
                   const ct = values.find(i => i.name === 'content_type')?.value || 'promo';
                   if (ct === 'iklan') return null;
 
@@ -1797,7 +3248,7 @@ function Kubus() {
               {
                 col: 12,
                 type: 'custom',
-                custom: ({ values, setValues, errors }) => {
+                custom: ({ values, setValues }) => {
                   const ct = values.find(i => i.name === 'content_type')?.value || 'promo';
                   if (ct === 'iklan') return null;
 
@@ -1838,7 +3289,7 @@ function Kubus() {
               {
                 col: 12,
                 type: 'custom',
-                custom: ({ values, setValues, errors }) => {
+                custom: ({ values, setValues }) => {
                   const ct = values.find(i => i.name === 'content_type')?.value || 'promo';
                   if (ct === 'iklan') return null;
 
@@ -1999,6 +3450,15 @@ function Kubus() {
           setRefresh(!refresh);
           setVoucherModal(false);
         }}
+      />
+
+      {/* Cropper Dialog */}
+      <CropperDialog
+        open={cropOpen}
+        imageUrl={rawImageUrl}
+        onClose={() => setCropOpen(false)}
+        onSave={handleCropSave}
+        aspect={1}
       />
     </div>
   );
