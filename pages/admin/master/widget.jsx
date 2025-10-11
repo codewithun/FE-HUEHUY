@@ -40,16 +40,22 @@ export default function Widget() {
             <div className="flex justify-between">
               <div className="flex gap-2">
                 <ButtonComponent
-                  label="Beranda"
+                  label="Beranda Utama"
                   size="sm"
                   variant={type == 'home' ? 'solid' : 'outline'}
                   onClick={() => setType('home')}
                 />
                 <ButtonComponent
-                  label="Berburu"
+                  label="Beranda Promo"
                   size="sm"
                   variant={type == 'hunting' ? 'solid' : 'outline'}
                   onClick={() => setType('hunting')}
+                />
+                <ButtonComponent
+                  label="Beranda Komunitas"
+                  size="sm"
+                  variant={type == 'information' ? 'solid' : 'outline'}
+                  onClick={() => setType('information')}
                 />
               </div>
               <div>

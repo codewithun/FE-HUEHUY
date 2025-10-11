@@ -139,15 +139,20 @@ const normalizeCommunities = (raw) => {
   // backend kita sekarang balikin { data: [...] }, tapi handle array langsung
   const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
   return list.map((c) => {
-  // Normalisasi privacy dari beberapa kemungkinan field
+    // Normalisasi privacy dari beberapa kemungkinan field
     const privacyRaw = c.privacy ?? c.world_type ?? c.type ?? 'public';
     const privacyStr = String(privacyRaw || '').toLowerCase();
-    let privacy = (privacyStr === 'private' || privacyStr === 'pribadi') ? 'private' : privacyStr;
+
+    // Hanya "private" yang benar-benar private. "pribadi" tidak lagi dianggap private.
+    let privacy = (privacyStr === 'private') ? 'private' : (privacyStr || 'public');
+
+    // Tetap hormati flag boolean is_private/private bila ada.
     const isPrivateFlag = (c.is_private ?? c.private);
     if (typeof isPrivateFlag !== 'undefined') {
       const b = typeof isPrivateFlag === 'number' ? Boolean(isPrivateFlag) : Boolean(isPrivateFlag);
       if (b) privacy = 'private';
     }
+
     const isJoinedRaw = c.isJoined ?? c.is_joined ?? false;
     const isJoined = typeof isJoinedRaw === 'number'
       ? Boolean(isJoinedRaw)
