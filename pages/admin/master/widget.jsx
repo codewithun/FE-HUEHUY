@@ -1,16 +1,18 @@
+/* eslint-disable no-console */
 import {
-    faArrowDown,
-    faArrowUp,
-    faEdit,
-    faTrash,
+  faArrowDown,
+  faArrowUp,
+  faEdit,
+  faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import { useState } from 'react';
 import {
-    ButtonComponent,
-    IconButtonComponent,
-    ModalConfirmComponent,
-    SelectComponent,
-    TableSupervisionComponent,
+  ButtonComponent,
+  IconButtonComponent,
+  ModalConfirmComponent,
+  SelectComponent,
+  TableSupervisionComponent,
+  RadioComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { post } from '../../../helpers';
@@ -21,7 +23,7 @@ export default function Widget() {
   const [refresh, setRefresh] = useState(false);
   const [loadingUpdateStatus, setLoadingUpdateStatus] = useState(false);
   const [type, setType] = useState('home');
-  const [worldId, setWorldId] = useState(null);
+  const [communityId, setCommunityId] = useState(null);
 
   return (
     <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
@@ -31,7 +33,8 @@ export default function Widget() {
         fetchControl={{
           path: 'admin/dynamic-content',
           includeParams: {
-            world_id: (type == 'hunting' && worldId) || '',
+            // align with backend: community_id filtering
+            community_id: (type == 'hunting' && communityId) || '',
           },
         }}
         setToRefresh={refresh}
@@ -72,12 +75,16 @@ export default function Widget() {
           <div>
             {type == 'hunting' ? (
               <SelectComponent
-                placeholder="Filter Dunia"
+                placeholder="Filter Komunitas"
                 serverOptionControl={{
-                  path: 'admin/options/world',
+                  path: 'admin/communities',
+                  mapOptions: (data) =>
+                    Array.isArray(data)
+                      ? data.map((item) => ({ label: item.name, value: item.id }))
+                      : [],
                 }}
-                value={worldId}
-                onChange={(e) => setWorldId(e)}
+                value={communityId}
+                onChange={(e) => setCommunityId(e)}
               />
             ) : (
               ''
@@ -105,11 +112,11 @@ export default function Widget() {
               label: 'Halaman',
               sortable: true,
               width: '150px',
-              item: ({ type }) => (type == 'home' ? 'Beranda' : 'Berburu'),
+              item: ({ type }) => (type == 'home' ? 'Beranda' : type == 'hunting' ? 'Berburu' : 'Komunitas'),
             },
             {
               selector: 'status',
-              label: 'Halaman',
+              label: 'Status',
               sortable: true,
               width: '150px',
               item: ({ is_active }) =>
@@ -128,6 +135,8 @@ export default function Widget() {
         formControl={{
           customDefaultValue: {
             type: type,
+            // default community on hunting tab for convenience
+            community_id: type === 'hunting' ? communityId ?? '' : '',
           },
           custom: [
             {
@@ -147,12 +156,17 @@ export default function Widget() {
             {
               type: 'select',
               construction: {
-                name: 'world_id',
-                label: 'Dunia (Opsional)',
-                placeholder: 'Pilih dunia...',
+                name: 'community_id',
+                label: 'Komunitas (Opsional)',
+                placeholder: 'Pilih komunitas...',
                 serverOptionControl: {
-                  path: 'admin/options/world',
+                  path: 'admin/communities', // endpoint komunitas
+                  mapOptions: (data) =>
+                    Array.isArray(data)
+                      ? data.map((item) => ({ label: item.name, value: item.id }))
+                      : [],
                 },
+                // searchable: true,
               },
             },
             {
@@ -162,73 +176,78 @@ export default function Widget() {
                 label: 'Jenis Konten',
                 placeholder: 'Pilih jenis tampilan konten...',
                 options: [
-                  {
-                    label: 'Kotak Kategori',
-                    value: 'category',
-                  },
-                  {
-                    label: 'Terdekat',
-                    value: 'nearby',
-                  },
-                  {
-                    label: 'Kategori Iklan',
-                    value: 'ad_category',
-                  },
-                  {
-                    label: 'Rekomendasi',
-                    value: 'recommendation',
-                  },
-                  {
-                    label: 'Daftar Menyamping',
-                    value: 'vertical',
-                  },
-                  {
-                    label: 'Daftar Kebawah',
-                    value: 'horizontal',
-                  },
+                  { label: 'Kotak Kategori', value: 'category' },
+                  { label: 'Terdekat', value: 'nearby' },
+                  { label: 'Kategori Iklan', value: 'ad_category' },
+                  { label: 'Rekomendasi', value: 'recommendation' },
+                  { label: 'Promo / Iklan', value: 'promo' },
                 ],
               },
             },
             {
               type: 'custom',
               custom: ({ formControl, values }) => {
-                const content_type = values.find(
-                  (val) => val.name == 'content_type'
-                )?.value;
+                const content_type = values.find(val => val.name == 'content_type')?.value;
 
-                if (content_type == 'vertical' || content_type == 'horizontal')
+                if (content_type === 'promo')
                   return (
-                    <SelectComponent
-                      name="source_type"
-                      {...formControl('source_type')}
-                      label="Sumber Konten"
-                      placeholder="Pilih sumber konten..."
-                      options={[
-                        {
-                          label: 'Kubus Acak',
-                          value: 'shuffle_cube',
-                        },
-                        {
-                          label: 'Kubus Pilihan',
-                          value: 'cube',
-                        },
-                        {
-                          label: 'Iklan Huehuy',
-                          value: 'ad',
-                        },
-                      ]}
-                    />
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="flex-1">
+                        <SelectComponent
+                          name="source_type"
+                          {...formControl('source_type')}
+                          label="Sumber Konten"
+                          placeholder="Pilih sumber konten..."
+                          options={[
+                            { label: 'Kubus Acak', value: 'shuffle_cube' },
+                            { label: 'Kubus Pilihan', value: 'cube' },
+                            { label: 'Iklan Huehuy', value: 'ad' },
+                            { label: 'Promo/Iklan Pilihan', value: 'promo_selected' },
+                          ]}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        {/* Ganti dropdown ukuran dengan radio group */}
+                        <div className="flex flex-col gap-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Ukuran</label>
+                          <div className="flex flex-wrap gap-3 mt-1">
+                            {['S', 'M', 'L', 'XL', 'XL-Ads'].map(opt => (
+                              <RadioComponent
+                                key={opt}
+                                name="size"
+                                label={opt}
+                                value={opt}
+                                checked={String(
+                                  values.find(val => val.name == 'size')?.value ||
+                                  formControl('size')?.value ||
+                                  ''
+                                ) === opt}
+                                onChange={() => {
+                                  if (formControl('size') && typeof formControl('size').onChange === 'function') {
+                                    formControl('size').onChange(opt);
+                                  }
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   );
               },
             },
             {
               type: 'custom',
               custom: ({ formControl, values }) => {
-                const source_type = values.find(
-                  (val) => val.name == 'source_type'
-                )?.value;
+                const source_type = values.find(val => val.name == 'source_type')?.value;
 
-                if (source_type == 'cube')
+                if (source_type === 'cube') {
+                  // Debug: cek nilai yang dipilih
+                  const currentValue = formControl('dynamic_content_cubes')?.value;
+                  console.log('🔍 Selected cubes:', currentValue);
+                  console.log('🔍 Type of selected cubes:', typeof currentValue);
+                  console.log('🔍 Is array:', Array.isArray(currentValue));
+                  
                   return (
                     <SelectComponent
                       name="dynamic_content_cubes"
@@ -240,17 +259,30 @@ export default function Widget() {
                       }}
                       searchable
                       multiple
+                      onChange={(value) => {
+                        // Debug: cek perubahan nilai
+                        console.log('🔄 Cube selection changed:', value);
+                        console.log('🔄 Type of new value:', typeof value);
+                        console.log('🔄 Is array:', Array.isArray(value));
+                        
+                        // Panggil onChange asli
+                        if (formControl('dynamic_content_cubes')?.onChange) {
+                          formControl('dynamic_content_cubes').onChange(value);
+                        }
+                      }}
                     />
                   );
+                }
               },
             },
           ],
         }}
+
         formUpdateControl={{
           customDefaultValue: (data) => {
             return {
               ...data,
-              world_id: data.world_id || '',
+              community_id: data.community_id || '',
               source_type: data.source_type || '',
               dynamic_content_cubes: data?.dynamic_content_cubes?.map(
                 (item) => item.cube_id
@@ -344,11 +376,7 @@ export default function Widget() {
       />
 
       <ModalConfirmComponent
-        title={
-          'Yakin Ingin ' + updateStatus == 'active'
-            ? 'Mengaktifkan Widget'
-            : 'Nonaktifkan Widget'
-        }
+        title={updateStatus == 'active' ? 'Yakin Ingin Mengaktifkan Widget' : 'Yakin Ingin Nonaktifkan Widget'}
         show={updateStatus}
         onClose={() => {
           setUpdateStatus(false);

@@ -29,7 +29,11 @@ export type selectProps = {
   urlOption?: string;
   multiple?: boolean;
   register?: (name: string, validations?: validationRules) => void;
-  serverOptionControl?: getProps & { cacheName?: string };
+  serverOptionControl?: getProps & {
+    cacheName?: string;
+    // Optional mapper to transform API payload into [{label,value}] options
+    mapOptions?: (data: any) => selectOptionProps[];
+  };
   autoFocus?: boolean;
   tempOptions?: [
     { label: string; value: string | string[] | number | number[] }
