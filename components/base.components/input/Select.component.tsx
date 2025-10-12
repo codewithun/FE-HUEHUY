@@ -348,9 +348,7 @@ export function SelectComponent({
           value={
             !multiple
               ? String(inputValue)
-              : Array()
-                  .concat(inputValue)
-                  .map((val) => String(val))
+              : JSON.stringify(Array().concat(inputValue))
           }
           name={name}
         />
@@ -416,9 +414,10 @@ export function SelectComponent({
                       }
                     }, 140);
                   } else {
+                    // For multiple select, do NOT clear values on blur.
+                    // Just clear the input display/keyword, keep current selections.
                     setInputShowValue('');
                     searchServer && setKeyword('');
-                    onChange?.('');
                   }
                 }
 

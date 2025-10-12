@@ -60,7 +60,16 @@ export const useForm = (
     const formData = new FormData();
 
     formValues.map((val) => {
-      formData.append(val.name, val.value);
+      const v = val.value;
+      if (Array.isArray(v)) {
+        // Append arrays with [] notation for backend (e.g., dynamic_content_cubes[])
+        v.forEach((item) => formData.append(`${val.name}[]`, String(item)));
+      } else if (v !== undefined && v !== null && typeof v === 'object') {
+        // Serialize objects safely
+        formData.append(val.name, JSON.stringify(v));
+      } else {
+        formData.append(val.name, v != undefined ? String(v) : '');
+      }
     });
 
     const mutate = await post({

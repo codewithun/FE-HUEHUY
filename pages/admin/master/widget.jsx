@@ -256,6 +256,13 @@ export default function Widget() {
                       placeholder="Pilih kubus..."
                       serverOptionControl={{
                         path: 'admin/options/cube',
+                        mapOptions: (data) =>
+                          Array.isArray(data)
+                            ? data.map((item) => ({
+                                label: item?.label || item?.name || `Cube #${item?.id}`,
+                                value: item?.value || item?.id,
+                              }))
+                            : [],
                       }}
                       searchable
                       multiple

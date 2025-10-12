@@ -19,7 +19,7 @@ const CommunityPromoPage = () => {
   const [loading, setLoading] = useState(true);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-  
+
   // baseUrl = apiUrl tanpa trailing `/api`, tanpa trailing slash
   const baseUrl = (apiUrl || '')
     .replace(/\/api\/?$/, '')
@@ -126,7 +126,7 @@ const CommunityPromoPage = () => {
       const res = await fetch(`${apiUrl}/communities/${communityId}`, {
         headers: getAuthHeaders()
       });
-      
+
       if (res.ok) {
         const json = await res.json();
         const community = json.data || json;
@@ -157,7 +157,7 @@ const CommunityPromoPage = () => {
       const promoRes = await fetch(`${apiUrl}/communities/${communityId}/promos`, {
         headers: getAuthHeaders()
       });
-      
+
       if (promoRes.ok) {
         const promoJson = await promoRes.json();
         const promoData = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
@@ -174,29 +174,29 @@ const CommunityPromoPage = () => {
   const fetchWidgetData = async () => {
     try {
       console.log('🔍 Fetching widgets for community:', communityId);
-      
+
       // Fetch widgets untuk tipe 'hunting' dan community_id yang sesuai
       const widgetRes = await fetch(`${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}`, {
         headers: getAuthHeaders()
       });
-      
+
       if (widgetRes.ok) {
         const widgetJson = await widgetRes.json();
         const widgets = Array.isArray(widgetJson?.data) ? widgetJson.data : [];
-        
+
         console.log('🎛️ Raw widgets received:', widgets);
-        
+
         // Filter hanya widget yang aktif dan content_type = 'promo'
-        const activePromoWidgets = widgets.filter(widget => 
-          widget.is_active && 
+        const activePromoWidgets = widgets.filter(widget =>
+          widget.is_active &&
           widget.content_type === 'promo'
         );
-        
+
         console.log('🎛️ Active promo widgets:', activePromoWidgets);
-        
+
         // Sort berdasarkan level
         activePromoWidgets.sort((a, b) => (a.level || 0) - (b.level || 0));
-        
+
         setWidgetData(activePromoWidgets);
       } else {
         console.error('Failed to fetch widgets:', widgetRes.status);
@@ -213,54 +213,54 @@ const CommunityPromoPage = () => {
   // Komponen untuk render widget berdasarkan tipe dan ukuran
   const WidgetRenderer = ({ widget }) => {
     const { source_type, size, dynamic_content_cubes, name } = widget;
-    
+
     console.log('🎨 Rendering widget:', { name, source_type, size, cubes: dynamic_content_cubes?.length });
-    
+
     if (source_type === 'cube' && dynamic_content_cubes?.length > 0) {
       // Tentukan layout berdasarkan size
       const getLayoutConfig = (size) => {
         switch (size) {
           case 'S':
-            return { 
-              gridCols: 'grid-cols-2', 
-              itemSize: 'w-16 h-16', 
+            return {
+              gridCols: 'grid-cols-2',
+              itemSize: 'w-14 h-14',
               textSize: 'text-sm',
-              maxItems: 4 
+              gap: 'gap-0.5' // lebih rapat lagi untuk S
             };
           case 'M':
-            return { 
-              gridCols: 'grid-cols-2', 
-              itemSize: 'w-20 h-20', 
+            return {
+              gridCols: 'grid-cols-2',
+              itemSize: 'w-20 h-20',
               textSize: 'text-base',
-              maxItems: 6 
+              gap: 'gap-3'
             };
           case 'L':
-            return { 
-              gridCols: 'grid-cols-1', 
-              itemSize: 'w-24 h-24', 
+            return {
+              gridCols: 'grid-cols-1',
+              itemSize: 'w-24 h-24',
               textSize: 'text-lg',
-              maxItems: 3 
+              gap: 'gap-4'
             };
           case 'XL':
-            return { 
-              gridCols: 'grid-cols-1', 
-              itemSize: 'w-32 h-32', 
+            return {
+              gridCols: 'grid-cols-1',
+              itemSize: 'w-32 h-32',
               textSize: 'text-xl',
-              maxItems: 2 
+              gap: 'gap-4'
             };
           case 'XL-Ads':
-            return { 
-              gridCols: 'grid-cols-1', 
-              itemSize: 'w-full h-40', 
+            return {
+              gridCols: 'grid-cols-1',
+              itemSize: 'w-full h-40',
               textSize: 'text-xl',
-              maxItems: 1 
+              gap: 'gap-4'
             };
           default:
-            return { 
-              gridCols: 'grid-cols-2', 
-              itemSize: 'w-20 h-20', 
+            return {
+              gridCols: 'grid-cols-2',
+              itemSize: 'w-20 h-20',
               textSize: 'text-base',
-              maxItems: 4 
+              gap: 'gap-3'
             };
         }
       };
@@ -268,6 +268,7 @@ const CommunityPromoPage = () => {
       const layout = getLayoutConfig(size);
       console.log('📐 Layout config for size', size, ':', layout);
 
+      // Ubah grid menjadi flex horizontal scrollable
       return (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -276,11 +277,12 @@ const CommunityPromoPage = () => {
               <FontAwesomeIcon icon={faGift} className="text-purple-500 text-sm" />
             </div>
           </div>
-          <div className={`grid gap-3 ${layout.gridCols}`}>
-            {dynamic_content_cubes.slice(0, layout.maxItems).map((cubeData, index) => {
+          {/* Scrollable horizontal container */}
+          <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+            {dynamic_content_cubes.map((cubeData, index) => {
               const cube = cubeData.cube;
               if (!cube) return null;
-              
+
               // Ambil data dari ads jika tersedia
               const ad = cube.ads?.[0];
               const imageUrl = buildImageUrl(
@@ -293,12 +295,13 @@ const CommunityPromoPage = () => {
               const title = ad?.title || cube.label || 'Promo';
               const merchant = ad?.merchant || communityData?.name || 'Merchant';
 
-              // XL-Ads: Banner dua layer
+              // XL-Ads: Banner dua layer (horizontal card)
               if (size === 'XL-Ads') {
                 return (
-                  <div 
+                  <div
                     key={cube.id || index}
-                    className="relative rounded-[16px] overflow-hidden mb-4 cursor-pointer"
+                    className="relative rounded-[16px] overflow-hidden cursor-pointer flex-shrink-0"
+                    style={{ minWidth: 320, maxWidth: 400 }}
                     onClick={() => {
                       if (ad?.id) {
                         router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
@@ -329,27 +332,27 @@ const CommunityPromoPage = () => {
                         {widget.content_type === 'promo'
                           ? 'Promo'
                           : widget.content_type === 'recommendation'
-                          ? 'Lihat Rekomendasi'
-                          : widget.content_type === 'category'
-                          ? 'Lihat Kategori'
-                          : widget.content_type === 'ad_category'
-                          ? 'Lihat Iklan'
-                          : widget.content_type === 'nearby'
-                          ? 'Lihat Terdekat'
-                          : 'Lihat Detail'}
+                            ? 'Lihat Rekomendasi'
+                            : widget.content_type === 'category'
+                              ? 'Lihat Kategori'
+                              : widget.content_type === 'ad_category'
+                                ? 'Lihat Iklan'
+                                : widget.content_type === 'nearby'
+                                  ? 'Lihat Terdekat'
+                                  : 'Lihat Detail'}
                       </button>
                     </div>
                   </div>
                 );
               }
 
-              // Versi lain (S/M/L/XL)
+              // XL
               if (size === 'XL') {
                 return (
                   <div
                     key={cube.id || index}
-                    className="relative rounded-[16px] border-2 border-blue-200 bg-[#5C8DBB]/10 overflow-hidden mb-4 p-3"
-                    style={{ minHeight: 220 }}
+                    className="relative rounded-[16px] border-2 border-blue-200 bg-[#5C8DBB]/10 overflow-hidden p-3 flex-shrink-0"
+                    style={{ minWidth: 260, maxWidth: 320, minHeight: 220 }}
                     onClick={() => {
                       if (ad?.id) {
                         router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
@@ -391,31 +394,32 @@ const CommunityPromoPage = () => {
                         {widget.content_type === 'promo'
                           ? 'Promo'
                           : widget.content_type === 'recommendation'
-                          ? 'Lihat Rekomendasi'
-                          : widget.content_type === 'category'
-                          ? 'Lihat Kategori'
-                          : widget.content_type === 'ad_category'
-                          ? 'Lihat Iklan'
-                          : widget.content_type === 'nearby'
-                          ? 'Lihat Terdekat'
-                          : 'Lihat Detail'}
+                            ? 'Lihat Rekomendasi'
+                            : widget.content_type === 'category'
+                              ? 'Lihat Kategori'
+                              : widget.content_type === 'ad_category'
+                                ? 'Lihat Iklan'
+                                : widget.content_type === 'nearby'
+                                  ? 'Lihat Terdekat'
+                                  : 'Lihat Detail'}
                       </button>
                     </div>
                   </div>
                 );
               }
 
+              // L
               if (size === 'L') {
                 return (
                   <div
                     key={cube.id || index}
-                    className="flex items-center rounded-[16px] border-2 border-blue-200 bg-[#5C8DBB]/10 overflow-hidden mb-4 px-4 py-3 min-h-[110px]"
+                    className="flex items-center rounded-[16px] border-2 border-blue-200 bg-[#5C8DBB]/10 overflow-hidden px-4 py-3 min-h-[110px] flex-shrink-0"
+                    style={{ minWidth: 220, maxWidth: 260, cursor: 'pointer' }}
                     onClick={() => {
                       if (ad?.id) {
                         router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
                       }
                     }}
-                    style={{ cursor: 'pointer' }}
                   >
                     {/* Gambar di kiri */}
                     <div className="relative w-24 h-24 rounded-[12px] overflow-hidden flex-shrink-0 mr-4">
@@ -452,31 +456,31 @@ const CommunityPromoPage = () => {
                         {widget.content_type === 'promo'
                           ? 'Promo'
                           : widget.content_type === 'recommendation'
-                          ? 'Lihat Rekomendasi'
-                          : widget.content_type === 'category'
-                          ? 'Lihat Kategori'
-                          : widget.content_type === 'ad_category'
-                          ? 'Lihat Iklan'
-                          : widget.content_type === 'nearby'
-                          ? 'Lihat Terdekat'
-                          : 'Lihat Detail'}
+                            ? 'Lihat Rekomendasi'
+                            : widget.content_type === 'category'
+                              ? 'Lihat Kategori'
+                              : widget.content_type === 'ad_category'
+                                ? 'Lihat Iklan'
+                                : widget.content_type === 'nearby'
+                                  ? 'Lihat Terdekat'
+                                  : 'Lihat Detail'}
                       </button>
                     </div>
                   </div>
                 );
               }
 
-              // Tambahan untuk size 'S'
+              // S/M
               if (size === 'S' || size === 'M') {
-                // Konfigurasi ukuran untuk S dan M
                 const isM = size === 'M';
                 return (
                   <div
                     key={cube.id || index}
-                    className="flex flex-col items-stretch rounded-[16px] border-2 border-blue-200 bg-[#5C8DBB]/10 overflow-hidden mb-4 p-2 min-w-[120px] max-w-[180px]"
+                    className="flex flex-col items-stretch w-full rounded-[10px] border border-blue-200 bg-[#5C8DBB]/10 overflow-hidden p-0.5 flex-shrink-0"
                     style={{
-                      width: isM ? 180 : 135, // S lebih kecil
-                      minHeight: isM ? 200 : 150, // S lebih kecil
+                      minWidth: isM ? 140 : 100,
+                      maxWidth: isM ? 180 : 120,
+                      minHeight: isM ? 160 : 120,
                       cursor: 'pointer'
                     }}
                     onClick={() => {
@@ -487,9 +491,9 @@ const CommunityPromoPage = () => {
                   >
                     {/* Gambar di atas */}
                     <div
-                      className="relative w-full rounded-[10px] overflow-hidden mb-2"
+                      className="relative w-full rounded-[8px] overflow-hidden mb-1"
                       style={{
-                        height: isM ? 100 : 70 // S lebih kecil
+                        height: isM ? 90 : 60 // S lebih kecil
                       }}
                     >
                       <Image
@@ -522,24 +526,26 @@ const CommunityPromoPage = () => {
                         {widget.content_type === 'promo'
                           ? 'Promo'
                           : widget.content_type === 'recommendation'
-                          ? 'Lihat Rekomendasi'
-                          : widget.content_type === 'category'
-                          ? 'Lihat Kategori'
-                          : widget.content_type === 'ad_category'
-                          ? 'Lihat Iklan'
-                          : widget.content_type === 'nearby'
-                          ? 'Lihat Terdekat'
-                          : 'Lihat Detail'}
+                            ? 'Lihat Rekomendasi'
+                            : widget.content_type === 'category'
+                              ? 'Lihat Kategori'
+                              : widget.content_type === 'ad_category'
+                                ? 'Lihat Iklan'
+                                : widget.content_type === 'nearby'
+                                  ? 'Lihat Terdekat'
+                                  : 'Lihat Detail'}
                       </button>
                     </div>
                   </div>
                 );
               }
 
+              // Tambahan untuk size 'S'
               return (
-                <div 
+                <div
                   key={cube.id || index}
-                  className="bg-white rounded-[16px] shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50"
+                  className="bg-white rounded-[16px] shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50 flex-shrink-0"
+                  style={{ minWidth: 140, maxWidth: 180 }}
                   onClick={() => {
                     if (ad?.id) {
                       router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
@@ -548,7 +554,7 @@ const CommunityPromoPage = () => {
                 >
                   <div className={`flex p-4 ${size === 'XL' ? 'flex-col' : 'flex-row'}`}>
                     <div className={`rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100 ${layout.itemSize}`}>
-                      <Image 
+                      <Image
                         src={imageUrl}
                         alt={title}
                         width={size === 'XL' ? 128 : size === 'L' ? 96 : size === 'M' ? 80 : 64}
@@ -579,19 +585,19 @@ const CommunityPromoPage = () => {
         </div>
       );
     }
-    
+
     return null;
   };
 
   const PromoCard = ({ promo }) => (
-    <div 
+    <div
       className="bg-white rounded-[16px] shadow-sm overflow-hidden mb-4 hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50"
       onClick={() => handlePromoClick(promo.id)}
     >
       <div className="flex p-5">
         <div className="w-20 h-20 rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100">
-          <Image 
-            src={promo.image} 
+          <Image
+            src={promo.image}
             alt={promo.title}
             width={80}
             height={80}
@@ -644,7 +650,7 @@ const CommunityPromoPage = () => {
       {/* Content */}
       <div className="px-4 pb-24">
         <div className="lg:mx-auto lg:max-w-md">
-          
+
           {/* Render Widgets - Tampilkan sebelum promo reguler */}
           {widgetData.map((widget) => (
             <WidgetRenderer key={widget.id} widget={widget} />
@@ -661,8 +667,8 @@ const CommunityPromoPage = () => {
 
             {promoData.length > 0 ? (
               promoData
-                .filter(promo => 
-                  searchQuery === '' || 
+                .filter(promo =>
+                  searchQuery === '' ||
                   promo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                   promo.merchant.toLowerCase().includes(searchQuery.toLowerCase())
                 )
