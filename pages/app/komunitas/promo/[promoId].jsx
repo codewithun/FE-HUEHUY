@@ -380,41 +380,141 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     hasFetched.current = false;
   }, [effectivePromoId, communityId]);
 
+  // Tambah helper URL gambar + baseUrl
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const baseUrl = (apiUrl || '').replace(/\/api\/?$/, '').replace(/\/+$/, '');
+  const isAbs = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
+  const buildImageUrl = (raw) => {
+    const fallback = '/default-avatar.png';
+    if (typeof raw !== 'string') return fallback;
+    let url = raw.trim();
+    if (!url) return fallback;
+    if (/^\/?default-avatar\.png$/i.test(url)) return fallback;
+    if (isAbs(url)) return url;
+    let path = url.replace(/^\/+/, '');
+    path = path.replace(/^api\/storage\//i, 'storage/');
+    if (/^(ads|promos|uploads|images|files|banners)\//i.test(path)) {
+      path = `storage/${path}`;
+    }
+    return `${baseUrl}/${path}`.replace(/([^:]\/)\/+/g, '$1');
+  };
+
+  // Ubah fetchPromoDetails: urutan cubes → ads → promos/public
   const fetchPromoDetails = useCallback(async () => {
-    if (!router.isReady || !effectivePromoId || !communityId) return null;
-    if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null; // hard guard
+    if (!router.isReady || !effectivePromoId) return null;
+    if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null;
     if (hasFetched.current) return null;
     hasFetched.current = true;
 
     try {
       setLoading(true);
-      let response = await get({
-        path: `communities/${communityId}/promos/${effectivePromoId}`,
-      });
 
-      if (!(response?.status === 200 && response?.data?.data)) {
-        response = await get({ path: `promos/${effectivePromoId}/public` });
+      // 1) Coba dari CubeController (pakai cube id)
+      let response = await get({ path: `admin/cubes/${effectivePromoId}` });
+
+      if (response?.status === 200 && (response?.data?.data || response?.data)) {
+        const cube = response.data?.data || response.data;
+        const ads = Array.isArray(cube?.ads) ? cube.ads : [];
+        const ad = ads.find(a => a?.status === 'active') || ads[0] || null;
+
+        const image = buildImageUrl(
+          ad?.image_1 || ad?.image || ad?.picture_source || cube?.picture_source || '/default-avatar.png'
+        );
+
+        const transformed = {
+          id: ad?.id || cube?.id,
+          title: ad?.title || cube?.label || 'Promo',
+          merchant: ad?.merchant || cube?.user?.name || 'Merchant',
+          image,
+          distance: '3 KM',
+          location: cube?.address || '',
+          coordinates: '',
+          originalPrice: ad?.original_price ?? null,
+          discountPrice: ad?.discount_price ?? null,
+          discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
+          detail: ad?.description || '',
+          start_date: ad?.start_validate || null,
+          always_available: false,
+          expires_at: ad?.finish_validate || null,
+          end_date: ad?.finish_validate || null,
+          schedule: {
+            day: 'Setiap Hari',
+            details: ad?.finish_validate ? `Berlaku hingga ${new Date(ad.finish_validate).toLocaleDateString()}` : 'Berlaku',
+            time: '10:00 - 22:00',
+            timeDetails: 'Jam Berlaku Promo',
+          },
+          status: {
+            type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
+            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+          },
+          description: ad?.description || '',
+          seller: { name: cube?.user?.name || 'Admin', phone: cube?.user?.phone || '' },
+          terms: 'TERM & CONDITIONS APPLY',
+        };
+
+        setPromoData(transformed);
+        return transformed;
       }
 
+      // 2) Fallback: coba endpoint ads langsung jika ada
+      response = await get({ path: `admin/ads/${effectivePromoId}` });
+      if (response?.status === 200 && (response?.data?.data || response?.data)) {
+        const ad = response.data?.data || response.data;
+        const image = buildImageUrl(
+          ad?.image_1 || ad?.image || ad?.picture_source || '/default-avatar.png'
+        );
+        const transformed = {
+          id: ad?.id,
+          title: ad?.title || 'Promo',
+          merchant: ad?.merchant || 'Merchant',
+          image,
+          distance: '3 KM',
+          location: ad?.location || '',
+          coordinates: '',
+          originalPrice: ad?.original_price ?? null,
+          discountPrice: ad?.discount_price ?? null,
+          discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
+          detail: ad?.description || '',
+          start_date: ad?.start_validate || null,
+          always_available: false,
+          expires_at: ad?.finish_validate || null,
+          end_date: ad?.finish_validate || null,
+          schedule: {
+            day: 'Setiap Hari',
+            details: ad?.finish_validate ? `Berlaku hingga ${new Date(ad.finish_validate).toLocaleDateString()}` : 'Berlaku',
+            time: '10:00 - 22:00',
+            timeDetails: 'Jam Berlaku Promo',
+          },
+          status: {
+            type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
+            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+          },
+          description: ad?.description || '',
+          seller: { name: ad?.owner_name || 'Admin', phone: ad?.owner_contact || '' },
+          terms: 'TERM & CONDITIONS APPLY',
+        };
+        setPromoData(transformed);
+        return transformed;
+      }
+
+      // 3) Legacy terakhir (publik)
+      response = await get({ path: `promos/${effectivePromoId}/public` });
       if (response?.status === 200 && response?.data?.data) {
         const data = response.data.data;
         const transformedData = {
           id: data.id,
           title: data.title,
           merchant: data.owner_name || 'Merchant',
-          image: data.image_url || data.image || '/default-avatar.png',
+          image: buildImageUrl(data.image_url || data.image || '/default-avatar.png'),
           distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
           location: data.location || '',
           coordinates: '',
           originalPrice: data.original_price ?? null,
           discountPrice: data.discount_price ?? null,
           discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
-          // Tambah: detail promo dari backend
           detail: data.detail || '',
-          // Tambah: tanggal mulai & always_available
           start_date: data.start_date || data.start_at || data.starts_at || data.valid_from || null,
           always_available: Boolean(data.always_available),
-          // Tambah: tanggal selesai
           expires_at: data.end_date || data.expires_at || data.valid_until || null,
           end_date: data.end_date || null,
           schedule: {
@@ -434,6 +534,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         setPromoData(transformedData);
         return transformedData;
       }
+
       return null;
     } catch (err) {
       console.error('Error fetching promo details:', err);
@@ -441,7 +542,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, communityId]);
+  }, [router.isReady, effectivePromoId]);
 
   // Panggil fetch ketika bukan QR autoRegister
   useEffect(() => {
