@@ -12,14 +12,23 @@ const withPWA = require('next-pwa')({
 module.exports = withPWA({
   // ✅ Tambahan: proxy agar hindari CORS untuk file statis Laravel
   async rewrites() {
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const FILE_BASE = API_BASE.replace(/\/api\/?$/, '');
+    const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    const FILE_BASE = API_BASE.replace(/\/api$/i, '');
 
     return [
+      // Untuk file statis Laravel (storage) tetap ke FILE_BASE
       { source: '/storage/:path*',      destination: `${FILE_BASE}/storage/:path*` },
-      { source: '/promos/:path*',       destination: `${FILE_BASE}/promos/:path*` },
       { source: '/api/storage/:path*',  destination: `${FILE_BASE}/storage/:path*` },
+
+      // map DB path 'ads/...'(public) ke 'storage/ads/...'
+      { source: '/ads/:path*',          destination: `${FILE_BASE}/storage/ads/:path*` },
+
+      // Untuk endpoint promos/public gunakan API_BASE (termasuk /api jika ada)
+      { source: '/promos/:path*',       destination: `${FILE_BASE}/promos/:path*` },
       { source: '/images/:path*',       destination: `${FILE_BASE}/images/:path*` },
+
+      // opsional: supaya fallback lama tidak 400
+      { source: '/api/placeholder/:w/:h', destination: '/default-avatar.png' },
     ];
   },
 
@@ -35,23 +44,19 @@ module.exports = withPWA({
   images: {
     // (tetap persis seperti punyamu)
     remotePatterns: [
-      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/promos/**' },
-      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/promos/**' },
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/**' },
       { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/storage/**' },
-      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/api/storage/**' },
-      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/api/storage/**' },
+      // izinkan jika backend kadang melayani /ads/** langsung
+      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/ads/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/ads/**' },
 
-      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/promos/**' },
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/storage/**' },
-      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/api/storage/**' },
+      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/ads/**' },
 
-      { protocol: 'https', hostname: '159.223.48.146', pathname: '/promos/**' },
-      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/promos/**' },
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/storage/**' },
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/storage/**' },
-      { protocol: 'https', hostname: '159.223.48.146', pathname: '/api/storage/**' },
-      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/api/storage/**' },
+      { protocol: 'https', hostname: '159.223.48.146', pathname: '/ads/**' },
+      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/ads/**' },
     ],
     // unoptimized: true,
   },

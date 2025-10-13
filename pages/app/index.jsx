@@ -74,7 +74,7 @@ export default function Index() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingMenu, codeMenu, dataMenu] = useGet({
-    path: `dynamic-content?type=home`,
+    path: `admin/dynamic-content?type=home`,
   }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

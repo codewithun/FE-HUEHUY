@@ -89,19 +89,31 @@ export function SelectComponent({
       );
 
       if (cacheData) {
+        // If cache already stores normalized options, use as-is
         setDataOptions(cacheData);
         setLoadingOption(false);
       } else {
         const mutateOptions =
           serverOptionControl?.path != null &&
           (await get(serverOptionControl || {}));
-        setDataOptions(mutateOptions?.data);
+        const raw = mutateOptions?.data;
+        const payload = Array.isArray(raw?.data) ? raw.data : raw;
+        const mapped = serverOptionControl?.mapOptions
+          ? serverOptionControl.mapOptions(payload)
+          : Array.isArray(payload)
+            ? payload.map((item: any) => ({
+                label: item?.label ?? item?.name ?? String(item?.id ?? ''),
+                value:
+                  item?.value ?? item?.id ?? item?.code ?? item?.key ?? item,
+              }))
+            : [];
+        setDataOptions(mapped);
         setShowOption(true);
         standIn.set({
           key:
             serverOptionControl?.cacheName ||
             `option_${serverOptionControl?.path}`,
-          data: mutateOptions?.data,
+          data: mapped,
           expired: 5,
         });
         setLoadingOption(false);
@@ -136,9 +148,16 @@ export function SelectComponent({
       if (mutateOptions.status == '200') {
         setIsInvalid('');
       }
-      let newOptions = mutateOptions?.data?.map((item: any) => {
-        return item;
-      });
+      const raw = mutateOptions?.data;
+      const payload = Array.isArray(raw?.data) ? raw.data : raw;
+      let newOptions: selectOptionProps[] = serverOptionControl?.mapOptions
+        ? serverOptionControl.mapOptions(payload)
+        : Array.isArray(payload)
+        ? payload.map((item: any) => ({
+            label: item?.label ?? item?.name ?? String(item?.id ?? ''),
+            value: item?.value ?? item?.id ?? item?.code ?? item?.key ?? item,
+          }))
+        : [];
       if (newOptions.length > 0) {
         setDataOptions(newOptions);
         setShowOption(true);
@@ -329,9 +348,7 @@ export function SelectComponent({
           value={
             !multiple
               ? String(inputValue)
-              : Array()
-                  .concat(inputValue)
-                  .map((val) => String(val))
+              : JSON.stringify(Array().concat(inputValue))
           }
           name={name}
         />
@@ -397,9 +414,10 @@ export function SelectComponent({
                       }
                     }, 140);
                   } else {
+                    // For multiple select, do NOT clear values on blur.
+                    // Just clear the input display/keyword, keep current selections.
                     setInputShowValue('');
                     searchServer && setKeyword('');
-                    onChange?.('');
                   }
                 }
 

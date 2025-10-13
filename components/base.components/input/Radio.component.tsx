@@ -26,18 +26,18 @@ export function RadioComponent({
   return (
     <>
       <input
-        type="checkbox"
+        type="radio"
         className="hidden"
-        id={'radio_' + name}
+        id={`radio_${name}_${String(value ?? '')}`}
         name={name}
-        onChange={onChange}
-        checked={checked}
+        onChange={() => onChange?.()}
+        checked={!!checked}
         value={value}
         disabled={disabled}
       />
 
       <label
-        htmlFor={'radio_' + name}
+        htmlFor={`radio_${name}_${String(value ?? '')}`}
         className={`
           flex gap-2 items-center cursor-pointer
           ${disabled && 'pointer-events-none opacity-60'}

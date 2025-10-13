@@ -1,6 +1,7 @@
 import {
   faArrowLeft,
   faCheckCircle,
+  faLock,
   faSearch,
   faTimes,
   faUsers
@@ -85,6 +86,38 @@ const joinCommunityAPI = async (communityId) => {
   return res.json();
 };
 
+// Kirim permintaan bergabung (untuk komunitas private)
+const requestJoinCommunityAPI = async (communityId) => {
+  const apiUrl = getApiBase();
+  const headers = getAuthHeaders();
+
+  if (!("Authorization" in headers)) {
+    throw new Error("Sesi habis. Silakan login ulang.");
+  }
+
+  // Coba beberapa endpoint umum: pilih yang tersedia di backend
+  const candidates = [
+    { url: `${apiUrl}/api/communities/${communityId}/join-request`, method: 'POST', body: undefined },
+    { url: `${apiUrl}/api/member-requests`, method: 'POST', body: JSON.stringify({ community_id: communityId }) },
+  ];
+
+  let lastErr;
+  for (const c of candidates) {
+    try {
+      const res = await fetch(c.url, { method: c.method, headers, body: c.body });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        lastErr = new Error(err?.message || err?.error || `Gagal mengirim permintaan bergabung (${res.status})`);
+        continue;
+      }
+      return await res.json().catch(() => ({}));
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('Gagal mengirim permintaan bergabung');
+};
+
 /**
  * @typedef {Object} CommunityItem
  * @property {number} id
@@ -106,10 +139,29 @@ const normalizeCommunities = (raw) => {
   // backend kita sekarang balikin { data: [...] }, tapi handle array langsung
   const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
   return list.map((c) => {
+    // Normalisasi privacy dari beberapa kemungkinan field
+    const privacyRaw = c.privacy ?? c.world_type ?? c.type ?? 'public';
+    const privacyStr = String(privacyRaw || '').toLowerCase();
+
+    // Hanya "private" yang benar-benar private. "pribadi" tidak lagi dianggap private.
+    let privacy = (privacyStr === 'private') ? 'private' : (privacyStr || 'public');
+
+    // Tetap hormati flag boolean is_private/private bila ada.
+    const isPrivateFlag = (c.is_private ?? c.private);
+    if (typeof isPrivateFlag !== 'undefined') {
+      const b = typeof isPrivateFlag === 'number' ? Boolean(isPrivateFlag) : Boolean(isPrivateFlag);
+      if (b) privacy = 'private';
+    }
+
     const isJoinedRaw = c.isJoined ?? c.is_joined ?? false;
     const isJoined = typeof isJoinedRaw === 'number'
       ? Boolean(isJoinedRaw)
       : Boolean(isJoinedRaw);
+
+    const hasRequestedRaw = c.hasRequested ?? c.has_requested ?? c.requestPending ?? false;
+    const hasRequested = typeof hasRequestedRaw === 'number'
+      ? Boolean(hasRequestedRaw)
+      : Boolean(hasRequestedRaw);
 
     const membersNum = Number(c.members ?? 0);
     return {
@@ -118,9 +170,10 @@ const normalizeCommunities = (raw) => {
       description: c.description ?? '',
       category: c.category ?? '',
       logo: c.logo ?? null,
-      privacy: c.privacy ?? 'public',
+      privacy,
       isVerified: Boolean(c.isVerified ?? c.is_verified ?? false),
       isJoined,
+      hasRequested,
       members: Number.isFinite(membersNum) ? membersNum : 0,
       activePromos: Number(c.activePromos ?? 0),
     };
@@ -457,29 +510,44 @@ export default function Komunitas() {
         {showJoinPopup && selectedCommunity && (
           <JoinConfirmationPopup
             community={selectedCommunity}
+            isPrivate={String(selectedCommunity?.privacy || '').toLowerCase() === 'private'}
             onConfirm={async () => {
               try {
-                await joinCommunityAPI(selectedCommunity.id);
-                setShowJoinPopup(false);
-                setSelectedCommunity(null);
+                const isPriv = String(selectedCommunity?.privacy || '').toLowerCase() === 'private';
+                if (isPriv) {
+                  await requestJoinCommunityAPI(selectedCommunity.id);
+                  setShowJoinPopup(false);
+                  setSelectedCommunity(null);
 
-                // Optimistic + update angka members
-                setCommunities(prev =>
-                  prev.map(c =>
-                    c.id === selectedCommunity.id
-                      ? { ...c, isJoined: true, members: Math.max(0, (c.members || 0) + 1) }
-                      : c
-                  )
-                );
-                setActiveTab('komunitasku');
+                  // Tandai sebagai sudah mengirim permintaan (pending)
+                  setCommunities(prev => prev.map(c => (
+                    c.id === selectedCommunity.id ? { ...c, hasRequested: true } : c
+                  )));
 
-                // Broadcast ke tab/halaman lain
-                localStorage.setItem(
-                  'community:membership',
-                  JSON.stringify({ id: selectedCommunity.id, action: 'join', delta: +1, at: Date.now() })
-                );
+                  alert('Permintaan bergabung terkirim. Menunggu persetujuan admin.');
+                } else {
+                  await joinCommunityAPI(selectedCommunity.id);
+                  setShowJoinPopup(false);
+                  setSelectedCommunity(null);
+
+                  // Optimistic + update angka members
+                  setCommunities(prev =>
+                    prev.map(c =>
+                      c.id === selectedCommunity.id
+                        ? { ...c, isJoined: true, members: Math.max(0, (c.members || 0) + 1) }
+                        : c
+                    )
+                  );
+                  setActiveTab('komunitasku');
+
+                  // Broadcast ke tab/halaman lain
+                  localStorage.setItem(
+                    'community:membership',
+                    JSON.stringify({ id: selectedCommunity.id, action: 'join', delta: +1, at: Date.now() })
+                  );
+                }
               } catch (error) {
-                alert(error?.message || 'Gagal bergabung');
+                alert(error?.message || (String(selectedCommunity?.privacy || '').toLowerCase() === 'private' ? 'Gagal mengirim permintaan bergabung' : 'Gagal bergabung'));
                 setShowJoinPopup(false);
                 setSelectedCommunity(null);
               }
@@ -502,6 +570,7 @@ export default function Komunitas() {
  * ========================= */
 function JoinConfirmationPopup({
   community,
+  isPrivate,
   onConfirm,
   onCancel,
 }) {
@@ -520,7 +589,7 @@ function JoinConfirmationPopup({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-auto shadow-2xl">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800">Bergabung Komunitas</h3>
+          <h3 className="text-lg font-bold text-slate-800">{isPrivate ? 'Minta Bergabung' : 'Bergabung Komunitas'}</h3>
           <button
             onClick={onCancel}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
@@ -555,12 +624,16 @@ function JoinConfirmationPopup({
 
         <div className="mb-6">
           <p className="text-slate-700 text-center leading-relaxed">
-            Apakah Anda yakin ingin bergabung dengan komunitas <span className="font-semibold">{community.name}</span>?
+            {isPrivate ? (
+              <>Kirim permintaan untuk bergabung ke komunitas <span className="font-semibold">{community.name}</span>. Permintaan Anda akan menunggu persetujuan admin.</>
+            ) : (
+              <>Apakah Anda yakin ingin bergabung dengan komunitas <span className="font-semibold">{community.name}</span>?</>
+            )}
           </p>
           <div className="mt-4 bg-blue-50 rounded-lg p-3">
             <div className="flex items-center gap-2 text-sm text-blue-800">
               <FontAwesomeIcon icon={faCheckCircle} className="text-blue-600" />
-              <span>Anda akan mendapatkan akses ke promo eksklusif komunitas</span>
+              <span>{isPrivate ? 'Permintaan akan muncul pada daftar persetujuan admin.' : 'Anda akan mendapatkan akses ke promo eksklusif komunitas'}</span>
             </div>
           </div>
         </div>
@@ -580,12 +653,12 @@ function JoinConfirmationPopup({
             {isJoining ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Bergabung...
+                {isPrivate ? 'Mengirim...' : 'Bergabung...'}
               </>
             ) : (
               <>
                 <FontAwesomeIcon icon={faUsers} />
-                Bergabung
+                {isPrivate ? 'Kirim Permintaan' : 'Bergabung'}
               </>
             )}
           </button>
@@ -600,14 +673,12 @@ function JoinConfirmationPopup({
  * ========================= */
 function CommunityCard({
   community,
-  type,
   onOpenCommunity,
   formatNumber,
-  setActiveTab,
   onShowJoinPopup,
-  onApplyDelta, // <-- baru: biar parent bisa update angka secara konsisten
 }) {
   const [isJoined, setIsJoined] = useState(Boolean(community.isJoined));
+  const isPrivate = String(community.privacy || '').toLowerCase() === 'private';
   const [justJoined, setJustJoined] = useState(false);
 
   useEffect(() => {
@@ -624,7 +695,7 @@ function CommunityCard({
 
   const handleJoinCommunity = (e) => {
     e.stopPropagation();
-    if (isJoined) return;
+    if (isJoined || community.hasRequested) return;
     onShowJoinPopup(community);
   };
 
@@ -651,11 +722,22 @@ function CommunityCard({
           ? 'border-green-300 bg-green-50 shadow-md'
           : isJoined
             ? 'border-primary bg-primary/5 hover:shadow-md cursor-pointer'
-            : 'border-slate-200 cursor-default'
+            : isPrivate && !community.hasRequested
+              ? 'border-slate-200 hover:shadow-md cursor-pointer'
+              : 'border-slate-200 cursor-default'
       }`}
-      onClick={isJoined ? handleClickCard : undefined}
+      onClick={() => {
+        if (isJoined) return handleClickCard();
+        if (isPrivate && !community.hasRequested) return onShowJoinPopup(community);
+      }}
       aria-disabled={!isJoined}
-      title={!isJoined ? 'Gabung dulu untuk membuka komunitas' : undefined}
+      title={
+        isJoined
+          ? undefined
+          : isPrivate
+            ? (community.hasRequested ? 'Permintaan bergabung menunggu persetujuan' : 'Komunitas privat — klik untuk minta bergabung')
+            : 'Gabung dulu untuk membuka komunitas'
+      }
     >
       <div className="flex gap-3">
         <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -684,7 +766,11 @@ function CommunityCard({
             </h3>
             <div className="flex items-center gap-2">
               {community.isVerified && <span className="text-blue-500 text-xs">✓</span>}
-              {community.privacy === 'private' && <span className="text-gray-400 text-xs">🔒</span>}
+              {community.privacy === 'private' && (
+                <span className="text-gray-300 text-xs" title="Komunitas privat">
+                  <FontAwesomeIcon icon={faLock} />
+                </span>
+              )}
             </div>
           </div>
 
@@ -707,12 +793,22 @@ function CommunityCard({
                   <span className="text-green-600 text-sm">✓</span>
                 </div>
               ) : (
-                <button
-                  onClick={handleJoinCommunity}
-                  className="bg-primary text-white px-3 py-1 rounded-full font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Gabung
-                </button>
+                community.hasRequested ? (
+                  <button
+                    disabled
+                    className="bg-gray-200 text-gray-600 px-3 py-1 rounded-full font-medium cursor-not-allowed"
+                    title="Menunggu persetujuan admin"
+                  >
+                    Menunggu Persetujuan
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleJoinCommunity}
+                    className="bg-primary text-white px-3 py-1 rounded-full font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    {isPrivate ? 'Minta Bergabung' : 'Gabung'}
+                  </button>
+                )
               )}
             </div>
           </div>
