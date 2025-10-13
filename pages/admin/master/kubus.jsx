@@ -95,7 +95,7 @@ function Kubus() {
   const isUserRole = useCallback((u) => {
     if (!u) return false;
     const denyList = [
-      'admin','superadmin','manager','tenant','tenant_manager','manager_tenant','staff','owner','operator','moderator'
+      'admin', 'superadmin', 'manager', 'tenant', 'tenant_manager', 'manager_tenant', 'staff', 'owner', 'operator', 'moderator'
     ];
 
     if (u.role && typeof u.role === 'object' && u.role.name) {
@@ -105,7 +105,7 @@ function Kubus() {
       return !denyList.includes(u.role.toLowerCase());
     }
     if (Array.isArray(u.roles)) {
-      return !u.roles.some((r) => 
+      return !u.roles.some((r) =>
         denyList.includes((r?.name ?? r)?.toLowerCase?.() ?? '')
       );
     }
@@ -255,40 +255,40 @@ function Kubus() {
   // Helper untuk mendapatkan URL gambar dari server berdasarkan field name
   const getServerImageUrl = useCallback((fieldName, values, selectedData) => {
     const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
-    
+
     let rawFromValues = '';
-    
+
     // Mapping untuk different field names
     if (fieldName === 'image') {
       // Untuk cube logo
-      rawFromValues = valMap('image_url_versioned') || 
-                     valMap('image_url') || 
-                     valMap('image') || 
-                     selectedData?.image || '';
+      rawFromValues = valMap('image_url_versioned') ||
+        valMap('image_url') ||
+        valMap('image') ||
+        selectedData?.image || '';
     } else if (fieldName === 'ads[image]') {
       // Banner image
-      rawFromValues = valMap('ads[image]') || 
-                     selectedData?.ads?.[0]?.image || 
-                     selectedData?.ads?.[0]?.picture_source || '';
+      rawFromValues = valMap('ads[image]') ||
+        selectedData?.ads?.[0]?.image ||
+        selectedData?.ads?.[0]?.picture_source || '';
     } else if (fieldName === 'ads[image_1]') {
-      rawFromValues = valMap('ads[image_1]') || 
-                     selectedData?.ads?.[0]?.image_1 || 
-                     selectedData?.ads?.[0]?.image_1_source || '';
+      rawFromValues = valMap('ads[image_1]') ||
+        selectedData?.ads?.[0]?.image_1 ||
+        selectedData?.ads?.[0]?.image_1_source || '';
     } else if (fieldName === 'ads[image_2]') {
-      rawFromValues = valMap('ads[image_2]') || 
-                     selectedData?.ads?.[0]?.image_2 || 
-                     selectedData?.ads?.[0]?.image_2_source || '';
+      rawFromValues = valMap('ads[image_2]') ||
+        selectedData?.ads?.[0]?.image_2 ||
+        selectedData?.ads?.[0]?.image_2_source || '';
     } else if (fieldName === 'ads[image_3]') {
-      rawFromValues = valMap('ads[image_3]') || 
-                     selectedData?.ads?.[0]?.image_3 || 
-                     selectedData?.ads?.[0]?.image_3_source || '';
+      rawFromValues = valMap('ads[image_3]') ||
+        selectedData?.ads?.[0]?.image_3 ||
+        selectedData?.ads?.[0]?.image_3_source || '';
     } else {
       // Fallback untuk field lain seperti main form ads[image_1], ads[image_2], ads[image_3]
       // Cek juga selectedData jika ada
-      rawFromValues = valMap(`${fieldName}_url_versioned`) || 
-                     valMap(`${fieldName}_url`) || 
-                     valMap(fieldName) || '';
-      
+      rawFromValues = valMap(`${fieldName}_url_versioned`) ||
+        valMap(`${fieldName}_url`) ||
+        valMap(fieldName) || '';
+
       // Untuk main form, ads data mungkin ada di selectedData.ads[0]
       if (!rawFromValues && selectedData?.ads?.[0]) {
         const adData = selectedData.ads[0];
@@ -540,20 +540,34 @@ function Kubus() {
         }}
         formControl={{
           contentType: 'multipart/form-data',
-          customDefaultValue: { 
-            'ads[is_daily_grab]': 0, 
-            'content_type': 'promo', 
-            'cube_type_id': 1, 
-            'owner_user_id': '', 
+          customDefaultValue: {
+            'ads[is_daily_grab]': 0,
+            'ads[unlimited_grab]': 0,
+            'content_type': 'promo',
+            'cube_type_id': 1,
+            'owner_user_id': null,
             'ads[validation_type]': 'auto',
+            'ads[day_type]': 'custom',
             'target_type': 'all',
             'target_user_ids': [],
-            'community_id': ''
+            'community_id': '',
+            'is_information': [],
+            'is_recommendation': []
           },
           onModalOpen: (isEdit) => {
             // Reset selected ketika mode add (bukan edit)
             if (!isEdit) {
               setSelected(null);
+            }
+            
+            // Debug logging untuk form mode
+            if (typeof window !== 'undefined') {
+              // eslint-disable-next-line no-console
+              console.log('[KUBUS DEBUG] Modal opened:', {
+                isEdit,
+                selected: selected,
+                formMode: isEdit ? 'edit' : 'create'
+              });
             }
           },
           custom: [
@@ -703,7 +717,7 @@ function Kubus() {
                     {cubeType == 2 ? (
                       <SelectComponent
                         name="corporate_id"
-                        label="Manager Tenant (Mitra)"
+                        label="Manager Tenant"
                         placeholder="Pilih Mitra..."
                         serverOptionControl={{ path: `admin/options/corporate` }}
                         {...formControl('corporate_id')}
@@ -713,7 +727,7 @@ function Kubus() {
                       <div>
                         <SelectComponent
                           name="owner_user_id"
-                          label="Manager Tenant *"
+                          label="Manager Tenant"
                           placeholder={
                             managersLoading
                               ? "Loading manager tenant..."
@@ -721,14 +735,12 @@ function Kubus() {
                                 ? "Tidak ada manager tenant"
                                 : "Pilih manager tenant..."
                           }
-                          required
                           {...formControl('owner_user_id')}
                           options={merchantManagers.map((u) => ({
                             value: String(u.id),
                             label: `${getDisplayName(u)}${getPhone(u) ? " — " + getPhone(u) : ""}`,
                           }))}
                           disabled={managersLoading}
-                          validations={{ required: true }}
                         />
                         {managersError && (
                           <p className="text-red-500 text-sm mt-1">{managersError}</p>
@@ -790,7 +802,7 @@ function Kubus() {
                 const handleFileChange = (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  
+
                   // Set ke form dan trigger crop
                   fc.onChange(file);
                   setPreviewOwnerKey(cubeKey);
@@ -1296,7 +1308,7 @@ function Kubus() {
                   const handleFileChange = (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    
+
                     // Set ke form dan trigger crop
                     fc.onChange(file);
                     setPreviewOwnerKey(imageKey);
@@ -1437,7 +1449,7 @@ function Kubus() {
                 const handleFileChange = (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  
+
                   // Set ke form dan trigger crop
                   fc.onChange(file);
                   setPreviewOwnerKey(bannerKey);
@@ -1554,11 +1566,21 @@ function Kubus() {
                       ]}
                       value={values.find((i) => i.name == 'ads[validation_type]')?.value || 'auto'}
                       onChange={(value) => {
+                        // Debug log untuk tracking perubahan
+                        if (typeof window !== 'undefined') {
+                          // eslint-disable-next-line no-console
+                          console.log('[DEBUG validation_type onChange]', {
+                            newValue: value,
+                            currentCode: values.find((i) => i.name == 'ads[code]')?.value,
+                            allAdsFields: values.filter(i => i.name.startsWith('ads[') || i.name.startsWith('ads.'))
+                          });
+                        }
+
                         setValues([
                           ...values.filter((i) => i.name != 'ads[validation_type]'),
                           { name: 'ads[validation_type]', value: value },
                         ]);
-                        
+
                         // Clear kode unik jika beralih ke auto
                         if (value === 'auto') {
                           setValues(prev => [
@@ -1581,7 +1603,7 @@ function Kubus() {
                 const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
                 const isInformation = values.find((i) => i.name === 'is_information')?.value?.at?.(0);
                 const validationType = values.find((i) => i.name == 'ads[validation_type]')?.value;
-                
+
                 if (isInformation || !['promo', 'voucher'].includes(contentType) || validationType !== 'manual') {
                   return null;
                 }
@@ -1595,14 +1617,26 @@ function Kubus() {
                       required
                       value={values.find((i) => i.name == 'ads[code]')?.value || ''}
                       onChange={(e) => {
+                        // Debug log untuk tracking perubahan code
+                        if (typeof window !== 'undefined') {
+                          // eslint-disable-next-line no-console
+                          console.log('[DEBUG ads[code] onChange]', {
+                            newValue: e,
+                            validationType: values.find((i) => i.name == 'ads[validation_type]')?.value
+                          });
+                        }
+
                         setValues([
                           ...values.filter((i) => i.name != 'ads[code]'),
-                          { name: 'ads[code]', value: e.target.value },
+                          { name: 'ads[code]', value: e },
                         ]);
                       }}
                       error={errors.find((i) => i.name == 'ads[code]')?.error}
                       validations={{ required: true }}
                     />
+                    <p className="text-sm text-gray-500">
+                      Kode ini akan digunakan untuk validasi manual oleh user. Pastikan kode mudah diingat dan unik.
+                    </p>
                   </div>
                 );
               },
@@ -1684,16 +1718,16 @@ function Kubus() {
                         disabled={values?.find((i) => i.name == 'ads[unlimited_grab]')?.value}
                       />
                       <InputTimeComponent
-                        name="validation_time_limit"
+                        name="ads[validation_time_limit]"
                         label="Batas Waktu Validasi"
                         placeholder="Masukan Batas Waktu Validasi..."
                         onChange={(v) => {
                           setValues([
-                            ...values.filter((i) => i.name !== 'validation_time_limit'),
-                            { name: 'validation_time_limit', value: v }, // format HH:mm
+                            ...values.filter((i) => i.name !== 'ads[validation_time_limit]'),
+                            { name: 'ads[validation_time_limit]', value: v }, // format HH:mm
                           ]);
                         }}
-                        value={values.find((i) => i.name === 'validation_time_limit')?.value || ''}
+                        value={values.find((i) => i.name === 'ads[validation_time_limit]')?.value || ''}
                         validations={{ required: true }}
                       />
                     </div>
@@ -1737,29 +1771,29 @@ function Kubus() {
                     {/* Row 3: Jam Mulai + Jam Berakhir */}
                     <div className="grid grid-cols-2 gap-4">
                       <InputTimeComponent
-                        name="jam_mulai"
+                        name="ads[jam_mulai]"
                         label="Jam Mulai"
                         placeholder="Pilih Jam..."
                         onChange={(v) => {
                           setValues([
-                            ...values.filter((i) => i.name !== 'jam_mulai'),
-                            { name: 'jam_mulai', value: v }, // HH:mm
+                            ...values.filter((i) => i.name !== 'ads[jam_mulai]'),
+                            { name: 'ads[jam_mulai]', value: v }, // HH:mm
                           ]);
                         }}
-                        value={values.find((i) => i.name === 'jam_mulai')?.value || ''}
+                        value={values.find((i) => i.name === 'ads[jam_mulai]')?.value || ''}
                         validations={{ required: true }}
                       />
                       <InputTimeComponent
-                        name="jam_berakhir"
+                        name="ads[jam_berakhir]"
                         label="Jam Berakhir"
                         placeholder="Pilih Jam..."
                         onChange={(v) => {
                           setValues([
-                            ...values.filter((i) => i.name !== 'jam_berakhir'),
-                            { name: 'jam_berakhir', value: v }, // HH:mm
+                            ...values.filter((i) => i.name !== 'ads[jam_berakhir]'),
+                            { name: 'ads[jam_berakhir]', value: v }, // HH:mm
                           ]);
                         }}
-                        value={values.find((i) => i.name === 'jam_berakhir')?.value || ''}
+                        value={values.find((i) => i.name === 'ads[jam_berakhir]')?.value || ''}
                         validations={{ required: true }}
                       />
                     </div>
@@ -1778,7 +1812,7 @@ function Kubus() {
                             { key: 'weekday', label: 'Weekdays' },
                             { key: 'custom', label: 'Hari Lain' },
                           ].map(opt => {
-                            const checked = values.find(i => i.name == 'day_type')?.value === opt.key;
+                            const checked = values.find(i => i.name == 'ads[day_type]')?.value === opt.key;
 
                             return (
                               <label key={opt.key} className="flex items-center gap-2 cursor-pointer">
@@ -1788,15 +1822,15 @@ function Kubus() {
                                   value={opt.key}
                                   checked={checked}
                                   onChange={() => {
-                                    // set day_type
+                                    // set day_type dengan prefix ads.
                                     const next = [
-                                      ...values.filter(i => i.name !== 'day_type'),
-                                      { name: 'day_type', value: opt.key },
+                                      ...values.filter(i => i.name !== 'ads[day_type]'),
+                                      { name: 'ads[day_type]', value: opt.key },
                                     ];
 
                                     // bersihkan pilihan hari kustom
                                     const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                                    const cleaned = next.filter(i => !dayNames.some(d => i.name === `custom_days[${d}]`));
+                                    const cleaned = next.filter(i => !dayNames.some(d => i.name === `ads[custom_days][${d}]`));
 
                                     // prefill utk weekend/weekday (agar pill hari di bawah tampil aktif)
                                     if (opt.key !== 'custom') {
@@ -1805,7 +1839,7 @@ function Kubus() {
                                         weekday: { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true },
                                       }[opt.key] || {};
                                       const injected = Object.entries(preset).map(([d, v]) => ({
-                                        name: `custom_days[${d}]`,
+                                        name: `ads[custom_days][${d}]`,
                                         value: v
                                       }));
                                       setValues([...cleaned, ...injected]);
@@ -1829,7 +1863,7 @@ function Kubus() {
                         Hanya Di Hari
                       </div>
                       {(() => {
-                        const dayType = values.find(i => i.name == 'day_type')?.value || 'custom';
+                        const dayType = values.find(i => i.name == 'ads[day_type]')?.value || 'custom';
                         const isCustom = dayType === 'custom';
 
                         const days = [
@@ -1844,7 +1878,7 @@ function Kubus() {
 
                         // status terpilih
                         const selected = (k) =>
-                          !!values.find(i => i.name === `custom_days[${k}]`)?.value;
+                          !!values.find(i => i.name === `ads[custom_days][${k}]`)?.value;
 
                         return (
                           <div className="flex flex-wrap gap-2">
@@ -1856,10 +1890,10 @@ function Kubus() {
                                   key={d.key}
                                   onClick={() => {
                                     if (!isCustom) return; // weekend/weekday = readonly
-                                    const exists = values.find(i => i.name === `custom_days[${d.key}]`)?.value || false;
+                                    const exists = values.find(i => i.name === `ads[custom_days][${d.key}]`)?.value || false;
                                     setValues([
-                                      ...values.filter(i => i.name !== `custom_days[${d.key}]`),
-                                      { name: `custom_days[${d.key}]`, value: !exists },
+                                      ...values.filter(i => i.name !== `ads[custom_days][${d.key}]`),
+                                      { name: `ads[custom_days][${d.key}]`, value: !exists },
                                     ]);
                                   }}
                                   className={[
@@ -1887,46 +1921,46 @@ function Kubus() {
 
             // Target Type Selection for Voucher
             {
-  type: 'custom',
-  custom: ({ formControl, values, setValues }) => {
-    const contentType = getCT(values);
-    if (contentType !== 'voucher') return null;
+              type: 'custom',
+              custom: ({ formControl, values, setValues }) => {
+                const contentType = getCT(values);
+                if (contentType !== 'voucher') return null;
 
-    const fc = formControl('target_type');
-    const current = fc.value ?? 'all';
+                const fc = formControl('target_type');
+                const current = fc.value ?? 'all';
 
-    // Normalisasi onChange apapun bentuknya (event / {value,label} / string)
-    const handleChange = (valOrEvent) => {
-      const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
+                // Normalisasi onChange apapun bentuknya (event / {value,label} / string)
+                const handleChange = (valOrEvent) => {
+                  const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
 
-      // 1) Update field target_type via formControl (biar konsisten dengan TableSupervision)
-      fc.onChange(newValue);
+                  // 1) Update field target_type via formControl (biar konsisten dengan TableSupervision)
+                  fc.onChange(newValue);
 
-      // 2) Hanya bersihkan field turunan, JANGAN set { name:'target_type' } lagi
-      setValues(prev =>
-        prev.filter(v => !['target_user_ids', 'community_id'].includes(v.name))
-      );
-    };
+                  // 2) Hanya bersihkan field turunan, JANGAN set { name:'target_type' } lagi
+                  setValues(prev =>
+                    prev.filter(v => !['target_user_ids', 'community_id'].includes(v.name))
+                  );
+                };
 
-    return (
-      <div className="space-y-3">
-        <div className="font-semibold text-base text-slate-700">Target Penerima Voucher</div>
-        <SelectComponent
-          name="target_type"
-          label="Siapa Yang Bisa Menggunakan Voucher?"
-          required
-          value={current}
-          onChange={handleChange}
-          options={[
-            { label: 'Semua User', value: 'all' },
-            { label: 'User Tertentu', value: 'user' },
-            { label: 'Komunitas Tertentu', value: 'community' },
-          ]}
-        />
-      </div>
-    );
-  },
-},
+                return (
+                  <div className="space-y-3">
+                    <div className="font-semibold text-base text-slate-700">Target Penerima Voucher</div>
+                    <SelectComponent
+                      name="target_type"
+                      label="Siapa Yang Bisa Menggunakan Voucher?"
+                      required
+                      value={current}
+                      onChange={handleChange}
+                      options={[
+                        { label: 'Semua User', value: 'all' },
+                        { label: 'User Tertentu', value: 'user' },
+                        { label: 'Komunitas Tertentu', value: 'community' },
+                      ]}
+                    />
+                  </div>
+                );
+              },
+            },
 
             // Community Selection for Voucher
             {
@@ -2038,7 +2072,7 @@ function Kubus() {
           customDefaultValue: (data) => {
             // Set selected ke data yang sedang diedit
             setSelected(data);
-            
+
             let worldID = data.world_id ? { world_id: data.world_id } : null;
             let ownerUserID = data.user_id ? { owner_user_id: data.user_id } : null;
             let corporateID = data.corporate_id ? { corporate_id: data.corporate_id } : null;
@@ -2108,7 +2142,7 @@ function Kubus() {
                     {cubeType == 2 ? (
                       <SelectComponent
                         name="corporate_id"
-                        label="Manager Tenant (Mitra)"
+                        label="Manager Tenant (Mitra) - Opsional"
                         placeholder="Pilih Mitra..."
                         serverOptionControl={{ path: `admin/options/corporate` }}
                         {...formControl('corporate_id')}
@@ -2118,7 +2152,7 @@ function Kubus() {
                       <div>
                         <SelectComponent
                           name="owner_user_id"
-                          label="Manager Tenant *"
+                          label="Manager Tenant"
                           placeholder={
                             managersLoading
                               ? "Loading manager tenant..."
@@ -2126,14 +2160,12 @@ function Kubus() {
                                 ? "Tidak ada manager tenant"
                                 : "Pilih manager tenant..."
                           }
-                          required
                           {...formControl('owner_user_id')}
                           options={merchantManagers.map((u) => ({
                             value: String(u.id),
                             label: `${getDisplayName(u)}${getPhone(u) ? " — " + getPhone(u) : ""}`,
                           }))}
                           disabled={managersLoading}
-                          validations={{ required: true }}
                         />
                         {managersError && (
                           <p className="text-red-500 text-sm mt-1">{managersError}</p>
@@ -2244,7 +2276,7 @@ function Kubus() {
               custom: ({ values, setValues }) => {
                 const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
                 const isInformation = values?.find(i => i.name === 'is_information')?.value;
-                
+
                 if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
 
                 return (
@@ -2264,7 +2296,7 @@ function Kubus() {
                           ...values.filter((i) => i.name != 'ads[validation_type]'),
                           { name: 'ads[validation_type]', value: value },
                         ]);
-                        
+
                         // Clear kode unik jika beralih ke auto
                         if (value === 'auto') {
                           setValues(prev => [
@@ -2287,7 +2319,7 @@ function Kubus() {
                 const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
                 const isInformation = values?.find(i => i.name === 'is_information')?.value;
                 const validationType = values?.find((i) => i.name == 'ads[validation_type]')?.value;
-                
+
                 if (isInformation || !['promo', 'voucher'].includes(contentType) || validationType !== 'manual') {
                   return null;
                 }
@@ -2370,46 +2402,46 @@ function Kubus() {
 
             // Target Type Selection for Voucher (Update Mode)
             {
-  type: 'custom',
-  custom: ({ formControl, values, setValues }) => {
-    const contentType = getCT(values);
-    if (contentType !== 'voucher') return null;
+              type: 'custom',
+              custom: ({ formControl, values, setValues }) => {
+                const contentType = getCT(values);
+                if (contentType !== 'voucher') return null;
 
-    const fc = formControl('target_type');
-    const current = fc.value ?? 'all';
+                const fc = formControl('target_type');
+                const current = fc.value ?? 'all';
 
-    // Normalisasi onChange apapun bentuknya (event / {value,label} / string)
-    const handleChange = (valOrEvent) => {
-      const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
+                // Normalisasi onChange apapun bentuknya (event / {value,label} / string)
+                const handleChange = (valOrEvent) => {
+                  const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
 
-      // 1) Update field target_type via formControl (biar konsisten dengan TableSupervision)
-      fc.onChange(newValue);
+                  // 1) Update field target_type via formControl (biar konsisten dengan TableSupervision)
+                  fc.onChange(newValue);
 
-      // 2) Hanya bersihkan field turunan, JANGAN set { name:'target_type' } lagi
-      setValues(prev =>
-        prev.filter(v => !['target_user_ids', 'community_id'].includes(v.name))
-      );
-    };
+                  // 2) Hanya bersihkan field turunan, JANGAN set { name:'target_type' } lagi
+                  setValues(prev =>
+                    prev.filter(v => !['target_user_ids', 'community_id'].includes(v.name))
+                  );
+                };
 
-    return (
-      <div className="space-y-3">
-        <div className="font-semibold text-base text-slate-700">Target Penerima Voucher</div>
-        <SelectComponent
-          name="target_type"
-          label="Siapa Yang Bisa Menggunakan Voucher?"
-          required
-          value={current}
-          onChange={handleChange}
-          options={[
-            { label: 'Semua User', value: 'all' },
-            { label: 'User Tertentu', value: 'user' },
-            { label: 'Komunitas Tertentu', value: 'community' },
-          ]}
-        />
-      </div>
-    );
-  },
-},
+                return (
+                  <div className="space-y-3">
+                    <div className="font-semibold text-base text-slate-700">Target Penerima Voucher</div>
+                    <SelectComponent
+                      name="target_type"
+                      label="Siapa Yang Bisa Menggunakan Voucher?"
+                      required
+                      value={current}
+                      onChange={handleChange}
+                      options={[
+                        { label: 'Semua User', value: 'all' },
+                        { label: 'User Tertentu', value: 'user' },
+                        { label: 'Komunitas Tertentu', value: 'community' },
+                      ]}
+                    />
+                  </div>
+                );
+              },
+            },
 
             // Community Selection for Voucher (Update Mode)
             {
@@ -2540,39 +2572,17 @@ function Kubus() {
                     setUpdateStatus(true);
                   }}
                 />
-                {/* {data.ads.length ? (
-                  <ButtonComponent
-                    icon={faNewspaper}
-                    label={'Iklan Huehuy'}
-                    variant="outline"
-                    paint="primary"
-                    size={'sm'}
-                    rounded
-                    onClick={() => {
-                      setSelected(data);
-                      setFormAds('huehuy');
-                    }}
-                  />
-                ) : null} */}
-                {data.ads.at(0)?.type === 'voucher' ? (
-                  <ButtonComponent
-                    icon={faTicket}
-                    label={'Voucher'}
-                    variant="outline"
-                    paint="secondary"
-                    size={'sm'}
-                    rounded
-                    onClick={() => {
-                      setSelected(data);
-                      setVoucherModal(true);
-                    }}
-                  />
-                ) : null}
               </>
             );
           },
         }}
-        onStoreSuccess={() => {
+        onStoreSuccess={(data) => {
+          // Debug log untuk berhasil create
+          if (typeof window !== 'undefined') {
+            // eslint-disable-next-line no-console
+            console.log('[KUBUS DEBUG] Store success:', data);
+          }
+          
           // Reset selected setelah berhasil create
           setSelected(null);
           setRefresh(!refresh);
@@ -2615,67 +2625,98 @@ function Kubus() {
                     : 'admin/ads',
               contentType: 'multipart/form-data',
             }}
-            defaultValue={
-              selected?.ads?.at(0)?.id
-                ? {
-                  _method: 'PUT',
-                  title: selected?.ads[0].title,
-                  description: selected?.ads[0].description || '',
-                  ad_category_id: selected?.ads[0].ad_category_id || '',
-                  promo_type: selected?.ads[0].promo_type || '',
-                  is_daily_grab: selected?.ads[0].is_daily_grab,
-                  max_grab: selected?.ads[0].max_grab || '',
+            defaultValue={(() => {
+              // Helper functions untuk mapping data edit
+              const formatTime = (time) => {
+                if (!time) return '';
+                return typeof time === 'string' && time.includes(':') ? time.substring(0, 5) : time;
+              };
+
+              const mapCustomDays = (customDays) => {
+                if (!customDays || typeof customDays !== 'object') return {};
+                const result = {};
+                Object.entries(customDays).forEach(([day, value]) => {
+                  result[`custom_days[${day}]`] = value;
+                });
+                return result;
+              };
+
+              if (!selected?.ads?.at(0)?.id) {
+                // Create mode
+                return {
                   cube_id: selected?.id,
-                  type: selected?.ads[0].type,
-
-                  // 👉 konsisten pakai ads[...]
-                  'ads[image]':
-                    selected?.ads[0]?.image ||
-                    selected?.ads[0]?.picture_source ||
-                    '',
-
-                  'ads[image_1]':
-                    selected?.ads[0]?.image_1 ||
-                    selected?.ads[0]?.image_1_source ||
-                    '',
-                  'ads[image_2]':
-                    selected?.ads[0]?.image_2 ||
-                    selected?.ads[0]?.image_2_source ||
-                    '',
-                  'ads[image_3]':
-                    selected?.ads[0]?.image_3 ||
-                    selected?.ads[0]?.image_3_source ||
-                    '',
-
-                  ...validate,
-                  is_information: selected?.is_information ? 1 : 0,
-                  link_information: selected?.link_information || '',
-                  level_umkm: selected?.ads[0].level_umkm || '',
-                  max_production_per_day: selected?.ads[0].max_production_per_day || '',
-                  sell_per_day: selected?.ads[0].sell_per_day || '',
-                  validation_time_limit: selected?.ads[0].validation_time_limit || '',
-                  validation_type: selected?.ads[0].validation_type || 'auto',
-                  code: selected?.ads[0].code || '',
-                  content_type:
-                    selected?.ads[0]?.type === 'voucher'
-                      ? 'voucher'
-                      : selected?.ads[0]?.type === 'iklan'
-                        ? 'iklan'
-                        : 'promo',
-
-                }
-                : {
-                  cube_id: selected?.id,
-                  // pakai nilai tab yang barusan di-set dari tombol (formAds)
                   type: formAds || 'promo',
                   is_daily_grab: 0,
+                  unlimited_grab: 0,
                   validation_type: 'auto',
-                  content_type:
-                    formAds === 'iklan' ? 'iklan' :
-                      formAds === 'voucher' ? 'voucher' :
-                        'promo',
-                }
-            }
+                  content_type: formAds === 'iklan' ? 'iklan' : formAds === 'voucher' ? 'voucher' : 'promo',
+                };
+              }
+
+              // Edit mode - map data dengan benar
+              const ad = selected.ads[0];
+              
+              // eslint-disable-next-line no-console
+              console.log('🔍 MAPPING ADS DATA FOR EDIT:', {
+                adId: ad.id,
+                title: ad.title,
+                validationType: ad.validation_type,
+                code: ad.code,
+                jamMulai: ad.jam_mulai,
+                jamBerakhir: ad.jam_berakhir,
+                dayType: ad.day_type,
+                customDays: ad.custom_days,
+                image1: ad.image_1,
+                image2: ad.image_2,
+                image3: ad.image_3,
+                pictureSource: ad.picture_source
+              });
+
+              return {
+                _method: 'PUT',
+                title: ad.title || '',
+                description: ad.description || '',
+                ad_category_id: ad.ad_category_id || '',
+                promo_type: ad.promo_type || '',
+                is_daily_grab: ad.is_daily_grab ? 1 : 0,
+                unlimited_grab: ad.unlimited_grab ? 1 : 0,
+                max_grab: ad.max_grab || '',
+                cube_id: selected.id,
+                type: ad.type || 'general',
+                
+                // ✅ PERBAIKI - Field gambar yang benar (tanpa _source)
+                'ads[image]': ad.picture_source || '',
+                'ads[image_1]': ad.image_1 || '',
+                'ads[image_2]': ad.image_2 || '',
+                'ads[image_3]': ad.image_3 || '',
+                
+                // ✅ PERBAIKI - Validation dan code
+                validation_type: ad.validation_type || 'auto',
+                code: ad.code || '',
+                
+                // ✅ PERBAIKI - Format time fields (HH:mm:ss -> HH:mm)
+                validation_time_limit: formatTime(ad.validation_time_limit),
+                jam_mulai: formatTime(ad.jam_mulai),
+                jam_berakhir: formatTime(ad.jam_berakhir),
+                
+                // ✅ PERBAIKI - Day type dan custom days
+                day_type: ad.day_type || 'custom',
+                ...mapCustomDays(ad.custom_days),
+                
+                // ✅ Date fields (validate variable sudah benar)
+                ...validate,
+                
+                // Other fields
+                is_information: selected.is_information ? 1 : 0,
+                link_information: selected.link_information || '',
+                level_umkm: ad.level_umkm || '',
+                max_production_per_day: ad.max_production_per_day || '',
+                sell_per_day: ad.sell_per_day || '',
+                
+                // ✅ PERBAIKI - Content type mapping
+                content_type: ad.type === 'voucher' ? 'voucher' : ad.type === 'iklan' ? 'iklan' : 'promo',
+              };
+            })()}
             onSuccess={() => {
               setFormAds(false);
               setRefresh(!refresh);
@@ -2744,7 +2785,7 @@ function Kubus() {
                 type: 'custom',
                 custom: ({ formControl, values }) => {
                   const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
-                  
+
                   if (!['promo', 'voucher'].includes(contentType)) return null;
 
                   return (
@@ -2771,7 +2812,7 @@ function Kubus() {
                 custom: ({ formControl, values }) => {
                   const contentType = values?.find(i => i.name === 'content_type')?.value || 'promo';
                   const validationType = values?.find(i => i.name === 'validation_type')?.value;
-                  
+
                   if (!['promo', 'voucher'].includes(contentType) || validationType !== 'manual') {
                     return null;
                   }
@@ -2857,7 +2898,7 @@ function Kubus() {
                     const handleFileChange = (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      
+
                       // Set ke form dan trigger crop
                       fc.onChange(file);
                       setPreviewOwnerKey(adsImageKey);
@@ -2966,7 +3007,7 @@ function Kubus() {
 
                   // Server image - menggunakan helper function
                   const serverImageUrl = getServerImageUrl('ads[image]', values, selected);
-                                       
+
                   const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
                   const imageVersion =
                     valMap('ads[image]_updated_at') ||
@@ -2996,7 +3037,7 @@ function Kubus() {
                   const handleFileChange = (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    
+
                     // Set ke form dan trigger crop
                     fc.onChange(file);
                     setPreviewOwnerKey(adsBannerKey);
