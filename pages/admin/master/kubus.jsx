@@ -168,6 +168,13 @@ function Kubus() {
 
     const s = String(raw).trim();
 
+    // 🚨 Skip temporary files atau path Windows yang invalid
+    if (s.includes('\\Temp\\') || s.includes('C:\\Users') || s.includes('.tmp') || s.includes('php')) {
+      // eslint-disable-next-line no-console
+      console.warn('🚨 toStoragePath: Skipping temporary/invalid path:', s);
+      return '';
+    }
+
     // Sudah berupa path absolut FE
     if (s.startsWith('/')) return s;
 
@@ -304,8 +311,37 @@ function Kubus() {
       }
     }
 
+    // Debug log untuk troubleshooting
+    if (process.env.NODE_ENV === 'development' && fieldName?.includes('image')) {
+      // eslint-disable-next-line no-console
+      console.log('🔍 getServerImageUrl DEBUG:', {
+        fieldName,
+        rawFromValues,
+        rawFromValuesType: typeof rawFromValues,
+        rawFromValuesValue: rawFromValues,
+        selectedDataAds: selectedData?.ads?.[0],
+        valMapResults: {
+          direct: valMap(fieldName),
+          versioned: valMap(`${fieldName}_url_versioned`),
+          url: valMap(`${fieldName}_url`)
+        }
+      });
+    }
+
     if (!rawFromValues) return '';
-    return toStoragePath(rawFromValues);
+    
+    // ✅ PERBAIKAN: Pastikan rawFromValues adalah string sebelum memanggil includes
+    const rawStr = String(rawFromValues || '').trim();
+    if (!rawStr) return '';
+    
+    // Skip path yang mengandung temporary file atau path Windows yang salah
+    if (rawStr.includes('\\Temp\\') || rawStr.includes('C:\\Users') || rawStr.includes('.tmp')) {
+      // eslint-disable-next-line no-console
+      console.warn('🚨 Skipping temporary/invalid path:', rawStr);
+      return '';
+    }
+    
+    return toStoragePath(rawStr);
   }, [toStoragePath]);
 
   useEffect(() => {
@@ -1289,6 +1325,21 @@ function Kubus() {
 
                   const serverSrc = serverImageUrl ? withVersion(serverImageUrl, imageVersion) : '';
 
+                  // Debug log untuk masing-masing field gambar
+                  if (process.env.NODE_ENV === 'development' && isEditMode) {
+                    // eslint-disable-next-line no-console
+                    console.log(`🖼️ ${fieldName} createImageField DEBUG:`, {
+                      fieldName,
+                      formId,
+                      isEditMode,
+                      serverImageUrl,
+                      serverSrc,
+                      currentValue: fc.value,
+                      selectedData: selected?.ads?.[0],
+                      imageVersion
+                    });
+                  }
+
                   // Prioritas File object dan blob preview
                   const currentValue = fc.value;
                   const hasFileObject = currentValue instanceof File;
@@ -1302,6 +1353,12 @@ function Kubus() {
                     finalPreviewSrc = URL.createObjectURL(currentValue);
                   } else if (serverSrc) {
                     finalPreviewSrc = serverSrc;
+                  } else if (isEditMode && currentValue && typeof currentValue === 'string') {
+                    // ✅ PERBAIKAN: Jika ada value dari form tapi serverSrc gagal, gunakan langsung
+                    const cleanPath = toStoragePath(currentValue);
+                    if (cleanPath && !cleanPath.includes('.tmp')) {
+                      finalPreviewSrc = withVersion(cleanPath, imageVersion);
+                    }
                   }
 
                   // File input handler
@@ -1316,6 +1373,21 @@ function Kubus() {
                   };
 
                   const fileInfo = hasFileObject ? `File: ${currentValue.name} (${(currentValue.size / 1024).toFixed(1)}KB)` : '';
+
+                  // Debug final state sebelum render
+                  if (process.env.NODE_ENV === 'development' && isEditMode) {
+                    // eslint-disable-next-line no-console
+                    console.log(`🎨 ${fieldName} FINAL RENDER STATE:`, {
+                      fieldName,
+                      finalPreviewSrc,
+                      hasFileObject,
+                      serverSrc,
+                      currentValue,
+                      canUseBlob,
+                      imageKey,
+                      previewOwnerKey
+                    });
+                  }
 
                   return (
                     <div className="form-control" key={`${fieldName}-field-${imageKey}`}>
@@ -2088,6 +2160,25 @@ function Kubus() {
                     ? 'iklan'
                     : 'promo'; // termasuk 'general' tetap dianggap promo
 
+            // Debug log untuk memeriksa mapping gambar (development only)
+            if (process.env.NODE_ENV === 'development') {
+              // eslint-disable-next-line no-console
+              console.log('🔧 FORM UPDATE MAPPING:', {
+                cubeId: data?.id,
+                cubePictureSource: data?.picture_source,
+                adId: ad?.id,
+                adPictureSource: ad?.picture_source,
+                adImage1: ad?.image_1,
+                adImage2: ad?.image_2,
+                adImage3: ad?.image_3,
+                contentType,
+                // Debug semua field ads
+                fullAdData: ad,
+                // Debug data mentah
+                rawData: data
+              });
+            }
+
             return {
               cube_type_id: data?.cube_type_id,
               is_recommendation: data?.is_recommendation ? 1 : 0,
@@ -2120,6 +2211,48 @@ function Kubus() {
               target_type: ad?.target_type || 'all',
               target_user_ids: ad?.target_user_ids || [],
               community_id: ad?.community_id || '',
+
+              // ✅ PERBAIKAN: Mapping gambar untuk form edit
+              // Gambar cube (logo untuk tipe kubus merah/hijau)
+              image: data?.picture_source || '',
+              
+              // Gambar ads (banner dan 3 gambar konten)
+              'ads[image]': ad?.picture_source || '',      // banner
+              'ads[image_1]': ad?.image_1 || '',           // gambar 1
+              'ads[image_2]': ad?.image_2 || '',           // gambar 2  
+              'ads[image_3]': ad?.image_3 || '',           // gambar 3
+
+              // ✅ TAMBAHAN: Mapping field ads lainnya untuk konsistensi
+              'ads[title]': ad?.title || '',
+              'ads[description]': ad?.description || '',
+              'ads[ad_category_id]': ad?.ad_category_id || '',
+              'ads[level_umkm]': ad?.level_umkm || '',
+              'ads[max_production_per_day]': ad?.max_production_per_day || '',
+              'ads[sell_per_day]': ad?.sell_per_day || '',
+              'ads[is_daily_grab]': ad?.is_daily_grab ? 1 : 0,
+              'ads[unlimited_grab]': ad?.unlimited_grab ? 1 : 0,
+              'ads[max_grab]': ad?.max_grab || '',
+
+              // ✅ TAMBAHAN: Field time dan validation
+              'ads[jam_mulai]': ad?.jam_mulai ? String(ad.jam_mulai).substring(0, 5) : '',
+              'ads[jam_berakhir]': ad?.jam_berakhir ? String(ad.jam_berakhir).substring(0, 5) : '',
+              'ads[day_type]': ad?.day_type || 'custom',
+              
+              // ✅ Custom days mapping
+              ...(ad?.custom_days && typeof ad.custom_days === 'object' ? 
+                Object.entries(ad.custom_days).reduce((acc, [day, value]) => {
+                  acc[`ads[custom_days][${day}]`] = value;
+                  return acc;
+                }, {}) : {}
+              ),
+
+              // ✅ Date validation fields
+              ...(ad?.start_validate ? {
+                'ads[start_validate]': moment(ad.start_validate).format('DD-MM-YYYY')
+              } : {}),
+              ...(ad?.finish_validate ? {
+                'ads[finish_validate]': moment(ad.finish_validate).format('DD-MM-YYYY')
+              } : {}),
 
               ...worldID,
               ...ownerUserID,
