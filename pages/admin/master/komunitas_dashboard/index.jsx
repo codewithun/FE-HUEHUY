@@ -489,77 +489,152 @@ export default function KomunitasDashboard() {
           submit: async ({ payload, isUpdate, row }) => {
             try {
               const form = new FormData();
-              form.append("name", payload.name || "");
-              form.append("description", payload.description || "");
 
-              // Mitra (corporate)
-              if (payload.corporate_id) form.append("corporate_id", String(payload.corporate_id));
+              // Debug setiap field yang di-append
+              const appendField = (key, value) => {
+                console.log(`Appending ${key}:`, value, typeof value);
+                form.append(key, value);
+              };
 
-              // Warna background
-              if (payload.bg_color_1) form.append("bg_color_1", payload.bg_color_1);
-              if (payload.bg_color_2) form.append("bg_color_2", payload.bg_color_2);
+              appendField("name", payload.name || "");
+              appendField("description", payload.description || "");
 
-              // Jenis dunia
+              if (payload.corporate_id) {
+                appendField("corporate_id", String(payload.corporate_id));
+              }
+
+              if (payload.bg_color_1) appendField("bg_color_1", payload.bg_color_1);
+              if (payload.bg_color_2) appendField("bg_color_2", payload.bg_color_2);
+
               if (payload.world_type) {
-                form.append("world_type", payload.world_type);
-                // fallback field name if backend expects 'type'
-                form.append("type", payload.world_type);
+                appendField("world_type", payload.world_type);
+                appendField("type", payload.world_type);
               }
 
-              // Aktif
-              if (Array.isArray(payload.is_active)) {
-                form.append("is_active", payload.is_active.includes(1) ? "1" : "0");
-              } else if (typeof payload.is_active === "boolean") {
-                form.append("is_active", payload.is_active ? "1" : "0");
+              // PERBAIKI: is_active → selalu kirim sebagai string "1" atau "0"
+              const isActiveBool =
+                Array.isArray(payload.is_active)
+                  ? payload.is_active.includes(1) || payload.is_active.includes("1")
+                  : !!payload.is_active;
+
+              if (isActiveBool !== undefined && isActiveBool !== null)
+                appendField("is_active", isActiveBool ? "1" : "0");
+
+              // ===== FIX FINAL: Logo Handling (robust) =====
+              console.log("Logo payload:", payload.logo);
+
+              const dataUrlToFile = async (dataUrl, filename = "logo.png") => {
+                try {
+                  const res = await fetch(dataUrl);
+                  const blob = await res.blob();
+                  const ext = (blob.type && blob.type.split("/")[1]) || "png";
+                  const safeName = filename.includes(".") ? filename : `logo.${ext}`;
+                  return new File([blob], safeName, { type: blob.type || "image/png" });
+                } catch (e) {
+                  console.warn("Failed convert dataURL to File:", e);
+                  return null;
+                }
+              };
+
+              let logoFile = null;
+
+              // Detect various shapes coming from different upload components
+              if (payload.logo instanceof File) {
+                logoFile = payload.logo;
+              } else if (payload.logo?.file instanceof File) {
+                logoFile = payload.logo.file;
+              } else if (payload.logo?.originFileObj instanceof File) {
+                logoFile = payload.logo.originFileObj;
+              } else if (Array.isArray(payload.logo) && payload.logo[0] instanceof File) {
+                logoFile = payload.logo[0];
+              } else if (payload.logo instanceof Blob) {
+                // If we only have a Blob, wrap it as File for Laravel validator "file|image"
+                const name = payload.logo?.name || "logo.png";
+                logoFile = new File([payload.logo], name, { type: payload.logo.type || "image/png" });
+              } else if (typeof payload.logo === "string" && payload.logo.startsWith("data:image")) {
+                // Convert data URL to File
+                logoFile = await dataUrlToFile(payload.logo, "logo.png");
               }
 
-              // Logo
-              if (payload.logo && typeof payload.logo !== "string") form.append("logo", payload.logo);
+              // Append if we have a valid File
+              if (logoFile instanceof File) {
+                const safeName = logoFile.name || "logo";
+                console.log("✅ Appending logo file:", safeName, logoFile.type, logoFile.size);
+                form.append("logo", logoFile, safeName);
+              } else if (isUpdate && typeof payload.logo === "string" && payload.logo.trim() !== "" && !payload.logo.startsWith("data:")) {
+                // On update, allow keeping existing string path
+                console.log("✅ Keeping old logo path (update):", payload.logo);
+                form.append("logo", payload.logo);
+              } else {
+                // On create without valid file, ensure we do not send string to pass validator
+                console.log("🚫 No valid logo file to upload; not including 'logo' in FormData");
+                form.delete("logo");
+              }
+
+              // Safety: remove obviously invalid logo values
+              for (let [key, val] of form.entries()) {
+                if (key === "logo" && (val === "" || val === "null")) {
+                  console.warn("🚨 Invalid logo detected, deleting before submit");
+                  form.delete("logo");
+                }
+              }
+
+              // Debug FormData contents
+              console.log('FormData entries:');
+              for (let [key, value] of form.entries()) {
+                console.log(`  ${key}:`, value);
+              }
 
               const url = isUpdate
                 ? apiJoin(`admin/communities/${row.id}`)
                 : apiJoin("admin/communities");
               const method = isUpdate ? "PUT" : "POST";
 
-              console.log('Submitting community:', { url, method, payload });
+              console.log('Request URL:', url);
+              console.log('Request method:', method);
 
               const response = await fetch(url, {
                 method,
                 headers: authHeadersMultipart(),
-                body: form
+                body: form,
               });
+
+              console.log('Response status:', response.status);
 
               if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Community submit failed:', {
-                  status: response.status,
-                  statusText: response.statusText,
-                  body: errorText
-                });
+                console.log('Error response:', errorText);
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
               }
 
               const result = await response.json().catch(() => ({}));
-              console.log('Community submit success:', result);
+              console.log("Community submit success:", result);
 
               setRefreshToggle((s) => !s);
               return true;
             } catch (error) {
-              console.error('Error submitting community:', error);
+              console.error("Error submitting community:", error);
               throw error;
             }
           },
+
         }}
         formUpdateControl={{
-          customDefaultValue: (data) => ({
-            name: data?.name || "",
-            description: data?.description || "",
-            corporate_id: data?.corporate_id || data?.corporate?.id || "",
-            bg_color_1: data?.bg_color_1 || data?.color || "",
-            bg_color_2: data?.bg_color_2 || "",
-            world_type: data?.world_type || data?.type || "",
-            is_active: data?.is_active ? [1] : [],
-          }),
+          customDefaultValue: (data) => {
+            console.log('Form update data:', data);
+            return {
+              name: data?.name || "",
+              description: data?.description || "",
+              corporate_id: data?.corporate_id || data?.corporate?.id || "",
+              bg_color_1: data?.bg_color_1 || data?.color || "",
+              bg_color_2: data?.bg_color_2 || "",
+              world_type: data?.world_type || data?.type || "",
+              // PERBAIKI: is_active harus array untuk checkbox
+              is_active: (data?.is_active || data?.active) ? [1] : [],
+              // PERBAIKI: logo sebagai string untuk update
+              logo: data?.logo || "",
+            };
+          },
         }}
       />
 
@@ -838,8 +913,6 @@ export default function KomunitasDashboard() {
                   (row.approved ? "approved" : (row.rejected ? "rejected" : "pending"));
                 const isApproved = raw === "approved" || raw === "accepted" || raw === "diterima";
                 const isRejected = raw === "rejected" || raw === "ditolak";
-                const disabled = isApproved || isRejected;
-
                 return (
                   <div className="flex items-center gap-2">
                     <ButtonComponent
