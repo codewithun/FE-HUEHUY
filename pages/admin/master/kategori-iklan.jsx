@@ -68,15 +68,31 @@ export default function ManageAdsCategories() {
                 },
               },
             },
+            // Tambahan: Komunitas (Opsional) — pola sama seperti di Widget
             {
               type: 'select',
               construction: {
-                multiple: true,
+                name: 'community_id',
+                label: 'Komunitas (Opsional)',
+                placeholder: 'Pilih Komunitas..',
+                serverOptionControl: {
+                  path: 'admin/communities',
+                  mapOptions: (data) =>
+                    Array.isArray(data)
+                      ? data.map((item) => ({ label: item.name, value: item.id }))
+                      : [],
+                },
+              },
+            },
+            {
+              type: 'select',
+              construction: {
+                // multiple: true, // hapus agar kirim single value
                 name: 'parent_id',
                 label: 'Kelompok',
                 placeholder: 'Pilih Kelompok Kategori..',
                 serverOptionControl: {
-                  path: 'admin/options/ad-category',
+                  path: 'admin/options/ad-category', // sesuaikan dengan route BE Anda
                 },
               },
             },
@@ -104,75 +120,6 @@ export default function ManageAdsCategories() {
                 options: [{ label: 'Tampil Di Beranda', value: 1 }],
               },
             },
-            // {
-            //   type: 'custom',
-            //   custom: ({ values, setValues, errors }) => {
-            //     return (
-            //       <div className="border rounded-lg px-3 py-2.5">
-            //         <CheckboxComponent
-            //           label="Kategori Utama"
-            //           name="is_primary_parent"
-            //           onChange={() => {
-            //             setValues([
-            //               ...values.filter(
-            //                 (i) => i.name != 'is_primary_parent'
-            //               ),
-            //               {
-            //                 name: 'is_primary_parent',
-            //                 value: !values.find(
-            //                   (i) => i.name == 'is_primary_parent'
-            //                 )?.value
-            //                   ? 1
-            //                   : '',
-            //               },
-            //             ]);
-            //           }}
-            //           checked={
-            //             values?.find((i) => i.name == 'is_primary_parent')
-            //               ?.value
-            //           }
-            //         />
-            //         <span className="text-danger">
-            //           {errors.find((err) => err?.name == 'is_primary_parent')
-            //             ?.error || ''}
-            //         </span>
-            //       </div>
-            //     );
-            //   },
-            // },
-            // {
-            //   type: 'custom',
-            //   custom: ({ values, setValues, errors }) => {
-            //     return (
-            //       <div className="border rounded-lg px-3 py-2.5">
-            //         <CheckboxComponent
-            //           label="Tampil Di Beranda"
-            //           name="is_home_display"
-            //           onChange={() => {
-            //             setValues([
-            //               ...values.filter((i) => i.name != 'is_home_display'),
-            //               {
-            //                 name: 'is_home_display',
-            //                 value: !values.find(
-            //                   (i) => i.name == 'is_home_display'
-            //                 )?.value
-            //                   ? 1
-            //                   : '',
-            //               },
-            //             ]);
-            //           }}
-            //           checked={
-            //             values?.find((i) => i.name == 'is_home_display')?.value
-            //           }
-            //         />
-            //         <span className="text-danger">
-            //           {errors.find((err) => err?.name == 'is_home_display')
-            //             ?.error || ''}
-            //         </span>
-            //       </div>
-            //     );
-            //   },
-            // },
           ],
         }}
         formUpdateControl={{
@@ -181,9 +128,11 @@ export default function ManageAdsCategories() {
             return {
               name: data?.name,
               parent_id: data?.parent_id || '',
-              // Don't set image field with URL - let the component handle preview internally
+              // Jangan set file image dari URL
               is_primary_parent: data?.is_primary_parent ? 1 : 0,
               is_home_display: data?.is_home_display ? 1 : 0,
+              // Tambahan: default value komunitas (opsional)
+              community_id: data?.community_id ?? undefined,
             };
           },
         }}
