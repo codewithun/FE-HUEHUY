@@ -14,7 +14,7 @@ const CommunityPromoPage = () => {
   const { communityId } = router.query;
   const [communityData, setCommunityData] = useState(null);
   const [promoData, setPromoData] = useState([]);
-  const [widgetData, setWidgetData] = useState([]); // Tambah state untuk widget
+  const [widgetData, setWidgetData] = useState([]); // widgets "hunting"
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -66,7 +66,7 @@ const CommunityPromoPage = () => {
       return token
         ? {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         }
         : { 'Content-Type': 'application/json' };
     } catch (e) {
@@ -97,7 +97,7 @@ const CommunityPromoPage = () => {
         location: p.location ?? p.community?.location ?? 'Location',
         image,
         created_at: p.created_at ?? ad?.created_at,
-        updated_at: p.updated_at ?? ad?.updated_at
+        updated_at: p.updated_at ?? ad?.updated_at,
       };
     });
 
@@ -105,7 +105,8 @@ const CommunityPromoPage = () => {
       const ta = new Date(a.updated_at || a.created_at || 0).getTime() || 0;
       const tb = new Date(b.updated_at || b.created_at || 0).getTime() || 0;
       if (tb !== ta) return tb - ta;
-      const ia = Number(a.id), ib = Number(b.id);
+      const ia = Number(a.id),
+        ib = Number(b.id);
       if (!Number.isNaN(ia) && !Number.isNaN(ib)) return ib - ia;
       return 0;
     });
@@ -113,18 +114,22 @@ const CommunityPromoPage = () => {
     return promos;
   };
 
+  // We intentionally call top-level async helpers when communityId changes.
+  // Disable exhaustive-deps here because these helpers are stable in this component.
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (communityId) {
       fetchCommunityData();
       fetchPromoData();
-      fetchWidgetData(); // Tambah fetch widget
+      fetchWidgetData(); // widgets "hunting"
     }
   }, [communityId]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const fetchCommunityData = async () => {
     try {
       const res = await fetch(`${apiUrl}/communities/${communityId}`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
       });
 
       if (res.ok) {
@@ -133,20 +138,20 @@ const CommunityPromoPage = () => {
         setCommunityData({
           id: community.id,
           name: community.name || 'Komunitas',
-          location: community.location || 'Location'
+          location: community.location || 'Location',
         });
       } else {
         setCommunityData({
           id: communityId,
           name: 'dbotanica Bandung',
-          location: 'Bandung'
+          location: 'Bandung',
         });
       }
     } catch (error) {
       setCommunityData({
         id: communityId,
         name: 'dbotanica Bandung',
-        location: 'Bandung'
+        location: 'Bandung',
       });
     }
   };
@@ -154,13 +159,20 @@ const CommunityPromoPage = () => {
   const fetchPromoData = async () => {
     setLoading(true);
     try {
-      const promoRes = await fetch(`${apiUrl}/communities/${communityId}/promos`, {
-        headers: getAuthHeaders()
-      });
+      const promoRes = await fetch(
+        `${apiUrl}/communities/${communityId}/promos`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
 
       if (promoRes.ok) {
         const promoJson = await promoRes.json();
-        const promoData = Array.isArray(promoJson?.data) ? promoJson.data : Array.isArray(promoJson) ? promoJson : [];
+        const promoData = Array.isArray(promoJson?.data)
+          ? promoJson.data
+          : Array.isArray(promoJson)
+            ? promoJson
+            : [];
         setPromoData(normalizePromos(promoData));
       }
     } catch (error) {
@@ -170,32 +182,22 @@ const CommunityPromoPage = () => {
     }
   };
 
-  // Tambah fungsi untuk fetch widget data
+  // fetch widget data (type=hunting, content_type=promo, active)
   const fetchWidgetData = async () => {
     try {
-      console.log('🔍 Fetching widgets for community:', communityId);
-
-      // Fetch widgets untuk tipe 'hunting' dan community_id yang sesuai
-      const widgetRes = await fetch(`${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}`, {
-        headers: getAuthHeaders()
-      });
+      const widgetRes = await fetch(
+        `${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}`,
+        { headers: getAuthHeaders() }
+      );
 
       if (widgetRes.ok) {
         const widgetJson = await widgetRes.json();
         const widgets = Array.isArray(widgetJson?.data) ? widgetJson.data : [];
-
-        console.log('🎛️ Raw widgets received:', widgets);
-
-        // Filter hanya widget yang aktif dan content_type = 'promo'
-        const activePromoWidgets = widgets.filter(widget =>
-          widget.is_active &&
-          widget.content_type === 'promo'
-        );
-
-        console.log('🎛️ Active promo widgets:', activePromoWidgets);
-
-        // Sort berdasarkan level
-        activePromoWidgets.sort((a, b) => (a.level || 0) - (b.level || 0));
+        const activePromoWidgets = widgets
+          .filter(
+            (w) => w.is_active && (w.content_type === 'promo' || !w.content_type)
+          )
+          .sort((a, b) => (a.level || 0) - (b.level || 0));
 
         setWidgetData(activePromoWidgets);
       } else {
@@ -207,386 +209,280 @@ const CommunityPromoPage = () => {
   };
 
   const handlePromoClick = (promoId) => {
-    router.push(`/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`);
+    router.push(
+      `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
+    );
   };
 
-  // Komponen untuk render widget berdasarkan tipe dan ukuran
+  // ======== UI TOKENS (BIAR KONSISTEN) ========
+  const COLORS = {
+    olive: '#5a6e1d',
+    oliveSoft: 'rgba(90,110,29,0.1)',
+    oliveBorder: '#cdd0b3',
+    textDark: '#2B3A55',
+  };
+
+  // ======== WIDGET RENDERER (S, M, L, XL, XL-Ads) ========
   const WidgetRenderer = ({ widget }) => {
     const { source_type, size, dynamic_content_cubes, name } = widget;
+    if (source_type !== 'cube' || !dynamic_content_cubes?.length) return null;
 
-    console.log('🎨 Rendering widget:', { name, source_type, size, cubes: dynamic_content_cubes?.length });
+    return (
+      <div className="mb-6">
+        {/* Header Widget */}
+        <div className="mb-2">
+          <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+          {widget.description && (
+            <p className="text-sm text-slate-600 mt-[1px]">
+              {widget.description}
+            </p>
+          )}
+        </div>
 
-    if (source_type === 'cube' && dynamic_content_cubes?.length > 0) {
-      // Tentukan layout berdasarkan size
-      const getLayoutConfig = (size) => {
-        switch (size) {
-          case 'S':
-            return {
-              gridCols: 'grid-cols-2',
-              itemSize: 'w-14 h-14',
-              textSize: 'text-sm',
-              gap: 'gap-0.5' // lebih rapat lagi untuk S
-            };
-          case 'M':
-            return {
-              gridCols: 'grid-cols-2',
-              itemSize: 'w-20 h-20',
-              textSize: 'text-base',
-              gap: 'gap-3'
-            };
-          case 'L':
-            return {
-              gridCols: 'grid-cols-1',
-              itemSize: 'w-24 h-24',
-              textSize: 'text-lg',
-              gap: 'gap-4'
-            };
-          case 'XL':
-            return {
-              gridCols: 'grid-cols-1',
-              itemSize: 'w-32 h-32',
-              textSize: 'text-xl',
-              gap: 'gap-4'
-            };
-          case 'XL-Ads':
-            return {
-              gridCols: 'grid-cols-1',
-              itemSize: 'w-full h-40',
-              textSize: 'text-xl',
-              gap: 'gap-4'
-            };
-          default:
-            return {
-              gridCols: 'grid-cols-2',
-              itemSize: 'w-20 h-20',
-              textSize: 'text-base',
-              gap: 'gap-3'
-            };
-        }
-      };
+        {/* Scrollable horizontal container */}
+        <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+          {dynamic_content_cubes.map((cubeData, index) => {
+            const cube = cubeData?.cube;
+            if (!cube) return null;
 
-      const layout = getLayoutConfig(size);
-      console.log('📐 Layout config for size', size, ':', layout);
+            const ad = cube?.ads?.[0];
+            const imageUrl = buildImageUrl(
+              ad?.image_1 ||
+              ad?.image ||
+              ad?.picture_source ||
+              cube?.image ||
+              FALLBACK_IMAGE
+            );
+            const title = ad?.title || cube?.label || 'Promo';
+            const merchant = ad?.merchant || communityData?.name || 'Merchant';
+            const description = ad?.description || '';
+            const category = cube?.category || 'Informasi';
 
-      // Ubah grid menjadi flex horizontal scrollable
-      return (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">{name}</h2>
-            <div className="bg-purple-50 p-2 rounded-lg">
-              <FontAwesomeIcon icon={faGift} className="text-purple-500 text-sm" />
-            </div>
-          </div>
-          {/* Scrollable horizontal container */}
-          <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
-            {dynamic_content_cubes.map((cubeData, index) => {
-              const cube = cubeData.cube;
-              if (!cube) return null;
-
-              // Ambil data dari ads jika tersedia
-              const ad = cube.ads?.[0];
-              const imageUrl = buildImageUrl(
-                ad?.image_1 ||
-                ad?.image ||
-                ad?.picture_source ||
-                cube?.image ||
-                FALLBACK_IMAGE
-              );
-              const title = ad?.title || cube.label || 'Promo';
-              const merchant = ad?.merchant || communityData?.name || 'Merchant';
-
-              // XL-Ads: Banner dua layer (horizontal card)
-              if (size === 'XL-Ads') {
-                return (
-                  <div
-                    key={cube.id || index}
-                    className="relative rounded-[16px] overflow-hidden cursor-pointer flex-shrink-0"
-                    style={{ minWidth: 320, maxWidth: 400 }}
-                    onClick={() => {
-                      if (ad?.id) {
-                        router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                      }
-                    }}
-                  >
-                    {/* Gambar utama */}
-                    <div className="relative w-full h-64">
-                      <Image
-                        src={imageUrl}
-                        alt={title}
-                        fill
-                        className="object-cover"
-                        placeholder="blur"
-                        blurDataURL="/default-avatar.png"
-                      />
-                      {/* Overlay nama komunitas */}
-                      <div className="absolute top-3 left-3 bg-black/40 text-white text-[12px] font-medium px-3 py-1 rounded-md backdrop-blur-sm">
-                        {merchant}
-                      </div>
-                    </div>
-                    {/* Kotak bawah konten */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/90 to-gray-900/40 p-4">
-                      <h3 className="text-white font-semibold text-[15px] leading-snug mb-1 line-clamp-2">
-                        {title}
-                      </h3>
-                      <button className="mt-1 inline-block bg-white/90 text-[12px] text-gray-800 font-medium px-3 py-1 rounded-md">
-                        {widget.content_type === 'promo'
-                          ? 'Promo'
-                          : widget.content_type === 'recommendation'
-                            ? 'Lihat Rekomendasi'
-                            : widget.content_type === 'category'
-                              ? 'Lihat Kategori'
-                              : widget.content_type === 'ad_category'
-                                ? 'Lihat Iklan'
-                                : widget.content_type === 'nearby'
-                                  ? 'Lihat Terdekat'
-                                  : 'Lihat Detail'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              // XL
-              if (size === 'XL') {
-                return (
-                  <div
-                    key={cube.id || index}
-                    className="relative rounded-[16px] border-2 border-blue-200 bg-[#5C8DBB]/10 overflow-hidden p-3 flex-shrink-0"
-                    style={{ minWidth: 260, maxWidth: 320, minHeight: 220 }}
-                    onClick={() => {
-                      if (ad?.id) {
-                        router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                      }
-                    }}
-                  >
-                    {/* Gambar utama */}
-                    <div className="relative w-full h-36 rounded-[12px] overflow-hidden mb-3">
-                      <Image
-                        src={imageUrl}
-                        alt={title}
-                        fill
-                        className="object-cover"
-                        placeholder="blur"
-                        blurDataURL="/default-avatar.png"
-                      />
-                      {/* Overlay nama komunitas */}
-                      <div className="absolute top-2 left-2 bg-white/70 text-[#5C8DBB] text-[12px] font-medium px-2 py-0.5 rounded-md border border-[#5C8DBB]">
-                        {merchant}
-                      </div>
-                    </div>
-                    {/* Konten bawah */}
-                    <div>
-                      <h3 className="text-[#2B3A55] font-semibold text-[15px] leading-snug mb-1 line-clamp-2">
-                        {title}
-                      </h3>
-                      <p className="text-gray-600 text-[13px] mb-2 line-clamp-2">
-                        {ad?.description || ''}
-                      </p>
-                      <button
-                        className="inline-block bg-white border border-[#5C8DBB] text-[#5C8DBB] text-[12px] font-medium px-3 py-1 rounded-md hover:bg-[#5C8DBB] hover:text-white transition"
-                        onClick={e => {
-                          e.stopPropagation();
-                          if (ad?.id) {
-                            router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                          }
-                        }}
-                      >
-                        {widget.content_type === 'promo'
-                          ? 'Promo'
-                          : widget.content_type === 'recommendation'
-                            ? 'Lihat Rekomendasi'
-                            : widget.content_type === 'category'
-                              ? 'Lihat Kategori'
-                              : widget.content_type === 'ad_category'
-                                ? 'Lihat Iklan'
-                                : widget.content_type === 'nearby'
-                                  ? 'Lihat Terdekat'
-                                  : 'Lihat Detail'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              // L
-              if (size === 'L') {
-                return (
-                  <div
-                    key={cube.id || index}
-                    className="flex items-center rounded-[16px] border-2 border-blue-200 bg-[#5C8DBB]/10 overflow-hidden px-4 py-3 min-h-[110px] flex-shrink-0"
-                    style={{ minWidth: 220, maxWidth: 260, cursor: 'pointer' }}
-                    onClick={() => {
-                      if (ad?.id) {
-                        router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                      }
-                    }}
-                  >
-                    {/* Gambar di kiri */}
-                    <div className="relative w-24 h-24 rounded-[12px] overflow-hidden flex-shrink-0 mr-4">
-                      <Image
-                        src={imageUrl}
-                        alt={title}
-                        fill
-                        className="object-cover"
-                        placeholder="blur"
-                        blurDataURL="/default-avatar.png"
-                      />
-                      {/* Overlay nama komunitas */}
-                      <div className="absolute top-2 left-2 bg-white/70 text-[#5C8DBB] text-[11px] font-medium px-2 py-0.5 rounded-md border border-[#5C8DBB]">
-                        {merchant}
-                      </div>
-                    </div>
-                    {/* Konten di kanan */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <h3 className="text-[#2B3A55] font-semibold text-[15px] leading-snug mb-1 line-clamp-2">
-                        {title}
-                      </h3>
-                      <p className="text-gray-600 text-[13px] mb-2 line-clamp-2">
-                        {ad?.description || ''}
-                      </p>
-                      <button
-                        className="inline-block bg-white border border-[#5C8DBB] text-[#5C8DBB] text-[12px] font-medium px-3 py-1 rounded-md hover:bg-[#5C8DBB] hover:text-white transition w-fit"
-                        onClick={e => {
-                          e.stopPropagation();
-                          if (ad?.id) {
-                            router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                          }
-                        }}
-                      >
-                        {widget.content_type === 'promo'
-                          ? 'Promo'
-                          : widget.content_type === 'recommendation'
-                            ? 'Lihat Rekomendasi'
-                            : widget.content_type === 'category'
-                              ? 'Lihat Kategori'
-                              : widget.content_type === 'ad_category'
-                                ? 'Lihat Iklan'
-                                : widget.content_type === 'nearby'
-                                  ? 'Lihat Terdekat'
-                                  : 'Lihat Detail'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              // S/M
-              if (size === 'S' || size === 'M') {
-                const isM = size === 'M';
-                return (
-                  <div
-                    key={cube.id || index}
-                    className="flex flex-col items-stretch w-full rounded-[10px] border border-blue-200 bg-[#5C8DBB]/10 overflow-hidden p-0.5 flex-shrink-0"
-                    style={{
-                      minWidth: isM ? 140 : 100,
-                      maxWidth: isM ? 180 : 120,
-                      minHeight: isM ? 160 : 120,
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => {
-                      if (ad?.id) {
-                        router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                      }
-                    }}
-                  >
-                    {/* Gambar di atas */}
-                    <div
-                      className="relative w-full rounded-[8px] overflow-hidden mb-1"
-                      style={{
-                        height: isM ? 90 : 60 // S lebih kecil
-                      }}
-                    >
-                      <Image
-                        src={imageUrl}
-                        alt={title}
-                        fill
-                        className="object-cover"
-                        placeholder="blur"
-                        blurDataURL="/default-avatar.png"
-                      />
-                      {/* Overlay nama komunitas */}
-                      <div className={`absolute top-1 left-1 bg-white/70 text-[#5C8DBB] ${isM ? 'text-[11px]' : 'text-[9px]'} font-medium px-2 py-0.5 rounded border border-[#5C8DBB]`}>
-                        {merchant}
-                      </div>
-                    </div>
-                    {/* Konten bawah */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <h3 className={`text-[#2B3A55] font-semibold ${isM ? 'text-[15px]' : 'text-[11px]'} leading-snug mb-1 line-clamp-2`}>
-                        {title}
-                      </h3>
-                      <button
-                        className={`inline-block bg-white border border-[#5C8DBB] text-[#5C8DBB] ${isM ? 'text-[12px] px-3 py-1' : 'text-[10px] px-2 py-0.5'} font-medium rounded-md hover:bg-[#5C8DBB] hover:text-white transition w-fit`}
-                        onClick={e => {
-                          e.stopPropagation();
-                          if (ad?.id) {
-                            router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                          }
-                        }}
-                      >
-                        {widget.content_type === 'promo'
-                          ? 'Promo'
-                          : widget.content_type === 'recommendation'
-                            ? 'Lihat Rekomendasi'
-                            : widget.content_type === 'category'
-                              ? 'Lihat Kategori'
-                              : widget.content_type === 'ad_category'
-                                ? 'Lihat Iklan'
-                                : widget.content_type === 'nearby'
-                                  ? 'Lihat Terdekat'
-                                  : 'Lihat Detail'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              // Tambahan untuk size 'S'
+            // ===== XL-ADS
+            if (size === 'XL-Ads') {
               return (
                 <div
-                  key={cube.id || index}
-                  className="bg-white rounded-[16px] shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50 flex-shrink-0"
-                  style={{ minWidth: 140, maxWidth: 180 }}
+                  key={cube?.id || index}
+                  className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+                  style={{
+                    minWidth: 320,
+                    maxWidth: 360,
+                    borderColor: '#d8d8d8',
+                    background: '#fffaf0',
+                    cursor: 'pointer',
+                  }}
                   onClick={() => {
-                    if (ad?.id) {
-                      router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
-                    }
+                    if (ad?.id)
+                      router.push(
+                        `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                      );
                   }}
                 >
-                  <div className={`flex p-4 ${size === 'XL' ? 'flex-col' : 'flex-row'}`}>
-                    <div className={`rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100 ${layout.itemSize}`}>
-                      <Image
-                        src={imageUrl}
-                        alt={title}
-                        width={size === 'XL' ? 128 : size === 'L' ? 96 : size === 'M' ? 80 : 64}
-                        height={size === 'XL' ? 128 : size === 'L' ? 96 : size === 'M' ? 80 : 64}
-                        className="w-full h-full object-cover"
-                        placeholder="blur"
-                        blurDataURL="/default-avatar.png"
-                      />
+                  {/* Gambar */}
+                  <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
+                    <Image
+                      src={imageUrl}
+                      alt={title}
+                      fill
+                      className="object-contain p-2"
+                    />
+                    <div className="absolute top-3 left-3 bg-white/70 text-[#5a6e1d] text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm">
+                      {merchant}
                     </div>
-                    <div className={`flex-1 min-w-0 flex flex-col justify-center ${size === 'XL' ? 'mt-3' : 'ml-3'}`}>
-                      <h3 className={`font-semibold text-gray-900 leading-tight line-clamp-2 mb-1 ${layout.textSize}`}>
-                        {title}
-                      </h3>
-                      <p className="text-xs text-gray-500 line-clamp-1">
-                        {merchant}
-                      </p>
-                      {size === 'XL' && ad?.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2 mt-2">
-                          {ad.description}
-                        </p>
-                      )}
+                  </div>
+
+                  {/* Overlay bawah warna hijau */}
+                  <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4"
+                    style={{ background: 'rgba(90,110,29,0.9)', borderTop: `1px solid ${COLORS.oliveBorder}` }}>
+                    <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
+                      {title}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40">
+                        {category}
+                      </span>
                     </div>
                   </div>
                 </div>
               );
-            })}
-          </div>
-        </div>
-      );
-    }
+            }
 
-    return null;
+            // ===== XL 
+            if (size === 'XL') {
+              return (
+                <div
+                  key={cube.id || index}
+                  className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#fffaf0] shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+                  style={{
+                    minWidth: 320,
+                    maxWidth: 360,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() =>
+                    router.push(
+                      `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
+                    )
+                  }
+                >
+                  {/* Gambar di atas */}
+                  <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
+                    <Image
+                      src={imageUrl}
+                      alt={title}
+                      fill
+                      className="object-contain p-2"
+                    />
+                    {/* Merchant Badge */}
+                    <div className="absolute top-3 left-3 bg-white/80 text-[#5a6e1d] text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm">
+                      {merchant}
+                    </div>
+                  </div>
+
+                  {/* Konten bawah */}
+                  <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                    <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">
+                      {title}
+                    </h3>
+                    <p className="text-[13px] text-slate-700 line-clamp-2 mb-3">
+                      {description || 'Temukan berbagai keseruan menarik di komunitas ini!'}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
+                        {cube.category || 'Informasi'}
+                      </span>
+                      <FontAwesomeIcon
+                        icon={faGift}
+                        className="text-[#3f4820] text-[14px] opacity-80"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // ===== L 
+            if (size === 'L') {
+              return (
+                <div
+                  key={cube.id || index}
+                  className="flex items-center rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+                  style={{
+                    minWidth: 280,
+                    maxWidth: 320,
+                    height: 130,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() =>
+                    router.push(
+                      `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
+                    )
+                  }
+                >
+                  {/* Gambar kiri */}
+                  <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
+                    <div className="w-[90%] h-[90%] relative">
+                      <Image
+                        src={imageUrl}
+                        alt={title}
+                        fill
+                        className="object-contain rounded-[10px]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Konten kanan */}
+                  <div className="flex-1 h-full p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">
+                        {title}
+                      </h3>
+                      <p className="text-[13px] text-slate-700 line-clamp-2">
+                        {description || 'Welcome to Huehuy!'}
+                      </p>
+                    </div>
+
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
+                        {cube.category || 'Advertising'}
+                      </span>
+                      <FontAwesomeIcon
+                        icon={faGift}
+                        className="text-[#3f4820] text-[13px] opacity-80"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // ===== S / M 
+            if (size === 'S' || size === 'M') {
+              const isM = size === 'M';
+              return (
+                <div
+                  key={cube.id || index}
+                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
+                  style={{
+                    minWidth: isM ? 180 : 140,
+                    maxWidth: isM ? 200 : 160,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() =>
+                    router.push(
+                      `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
+                    )
+                  }
+                >
+                  {/* Gambar */}
+                  <div
+                    className="relative w-full bg-white flex items-center justify-center overflow-hidden"
+                    style={{ height: isM ? 150 : 120 }}
+                  >
+                    <div className="w-[90%] h-[90%] relative">
+                      <Image
+                        src={imageUrl}
+                        alt={title}
+                        fill
+                        className="object-contain rounded-[8px]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Konten bawah */}
+                  <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                    <h3
+                      className={`${isM ? 'text-[14px]' : 'text-[13px]'
+                        } font-bold text-slate-900 line-clamp-2 mb-0.5`}
+                    >
+                      {title}
+                    </h3>
+                    <p
+                      className={`${isM ? 'text-[12px]' : 'text-[11px]'
+                        } text-slate-700 line-clamp-1`}
+                    >
+                      {description || 'Welcome to Huehuy!'}
+                    </p>
+
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">
+                        {cube.category || 'Advertising'}
+                      </span>
+                      <FontAwesomeIcon
+                        icon={faGift}
+                        className="text-[#3f4820] text-[11px] opacity-80"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            // fallback (shouldn't happen)
+            return null;
+          })}
+        </div>
+      </div>
+    );
   };
 
   const PromoCard = ({ promo }) => (
@@ -610,9 +506,7 @@ const CommunityPromoPage = () => {
           <h3 className="font-semibold text-gray-900 text-base leading-tight line-clamp-2 mb-1">
             {promo.title}
           </h3>
-          <p className="text-sm text-gray-500 line-clamp-1">
-            {promo.merchant}
-          </p>
+          <p className="text-sm text-gray-500 line-clamp-1">{promo.merchant}</p>
         </div>
       </div>
     </div>
@@ -650,40 +544,10 @@ const CommunityPromoPage = () => {
       {/* Content */}
       <div className="px-4 pb-24">
         <div className="lg:mx-auto lg:max-w-md">
-
-          {/* Render Widgets - Tampilkan sebelum promo reguler */}
+          {/* Render Widgets sebelum promo reguler */}
           {widgetData.map((widget) => (
             <WidgetRenderer key={widget.id} widget={widget} />
           ))}
-
-          {/* Promo Reguler Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Promo Terkini</h2>
-              <div className="bg-blue-50 p-2 rounded-lg">
-                <FontAwesomeIcon icon={faTag} className="text-blue-500 text-sm" />
-              </div>
-            </div>
-
-            {promoData.length > 0 ? (
-              promoData
-                .filter(promo =>
-                  searchQuery === '' ||
-                  promo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  promo.merchant.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .map((promo) => (
-                  <PromoCard key={promo.id} promo={promo} />
-                ))
-            ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-[12px]">
-                <div className="bg-gray-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FontAwesomeIcon icon={faGift} className="text-gray-400" />
-                </div>
-                <p className="text-gray-500 text-sm">Belum ada promo tersedia</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 

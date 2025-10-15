@@ -190,7 +190,6 @@ export default function Widget() {
                 options: [
                   { label: 'Kotak Kategori', value: 'category' },
                   { label: 'Terdekat', value: 'nearby' },
-                  { label: 'Kategori Iklan', value: 'ad_category' },
                   { label: 'Rekomendasi', value: 'recommendation' },
                   { label: 'Promo / Iklan', value: 'promo' },
                 ],
@@ -200,51 +199,76 @@ export default function Widget() {
               type: 'custom',
               custom: ({ formControl, values }) => {
                 const content_type = values.find(val => val.name === 'content_type')?.value;
+                const source_type = values.find(val => val.name === 'source_type')?.value;
 
-                if (content_type === 'promo')
+                if (content_type === 'promo') {
                   return (
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="flex-1">
-                        <SelectComponent
-                          name="source_type"
-                          {...formControl('source_type')}
-                          label="Sumber Konten"
-                          placeholder="Pilih sumber konten..."
-                          options={[
-                            { label: 'Kubus Acak', value: 'shuffle_cube' },
-                            { label: 'Kubus Pilihan', value: 'cube' },
-                            { label: 'Iklan Huehuy', value: 'ad' },
-                            { label: 'Promo/Iklan Pilihan', value: 'promo_selected' },
-                          ]}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex flex-col gap-2">
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Ukuran</label>
-                          <div className="flex flex-wrap gap-3 mt-1">
-                            {['S', 'M', 'L', 'XL', 'XL-Ads'].map(opt => (
-                              <RadioComponent
-                                key={opt}
-                                name="size"
-                                label={opt}
-                                value={opt}
-                                checked={String(
-                                  values.find(val => val.name === 'size')?.value ||
-                                  formControl('size')?.value ||
-                                  ''
-                                ) === opt}
-                                onChange={() => {
-                                  if (formControl('size') && typeof formControl('size').onChange === 'function') {
-                                    formControl('size').onChange(opt);
-                                  }
-                                }}
-                              />
-                            ))}
+                    <>
+                      <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1">
+                          <SelectComponent
+                            name="source_type"
+                            {...formControl('source_type')}
+                            label="Sumber Konten"
+                            placeholder="Pilih sumber konten..."
+                            options={[
+                              { label: 'Promo/Iklan Acak', value: 'shuffle_cube' },
+                              { label: 'Promo/Iklan Pilihan', value: 'cube' },
+                              { label: 'Iklan Huehuy', value: 'ad' },
+                              { label: 'Kategori Iklan', value: 'ad_category' },
+                            ]}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex flex-col gap-2">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Ukuran</label>
+                            <div className="flex flex-wrap gap-3 mt-1">
+                              {['S', 'M', 'L', 'XL', 'XL-Ads'].map(opt => (
+                                <RadioComponent
+                                  key={opt}
+                                  name="size"
+                                  label={opt}
+                                  value={opt}
+                                  checked={String(
+                                    values.find(val => val.name === 'size')?.value ||
+                                    formControl('size')?.value ||
+                                    ''
+                                  ) === opt}
+                                  onChange={() => {
+                                    if (formControl('size') && typeof formControl('size').onChange === 'function') {
+                                      formControl('size').onChange(opt);
+                                    }
+                                  }}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                      {/* Tambahkan dropdown kategori iklan jika source_type == 'ad_category' */}
+                      {source_type === 'ad_category' && (
+                        <div className="mt-4">
+                          <SelectComponent
+                            name="ad_category_id"
+                            {...formControl('ad_category_id')}
+                            label="Kategori Iklan"
+                            placeholder="Pilih kategori iklan..."
+                            serverOptionControl={{
+                              path: 'admin/options/ad-category',
+                              mapOptions: (data) =>
+                                Array.isArray(data)
+                                  ? data.map((item) => ({
+                                      label: item?.label || item?.name || `Kategori #${item?.id}`,
+                                      value: item?.value || item?.id,
+                                    }))
+                                  : [],
+                            }}
+                          />
+                        </div>
+                      )}
+                    </>
                   );
+                }
 
                 return null;
               },
