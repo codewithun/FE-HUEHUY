@@ -16,6 +16,7 @@ const CommunityPromoPage = () => {
   const [promoData, setPromoData] = useState([]);
   const [widgetData, setWidgetData] = useState([]); // widgets "hunting"
   const [adCategories, setAdCategories] = useState([]); // ambil ad_category di parent
+  const [adCategoryLevel, setAdCategoryLevel] = useState(null); // level untuk posisi kategori
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -196,54 +197,61 @@ const CommunityPromoPage = () => {
         const widgetJson = await widgetRes.json();
 
         // fallback kalau backend ngirim data langsung tanpa wrapper .data
-        const widgets = Array.isArray(widgetJson?.data)
+        let widgets = Array.isArray(widgetJson?.data)
           ? widgetJson.data
           : Array.isArray(widgetJson)
             ? widgetJson
             : [];
 
         // filter hanya widget hunting aktif
-        const activePromoWidgets = widgets
+        widgets = widgets
           .filter((w) => w.is_active && w.type === 'hunting')
           .sort((a, b) => (a.level || 0) - (b.level || 0));
 
-        setWidgetData(activePromoWidgets);
+        // 🔹 Cari widget ad_category: ambil kategorinya dan hapus widget agar tidak dirender dua kali
+        const adCategoryWidget = widgets.find((w) => w.source_type === 'ad_category');
+        if (adCategoryWidget) {
+          try {
+            const catRes = await fetch(
+              `${apiUrl}/admin/options/ad-category?community_id=${communityId}`,
+              { headers: getAuthHeaders() }
+            );
+            const catResult = await catRes.json();
+            if (catResult?.message === 'success' && Array.isArray(catResult.data)) {
+              setAdCategories(catResult.data);
+              setAdCategoryLevel(adCategoryWidget.level ?? null);
+            } else if (Array.isArray(catResult)) {
+              setAdCategories(catResult);
+              setAdCategoryLevel(adCategoryWidget.level ?? null);
+            } else {
+              setAdCategories([]);
+              setAdCategoryLevel(null);
+            }
+          } catch (e) {
+            console.error('Gagal ambil ad_category saat fetch widget:', e);
+            setAdCategories([]);
+            setAdCategoryLevel(null);
+          }
+
+          // remove the ad_category widget so it won't render via WidgetRenderer
+          widgets = widgets.filter((w) => w.id !== adCategoryWidget.id);
+        } else {
+          setAdCategories([]);
+          setAdCategoryLevel(null);
+        }
+
+        setWidgetData(widgets);
       } else {
         console.error('Failed to fetch widgets:', widgetRes.status);
       }
     } catch (error) {
       console.error('Error fetching widget data:', error);
+      setAdCategories([]);
+      setAdCategoryLevel(null);
     }
   };
 
-  useEffect(() => {
-    // jika ada widget dengan source_type 'ad_category' -> fetch sekali di parent
-    if (!communityId) return;
-    const hasAdCategory = widgetData.some((w) => w.source_type === 'ad_category');
-    if (!hasAdCategory) return;
 
-    const fetchAdCategories = async () => {
-      try {
-        const res = await fetch(
-          `${apiUrl}/admin/options/ad-category?community_id=${communityId}`,
-          { headers: getAuthHeaders() }
-        );
-        const result = await res.json();
-        if (result?.message === 'success' && Array.isArray(result.data)) {
-          setAdCategories(result.data);
-        } else if (Array.isArray(result)) {
-          setAdCategories(result);
-        } else {
-          setAdCategories([]);
-        }
-      } catch (err) {
-        console.error('Gagal ambil ad_category (parent):', err);
-        setAdCategories([]);
-      }
-    };
-
-    fetchAdCategories();
-  }, [widgetData, communityId]);
 
   const handlePromoClick = (promoId) => {
     router.push(
@@ -633,10 +641,81 @@ const CommunityPromoPage = () => {
       {/* Content */}
       <div className="px-4 pb-24">
         <div className="lg:mx-auto lg:max-w-md">
-          {/* Render Widgets sebelum promo reguler */}
-          {widgetData.map((widget) => (
-            <WidgetRenderer key={widget.id} widget={widget} />
-          ))}
+          {/* Render Widgets dengan level-aware ordering */}
+          {(widgetData.length > 0 || adCategories.length > 0) && (
+            <>
+              {(() => {
+                // Create combined items with widgets and categories at correct level
+                const items = [];
+                
+                // Add all widgets
+                widgetData.forEach(widget => {
+                  items.push({
+                    type: 'widget',
+                    level: widget.level || 0,
+                    data: widget
+                  });
+                });
+                
+                // Add category block if available
+                if (adCategories.length > 0 && adCategoryLevel !== null) {
+                  items.push({
+                    type: 'categories',
+                    level: adCategoryLevel,
+                    data: adCategories
+                  });
+                }
+                
+                // Sort by level
+                items.sort((a, b) => a.level - b.level);
+                
+                // Render items
+                return items.map((item) => {
+                  if (item.type === 'widget') {
+                    return <WidgetRenderer key={item.data.id} widget={item.data} />;
+                  } else if (item.type === 'categories') {
+                    return (
+                      <div key="categories" className="mb-6">
+                        <div className="mb-2">
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+                          {item.data.map((cat) => {
+                            const imgSrc = cat.image || buildImageUrl(cat.picture_source) || '/default-avatar.png';
+                            const label = cat.label || cat.name || 'Kategori';
+                            const id = cat.id || cat.value;
+
+                            return (
+                              <div
+                                key={id}
+                                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all"
+                                style={{ minWidth: 90 }}
+                                onClick={() =>
+                                  router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
+                                }
+                              >
+                                <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-[#d8d8d8] bg-white shadow-sm mb-2">
+                                  <Image
+                                    src={imgSrc}
+                                    alt={label}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </div>
+                                <p className="text-[12px] text-slate-700 font-medium text-center line-clamp-2">
+                                  {label}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                });
+              })()}
+            </>
+          )}
 
           {/* Render promo list sebagai horizontal scroller */}
           {promoData.length > 0 && (
@@ -648,35 +727,6 @@ const CommunityPromoPage = () => {
                 {promoData.map((p) => (
                   <div key={p.id} className="flex-shrink-0">
                     <PromoCard promo={p} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Render data adCategories (widget UI tetap hidden) */}
-          {adCategories.length > 0 && (
-            <div className="mb-6">
-              <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar mt-2">
-                {adCategories.map((cat) => (
-                  <div
-                    key={cat.value || cat.id}
-                    className="flex flex-col items-center cursor-pointer flex-shrink-0"
-                    style={{ minWidth: 90 }}
-                    onClick={() =>
-                      router.push(
-                        `/app/komunitas/promo?categoryId=${cat.value || cat.id}&communityId=${communityId}`
-                      )
-                    }
-                  >
-                    <img
-                      src={cat.image || buildImageUrl(cat.picture_source) || '/default-avatar.png'}
-                      alt={cat.label || cat.name || 'Kategori'}
-                      className="w-20 h-20 object-cover rounded-xl shadow-sm"
-                    />
-                    <p className="text-sm font-semibold text-slate-700 mt-2 text-center">
-                      {cat.label || cat.name}
-                    </p>
                   </div>
                 ))}
               </div>
