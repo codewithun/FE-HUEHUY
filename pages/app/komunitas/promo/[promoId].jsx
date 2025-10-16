@@ -12,9 +12,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ImageCarousel } from '../../../../components/base.components';
 import { token_cookie_name } from '../../../../helpers';
 import { get } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
@@ -132,11 +132,111 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
   const isCheckingRef = useRef(false);
   const verificationDoneRef = useRef(false);
 
-  // ==== Hook gambar harus di atas (hindari React error #310) ====
-  const [imgSrc, setImgSrc] = useState(promoData?.image || '/default-avatar.png');
+  // Tambah helper URL gambar + baseUrl
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const baseUrl = (apiUrl || '').replace(/\/api\/?$/, '').replace(/\/+$/, '');
+  
+  const buildImageUrl = useCallback((raw) => {
+    const isAbs = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
+    const fallback = '/default-avatar.png';
+    if (typeof raw !== 'string') return fallback;
+    let url = raw.trim();
+    if (!url) return fallback;
+    if (/^\/?default-avatar\.png$/i.test(url)) return fallback;
+    if (isAbs(url)) return url;
+    let path = url.replace(/^\/+/, '');
+    path = path.replace(/^api\/storage\//i, 'storage/');
+    if (/^(ads|promos|uploads|images|files|banners)\//i.test(path)) {
+      path = `storage/${path}`;
+    }
+    return `${baseUrl}/${path}`.replace(/([^:]\/)\/+/g, '$1');
+  }, [baseUrl]);
+
+  // ==== Hook gambar - mendukung multiple images ====
+  const promoImages = useMemo(() => {
+    if (!promoData) return ['/default-avatar.png'];
+    
+    // Helper untuk memproses URL gambar
+    const processImageUrl = (url) => {
+      if (!url) return null;
+      return buildImageUrl(url);
+    };
+    
+    const images = [];
+    
+    // Priority order: gallery -> images (yang sudah dikumpulkan di fetchPromoDetails) -> image_1/image_2/image_3 -> picture_source -> image
+    if (promoData.gallery && Array.isArray(promoData.gallery) && promoData.gallery.length > 0) {
+      return promoData.gallery.map(processImageUrl).filter(Boolean);
+    }
+    
+    // Prioritas utama: gunakan images yang sudah dikumpulkan dari fetchPromoDetails
+    if (promoData.images && Array.isArray(promoData.images) && promoData.images.length > 0) {
+      const processedImages = promoData.images.map(processImageUrl).filter(Boolean);
+      if (processedImages.length > 0) {
+        console.log('🖼️ Using images from promoData.images:', processedImages);
+        return processedImages;
+      }
+    }
+    
+    // Fallback: ambil langsung dari database fields jika images array kosong/tidak ada
+    if (promoData.image_1) {
+      const img1 = processImageUrl(promoData.image_1);
+      if (img1) images.push(img1);
+    }
+    if (promoData.image_2) {
+      const img2 = processImageUrl(promoData.image_2);
+      if (img2) images.push(img2);
+    }
+    if (promoData.image_3) {
+      const img3 = processImageUrl(promoData.image_3);
+      if (img3) images.push(img3);
+    }
+    
+    // Jika ada images dari image_1/2/3, return itu
+    if (images.length > 0) {
+      console.log('🖼️ Using fallback images from individual fields:', images);
+      return images;
+    }
+    
+    // Fallback ke picture_source
+    if (promoData.picture_source) {
+      const pic = processImageUrl(promoData.picture_source);
+      if (pic) {
+        console.log('🖼️ Using picture_source:', [pic]);
+        return [pic];
+      }
+    }
+    
+    // Fallback ke single image
+    if (promoData.image) {
+      const img = processImageUrl(promoData.image);
+      if (img) {
+        console.log('🖼️ Using single image:', [img]);
+        return [img];
+      }
+    }
+    
+    console.log('🖼️ Using default image');
+    return ['/default-avatar.png'];
+  }, [promoData, buildImageUrl]);
+
+  // Debug log untuk memastikan images terdeteksi dengan benar
   useEffect(() => {
-    setImgSrc(promoData?.image || '/default-avatar.png');
-  }, [promoData?.image]);
+    if (promoImages && promoImages.length > 0) {
+      console.log('🎠 Carousel akan menampilkan images:', {
+        count: promoImages.length,
+        images: promoImages,
+        promoData: {
+          id: promoData?.id,
+          title: promoData?.title,
+          images: promoData?.images,
+          image_1: promoData?.image_1,
+          image_2: promoData?.image_2,
+          image_3: promoData?.image_3
+        }
+      });
+    }
+  }, [promoImages, promoData]);
 
   // Clean up on unmount to prevent memory leaks
   useEffect(() => {
@@ -210,168 +310,10 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     checkClaimedStatus();
   }, [promoData?.id]);
 
-  // ====== Mock legacy (fallback jika tanpa communityId) ======
-  const getLegacyPromoData = (id) => {
-    const allPromos = {
-      1: {
-        id: 1,
-        title: "McDonald's - Burger Combo Flash Sale",
-        subtitle: 'Paket burger kombo dengan kentang dan minuman',
-        image: '/images/promo/burger-combo-flash.jpg',
-        merchant: {
-          name: "McDonald's Bandung",
-          logo: '/images/merchants/mcdonalds-logo.png',
-          rating: 4.5,
-          address: 'Jl. Merdeka No. 123, Bandung',
-          phone: '+62 22 1234567',
-        },
-        discount: '30%',
-        originalPrice: 45000,
-        discountedPrice: 31500,
-        category: 'Fast Food',
-        description:
-          'Nikmati burger combo spesial dengan diskon hingga 30%! Paket lengkap berisi burger beef, kentang goreng crispy, dan minuman soda pilihan.',
-        terms: ['Berlaku hingga 31 Agustus 2025'],
-        validUntil: '31 Agustus 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Burger', 'Fast Food', 'Family', 'Combo'],
-        gallery: [
-          '/images/promo/burger-combo-flash.jpg',
-          '/images/promo/chicken-package.jpg',
-          '/images/promo/pizza-medium-deal.jpg',
-        ],
-      },
-      2: {
-        id: 2,
-        title: 'Chicken Star - Paket Ayam Special',
-        subtitle: 'Ayam crispy dengan nasi dan saus pilihan',
-        image: '/images/promo/chicken-package.jpg',
-        merchant: {
-          name: 'Chicken Star',
-          logo: '/images/merchants/chicken-star-logo.png',
-          rating: 4.3,
-          address: 'Jl. Sudirman No. 45, Bandung',
-          phone: '+62 22 7654321',
-        },
-        discount: '25%',
-        originalPrice: 35000,
-        discountedPrice: 26250,
-        category: 'Chicken',
-        description:
-          'Ayam crispy special dengan bumbu rahasia. Disajikan dengan nasi hangat dan saus pilihan.',
-        terms: ['Berlaku hingga stok habis'],
-        validUntil: '30 September 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Chicken', 'Crispy', 'Rice', 'Spicy'],
-        gallery: [
-          '/images/promo/chicken-package.jpg',
-          '/images/promo/beef-sausage-chicken.jpg',
-          '/images/promo/burger-combo-flash.jpg',
-        ],
-      },
-      3: {
-        id: 3,
-        title: 'Pizza Hut - Medium Pizza Deal',
-        subtitle: 'Pizza medium dengan topping pilihan dan minuman',
-        image: '/images/promo/pizza-medium-deal.jpg',
-        merchant: {
-          name: 'Pizza Hut',
-          logo: '/images/merchants/pizza-hut-logo.png',
-          rating: 4.4,
-          address: 'Jl. Asia Afrika No. 67, Bandung',
-          phone: '+62 22 3456789',
-        },
-        discount: '35%',
-        originalPrice: 85000,
-        discountedPrice: 55250,
-        category: 'Pizza',
-        description:
-          'Pizza medium dengan berbagai pilihan topping favorit. Termasuk minuman.',
-        terms: ['Dine-in saja'],
-        validUntil: '15 September 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Pizza', 'Italian', 'Sharing', 'Drinks'],
-        gallery: [
-          '/images/promo/pizza-medium-deal.jpg',
-          '/images/promo/burger-combo-flash.jpg',
-          '/images/promo/brown-sugar-coffee.jpg',
-        ],
-      },
-      4: {
-        id: 4,
-        title: 'Bubble Tea House - Minuman Segar',
-        subtitle: 'Bubble tea dengan berbagai rasa',
-        image: '/images/promo/bubble-tea-discount.jpg',
-        merchant: {
-          name: 'Bubble Tea House',
-          logo: '/images/merchants/bubble-tea-house-logo.png',
-          rating: 4.6,
-          address: 'Jl. Braga No. 89, Bandung',
-          phone: '+62 22 9876543',
-        },
-        discount: '15%',
-        originalPrice: 25000,
-        discountedPrice: 21250,
-        category: 'Beverages',
-        description:
-          'Bubble tea premium berbagai rasa: original, taro, matcha, brown sugar.',
-        terms: ['Semua varian'],
-        validUntil: '20 September 2025',
-        location: 'dbotanica Bandung',
-        tags: ['Bubble Tea', 'Drinks', 'Sweet', 'Refreshing'],
-        gallery: [
-          '/images/promo/bubble-tea-discount.jpg',
-          '/images/promo/brown-sugar-coffee.jpg',
-          '/images/promo/chicken-package.jpg',
-        ],
-      },
-    };
-    return allPromos[parseInt(id)] || allPromos[1];
-  };
-
-  const normalizeToDetailShape = (src) => {
-    if (!src) return null;
-    return {
-      id: src.id,
-      title: src.title,
-      merchant: src.merchant?.name || 'Merchant',
-      image: src.image,
-      distance: src.distance || '3 KM',
-      location: src.merchant?.address || src.location || '',
-      coordinates: src.coordinates || '',
-      originalPrice: src.originalPrice ?? null,
-      discountPrice: src.discountedPrice ?? null,
-      discount: src.discount ?? null,
-      // Tambah: simpan tanggal kadaluwarsa jika ada (legacy bisa null)
-      expires_at: src.validUntil || null,
-      schedule: {
-        day: 'Everyday',
-        details: src.validUntil ? `Berlaku hingga ${src.validUntil}` : 'Berlaku',
-        time: '10:00 - 22:00',
-        timeDetails: 'Jam Berlaku Promo',
-      },
-      status: {
-        type: 'Offline',
-        description: 'Tipe Promo: 🌐 Online / 📍 Offline',
-      },
-      description: src.description || '',
-      seller: {
-        name: src.merchant?.name || 'Admin',
-        phone: src.merchant?.phone || '',
-      },
-      terms: 'TERM & CONDITIONS APPLY',
-    };
-  };
-
-  // Fallback legacy jika tidak ada communityId
-  // Hapus batasan communityId agar tidak menghalangi fetch API yang sebenarnya
+  // Fallback legacy jika tidak ada communityId - REMOVED DUMMY DATA
   useEffect(() => {
     if (!effectivePromoId) return;
-    // Jika ingin tetap punya placeholder cepat, boleh biarkan legacy sementara sebelum fetch API selesai
-    if (typeof communityId !== 'undefined' && communityId !== null) return;
-    const legacy = getLegacyPromoData(effectivePromoId);
-    setPromoData(normalizeToDetailShape(legacy));
-    setLoading(false);
+    // Real API fetching only - no dummy data fallback
   }, [effectivePromoId, communityId]);
 
   // --- Fetch detail (stabil, anti double-run) ---
@@ -384,25 +326,6 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
   useEffect(() => {
     hasFetched.current = false;
   }, [effectivePromoId, communityId]);
-
-  // Tambah helper URL gambar + baseUrl
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-  const baseUrl = (apiUrl || '').replace(/\/api\/?$/, '').replace(/\/+$/, '');
-  const isAbs = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
-  const buildImageUrl = (raw) => {
-    const fallback = '/default-avatar.png';
-    if (typeof raw !== 'string') return fallback;
-    let url = raw.trim();
-    if (!url) return fallback;
-    if (/^\/?default-avatar\.png$/i.test(url)) return fallback;
-    if (isAbs(url)) return url;
-    let path = url.replace(/^\/+/, '');
-    path = path.replace(/^api\/storage\//i, 'storage/');
-    if (/^(ads|promos|uploads|images|files|banners)\//i.test(path)) {
-      path = `storage/${path}`;
-    }
-    return `${baseUrl}/${path}`.replace(/([^:]\/)\/+/g, '$1');
-  };
 
 // +++ Helper jarak + koordinat +++
   const haversineKm = (lat1, lon1, lat2, lon2) => {
@@ -426,7 +349,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     lat != null && lng != null ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}` : '';
 
   // Pilih tag yang punya koordinat; fallback ke cube.map_lat/lng
-  const getCubeLocationInfo = (cube) => {
+  const getCubeLocationInfo = useCallback((cube) => {
     const tags = Array.isArray(cube?.tags) ? cube.tags : [];
     const primaryTag =
       tags.find((t) => t?.map_lat != null && t?.map_lng != null) ||
@@ -443,7 +366,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       lng: lng != null ? Number(lng) : null,
       coordinates: lat != null && lng != null ? fmtCoord(lat, lng) : '',
     };
-  };
+  }, []);
 
   // === MISSING HELPERS: day label, time range, tanggal Indonesia ===
   const DAY_ID = {
@@ -455,7 +378,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     saturday: 'Sabtu',
     sunday: 'Minggu',
   };
-  const MONTH_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const MONTH_ID = useMemo(() => ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'], []);
 
   const pad2 = (n) => String(n).padStart(2, '0');
   const toHM = (val) => {
@@ -469,7 +392,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     return `${hh}:${mm}`;
   };
 
-  const fmtDateID = (raw) => {
+  const fmtDateID = useCallback((raw) => {
     if (!raw) return '';
     let d = new Date(raw);
     if (Number.isNaN(d.getTime())) {
@@ -479,9 +402,9 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     }
     if (Number.isNaN(d.getTime())) return String(raw);
     return `${d.getDate()} ${MONTH_ID[d.getMonth()]} ${d.getFullYear()}`;
-  };
+  }, [MONTH_ID]);
 
-  const labelDayType = (ad) => {
+  const labelDayType = useCallback((ad) => {
     const t = (ad?.day_type || '').toLowerCase();
     if (t === 'weekend') return 'Sabtu - Minggu';
     if (t === 'weekday') return 'Senin - Jumat';
@@ -502,9 +425,9 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     if (list.length === 7) return 'Setiap Hari';
     if (list.length > 0) return list.join(', ');
     return 'Sabtu - Minggu'; // default sama dengan tampilan sebelumnya
-  };
+  }, []);
 
-  const buildTimeRange = (ad) => {
+  const buildTimeRange = useCallback((ad) => {
     const start = toHM(ad?.jam_mulai);
     const end = toHM(ad?.jam_berakhir);
     if (start && end) return `${start} - ${end}`;
@@ -513,14 +436,14 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     const limit = toHM(ad?.validation_time_limit);
     if (limit) return `Sampai ${limit}`;
     return '00:00 - 23:59';
-  };
+  }, []);
 
-  const buildScheduleFromAd = (ad) => ({
+  const buildScheduleFromAd = useCallback((ad) => ({
     day: labelDayType(ad),
     details: ad?.finish_validate ? `Berlaku hingga ${fmtDateID(ad.finish_validate)}` : 'Berlaku',
     time: buildTimeRange(ad),
     timeDetails: 'Jam Berlaku Promo',
-  });
+  }), [fmtDateID, buildTimeRange, labelDayType]);
 
   // Ubah fetchPromoDetails: urutan cubes → ads → promos/public
   const fetchPromoDetails = useCallback(async () => {
@@ -540,9 +463,35 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         const ads = Array.isArray(cube?.ads) ? cube.ads : [];
         const ad = ads.find(a => a?.status === 'active') || ads[0] || null;
 
-        const image = buildImageUrl(
-          ad?.image_1 || ad?.image || ad?.picture_source || cube?.picture_source || '/default-avatar.png'
-        );
+        // Collect all available images from ad
+        const imageUrls = [];
+        if (ad?.picture_source) imageUrls.push(ad.picture_source);
+        if (ad?.image_1) imageUrls.push(ad.image_1);
+        if (ad?.image_2) imageUrls.push(ad.image_2);
+        if (ad?.image_3) imageUrls.push(ad.image_3);
+        if (ad?.image) imageUrls.push(ad.image);
+        
+        // Fallback to cube image if no ad images
+        if (imageUrls.length === 0 && cube?.picture_source) {
+          imageUrls.push(cube.picture_source);
+        }
+        
+        // Fallback to default if still no images
+        if (imageUrls.length === 0) {
+          imageUrls.push('/default-avatar.png');
+        }
+
+        console.log('🖼️ Collected images from cube/ads endpoint:', {
+          imageCount: imageUrls.length,
+          imageUrls,
+          adData: {
+            picture_source: ad?.picture_source,
+            image_1: ad?.image_1,
+            image_2: ad?.image_2,
+            image_3: ad?.image_3,
+            image: ad?.image
+          }
+        });
 
         const loc = getCubeLocationInfo(cube);
 
@@ -550,7 +499,8 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           id: ad?.id || cube?.id,
           title: ad?.title || cube?.label || 'Promo',
           merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
-          image,
+          images: imageUrls,
+          image: imageUrls[0], // Keep for backward compatibility
           distance: '3 KM',
           location: loc.address || (loc.coordinates ? loc.coordinates : ''),
           coordinates: loc.coordinates,
@@ -585,9 +535,30 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       response = await get({ path: `admin/ads/${effectivePromoId}` });
       if (response?.status === 200 && (response?.data?.data || response?.data)) {
         const ad = response.data?.data || response.data;
-        const image = buildImageUrl(
-          ad?.image_1 || ad?.image || ad?.picture_source || '/default-avatar.png'
-        );
+        // Collect all available images from ad
+        const imageUrls = [];
+        if (ad?.picture_source) imageUrls.push(ad.picture_source);
+        if (ad?.image_1) imageUrls.push(ad.image_1);
+        if (ad?.image_2) imageUrls.push(ad.image_2);
+        if (ad?.image_3) imageUrls.push(ad.image_3);
+        if (ad?.image) imageUrls.push(ad.image);
+        
+        // Fallback to default if no images
+        if (imageUrls.length === 0) {
+          imageUrls.push('/default-avatar.png');
+        }
+
+        console.log('🖼️ Collected images from ads endpoint:', {
+          imageCount: imageUrls.length,
+          imageUrls,
+          adData: {
+            picture_source: ad?.picture_source,
+            image_1: ad?.image_1,
+            image_2: ad?.image_2,
+            image_3: ad?.image_3,
+            image: ad?.image
+          }
+        });
 
         // >>> Perbaikan: manfaatkan relasi ad.cube terlebih dahulu
         let cubeInfo = {
@@ -633,7 +604,8 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           id: ad?.id,
           title: ad?.title || 'Promo',
           merchant: ad?.merchant || cubeInfo.sellerName || 'Merchant',
-          image,
+          images: imageUrls,
+          image: imageUrls[0], // Keep for backward compatibility
           distance: '3 KM',
           location: cubeInfo.address || cubeInfo.coordinates || ad?.location || '',
           coordinates: cubeInfo.coordinates || '',
@@ -667,11 +639,26 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       response = await get({ path: `promos/${effectivePromoId}/public` });
       if (response?.status === 200 && response?.data?.data) {
         const data = response.data.data;
+        // Collect all available images
+        const imageUrls = [];
+        if (data.image_url) imageUrls.push(data.image_url);
+        if (data.image) imageUrls.push(data.image);
+        if (data.picture_source) imageUrls.push(data.picture_source);
+        if (data.image_1) imageUrls.push(data.image_1);
+        if (data.image_2) imageUrls.push(data.image_2);
+        if (data.image_3) imageUrls.push(data.image_3);
+        
+        // Fallback to default if no images
+        if (imageUrls.length === 0) {
+          imageUrls.push('/default-avatar.png');
+        }
+
         const transformedData = {
           id: data.id,
           title: data.title,
           merchant: data.owner_name || 'Merchant',
-          image: buildImageUrl(data.image_url || data.image || '/default-avatar.png'),
+          images: imageUrls,
+          image: imageUrls[0], // Keep for backward compatibility
           distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
           location: data.location || '',
           coordinates: '',
@@ -708,7 +695,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId]);
+  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo]);
 
   // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
@@ -991,7 +978,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     if (typeof window !== 'undefined' && navigator?.geolocation) {
       navigator.geolocation.getCurrentPosition(onOk, onErr, { enableHighAccuracy: true, timeout: 8000 });
     }
-  }, [promoData?.lat, promoData?.lng]);
+  }, [promoData]);
 
   // Buka rute Google Maps (gunakan location.href agar tidak diblokir popup)
   const openRoute = useCallback(() => {
@@ -1325,24 +1312,13 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       {/* Content */}
       <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
         <div className="lg:mx-auto lg:max-w-md">
-          {/* Hero */}
+          {/* Hero Image Carousel */}
           <div className="mb-4">
-            <div className="bg-white rounded-[20px] shadow-lg overflow-hidden border border-slate-100">
-              <div className="relative h-80 bg-slate-50 flex items-center justify-center overflow-hidden">
-                <div className="relative w-full h-full">
-                  <Image
-                    src={imgSrc}
-                    alt={promoData.title}
-                    className="object-cover"
-                    fill
-                    sizes="(max-width: 768px) 100vw, 500px"
-                    placeholder="blur"
-                    blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2NjYyIvPjwvc3ZnPg=="
-                    onError={() => setImgSrc('/default-avatar.png')}
-                  />
-                </div>
-              </div>
-            </div>
+            <ImageCarousel
+              images={promoImages}
+              title={promoData?.title || 'Promo'}
+              className="w-full"
+            />
           </div>
 
           {/* Info cards */}
