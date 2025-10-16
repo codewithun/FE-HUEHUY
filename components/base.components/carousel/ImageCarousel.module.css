@@ -1,0 +1,320 @@
+/* Carousel custom styles */
+.imageCarousel {
+  position: relative;
+  width: 100%;
+}
+
+.imageCarousel .carouselContainer {
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #f8fafc;
+}
+
+.imageCarousel .carouselTrack {
+  display: flex;
+  height: 100%;
+  will-change: transform;
+  /* Track width akan diatur di component React */
+}
+
+.imageCarousel .carouselSlide {
+  flex-shrink: 0;
+  /* Width akan diatur dari inline style di component */
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.imageCarousel .carouselImage {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.3s ease;
+  border-radius: inherit;
+}
+
+.imageCarousel .carouselSlide:hover .carouselImage {
+  transform: scale(1.02);
+}
+
+.imageCarousel .carouselNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.imageCarousel:hover .carouselNav {
+  opacity: 1;
+}
+
+.imageCarousel .carouselNav:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.imageCarousel .carouselNav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: translateY(-50%);
+}
+
+.imageCarousel .carouselNav:disabled:hover {
+  background: rgba(0, 0, 0, 0.5);
+  transform: translateY(-50%);
+}
+
+.imageCarousel .carouselNav.prev {
+  left: 12px;
+}
+
+.imageCarousel .carouselNav.next {
+  right: 12px;
+}
+
+.imageCarousel .carouselCounter {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10;
+}
+
+.imageCarousel .carouselExpand {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0;
+  z-index: 10;
+}
+
+.imageCarousel .carouselSlide:hover .carouselExpand {
+  opacity: 1;
+}
+
+.imageCarousel .carouselExpand:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
+}
+
+.imageCarousel .carouselDots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.imageCarousel .carouselDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.imageCarousel .carouselDot.active {
+  background: #3b82f6; /* Primary blue color */
+  width: 24px;
+  border-radius: 12px;
+}
+
+.imageCarousel .carouselDot:hover:not(.active) {
+  background: #94a3b8;
+}
+
+.imageCarousel .carouselDot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .imageCarousel .carouselNav {
+    opacity: 0.8;
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.7);
+  }
+  
+  .imageCarousel .carouselNav.prev {
+    left: 8px;
+  }
+  
+  .imageCarousel .carouselNav.next {
+    right: 8px;
+  }
+  
+  .imageCarousel .carouselCounter {
+    top: 8px;
+    left: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  
+  .imageCarousel .carouselExpand {
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    opacity: 0.8;
+    background: rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* Desktop hover effects */
+@media (min-width: 1024px) {
+  .imageCarousel .carouselNav {
+    opacity: 0.7;
+  }
+  
+  .imageCarousel:hover .carouselNav {
+    opacity: 1;
+  }
+}
+
+/* Fullscreen modal */
+.carouselFullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.carouselFullscreen .fullscreenContainer {
+  position: relative;
+  max-width: 1200px;
+  max-height: 90vh;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.carouselFullscreen .fullscreenImage {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+}
+
+.carouselFullscreen .fullscreenClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  z-index: 10;
+}
+
+.carouselFullscreen .fullscreenNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  z-index: 10;
+}
+
+.carouselFullscreen .fullscreenNav.prev {
+  left: 16px;
+}
+
+.carouselFullscreen .fullscreenNav.next {
+  right: 16px;
+}
+
+.carouselFullscreen .fullscreenNav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.carouselDraggable {
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.carouselDragging {
+  cursor: grabbing !important;
+  user-select: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Animations */
+@keyframes carouselFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.carouselFadeIn {
+  animation: carouselFadeIn 0.3s ease-out;
+}
