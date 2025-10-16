@@ -15,6 +15,7 @@ const CommunityPromoPage = () => {
   const [communityData, setCommunityData] = useState(null);
   const [promoData, setPromoData] = useState([]);
   const [widgetData, setWidgetData] = useState([]); // widgets "hunting"
+  const [adCategories, setAdCategories] = useState([]); // ambil ad_category di parent
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -185,18 +186,25 @@ const CommunityPromoPage = () => {
   // fetch widget data (type=hunting, content_type=promo, active)
   const fetchWidgetData = async () => {
     try {
+      // tambahkan paginate=all biar backend ngasih semua data
       const widgetRes = await fetch(
-        `${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}`,
+        `${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
         { headers: getAuthHeaders() }
       );
 
       if (widgetRes.ok) {
         const widgetJson = await widgetRes.json();
-        const widgets = Array.isArray(widgetJson?.data) ? widgetJson.data : [];
+
+        // fallback kalau backend ngirim data langsung tanpa wrapper .data
+        const widgets = Array.isArray(widgetJson?.data)
+          ? widgetJson.data
+          : Array.isArray(widgetJson)
+            ? widgetJson
+            : [];
+
+        // filter hanya widget hunting aktif
         const activePromoWidgets = widgets
-          .filter(
-            (w) => w.is_active && (w.content_type === 'promo' || !w.content_type)
-          )
+          .filter((w) => w.is_active && w.type === 'hunting')
           .sort((a, b) => (a.level || 0) - (b.level || 0));
 
         setWidgetData(activePromoWidgets);
@@ -207,6 +215,35 @@ const CommunityPromoPage = () => {
       console.error('Error fetching widget data:', error);
     }
   };
+
+  useEffect(() => {
+    // jika ada widget dengan source_type 'ad_category' -> fetch sekali di parent
+    if (!communityId) return;
+    const hasAdCategory = widgetData.some((w) => w.source_type === 'ad_category');
+    if (!hasAdCategory) return;
+
+    const fetchAdCategories = async () => {
+      try {
+        const res = await fetch(
+          `${apiUrl}/admin/options/ad-category?community_id=${communityId}`,
+          { headers: getAuthHeaders() }
+        );
+        const result = await res.json();
+        if (result?.message === 'success' && Array.isArray(result.data)) {
+          setAdCategories(result.data);
+        } else if (Array.isArray(result)) {
+          setAdCategories(result);
+        } else {
+          setAdCategories([]);
+        }
+      } catch (err) {
+        console.error('Gagal ambil ad_category (parent):', err);
+        setAdCategories([]);
+      }
+    };
+
+    fetchAdCategories();
+  }, [widgetData, communityId]);
 
   const handlePromoClick = (promoId) => {
     router.push(
@@ -224,7 +261,57 @@ const CommunityPromoPage = () => {
 
   // ======== WIDGET RENDERER (S, M, L, XL, XL-Ads) ========
   const WidgetRenderer = ({ widget }) => {
-    const { source_type, size, dynamic_content_cubes, name } = widget;
+    const { source_type, size, dynamic_content_cubes, name, content_type } = widget;
+
+    // jika widget adalah ad_category kita hide UI di sini (data sudah diambil di parent)
+    if (source_type === 'ad_category') return null;
+
+    // 🟢 Kotak Kategori Biasa dari dynamic_content_cubes (versi lama)
+    if (content_type === 'category' && dynamic_content_cubes?.length) {
+      return (
+        <div className="mb-6">
+          <div className="mb-2">
+            <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+            {widget.description && (
+              <p className="text-sm text-slate-600 mt-[1px]">{widget.description}</p>
+            )}
+          </div>
+
+          <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+            {dynamic_content_cubes.map((catData, index) => {
+              const cube = catData?.cube;
+              if (!cube) return null;
+
+              return (
+                <div
+                  key={cube.id || index}
+                  className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all"
+                  style={{ minWidth: 90 }}
+                  onClick={() => {
+                    router.push(
+                      `/app/komunitas/promo?categoryId=${cube.id}&communityId=${communityId}`
+                    );
+                  }}
+                >
+                  <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-[#d8d8d8] bg-white shadow-sm mb-2">
+                    <Image
+                      src={buildImageUrl(cube.image)}
+                      alt={cube.category}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <p className="text-[12px] text-slate-700 font-medium text-center line-clamp-2">
+                    {cube.category}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     if (source_type !== 'cube' || !dynamic_content_cubes?.length) return null;
 
     return (
@@ -489,14 +576,16 @@ const CommunityPromoPage = () => {
     <div
       className="bg-white rounded-[16px] shadow-sm overflow-hidden mb-4 hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50"
       onClick={() => handlePromoClick(promo.id)}
+      style={{ minWidth: 220 }} // buat card bisa jadi item horizontal
     >
-      <div className="flex p-5">
-        <div className="w-20 h-20 rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100">
+      <div className="flex p-4 items-center">
+        <div className="w-28 h-28 rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100"> 
+          {/* ukuran diperbesar */}
           <Image
             src={promo.image}
             alt={promo.title}
-            width={80}
-            height={80}
+            width={112}
+            height={112}
             className="w-full h-full object-cover"
             placeholder="blur"
             blurDataURL="/default-avatar.png"
@@ -548,6 +637,51 @@ const CommunityPromoPage = () => {
           {widgetData.map((widget) => (
             <WidgetRenderer key={widget.id} widget={widget} />
           ))}
+
+          {/* Render promo list sebagai horizontal scroller */}
+          {promoData.length > 0 && (
+            <div className="mb-6">
+              <div className="mb-2">
+                <h2 className="text-lg font-bold text-slate-900">Promo Terbaru</h2>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-3 hide-scrollbar">
+                {promoData.map((p) => (
+                  <div key={p.id} className="flex-shrink-0">
+                    <PromoCard promo={p} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Render data adCategories (widget UI tetap hidden) */}
+          {adCategories.length > 0 && (
+            <div className="mb-6">
+              <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar mt-2">
+                {adCategories.map((cat) => (
+                  <div
+                    key={cat.value || cat.id}
+                    className="flex flex-col items-center cursor-pointer flex-shrink-0"
+                    style={{ minWidth: 90 }}
+                    onClick={() =>
+                      router.push(
+                        `/app/komunitas/promo?categoryId=${cat.value || cat.id}&communityId=${communityId}`
+                      )
+                    }
+                  >
+                    <img
+                      src={cat.image || buildImageUrl(cat.picture_source) || '/default-avatar.png'}
+                      alt={cat.label || cat.name || 'Kategori'}
+                      className="w-20 h-20 object-cover rounded-xl shadow-sm"
+                    />
+                    <p className="text-sm font-semibold text-slate-700 mt-2 text-center">
+                      {cat.label || cat.name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

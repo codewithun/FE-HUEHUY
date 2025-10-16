@@ -82,6 +82,7 @@ export default function CommunityDashboard({ communityId }) {
               const cube = cubeData?.cube;
               if (!cube) return null;
               const ad = cube.ads?.[0];
+              const category = cube.category || ad?.category || 'Informasi';
 
               const imageUrl =
                 ad?.image_1 ||

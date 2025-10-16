@@ -195,12 +195,35 @@ export default function Widget() {
                 ],
               },
             },
-            {
+           {
               type: 'custom',
               custom: ({ formControl, values }) => {
-                const content_type = values.find(val => val.name === 'content_type')?.value;
-                const source_type = values.find(val => val.name === 'source_type')?.value;
+                const content_type = values.find(
+                  (val) => val.name === 'content_type'
+                )?.value;
+                const source_type = values.find(
+                  (val) => val.name === 'source_type'
+                )?.value;
 
+                // 🟢 CASE 1: Kotak Kategori — otomatis ambil semua kategori utama
+                if (content_type === 'category') {
+                  return (
+                    <div className="mt-2">
+                      <input
+                        type="hidden"
+                        name="source_type"
+                        value="ad_category"
+                        {...formControl('source_type')}
+                      />
+                      <p className="text-sm text-slate-500 italic">
+                        Semua kategori utama (is_primary_parent = 1) akan
+                        ditampilkan otomatis di halaman komunitas.
+                      </p>
+                    </div>
+                  );
+                }
+
+                // 🟣 CASE 2: Promo / Iklan — tetap seperti semula
                 if (content_type === 'promo') {
                   return (
                     <>
@@ -221,21 +244,31 @@ export default function Widget() {
                         </div>
                         <div className="flex-1">
                           <div className="flex flex-col gap-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Ukuran</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                              Ukuran
+                            </label>
                             <div className="flex flex-wrap gap-3 mt-1">
-                              {['S', 'M', 'L', 'XL', 'XL-Ads'].map(opt => (
+                              {['S', 'M', 'L', 'XL', 'XL-Ads'].map((opt) => (
                                 <RadioComponent
                                   key={opt}
                                   name="size"
                                   label={opt}
                                   value={opt}
-                                  checked={String(
-                                    values.find(val => val.name === 'size')?.value ||
-                                    formControl('size')?.value ||
-                                    ''
-                                  ) === opt}
+                                  checked={
+                                    String(
+                                      values.find(
+                                        (val) => val.name === 'size'
+                                      )?.value ||
+                                        formControl('size')?.value ||
+                                        ''
+                                    ) === opt
+                                  }
                                   onChange={() => {
-                                    if (formControl('size') && typeof formControl('size').onChange === 'function') {
+                                    if (
+                                      formControl('size') &&
+                                      typeof formControl('size').onChange ===
+                                        'function'
+                                    ) {
                                       formControl('size').onChange(opt);
                                     }
                                   }}
@@ -245,7 +278,7 @@ export default function Widget() {
                           </div>
                         </div>
                       </div>
-                      {/* Tambahkan dropdown kategori iklan jika source_type == 'ad_category' */}
+
                       {source_type === 'ad_category' && (
                         <div className="mt-4">
                           <SelectComponent
@@ -258,7 +291,10 @@ export default function Widget() {
                               mapOptions: (data) =>
                                 Array.isArray(data)
                                   ? data.map((item) => ({
-                                      label: item?.label || item?.name || `Kategori #${item?.id}`,
+                                      label:
+                                        item?.label ||
+                                        item?.name ||
+                                        `Kategori #${item?.id}`,
                                       value: item?.value || item?.id,
                                     }))
                                   : [],
