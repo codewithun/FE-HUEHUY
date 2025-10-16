@@ -364,8 +364,10 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
   };
 
   // Fallback legacy jika tidak ada communityId
+  // Hapus batasan communityId agar tidak menghalangi fetch API yang sebenarnya
   useEffect(() => {
     if (!effectivePromoId) return;
+    // Jika ingin tetap punya placeholder cepat, boleh biarkan legacy sementara sebelum fetch API selesai
     if (typeof communityId !== 'undefined' && communityId !== null) return;
     const legacy = getLegacyPromoData(effectivePromoId);
     setPromoData(normalizeToDetailShape(legacy));
@@ -374,6 +376,9 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
 
   // --- Fetch detail (stabil, anti double-run) ---
   const hasFetched = useRef(false);
+
+  // simpan posisi user untuk origin rute
+  const userPosRef = useRef(null);
 
   // izinkan fetch ulang kalau ID komunitas/Promo berubah
   useEffect(() => {
@@ -399,6 +404,124 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     return `${baseUrl}/${path}`.replace(/([^:]\/)\/+/g, '$1');
   };
 
+// +++ Helper jarak + koordinat +++
+  const haversineKm = (lat1, lon1, lat2, lon2) => {
+    const toRad = (v) => (v * Math.PI) / 180;
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+  const fmtKm = (km) => {
+    if (km == null || Number.isNaN(km)) return '3 KM';
+    if (km < 1) return `${(km * 1000).toFixed(0)} M`;
+    return `${km.toFixed(km < 10 ? 1 : 0)} KM`;
+  };
+  const fmtCoord = (lat, lng) =>
+    lat != null && lng != null ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}` : '';
+
+  // Pilih tag yang punya koordinat; fallback ke cube.map_lat/lng
+  const getCubeLocationInfo = (cube) => {
+    const tags = Array.isArray(cube?.tags) ? cube.tags : [];
+    const primaryTag =
+      tags.find((t) => t?.map_lat != null && t?.map_lng != null) ||
+      tags[0] ||
+      null;
+
+    const lat = primaryTag?.map_lat ?? cube?.map_lat ?? null;
+    const lng = primaryTag?.map_lng ?? cube?.map_lng ?? null;
+    const address = primaryTag?.address || cube?.address || '';
+
+    return {
+      address,
+      lat: lat != null ? Number(lat) : null,
+      lng: lng != null ? Number(lng) : null,
+      coordinates: lat != null && lng != null ? fmtCoord(lat, lng) : '',
+    };
+  };
+
+  // === MISSING HELPERS: day label, time range, tanggal Indonesia ===
+  const DAY_ID = {
+    monday: 'Senin',
+    tuesday: 'Selasa',
+    wednesday: 'Rabu',
+    thursday: 'Kamis',
+    friday: 'Jumat',
+    saturday: 'Sabtu',
+    sunday: 'Minggu',
+  };
+  const MONTH_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const toHM = (val) => {
+    if (!val) return '';
+    const s = String(val).trim();
+    // Accept "H:mm", "HH:mm", "HH:mm:ss"
+    const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return '';
+    const hh = pad2(Math.min(23, parseInt(m[1], 10)));
+    const mm = pad2(Math.min(59, parseInt(m[2], 10)));
+    return `${hh}:${mm}`;
+  };
+
+  const fmtDateID = (raw) => {
+    if (!raw) return '';
+    let d = new Date(raw);
+    if (Number.isNaN(d.getTime())) {
+      // try dd-mm-yyyy
+      const m = String(raw).match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+      if (m) d = new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10));
+    }
+    if (Number.isNaN(d.getTime())) return String(raw);
+    return `${d.getDate()} ${MONTH_ID[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
+  const labelDayType = (ad) => {
+    const t = (ad?.day_type || '').toLowerCase();
+    if (t === 'weekend') return 'Sabtu - Minggu';
+    if (t === 'weekday') return 'Senin - Jumat';
+    // custom days could be object or array
+    const cd = ad?.custom_days;
+    const list = [];
+    if (Array.isArray(cd)) {
+      cd.forEach((k) => {
+        const key = String(k || '').toLowerCase();
+        if (DAY_ID[key]) list.push(DAY_ID[key]);
+      });
+    } else if (cd && typeof cd === 'object') {
+      Object.keys(cd).forEach((k) => {
+        const v = cd[k];
+        if (v && DAY_ID[k.toLowerCase()]) list.push(DAY_ID[k.toLowerCase()]);
+      });
+    }
+    if (list.length === 7) return 'Setiap Hari';
+    if (list.length > 0) return list.join(', ');
+    return 'Sabtu - Minggu'; // default sama dengan tampilan sebelumnya
+  };
+
+  const buildTimeRange = (ad) => {
+    const start = toHM(ad?.jam_mulai);
+    const end = toHM(ad?.jam_berakhir);
+    if (start && end) return `${start} - ${end}`;
+    if (start && !end) return `${start} - 23:59`;
+    if (!start && end) return `Sampai ${end}`;
+    const limit = toHM(ad?.validation_time_limit);
+    if (limit) return `Sampai ${limit}`;
+    return '00:00 - 23:59';
+  };
+
+  const buildScheduleFromAd = (ad) => ({
+    day: labelDayType(ad),
+    details: ad?.finish_validate ? `Berlaku hingga ${fmtDateID(ad.finish_validate)}` : 'Berlaku',
+    time: buildTimeRange(ad),
+    timeDetails: 'Jam Berlaku Promo',
+  });
+
   // Ubah fetchPromoDetails: urutan cubes → ads → promos/public
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady || !effectivePromoId) return null;
@@ -421,34 +544,36 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           ad?.image_1 || ad?.image || ad?.picture_source || cube?.picture_source || '/default-avatar.png'
         );
 
+        const loc = getCubeLocationInfo(cube);
+
         const transformed = {
           id: ad?.id || cube?.id,
           title: ad?.title || cube?.label || 'Promo',
-          merchant: ad?.merchant || cube?.user?.name || 'Merchant',
+          merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
           image,
           distance: '3 KM',
-          location: cube?.address || '',
-          coordinates: '',
+          location: loc.address || (loc.coordinates ? loc.coordinates : ''),
+          coordinates: loc.coordinates,
+          lat: loc.lat,
+          lng: loc.lng,
           originalPrice: ad?.original_price ?? null,
           discountPrice: ad?.discount_price ?? null,
           discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
           detail: ad?.description || '',
+          description: ad?.description || '',
           start_date: ad?.start_validate || null,
           always_available: false,
           expires_at: ad?.finish_validate || null,
           end_date: ad?.finish_validate || null,
-          schedule: {
-            day: 'Setiap Hari',
-            details: ad?.finish_validate ? `Berlaku hingga ${new Date(ad.finish_validate).toLocaleDateString()}` : 'Berlaku',
-            time: '10:00 - 22:00',
-            timeDetails: 'Jam Berlaku Promo',
-          },
+          schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
             description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
           },
-          description: ad?.description || '',
-          seller: { name: cube?.user?.name || 'Admin', phone: cube?.user?.phone || '' },
+          seller: {
+            name: cube?.user?.name || cube?.corporate?.name || 'Admin',
+            phone: cube?.user?.phone || cube?.corporate?.phone || '',
+          },
           terms: 'TERM & CONDITIONS APPLY',
         };
 
@@ -463,34 +588,75 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         const image = buildImageUrl(
           ad?.image_1 || ad?.image || ad?.picture_source || '/default-avatar.png'
         );
+
+        // >>> Perbaikan: manfaatkan relasi ad.cube terlebih dahulu
+        let cubeInfo = {
+          address: '',
+          coordinates: '',
+          lat: null,
+          lng: null,
+          sellerName: 'Admin',
+          sellerPhone: '',
+        };
+
+        try {
+          if (ad?.cube) {
+            const loc = getCubeLocationInfo(ad.cube);
+            cubeInfo = {
+              address: loc.address,
+              coordinates: loc.coordinates,
+              lat: loc.lat,
+              lng: loc.lng,
+              sellerName:
+                ad?.cube?.user?.name || ad?.cube?.corporate?.name || 'Admin',
+              sellerPhone:
+                ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || '',
+            };
+          } else if (ad?.cube_id) {
+            const cubeRes = await get({ path: `admin/cubes/${ad.cube_id}` });
+            if (cubeRes?.status === 200 && (cubeRes?.data?.data || cubeRes?.data)) {
+              const cube = cubeRes.data?.data || cubeRes.data;
+              const loc = getCubeLocationInfo(cube);
+              cubeInfo = {
+                address: loc.address,
+                coordinates: loc.coordinates,
+                lat: loc.lat,
+                lng: loc.lng,
+                sellerName: cube?.user?.name || cube?.corporate?.name || 'Admin',
+                sellerPhone: cube?.user?.phone || cube?.corporate?.phone || '',
+              };
+            }
+          }
+        } catch {}
+
         const transformed = {
           id: ad?.id,
           title: ad?.title || 'Promo',
-          merchant: ad?.merchant || 'Merchant',
+          merchant: ad?.merchant || cubeInfo.sellerName || 'Merchant',
           image,
           distance: '3 KM',
-          location: ad?.location || '',
-          coordinates: '',
+          location: cubeInfo.address || cubeInfo.coordinates || ad?.location || '',
+          coordinates: cubeInfo.coordinates || '',
+          lat: cubeInfo.lat,
+          lng: cubeInfo.lng,
           originalPrice: ad?.original_price ?? null,
           discountPrice: ad?.discount_price ?? null,
           discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
           detail: ad?.description || '',
+          description: ad?.description || '',
           start_date: ad?.start_validate || null,
           always_available: false,
           expires_at: ad?.finish_validate || null,
           end_date: ad?.finish_validate || null,
-          schedule: {
-            day: 'Setiap Hari',
-            details: ad?.finish_validate ? `Berlaku hingga ${new Date(ad.finish_validate).toLocaleDateString()}` : 'Berlaku',
-            time: '10:00 - 22:00',
-            timeDetails: 'Jam Berlaku Promo',
-          },
+          schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
             description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
           },
-          description: ad?.description || '',
-          seller: { name: ad?.owner_name || 'Admin', phone: ad?.owner_contact || '' },
+          seller: {
+            name: cubeInfo.sellerName || ad?.owner_name || 'Admin',
+            phone: cubeInfo.sellerPhone || ad?.owner_contact || '',
+          },
           terms: 'TERM & CONDITIONS APPLY',
         };
         setPromoData(transformed);
@@ -513,21 +679,21 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           discountPrice: data.discount_price ?? null,
           discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
           detail: data.detail || '',
+          description: data.description || '',
           start_date: data.start_date || data.start_at || data.starts_at || data.valid_from || null,
           always_available: Boolean(data.always_available),
           expires_at: data.end_date || data.expires_at || data.valid_until || null,
           end_date: data.end_date || null,
           schedule: {
             day: data.always_available ? 'Setiap Hari' : 'Weekday',
-            details: data.end_date ? `Berlaku hingga ${new Date(data.end_date).toLocaleDateString()}` : 'Berlaku',
-            time: '10:00 - 22:00',
+            details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
+            time: '00:00 - 23:59',
             timeDetails: 'Jam Berlaku Promo',
           },
           status: {
             type: data.promo_type === 'online' ? 'Online' : 'Offline',
             description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
           },
-          description: data.description || '',
           seller: { name: data.owner_name || 'Admin', phone: data.owner_contact || '' },
           terms: 'TERM & CONDITIONS APPLY',
         };
@@ -544,15 +710,14 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     }
   }, [router.isReady, effectivePromoId]);
 
-  // Panggil fetch ketika bukan QR autoRegister
+  // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
     if (!router.isReady) return;
-    if (!effectivePromoId || !communityId) return;
+    if (!effectivePromoId) return;
     if (autoRegister) return;
     fetchPromoDetails();
-    // penting: JANGAN masukkan fetchPromoDetails ke deps agar tidak berubah referensi
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, effectivePromoId, communityId, autoRegister]);
+  }, [router.isReady, effectivePromoId, autoRegister]);
 
   // --- Auto register setelah QR ---
   const handleAutoRegister = useCallback(
@@ -803,6 +968,56 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       router.push('/app');
     }
   };
+
+  // +++ Hitung jarak berdasar posisi user → lat/lng promo +++
+  useEffect(() => {
+    if (!promoData || promoData.lat == null || promoData.lng == null) return;
+
+    const onOk = (pos) => {
+      const { latitude, longitude } = pos.coords || {};
+      if (latitude == null || longitude == null) return;
+
+      // simpan origin untuk rute
+      userPosRef.current = { lat: Number(latitude), lng: Number(longitude) };
+
+      const km = haversineKm(Number(latitude), Number(longitude), Number(promoData.lat), Number(promoData.lng));
+      setPromoData((prev) => (prev ? { ...prev, distance: fmtKm(km) } : prev));
+    };
+
+    const onErr = () => {
+      // jika ditolak/timeout, biarkan default '3 KM'
+    };
+
+    if (typeof window !== 'undefined' && navigator?.geolocation) {
+      navigator.geolocation.getCurrentPosition(onOk, onErr, { enableHighAccuracy: true, timeout: 8000 });
+    }
+  }, [promoData?.lat, promoData?.lng]);
+
+  // Buka rute Google Maps (gunakan location.href agar tidak diblokir popup)
+  const openRoute = useCallback(() => {
+    if (!promoData) return;
+
+    let destination = '';
+    if (promoData.lat != null && promoData.lng != null) {
+      destination = `${promoData.lat},${promoData.lng}`;
+    } else if (promoData.location) {
+      destination = encodeURIComponent(promoData.location);
+    } else if (promoData.coordinates) {
+      destination = encodeURIComponent(promoData.coordinates);
+    }
+    if (!destination) return;
+
+    const qs = new URLSearchParams();
+    qs.set('destination', destination);
+    if (userPosRef.current?.lat != null && userPosRef.current?.lng != null) {
+      qs.set('origin', `${userPosRef.current.lat},${userPosRef.current.lng}`);
+    }
+
+    const url = `https://www.google.com/maps/dir/?api=1&${qs.toString()}`;
+    if (typeof window !== 'undefined') {
+      window.location.href = url;
+    }
+  }, [promoData]);
 
   // --- Share & Report ---
   const handleShare = () => setShowShareModal(true);
@@ -1217,7 +1432,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
             <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
               <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
               <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
-              <button className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
+              <button onClick={openRoute} className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
                 <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
                 Rute
               </button>
@@ -1230,8 +1445,16 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
               <h4 className="font-semibold text-slate-900 mb-3 text-sm">Penjual / Pemilik Iklan</h4>
               <div className="space-y-2">
                 <p className="font-semibold text-slate-900 text-xs">Nama: {promoData.seller?.name}</p>
-                <p className="text-xs text-slate-500">No Hp/WA: {promoData.seller?.phone}</p>
-                <button className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center">
+                <p className="text-xs text-slate-500">No Hp/WA: {promoData.seller?.phone || '-'}</p>
+                <button
+                  className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                  onClick={() => {
+                    if (promoData?.seller?.phone) {
+                      const phone = String(promoData.seller.phone).replace(/\s+/g, '');
+                      window.location.href = `tel:${phone}`;
+                    }
+                  }}
+                >
                   <FontAwesomeIcon icon={faPhone} className="text-sm" />
                 </button>
               </div>
