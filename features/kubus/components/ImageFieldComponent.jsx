@@ -110,35 +110,35 @@ const ImageFieldComponent = ({
 				)}
 			</div>
 
-			<div className="flex gap-2">
-				<input
-					type="file"
-					accept="image/*"
-					className="file-input file-input-bordered flex-1"
-					onChange={handleFileChange}
-					key={`${fieldName}-file-input-${fieldKey}-${imageVersion}`}
-				/>
-				{finalPreviewSrc && (
-					<div className="flex gap-2">
-						<button
-							type="button"
-							className="btn btn-outline btn-sm"
-							onClick={() => handleRecrop(fc)}
-							title="Crop ulang untuk menyesuaikan gambar"
-						>
-							Crop Ulang
-						</button>
-						<button
-							type="button"
-							className="btn btn-outline btn-error btn-sm"
-							onClick={() => onClearImage(fc, fieldKey)}
-							title="Hapus gambar"
-						>
-							Hapus
-						</button>
-					</div>
-				)}
-			</div>
+			<div className="flex flex-wrap items-start gap-2">
+	<input
+		type="file"
+		accept="image/*"
+		className="file-input file-input-bordered flex-1"
+		onChange={handleFileChange}
+		key={`${fieldName}-file-input-${fieldKey}-${imageVersion}`}
+	/>
+	{finalPreviewSrc && (
+		<div className="flex flex-wrap items-center gap-2">
+			<button
+				type="button"
+				className="btn btn-outline btn-sm"
+				onClick={() => handleRecrop(fc)}
+				title="Crop ulang untuk menyesuaikan gambar"
+			>
+				Crop Ulang
+			</button>
+			<button
+				type="button"
+				className="btn btn-outline btn-error btn-sm"
+				onClick={() => onClearImage(fc, fieldKey)}
+				title="Hapus gambar"
+			>
+				Hapus
+			</button>
+		</div>
+	)}
+</div>
 			<span className="text-xs text-gray-500 mt-1">
 				PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
 			</span>
