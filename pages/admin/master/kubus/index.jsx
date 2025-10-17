@@ -15,7 +15,7 @@ import {
 } from '../../../../components/base.components';
 import CropperDialog from '../../../../components/crop.components/CropperDialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity, faEdit, faFilePen } from '@fortawesome/free-solid-svg-icons';
+import { faInfinity, faFilePen } from '@fortawesome/free-solid-svg-icons';
 import moment from 'moment';
 
 // Extra project components
@@ -36,7 +36,8 @@ import ContentTypeSelector from '../../../../features/kubus/components/ContentTy
 import ManagerTenantSelector from '../../../../features/kubus/components/ManagerTenantSelector';
 import ImageFieldComponent from '../../../../features/kubus/components/ImageFieldComponent';
 import InformationForm from '../../../../features/kubus/forms/InformationForm';
-import PromoVoucherForm from '../../../../features/kubus/forms/PromoVoucherForm';
+import PromoForm from '../../../../features/kubus/forms/PromoForm';
+import VoucherForm from '../../../../features/kubus/forms/VoucherForm';
 import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
 // Note: Real modals are imported above
 function KubusMain() {
@@ -481,16 +482,18 @@ function KubusMain() {
                 const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
                 if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
 
-                return (
-                  <PromoVoucherForm
-                    formControl={formControl}
-                    values={values}
-                    setValues={setValues}
-                  />
-                );
+                if (contentType === 'promo') {
+                  return (
+                    <PromoForm
+                      formControl={formControl}
+                      values={values}
+                      setValues={setValues}
+                    />
+                  );
+                }
+                return <VoucherForm formControl={formControl} />;
               },
             },
-
             // Maps and Address for Offline Promo/Voucher
             {
               type: 'custom',
