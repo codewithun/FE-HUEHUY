@@ -24,6 +24,8 @@ const ContentTypeSelector = ({ values, setValues }) => {
 			
 			// Location and links
 			'cube_tags[0][link]', 'cube_tags[0][address]', 'cube_tags[0][map_lat]', 'cube_tags[0][map_lng]',
+			// Bare map fields possibly used elsewhere in form
+			'map_lat', 'map_lng', 'address',
 			
 			// Target and community
 			'target_type', 'target_user_ids', 'community_id',

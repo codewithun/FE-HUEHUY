@@ -73,6 +73,33 @@ const PromoForm = ({ formControl, values, setValues }) => {
             { label: 'Online', value: 'online' },
             { label: 'Offline', value: 'offline' },
           ]}
+          onChange={(value) => {
+            // set promo type
+            let next = [
+              ...values.filter((i) => i.name !== 'ads[promo_type]')
+            ];
+            next.push({ name: 'ads[promo_type]', value });
+
+            if (value === 'online') {
+              // Bersihkan semua field lokasi saat beralih ke Online
+              next = next.filter(
+                (i) => ![
+                  'cube_tags[0][map_lat]',
+                  'cube_tags[0][map_lng]',
+                  'cube_tags[0][address]',
+                  'map_lat',
+                  'map_lng',
+                  'address'
+                ].includes(i.name)
+              );
+            } else if (value === 'offline') {
+              // Bersihkan link online saat beralih ke Offline
+              next = next.filter((i) => i.name !== 'cube_tags[0][link]');
+            }
+
+            setValues(next);
+          }}
+          value={values.find((i) => i.name === 'ads[promo_type]')?.value}
         />
       </div>
 
