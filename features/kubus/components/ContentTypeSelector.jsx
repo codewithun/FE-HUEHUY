@@ -1,0 +1,1 @@
+export { default } from '../../pages/admin/master/kubus/components/ContentTypeSelector.jsx';

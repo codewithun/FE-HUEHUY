@@ -1,0 +1,1 @@
+export { default } from '../../pages/admin/master/kubus/forms/InformationForm.jsx';

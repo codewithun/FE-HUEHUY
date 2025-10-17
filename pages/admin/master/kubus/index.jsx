@@ -29,14 +29,14 @@ import { token_cookie_name } from '../../../../helpers';
 import { useUserContext } from '../../../../context/user.context';
 
 // Import components dan hooks
-import { useManagersData, useUsersData } from './hooks/useDataFetching';
-import { useCropFunctionality } from './hooks/useCropFunctionality';
-import ContentTypeSelector from './components/ContentTypeSelector';
-import ManagerTenantSelector from './components/ManagerTenantSelector';
-import ImageFieldComponent from './components/ImageFieldComponent';
-import InformationForm from './forms/InformationForm';
-import PromoVoucherForm from './forms/PromoVoucherForm';
-import { getCT, isInfo } from './utils/helpers';
+import { useManagersData, useUsersData } from '../../../../features/kubus/hooks/useDataFetching';
+import { useCropFunctionality } from '../../../../features/kubus/hooks/useCropFunctionality';
+import ContentTypeSelector from '../../../../features/kubus/components/ContentTypeSelector';
+import ManagerTenantSelector from '../../../../features/kubus/components/ManagerTenantSelector';
+import ImageFieldComponent from '../../../../features/kubus/components/ImageFieldComponent';
+import InformationForm from '../../../../features/kubus/forms/InformationForm';
+import PromoVoucherForm from '../../../../features/kubus/forms/PromoVoucherForm';
+import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
 // Note: Real modals are imported above
 function KubusMain() {
   // States

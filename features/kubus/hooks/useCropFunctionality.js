@@ -1,0 +1,1 @@
+export * from '../../pages/admin/master/kubus/hooks/useCropFunctionality.js';
