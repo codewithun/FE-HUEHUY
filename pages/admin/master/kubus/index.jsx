@@ -14,7 +14,7 @@ import {
 } from '../../../../components/base.components';
 import CropperDialog from '../../../../components/crop.components/CropperDialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity, faEdit, faTicket } from '@fortawesome/free-solid-svg-icons';
+import { faInfinity, faEdit, faFilePen, faTrash } from '@fortawesome/free-solid-svg-icons';
 import moment from 'moment';
 
 // Extra project components
@@ -36,10 +36,8 @@ import ManagerTenantSelector from './components/ManagerTenantSelector';
 import ImageFieldComponent from './components/ImageFieldComponent';
 import InformationForm from './forms/InformationForm';
 import PromoVoucherForm from './forms/PromoVoucherForm';
-import { getCT, isInfo } from './utils/helpers';
-
+import { getCT, isInfo, getApiBase } from './utils/helpers';
 // Note: Real modals are imported above
-
 function KubusMain() {
   // States
   const [selected, setSelected] = useState(null);
@@ -48,6 +46,7 @@ function KubusMain() {
   const [updateStatus, setUpdateStatus] = useState(false);
   const [voucherModal, setVoucherModal] = useState(false);
   const [formSessionId] = useState(0);
+  const apiBase = getApiBase();
 
   // Context (not used in this simplified refactor)
   const { profile: Profile } = useUserContext();
@@ -1149,36 +1148,68 @@ function KubusMain() {
         )}
 
         actionControl={{
-          include: (data) => (
-            <>
-              <ButtonComponent
-                icon={faEdit}
-                label={'Ubah Status'}
-                variant="outline"
-                paint={data?.status === 'active' ? 'danger' : 'success'}
-                size={'xs'}
-                rounded
-                onClick={() => {
-                  setSelected(data);
-                  setUpdateStatus(true);
-                }}
-              />
-              <ButtonComponent
-                icon={faTicket}
-                label={'Voucher'}
-                variant="outline"
-                paint={'primary'}
-                size={'xs'}
-                rounded
-                onClick={() => {
-                  setSelected(data);
-                  setVoucherModal(true);
-                }}
-              />
-            </>
-          ),
+          // non-aktifkan tombol "Ubah" bawaan dengan except
+          except: ['edit'],
+          include: (row, ctx) => {
+            
+            const { setModalForm, setDataSelected } = ctx || {};
+            const handleDelete = async () => {
+              if (!window.confirm('Yakin ingin menghapus kubus ini? Tindakan ini tidak dapat dibatalkan.')) return;
+              try {
+                const token = Cookies.get(token_cookie_name);
+                const res = await fetch(`${apiBase}/api/admin/cubes/${row.id}`, {
+                  method: 'DELETE',
+                  headers: {
+                    Accept: 'application/json',
+                    Authorization: token ? `Bearer ${token}` : undefined,
+                  },
+                });
+                if (!res.ok) {
+                  const t = await res.text();
+                  alert(`Gagal menghapus: ${res.status} ${t?.slice?.(0,120) || ''}`);
+                } else {
+                  setSelected(null);
+                  setRefresh((v) => !v);
+                }
+              } catch (e) {
+                alert(`Gagal menghapus: ${e.message}`);
+              }
+            };
+
+            return (
+              <>
+                <ButtonComponent
+                  icon={faEdit}
+                  label={'Ubah Kubus'}
+                  variant="outline"
+                  paint={'warning'}
+                  size={'xs'}
+                  rounded
+                  onClick={() => { setModalForm?.(true); setDataSelected?.(row); }}
+                />
+                <ButtonComponent
+                  icon={faFilePen}
+                  label={'Ubah Iklan'}
+                  variant="outline"
+                  paint={'warning'}
+                  size={'xs'}
+                  rounded
+                  onClick={() => { setModalForm?.(true); setDataSelected?.(row); }}
+                />
+                <ButtonComponent
+                  label={row?.status === 'active' ? 'Non-Aktifkan' : 'Aktifkan'}
+                  variant="outline"
+                  paint={row?.status === 'active' ? 'danger' : 'success'}
+                  size={'xs'}
+                  rounded
+                  onClick={() => { setSelected(row); setUpdateStatus(true); }}
+                />
+                {/* Tombol Hapus manual dihilangkan karena TableSupervisionComponent
+                    kemungkinan sudah menyertakan aksi Hapus secara default. */}
+              </>
+            );
+          }
         }}
-        
         onStoreSuccess={() => {
           setRefresh(r => !r);
           resetCropState();
