@@ -1,5 +1,5 @@
 import React from 'react';
-import { InputComponent, TextareaComponent } from '../../../../components/base.components';
+import { InputComponent, TextareaComponent } from '../../../components/base.components';
 
 const InformationForm = ({ formControl }) => {
 	return (

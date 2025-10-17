@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Cookies from 'js-cookie';
-import { token_cookie_name, Decrypt } from '../../../../helpers';
+import { token_cookie_name, Decrypt } from '../../../helpers';
 import { getApiBase, isManagerTenant, getDisplayName, isUserRole } from '../utils/helpers';
 
 export const useManagersData = () => {

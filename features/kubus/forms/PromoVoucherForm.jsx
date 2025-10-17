@@ -1,12 +1,10 @@
 import React, { useEffect } from 'react';
 import { 
-	InputComponent, 
-	TextareaComponent, 
-	SelectComponent, 
-	InputNumberComponent 
-} from '../../../../components/base.components';
-
-const PromoVoucherForm = ({ formControl, values, setValues }) => {
+  InputComponent, 
+  TextareaComponent, 
+  SelectComponent, 
+  InputNumberComponent 
+} from '../../../components/base.components';const PromoVoucherForm = ({ formControl, values, setValues }) => {
 	const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
 
 	// Ensure a default promo_type for voucher to avoid backend enum/NOT NULL issues

@@ -1,5 +1,5 @@
 import React from 'react';
-import { SelectComponent } from '../../../../components/base.components';
+import { SelectComponent } from '../../../components/base.components';
 import { getDisplayName, getPhone } from '../utils/helpers';
 
 const ManagerTenantSelector = ({ 
