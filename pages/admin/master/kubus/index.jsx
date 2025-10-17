@@ -14,7 +14,7 @@ import {
 } from '../../../../components/base.components';
 import CropperDialog from '../../../../components/crop.components/CropperDialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity, faEdit, faFilePen, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faInfinity, faEdit, faFilePen } from '@fortawesome/free-solid-svg-icons';
 import moment from 'moment';
 
 // Extra project components
@@ -36,7 +36,7 @@ import ManagerTenantSelector from './components/ManagerTenantSelector';
 import ImageFieldComponent from './components/ImageFieldComponent';
 import InformationForm from './forms/InformationForm';
 import PromoVoucherForm from './forms/PromoVoucherForm';
-import { getCT, isInfo, getApiBase } from './utils/helpers';
+import { getCT, isInfo } from './utils/helpers';
 // Note: Real modals are imported above
 function KubusMain() {
   // States
@@ -46,7 +46,8 @@ function KubusMain() {
   const [updateStatus, setUpdateStatus] = useState(false);
   const [voucherModal, setVoucherModal] = useState(false);
   const [formSessionId] = useState(0);
-  const apiBase = getApiBase();
+  // Edit target: 'cube' (default) or 'ad'
+  const [editMode, setEditMode] = useState('cube');
 
   // Context (not used in this simplified refactor)
   const { profile: Profile } = useUserContext();
@@ -112,6 +113,73 @@ function KubusMain() {
     ImageFieldWrapper.displayName = `ImageFieldWrapper(${fieldName})`;
     return ImageFieldWrapper;
   }, [selected, formSessionId, getServerImageUrl, withVersion, previewUrl, previewOwnerKey, handleFileInput, handleRecrop, handleClearImage]);
+
+  // Mapper default value untuk mode update (dipakai untuk Ubah Kubus maupun Ubah Iklan)
+  const mapUpdateDefault = useCallback((data) => {
+    setSelected(data);
+    const ad = data?.ads?.[0] || {};
+    const contentType = data?.is_information
+      ? 'kubus-informasi'
+      : ad?.type === 'voucher'
+        ? 'voucher'
+        : ad?.type === 'iklan'
+          ? 'iklan'
+          : 'promo';
+
+    const mapCustomDays = (customDays) => {
+      if (!customDays || typeof customDays !== 'object') return {};
+      const result = {};
+      Object.entries(customDays).forEach(([day, value]) => {
+        result[`ads[custom_days][${day}]`] = value;
+      });
+      return result;
+    };
+
+    return {
+      cube_type_id: data?.cube_type_id,
+      is_recommendation: data?.is_recommendation ? [1] : [],
+      is_information: data?.is_information ? [1] : [],
+      link_information: data?.link_information || '',
+      _original_map_lat: data?.map_lat,
+      _original_map_lng: data?.map_lng,
+      _original_address: data?.address,
+      status: data?.status,
+      content_type: contentType,
+      'ads[promo_type]': ad?.promo_type || '',
+      'ads[validation_type]': ad?.validation_type || 'auto',
+      'ads[code]': ad?.code || '',
+      'cube_tags[0][link]': data?.tags?.at(0)?.link || '',
+      'cube_tags[0][map_lat]': data?.tags?.at(0)?.map_lat || data?.map_lat || '',
+      'cube_tags[0][map_lng]': data?.tags?.at(0)?.map_lng || data?.map_lng || '',
+      'cube_tags[0][address]': data?.tags?.at(0)?.address || data?.address || '',
+      target_type: ad?.target_type || 'all',
+      target_user_ids: ad?.target_user_ids || [],
+      community_id: ad?.community_id || '',
+      image: data?.picture_source || '',
+      'ads[image]': ad?.picture_source || '',
+      'ads[image_1]': ad?.image_1 || '',
+      'ads[image_2]': ad?.image_2 || '',
+      'ads[image_3]': ad?.image_3 || '',
+      'ads[title]': ad?.title || '',
+      'ads[description]': ad?.description || '',
+      'ads[ad_category_id]': ad?.ad_category_id || '',
+      'ads[level_umkm]': ad?.level_umkm || '',
+      'ads[max_production_per_day]': ad?.max_production_per_day || '',
+      'ads[sell_per_day]': ad?.sell_per_day || '',
+      'ads[is_daily_grab]': ad?.is_daily_grab ? 1 : 0,
+      'ads[unlimited_grab]': ad?.unlimited_grab ? 1 : 0,
+      'ads[max_grab]': ad?.max_grab || '',
+      'ads[jam_mulai]': ad?.jam_mulai ? String(ad.jam_mulai).substring(0, 5) : '',
+      'ads[jam_berakhir]': ad?.jam_berakhir ? String(ad.jam_berakhir).substring(0, 5) : '',
+      'ads[day_type]': ad?.day_type || 'custom',
+      ...mapCustomDays(ad?.custom_days),
+      ...(ad?.start_validate ? { 'ads[start_validate]': moment(ad.start_validate).format('DD-MM-YYYY') } : {}),
+      ...(ad?.finish_validate ? { 'ads[finish_validate]': moment(ad.finish_validate).format('DD-MM-YYYY') } : {}),
+      ...(data?.world_id ? { world_id: data.world_id } : {}),
+      ...(data?.user_id ? { owner_user_id: data.user_id } : {}),
+      ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
+    };
+  }, [setSelected]);
 
   // const validate = selected?.ads?.at(0)?.start_validate && selected?.ads?.at(0)?.finish_validate
   //   ? {
@@ -973,72 +1041,12 @@ function KubusMain() {
           ],
         }}
 
-        formUpdateControl={{
-          customDefaultValue: (data) => {
-            setSelected(data);
-            const ad = data?.ads?.[0] || {};
-            const contentType = data?.is_information
-              ? 'kubus-informasi'
-              : ad?.type === 'voucher'
-                ? 'voucher'
-                : ad?.type === 'iklan'
-                  ? 'iklan'
-                  : 'promo';
-
-            const mapCustomDays = (customDays) => {
-              if (!customDays || typeof customDays !== 'object') return {};
-              const result = {};
-              Object.entries(customDays).forEach(([day, value]) => {
-                result[`ads[custom_days][${day}]`] = value;
-              });
-              return result;
-            };
-
-            return {
-              cube_type_id: data?.cube_type_id,
-              is_recommendation: data?.is_recommendation ? [1] : [],
-              is_information: data?.is_information ? [1] : [],
-              link_information: data?.link_information || '',
-              _original_map_lat: data?.map_lat,
-              _original_map_lng: data?.map_lng,
-              _original_address: data?.address,
-              status: data?.status,
-              content_type: contentType,
-              'ads[promo_type]': ad?.promo_type || '',
-              'ads[validation_type]': ad?.validation_type || 'auto',
-              'ads[code]': ad?.code || '',
-              'cube_tags[0][link]': data?.tags?.at(0)?.link || '',
-              'cube_tags[0][map_lat]': data?.tags?.at(0)?.map_lat || data?.map_lat || '',
-              'cube_tags[0][map_lng]': data?.tags?.at(0)?.map_lng || data?.map_lng || '',
-              'cube_tags[0][address]': data?.tags?.at(0)?.address || data?.address || '',
-              target_type: ad?.target_type || 'all',
-              target_user_ids: ad?.target_user_ids || [],
-              community_id: ad?.community_id || '',
-              image: data?.picture_source || '',
-              'ads[image]': ad?.picture_source || '',
-              'ads[image_1]': ad?.image_1 || '',
-              'ads[image_2]': ad?.image_2 || '',
-              'ads[image_3]': ad?.image_3 || '',
-              'ads[title]': ad?.title || '',
-              'ads[description]': ad?.description || '',
-              'ads[ad_category_id]': ad?.ad_category_id || '',
-              'ads[level_umkm]': ad?.level_umkm || '',
-              'ads[max_production_per_day]': ad?.max_production_per_day || '',
-              'ads[sell_per_day]': ad?.sell_per_day || '',
-              'ads[is_daily_grab]': ad?.is_daily_grab ? 1 : 0,
-              'ads[unlimited_grab]': ad?.unlimited_grab ? 1 : 0,
-              'ads[max_grab]': ad?.max_grab || '',
-              'ads[jam_mulai]': ad?.jam_mulai ? String(ad.jam_mulai).substring(0, 5) : '',
-              'ads[jam_berakhir]': ad?.jam_berakhir ? String(ad.jam_berakhir).substring(0, 5) : '',
-              'ads[day_type]': ad?.day_type || 'custom',
-              ...mapCustomDays(ad?.custom_days),
-              ...(ad?.start_validate ? { 'ads[start_validate]': moment(ad.start_validate).format('DD-MM-YYYY') } : {}),
-              ...(ad?.finish_validate ? { 'ads[finish_validate]': moment(ad.finish_validate).format('DD-MM-YYYY') } : {}),
-              ...(data?.world_id ? { world_id: data.world_id } : {}),
-              ...(data?.user_id ? { owner_user_id: data.user_id } : {}),
-              ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
-            };
-          },
+        formUpdateControl={editMode === 'ad' ? {
+          customDefaultValue: mapUpdateDefault,
+          contentType: 'multipart/form-data',
+          // penting: TANPA 'custom' agar fallback ke formControl.custom (form buat konten)
+        } : {
+          customDefaultValue: mapUpdateDefault,
           contentType: 'multipart/form-data',
           custom: [
             // Manager Tenant (editable on update)
@@ -1153,28 +1161,6 @@ function KubusMain() {
           include: (row, ctx) => {
             
             const { setModalForm, setDataSelected } = ctx || {};
-            const handleDelete = async () => {
-              if (!window.confirm('Yakin ingin menghapus kubus ini? Tindakan ini tidak dapat dibatalkan.')) return;
-              try {
-                const token = Cookies.get(token_cookie_name);
-                const res = await fetch(`${apiBase}/api/admin/cubes/${row.id}`, {
-                  method: 'DELETE',
-                  headers: {
-                    Accept: 'application/json',
-                    Authorization: token ? `Bearer ${token}` : undefined,
-                  },
-                });
-                if (!res.ok) {
-                  const t = await res.text();
-                  alert(`Gagal menghapus: ${res.status} ${t?.slice?.(0,120) || ''}`);
-                } else {
-                  setSelected(null);
-                  setRefresh((v) => !v);
-                }
-              } catch (e) {
-                alert(`Gagal menghapus: ${e.message}`);
-              }
-            };
 
             return (
               <>
@@ -1185,7 +1171,7 @@ function KubusMain() {
                   paint={'warning'}
                   size={'xs'}
                   rounded
-                  onClick={() => { setModalForm?.(true); setDataSelected?.(row); }}
+                  onClick={() => { setEditMode('cube'); setModalForm?.(true); setDataSelected?.(row); }}
                 />
                 <ButtonComponent
                   icon={faFilePen}
@@ -1194,7 +1180,7 @@ function KubusMain() {
                   paint={'warning'}
                   size={'xs'}
                   rounded
-                  onClick={() => { setModalForm?.(true); setDataSelected?.(row); }}
+                  onClick={() => { setEditMode('ad'); setModalForm?.(true); setDataSelected?.(row); }}
                 />
                 <ButtonComponent
                   label={row?.status === 'active' ? 'Non-Aktifkan' : 'Aktifkan'}
@@ -1222,6 +1208,7 @@ function KubusMain() {
         
         onModalClose={() => {
           resetCropState();
+          setEditMode('cube');
         }}
       />
 
