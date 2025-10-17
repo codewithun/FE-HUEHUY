@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
 import { 
@@ -118,6 +119,22 @@ function KubusMain() {
   const mapUpdateDefault = useCallback((data) => {
     setSelected(data);
     const ad = data?.ads?.[0] || {};
+    
+    // Debug: Log data structure untuk melihat struktur gambar yang sebenarnya
+    console.log('=== DEBUG KUBUS DATA ===');
+    console.log('Full data:', data);
+    console.log('Ads data:', ad);
+    console.log('Data images:', {
+      'data.image': data?.image,
+      'data.picture_source': data?.picture_source,
+      'ad.image': ad?.image,
+      'ad.picture_source': ad?.picture_source,
+      'ad.image_1': ad?.image_1,
+      'ad.image_2': ad?.image_2,
+      'ad.image_3': ad?.image_3,
+    });
+    console.log('=== END DEBUG ===');
+    
     const contentType = data?.is_information
       ? 'kubus-informasi'
       : ad?.type === 'voucher'
@@ -135,7 +152,17 @@ function KubusMain() {
       return result;
     };
 
-    return {
+    // Format tanggal untuk input date (YYYY-MM-DD)
+    const formatDateForInput = (dateStr) => {
+      if (!dateStr) return '';
+      try {
+        return moment(dateStr).format('YYYY-MM-DD');
+      } catch (e) {
+        return '';
+      }
+    };
+
+    const mappedData = {
       cube_type_id: data?.cube_type_id,
       is_recommendation: data?.is_recommendation ? [1] : [],
       is_information: data?.is_information ? [1] : [],
@@ -155,8 +182,10 @@ function KubusMain() {
       target_type: ad?.target_type || 'all',
       target_user_ids: ad?.target_user_ids || [],
       community_id: ad?.community_id || '',
-      image: data?.picture_source || '',
-      'ads[image]': ad?.picture_source || '',
+      // Gambar kubus (untuk cube_type 2 atau 4)
+      image: data?.image || data?.picture_source || '',
+      // Gambar iklan/konten - pastikan URL lengkap tersimpan
+      'ads[image]': ad?.image || ad?.picture_source || '',
       'ads[image_1]': ad?.image_1 || '',
       'ads[image_2]': ad?.image_2 || '',
       'ads[image_3]': ad?.image_3 || '',
@@ -172,13 +201,33 @@ function KubusMain() {
       'ads[jam_mulai]': ad?.jam_mulai ? String(ad.jam_mulai).substring(0, 5) : '',
       'ads[jam_berakhir]': ad?.jam_berakhir ? String(ad.jam_berakhir).substring(0, 5) : '',
       'ads[day_type]': ad?.day_type || 'custom',
+      // Tanggal validasi dalam format yang benar untuk input date
+      'ads[start_validate]': formatDateForInput(ad?.start_validate),
+      'ads[finish_validate]': formatDateForInput(ad?.finish_validate),
+      'ads[validation_time_limit]': ad?.validation_time_limit || '',
       ...mapCustomDays(ad?.custom_days),
-      ...(ad?.start_validate ? { 'ads[start_validate]': moment(ad.start_validate).format('DD-MM-YYYY') } : {}),
-      ...(ad?.finish_validate ? { 'ads[finish_validate]': moment(ad.finish_validate).format('DD-MM-YYYY') } : {}),
       ...(data?.world_id ? { world_id: data.world_id } : {}),
       ...(data?.user_id ? { owner_user_id: data.user_id } : {}),
       ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
     };
+
+    // Debug: Log hasil mapping
+    console.log('=== HASIL MAPPING ===');
+    console.log('Mapped Images:', {
+      'image': mappedData.image,
+      'ads[image]': mappedData['ads[image]'],
+      'ads[image_1]': mappedData['ads[image_1]'],
+      'ads[image_2]': mappedData['ads[image_2]'],
+      'ads[image_3]': mappedData['ads[image_3]'],
+    });
+    console.log('Mapped Dates:', {
+      'ads[start_validate]': mappedData['ads[start_validate]'],
+      'ads[finish_validate]': mappedData['ads[finish_validate]'],
+    });
+    console.log('Full mapped data:', mappedData);
+    console.log('=== END HASIL MAPPING ===');
+
+    return mappedData;
   }, [setSelected]);
 
   // const validate = selected?.ads?.at(0)?.start_validate && selected?.ads?.at(0)?.finish_validate
@@ -1164,15 +1213,6 @@ function KubusMain() {
 
             return (
               <>
-                <ButtonComponent
-                  icon={faEdit}
-                  label={'Ubah Kubus'}
-                  variant="outline"
-                  paint={'warning'}
-                  size={'xs'}
-                  rounded
-                  onClick={() => { setEditMode('cube'); setModalForm?.(true); setDataSelected?.(row); }}
-                />
                 <ButtonComponent
                   icon={faFilePen}
                   label={'Ubah Iklan'}

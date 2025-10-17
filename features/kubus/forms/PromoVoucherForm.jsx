@@ -107,13 +107,13 @@ import {
 					name="cube_tags[0][link]"
 					label="Tautan/Link"
 					placeholder="Masukkan tautan/link promo online..."
-					onChange={(e) => {
+					onChange={(value) => {
 						const linkIndex = values.findIndex(v => v.name === 'cube_tags[0][link]');
 						const newValues = [...values];
 						if (linkIndex >= 0) {
-							newValues[linkIndex] = { name: 'cube_tags[0][link]', value: e.target.value };
+							newValues[linkIndex] = { name: 'cube_tags[0][link]', value: value };
 						} else {
-							newValues.push({ name: 'cube_tags[0][link]', value: e.target.value });
+							newValues.push({ name: 'cube_tags[0][link]', value: value });
 						}
 						setValues(newValues);
 					}}
