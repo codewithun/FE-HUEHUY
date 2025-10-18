@@ -39,36 +39,36 @@ const ImageFieldComponent = ({
 	const hasFileObject = currentValue instanceof File;
 	const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(fieldKey);
 
-	// Debug log untuk image field
-	console.log(`=== DEBUG IMAGE FIELD: ${fieldName} ===`);
-	console.log('isEditMode:', isEditMode);
-	console.log('currentValue:', currentValue);
-	console.log('hasFileObject:', hasFileObject);
-	console.log('serverImageUrl:', serverImageUrl);
-	console.log('serverSrc:', serverSrc);
-	console.log('canUseBlob:', canUseBlob);
-	console.log('previewUrl:', previewUrl);
-	console.log('formId:', formId);
-	console.log('selected:', selected);
+	// // Debug log untuk image field
+	// console.log(`=== DEBUG IMAGE FIELD: ${fieldName} ===`);
+	// console.log('isEditMode:', isEditMode);
+	// console.log('currentValue:', currentValue);
+	// console.log('hasFileObject:', hasFileObject);
+	// console.log('serverImageUrl:', serverImageUrl);
+	// console.log('serverSrc:', serverSrc);
+	// console.log('canUseBlob:', canUseBlob);
+	// console.log('previewUrl:', previewUrl);
+	// console.log('formId:', formId);
+	// console.log('selected:', selected);
 
 	let finalPreviewSrc = '';
 	if (hasFileObject && canUseBlob) {
 		finalPreviewSrc = previewUrl;
-		console.log('Using blob preview URL');
+		// console.log('Using blob preview URL');
 	} else if (hasFileObject) {
 		finalPreviewSrc = URL.createObjectURL(currentValue);
-		console.log('Creating object URL from file');
+		// console.log('Creating object URL from file');
 	} else if (serverSrc) {
 		finalPreviewSrc = serverSrc;
-		console.log('Using server image URL');
+		// console.log('Using server image URL');
 	} else if (currentValue && typeof currentValue === 'string' && currentValue.startsWith('http')) {
 		// Fallback: jika currentValue adalah URL string langsung
 		finalPreviewSrc = currentValue;
-		console.log('Using direct URL from current value');
+		// console.log('Using direct URL from current value');
 	}
 
-	console.log('finalPreviewSrc:', finalPreviewSrc);
-	console.log(`=== END DEBUG ${fieldName} ===`);
+	// console.log('finalPreviewSrc:', finalPreviewSrc);
+	// console.log(`=== END DEBUG ${fieldName} ===`);
 
 	// File input handler
 	const handleFileChange = (e) => {

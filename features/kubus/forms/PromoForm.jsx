@@ -81,17 +81,29 @@ const PromoForm = ({ formControl, values, setValues }) => {
             next.push({ name: 'ads[promo_type]', value });
 
             if (value === 'online') {
-              // Bersihkan semua field lokasi saat beralih ke Online
-              next = next.filter(
-                (i) => ![
-                  'cube_tags[0][map_lat]',
-                  'cube_tags[0][map_lng]',
-                  'cube_tags[0][address]',
-                  'map_lat',
-                  'map_lng',
-                  'address'
-                ].includes(i.name)
+              // Bersihkan field lokasi TAG saat beralih ke Online
+              // Catatan: Pada mode edit, backend tetap mewajibkan root address/map_lat/map_lng,
+              // jadi JANGAN hapus root-level jika _original_* ada (indikasi edit mode)
+              const isEditMode = Boolean(
+                values.find(v => v.name === '_original_map_lat') ||
+                values.find(v => v.name === '_original_map_lng') ||
+                values.find(v => v.name === '_original_address')
               );
+
+              const fieldsToRemove = [
+                'cube_tags[0][map_lat]',
+                'cube_tags[0][map_lng]',
+                'cube_tags[0][address]'
+              ];
+
+              next = next.filter((i) => !fieldsToRemove.includes(i.name));
+
+              if (!isEditMode) {
+                // Hanya pada create, aman untuk menghapus root-level
+                next = next.filter(
+                  (i) => !['map_lat', 'map_lng', 'address'].includes(i.name)
+                );
+              }
             } else if (value === 'offline') {
               // Bersihkan link online saat beralih ke Offline
               next = next.filter((i) => i.name !== 'cube_tags[0][link]');
