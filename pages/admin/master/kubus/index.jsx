@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
+/* eslint-disable no-console */
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AdminLayout } from '../../../../components/construct.components/layout/Admin.layout';
-import { 
+import {
   TableSupervisionComponent,
   DateFormatComponent,
   ButtonComponent,
@@ -14,7 +15,7 @@ import {
 } from '../../../../components/base.components';
 import CropperDialog from '../../../../components/crop.components/CropperDialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity, faEdit, faFilePen } from '@fortawesome/free-solid-svg-icons';
+import { faInfinity, faFilePen } from '@fortawesome/free-solid-svg-icons';
 import moment from 'moment';
 
 // Extra project components
@@ -26,6 +27,7 @@ import UpdateCubeStatusModal from '../../../../components/construct.components/m
 import VoucherModal from '../../../../components/construct.components/modal/Voucher.modal';
 import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../../helpers';
+import { Decrypt } from '../../../../helpers/encryption.helpers';
 import { useUserContext } from '../../../../context/user.context';
 
 // Import components dan hooks
@@ -35,7 +37,8 @@ import ContentTypeSelector from '../../../../features/kubus/components/ContentTy
 import ManagerTenantSelector from '../../../../features/kubus/components/ManagerTenantSelector';
 import ImageFieldComponent from '../../../../features/kubus/components/ImageFieldComponent';
 import InformationForm from '../../../../features/kubus/forms/InformationForm';
-import PromoVoucherForm from '../../../../features/kubus/forms/PromoVoucherForm';
+import PromoForm from '../../../../features/kubus/forms/PromoForm';
+import VoucherForm from '../../../../features/kubus/forms/VoucherForm';
 import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
 // Note: Real modals are imported above
 function KubusMain() {
@@ -48,6 +51,10 @@ function KubusMain() {
   const [formSessionId] = useState(0);
   // Edit target: 'cube' (default) or 'ad'
   const [editMode, setEditMode] = useState('cube');
+  // Store original data and track form values for delta detection
+  const [originalData, setOriginalData] = useState(null);
+  // Use ref to track latest form values without triggering re-render loops
+  const formValuesRef = useRef([]);
 
   // Context (not used in this simplified refactor)
   const { profile: Profile } = useUserContext();
@@ -115,9 +122,26 @@ function KubusMain() {
   }, [selected, formSessionId, getServerImageUrl, withVersion, previewUrl, previewOwnerKey, handleFileInput, handleRecrop, handleClearImage]);
 
   // Mapper default value untuk mode update (dipakai untuk Ubah Kubus maupun Ubah Iklan)
-  const mapUpdateDefault = useCallback((data) => {
+  const mapUpdateDefault = (data) => {
     setSelected(data);
+    setOriginalData(data); // Store original data for delta comparison
     const ad = data?.ads?.[0] || {};
+
+    // Debug: Log data structure untuk melihat struktur gambar yang sebenarnya
+    console.log('=== DEBUG KUBUS DATA ===');
+    console.log('Full data:', data);
+    console.log('Ads data:', ad);
+    console.log('Data images:', {
+      'data.image': data?.image,
+      'data.picture_source': data?.picture_source,
+      'ad.image': ad?.image,
+      'ad.picture_source': ad?.picture_source,
+      'ad.image_1': ad?.image_1,
+      'ad.image_2': ad?.image_2,
+      'ad.image_3': ad?.image_3,
+    });
+    console.log('=== END DEBUG ===');
+
     const contentType = data?.is_information
       ? 'kubus-informasi'
       : ad?.type === 'voucher'
@@ -135,7 +159,17 @@ function KubusMain() {
       return result;
     };
 
-    return {
+    // Format tanggal untuk input date (YYYY-MM-DD)
+    const formatDateForInput = (dateStr) => {
+      if (!dateStr) return '';
+      try {
+        return moment(dateStr).format('YYYY-MM-DD');
+      } catch (e) {
+        return '';
+      }
+    };
+
+    const mappedData = {
       cube_type_id: data?.cube_type_id,
       is_recommendation: data?.is_recommendation ? [1] : [],
       is_information: data?.is_information ? [1] : [],
@@ -143,6 +177,11 @@ function KubusMain() {
       _original_map_lat: data?.map_lat,
       _original_map_lng: data?.map_lng,
       _original_address: data?.address,
+      // IMPORTANT: Always send root-level address & coords on update to satisfy backend required fields
+      // Even for Promo Online, backend update() requires these three fields
+      address: data?.address || '',
+      map_lat: data?.map_lat || '',
+      map_lng: data?.map_lng || '',
       status: data?.status,
       content_type: contentType,
       'ads[promo_type]': ad?.promo_type || '',
@@ -155,8 +194,10 @@ function KubusMain() {
       target_type: ad?.target_type || 'all',
       target_user_ids: ad?.target_user_ids || [],
       community_id: ad?.community_id || '',
-      image: data?.picture_source || '',
-      'ads[image]': ad?.picture_source || '',
+      // Gambar kubus (untuk cube_type 2 atau 4)
+      image: data?.image || data?.picture_source || '',
+      // Gambar iklan/konten - pastikan URL lengkap tersimpan
+      'ads[image]': ad?.image || ad?.picture_source || '',
       'ads[image_1]': ad?.image_1 || '',
       'ads[image_2]': ad?.image_2 || '',
       'ads[image_3]': ad?.image_3 || '',
@@ -172,14 +213,34 @@ function KubusMain() {
       'ads[jam_mulai]': ad?.jam_mulai ? String(ad.jam_mulai).substring(0, 5) : '',
       'ads[jam_berakhir]': ad?.jam_berakhir ? String(ad.jam_berakhir).substring(0, 5) : '',
       'ads[day_type]': ad?.day_type || 'custom',
+      // Tanggal validasi dalam format yang benar untuk input date
+      'ads[start_validate]': formatDateForInput(ad?.start_validate),
+      'ads[finish_validate]': formatDateForInput(ad?.finish_validate),
+      'ads[validation_time_limit]': ad?.validation_time_limit || '',
       ...mapCustomDays(ad?.custom_days),
-      ...(ad?.start_validate ? { 'ads[start_validate]': moment(ad.start_validate).format('DD-MM-YYYY') } : {}),
-      ...(ad?.finish_validate ? { 'ads[finish_validate]': moment(ad.finish_validate).format('DD-MM-YYYY') } : {}),
       ...(data?.world_id ? { world_id: data.world_id } : {}),
       ...(data?.user_id ? { owner_user_id: data.user_id } : {}),
       ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
     };
-  }, [setSelected]);
+
+    // Debug: Log hasil mapping
+    console.log('=== HASIL MAPPING ===');
+    console.log('Mapped Images:', {
+      'image': mappedData.image,
+      'ads[image]': mappedData['ads[image]'],
+      'ads[image_1]': mappedData['ads[image_1]'],
+      'ads[image_2]': mappedData['ads[image_2]'],
+      'ads[image_3]': mappedData['ads[image_3]'],
+    });
+    console.log('Mapped Dates:', {
+      'ads[start_validate]': mappedData['ads[start_validate]'],
+      'ads[finish_validate]': mappedData['ads[finish_validate]'],
+    });
+    console.log('Full mapped data:', mappedData);
+    console.log('=== END HASIL MAPPING ===');
+
+    return mappedData;
+  };
 
   // const validate = selected?.ads?.at(0)?.start_validate && selected?.ads?.at(0)?.finish_validate
   //   ? {
@@ -188,10 +249,295 @@ function KubusMain() {
   //     }
   //   : null;
 
+  // Helper function untuk membandingkan dan membuat delta payload
+  const createDeltaPayload = (formValues, originalData) => {
+    console.log('=== DELTA DETECTION START ===');
+    console.log('Form values:', formValues);
+    console.log('Original data:', originalData);
+
+    const deltaCube = {};
+    const deltaAds = {};
+    let hasChanges = false;
+
+    // Helper untuk compare values
+    const isEqual = (a, b) => {
+      if (a === b) return true;
+      if (a == null && b == null) return true;
+      if ((a == null || a === '') && (b == null || b === '')) return true;
+      if (Array.isArray(a) && Array.isArray(b)) {
+        return a.length === b.length && a.every((val, i) => val === b[i]);
+      }
+      // Deep compare objects
+      if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        return keysA.every(key => isEqual(a[key], b[key]));
+      }
+      return false;
+    };
+
+    // Helper untuk convert value ke format yang benar
+    const convertValue = (value) => {
+      if (value === '' || value === undefined) return null;
+      if (value === 'true' || value === true) return true;
+      if (value === 'false' || value === false) return false;
+      return value;
+    };
+
+    // Collect custom_days dari form values
+    const customDays = {};
+    const regularFields = [];
+    
+    for (const { name, value } of formValues) {
+      if (name && name.match(/^ads\[custom_days\]\[(\w+)\]$/)) {
+        const dayName = name.match(/^ads\[custom_days\]\[(\w+)\]$/)[1];
+        customDays[dayName] = convertValue(value);
+      } else {
+        regularFields.push({ name, value });
+      }
+    }
+
+    // Process regular fields
+    for (const { name, value } of regularFields) {
+      if (!name || name.startsWith('_original_') || name === 'change_map' || name === 'content_type') continue;
+
+      const convertedValue = convertValue(value);
+      
+      if (name.startsWith('ads[')) {
+        const key = name.replace(/^ads\[|\]$/g, '');
+        let originalValue = originalData?.ads?.[0]?.[key];
+        
+        // Special handling for custom_days
+        if (key === 'custom_days') {
+          if (!isEqual(customDays, originalValue)) {
+            deltaAds.custom_days = Object.keys(customDays).length > 0 ? customDays : null;
+            hasChanges = true;
+            console.log(`ADS CHANGE - custom_days: ${JSON.stringify(originalValue)} → ${JSON.stringify(customDays)}`);
+          }
+          continue;
+        }
+        
+        if (!isEqual(convertedValue, originalValue)) {
+          deltaAds[key] = convertedValue;
+          hasChanges = true;
+          console.log(`ADS CHANGE - ${key}: ${originalValue} → ${convertedValue}`);
+        }
+      } else {
+        // Handle special cases for cube fields
+        let originalValue;
+        
+        if (name === 'is_recommendation') {
+          originalValue = originalData?.is_recommendation ? [1] : [];
+        } else if (name === 'is_information') {
+          originalValue = originalData?.is_information ? [1] : [];
+        } else if (name === 'target_user_ids') {
+          originalValue = originalData?.ads?.[0]?.target_user_ids || [];
+          if (!isEqual(convertedValue, originalValue)) {
+            deltaAds.target_user_ids = convertedValue;
+            hasChanges = true;
+            console.log(`ADS CHANGE - target_user_ids: ${JSON.stringify(originalValue)} → ${JSON.stringify(convertedValue)}`);
+          }
+          continue;
+        } else if (name === 'community_id') {
+          originalValue = originalData?.ads?.[0]?.community_id;
+          if (!isEqual(convertedValue, originalValue)) {
+            deltaAds.community_id = convertedValue;
+            hasChanges = true;
+            console.log(`ADS CHANGE - community_id: ${originalValue} → ${convertedValue}`);
+          }
+          continue;
+        } else if (name === 'target_type') {
+          originalValue = originalData?.ads?.[0]?.target_type || 'all';
+          if (!isEqual(convertedValue, originalValue)) {
+            deltaAds.target_type = convertedValue;
+            hasChanges = true;
+            console.log(`ADS CHANGE - target_type: ${originalValue} → ${convertedValue}`);
+          }
+          continue;
+        } else if (name.startsWith('cube_tags[')) {
+          // Skip cube_tags comparison for now, handle separately
+          continue;
+        } else {
+          originalValue = originalData?.[name];
+        }
+
+        if (!isEqual(convertedValue, originalValue)) {
+          deltaCube[name] = convertedValue;
+          hasChanges = true;
+          console.log(`CUBE CHANGE - ${name}: ${originalValue} → ${convertedValue}`);
+        }
+      }
+    }
+
+    // Add custom_days to deltaAds if there are any changes
+    if (Object.keys(customDays).length > 0) {
+      const originalCustomDays = originalData?.ads?.[0]?.custom_days || {};
+      if (!isEqual(customDays, originalCustomDays)) {
+        deltaAds.custom_days = customDays;
+        hasChanges = true;
+        console.log(`ADS CHANGE - custom_days: ${JSON.stringify(originalCustomDays)} → ${JSON.stringify(customDays)}`);
+      }
+    }
+
+    // Handle location update kondisional
+    const changeMapValue = formValues.find(v => v.name === 'change_map')?.value;
+    if (changeMapValue) {
+      // User ingin mengubah lokasi
+      const locationFields = ['address', 'map_lat', 'map_lng'];
+      locationFields.forEach(field => {
+        const formValue = formValues.find(v => v.name === field)?.value;
+        const convertedValue = convertValue(formValue);
+        const originalValue = originalData?.[field];
+        
+        if (!isEqual(convertedValue, originalValue)) {
+          deltaCube[field] = convertedValue;
+          hasChanges = true;
+          console.log(`LOCATION CHANGE - ${field}: ${originalValue} → ${convertedValue}`);
+        }
+      });
+      
+      // Tambahkan flag update_location
+      deltaCube.update_location = 1;
+      hasChanges = true;
+    }
+
+    console.log('Delta cube:', deltaCube);
+    console.log('Delta ads:', deltaAds);
+    console.log('Has changes:', hasChanges);
+    console.log('=== DELTA DETECTION END ===');
+
+    return { deltaCube, deltaAds, hasChanges };
+  };
+
+  // Tambahkan fungsi ini setelah deklarasi state, sebelum return
+  const handleUpdateCubeAndAd = async (values, data) => {
+    console.log('=== handleUpdateCubeAndAd START ===');
+    console.log('Received values:', values);
+    console.log('Received data:', data);
+    console.log('Original data for comparison:', originalData);
+    
+    const cubeId = data?.id;
+    const adId = data?.ads?.[0]?.id;
+
+    if (!cubeId || !adId) {
+      console.error('Cube ID atau Ad ID tidak ditemukan:', { cubeId, adId });
+      if (typeof window !== 'undefined') window.alert('ID data tidak lengkap untuk update.');
+      return;
+    }
+
+    // Gunakan originalData untuk comparison, data untuk ID saja
+    const comparisonData = originalData || data;
+    
+    // Deteksi perubahan dengan delta
+    const { deltaCube, deltaAds, hasChanges } = createDeltaPayload(values, comparisonData);
+
+    // Jika tidak ada perubahan, skip update
+    if (!hasChanges) {
+      console.log('Tidak ada perubahan, skip update');
+      if (typeof window !== 'undefined') window.alert('Tidak ada perubahan untuk disimpan.');
+      return;
+    }
+
+    try {
+      // Gunakan helper dari proyek seperti di file lain
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : '';
+
+      if (!token) {
+        if (typeof window !== 'undefined') {
+          window.alert('Token tidak ditemukan. Silakan login kembali.');
+          window.location.href = '/admin';
+        }
+        return;
+      }
+
+      const config = {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      };
+
+      // Gunakan endpoint yang sama seperti di TableSupervisionComponent
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const baseUrl = apiBase.replace(/\/+$/, '');
+
+      // Siapkan payload cube: selalu sertakan status (required oleh backend)
+      const statusFromForm = values.find?.(v => v.name === 'status')?.value;
+      const ensuredStatus = statusFromForm ?? comparisonData?.status ?? 'active';
+      const cubePayload = { ...deltaCube, status: ensuredStatus };
+
+      // Update cube jika ada perubahan atau memang ada field wajib yang harus ikut (status)
+      if (Object.keys(deltaCube).length > 0 || ensuredStatus !== undefined) {
+        console.log('Sending cube request with delta payload:', cubePayload);
+        const cubeResponse = await fetch(`${baseUrl}/admin/cubes/${cubeId}`, {
+          ...config,
+          body: JSON.stringify(cubePayload),
+          headers: {
+            ...config.headers,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!cubeResponse.ok) {
+          const errorText = await cubeResponse.text();
+          console.error('Cube update response:', errorText);
+          throw new Error(`Cube update failed: ${cubeResponse.status}`);
+        }
+        console.log('Cube update berhasil');
+      } else {
+        console.log('Tidak ada perubahan cube, skip cube update');
+      }
+
+      // Update ads hanya jika ada perubahan ads
+      if (Object.keys(deltaAds).length > 0) {
+        console.log('Sending ads request with delta payload:', deltaAds);
+        const adsResponse = await fetch(`${baseUrl}/admin/ads/${adId}`, {
+          ...config,
+          body: JSON.stringify(deltaAds),
+          headers: {
+            ...config.headers,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!adsResponse.ok) {
+          const errorText = await adsResponse.text();
+          console.error('Ads update response:', errorText);
+          throw new Error(`Ads update failed: ${adsResponse.status}`);
+        }
+        console.log('Ads update berhasil');
+      } else {
+        console.log('Tidak ada perubahan ads, skip ads update');
+      }
+
+      if (typeof window !== 'undefined') window.alert('Data berhasil diperbarui!');
+      setRefresh(r => !r);
+      resetCropState();
+    } catch (err) {
+      console.error('Gagal update cube/ads:', err);
+      
+      // Handle 401 seperti di file lain
+      if (err.message?.includes('401') || err.response?.status === 401) {
+        Cookies.remove(token_cookie_name);
+        if (typeof window !== 'undefined') {
+          window.alert('Sesi login telah berakhir. Silakan login kembali.');
+          window.location.href = '/admin';
+        }
+        return;
+      }
+      
+      if (typeof window !== 'undefined') window.alert('Gagal memperbarui data. Cek console untuk detail.');
+    }
+  };
+
   return (
     <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
       <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Kubus</h1>
-      
+
       <TableSupervisionComponent
         setToRefresh={refresh}
         title="Kubus"
@@ -319,27 +665,46 @@ function KubusMain() {
             }
           },
           custom: [
-            // Content Type Selection
+            // Global Form Values Tracker (aktif untuk create dan edit iklan)
             {
               type: 'custom',
-              custom: ({ values, setValues }) => (
-                <ContentTypeSelector values={values} setValues={setValues} />
-              ),
-            },
-            
-            // Information Checkbox
-            {
-              type: 'check',
-              construction: {
-                name: 'is_information',
-                options: [{ label: 'Kubus Informasi', value: 1 }],
+              custom: ({ values }) => {
+                if (values && Array.isArray(values) && values.length > 0) {
+                  // Simpan snapshot ke ref tanpa memicu rerender
+                  formValuesRef.current = values;
+                }
+                return null;
               },
             },
-
-            // Information Type Sync
+            // Content Type Selection (hidden on edit)
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
+                if (selected) return null;
+                return <ContentTypeSelector values={values} setValues={setValues} />;
+              },
+            },
+
+            // Information Checkbox (hidden on edit)
+            {
+              type: 'custom',
+              custom: ({ formControl }) => {
+                if (selected) return null;
+                return (
+                  <CheckboxComponent
+                    name="is_information"
+                    options={[{ label: 'Kubus Informasi', value: 1 }]}
+                    {...formControl('is_information')}
+                  />
+                );
+              },
+            },
+
+            // Information Type Sync (hidden on edit)
+            {
+              type: 'custom',
+              custom: ({ values, setValues }) => {
+                if (selected) return null;
                 const isInformation = !!values.find(i => i.name === 'is_information')?.value?.at?.(0);
                 const ct = values.find(i => i.name === 'content_type')?.value || 'promo';
 
@@ -432,16 +797,18 @@ function KubusMain() {
                 const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
                 if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
 
-                return (
-                  <PromoVoucherForm
-                    formControl={formControl}
-                    values={values}
-                    setValues={setValues}
-                  />
-                );
+                if (contentType === 'promo') {
+                  return (
+                    <PromoForm
+                      formControl={formControl}
+                      values={values}
+                      setValues={setValues}
+                    />
+                  );
+                }
+                return <VoucherForm formControl={formControl} />;
               },
             },
-
             // Maps and Address for Offline Promo/Voucher
             {
               type: 'custom',
@@ -1049,6 +1416,17 @@ function KubusMain() {
           customDefaultValue: mapUpdateDefault,
           contentType: 'multipart/form-data',
           custom: [
+            // Form Values Tracker - harus di atas untuk capture semua changes
+            {
+              type: 'custom',
+              custom: ({ values }) => {
+                if (values && Array.isArray(values) && values.length > 0) {
+                  formValuesRef.current = values;
+                }
+                return null;
+              },
+            },
+            
             // Manager Tenant (editable on update)
             {
               type: 'custom',
@@ -1074,7 +1452,8 @@ function KubusMain() {
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
-                const isInfo = !!values?.find(i => i.name == 'is_information')?.value;
+                const isInfoVal = values?.find(i => i.name == 'is_information')?.value;
+                const isInfo = Array.isArray(isInfoVal) && isInfoVal.length > 0;
                 if (isInfo) return null;
                 const changeMapActive = values?.find(i => i.name == 'change_map')?.value;
                 const ensure = (name, fallbackName) => {
@@ -1102,7 +1481,8 @@ function KubusMain() {
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
-                const isInfo = !!values?.find((i) => i.name == 'is_information')?.value;
+                const isInfoVal = values?.find((i) => i.name == 'is_information')?.value;
+                const isInfo = Array.isArray(isInfoVal) && isInfoVal.length > 0;
                 if (isInfo) return null;
                 const change = values?.find(i => i.name == 'change_map')?.value;
                 const lat0 = values?.find(i => i.name == '_original_map_lat')?.value;
@@ -1117,7 +1497,7 @@ function KubusMain() {
                       initialLng={lng0}
                       initialAddress={addr0}
                       onChange={(e) => {
-                        const rm = ['map_lat','map_lng','address','cube_tags[0][map_lat]','cube_tags[0][map_lng]','cube_tags[0][address]'];
+                        const rm = ['map_lat', 'map_lng', 'address', 'cube_tags[0][map_lat]', 'cube_tags[0][map_lng]', 'cube_tags[0][address]'];
                         setValues([
                           ...values.filter(i => !rm.includes(i.name)),
                           { name: 'map_lat', value: e?.lat },
@@ -1159,20 +1539,11 @@ function KubusMain() {
           // non-aktifkan tombol "Ubah" bawaan dengan except
           except: ['edit'],
           include: (row, ctx) => {
-            
+
             const { setModalForm, setDataSelected } = ctx || {};
 
             return (
               <>
-                <ButtonComponent
-                  icon={faEdit}
-                  label={'Ubah Kubus'}
-                  variant="outline"
-                  paint={'warning'}
-                  size={'xs'}
-                  rounded
-                  onClick={() => { setEditMode('cube'); setModalForm?.(true); setDataSelected?.(row); }}
-                />
                 <ButtonComponent
                   icon={faFilePen}
                   label={'Ubah Iklan'}
@@ -1200,15 +1571,19 @@ function KubusMain() {
           setRefresh(r => !r);
           resetCropState();
         }}
-        
-        onUpdateSuccess={() => {
-          setRefresh(r => !r);
-          resetCropState();
+
+        onUpdateSuccess={(response) => {
+          const data = response?.data || response;
+          if (!data || !data.id) return;
+          const values = Array.isArray(formValuesRef.current) ? [...formValuesRef.current] : [];
+          handleUpdateCubeAndAd(values, data);
         }}
-        
+
         onModalClose={() => {
           resetCropState();
           setEditMode('cube');
+          setOriginalData(null);
+          formValuesRef.current = [];
         }}
       />
 

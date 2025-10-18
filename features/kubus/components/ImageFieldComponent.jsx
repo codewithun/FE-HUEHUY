@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import React from 'react';
 import Image from 'next/image';
 
@@ -38,14 +39,36 @@ const ImageFieldComponent = ({
 	const hasFileObject = currentValue instanceof File;
 	const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(fieldKey);
 
+	// // Debug log untuk image field
+	// console.log(`=== DEBUG IMAGE FIELD: ${fieldName} ===`);
+	// console.log('isEditMode:', isEditMode);
+	// console.log('currentValue:', currentValue);
+	// console.log('hasFileObject:', hasFileObject);
+	// console.log('serverImageUrl:', serverImageUrl);
+	// console.log('serverSrc:', serverSrc);
+	// console.log('canUseBlob:', canUseBlob);
+	// console.log('previewUrl:', previewUrl);
+	// console.log('formId:', formId);
+	// console.log('selected:', selected);
+
 	let finalPreviewSrc = '';
 	if (hasFileObject && canUseBlob) {
 		finalPreviewSrc = previewUrl;
+		// console.log('Using blob preview URL');
 	} else if (hasFileObject) {
 		finalPreviewSrc = URL.createObjectURL(currentValue);
+		// console.log('Creating object URL from file');
 	} else if (serverSrc) {
 		finalPreviewSrc = serverSrc;
+		// console.log('Using server image URL');
+	} else if (currentValue && typeof currentValue === 'string' && currentValue.startsWith('http')) {
+		// Fallback: jika currentValue adalah URL string langsung
+		finalPreviewSrc = currentValue;
+		// console.log('Using direct URL from current value');
 	}
+
+	// console.log('finalPreviewSrc:', finalPreviewSrc);
+	// console.log(`=== END DEBUG ${fieldName} ===`);
 
 	// File input handler
 	const handleFileChange = (e) => {
@@ -87,35 +110,35 @@ const ImageFieldComponent = ({
 				)}
 			</div>
 
-			<div className="flex gap-2">
-				<input
-					type="file"
-					accept="image/*"
-					className="file-input file-input-bordered flex-1"
-					onChange={handleFileChange}
-					key={`${fieldName}-file-input-${fieldKey}-${imageVersion}`}
-				/>
-				{finalPreviewSrc && (
-					<div className="flex gap-2">
-						<button
-							type="button"
-							className="btn btn-outline btn-sm"
-							onClick={() => handleRecrop(fc)}
-							title="Crop ulang untuk menyesuaikan gambar"
-						>
-							Crop Ulang
-						</button>
-						<button
-							type="button"
-							className="btn btn-outline btn-error btn-sm"
-							onClick={() => onClearImage(fc, fieldKey)}
-							title="Hapus gambar"
-						>
-							Hapus
-						</button>
-					</div>
-				)}
-			</div>
+			<div className="flex flex-wrap items-start gap-2">
+	<input
+		type="file"
+		accept="image/*"
+		className="file-input file-input-bordered flex-1"
+		onChange={handleFileChange}
+		key={`${fieldName}-file-input-${fieldKey}-${imageVersion}`}
+	/>
+	{finalPreviewSrc && (
+		<div className="flex flex-wrap items-center gap-2">
+			<button
+				type="button"
+				className="btn btn-outline btn-sm"
+				onClick={() => handleRecrop(fc)}
+				title="Crop ulang untuk menyesuaikan gambar"
+			>
+				Crop Ulang
+			</button>
+			<button
+				type="button"
+				className="btn btn-outline btn-error btn-sm"
+				onClick={() => onClearImage(fc, fieldKey)}
+				title="Hapus gambar"
+			>
+				Hapus
+			</button>
+		</div>
+	)}
+</div>
 			<span className="text-xs text-gray-500 mt-1">
 				PNG/JPG/WEBP, maksimal 10MB. Dialog crop akan terbuka otomatis setelah memilih file.
 			</span>
