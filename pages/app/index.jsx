@@ -33,6 +33,9 @@ export default function Index() {
   const [map, setMap] = useState(null);
   const [apiReady, setApiReady] = useState(false);
 
+  const getAdImage = (ad) =>
+    ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
+
   // Delay API calls sedikit untuk memastikan token ready setelah redirect
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -41,11 +44,154 @@ export default function Index() {
       console.log('=== APP PAGE LOADED ===');
       // eslint-disable-next-line no-console
       console.log('Will start API calls in 200ms...');
-      
+
       setApiReady(true);
     }, 200);
     return () => clearTimeout(timer);
   }, []);
+
+  // ----- HELPERS: baca flag informasi dari BE apapun bentuknya -----
+  const normalizeBoolLike = (val) => {
+    if (val === true || val === 1) return true;
+    if (typeof val === 'number') return val === 1;
+    if (Array.isArray(val)) {
+      // checkbox style: [1] atau ['1'] = true, [] = false
+      return val.length > 0 && (val.includes(1) || val.includes('1') || val.includes(true));
+    }
+    if (typeof val === 'string') {
+      const s = val.trim().toLowerCase();
+      // string langsung
+      if (['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s)) return true;
+      if (['0', 'false', 'n', 'no', 'off', ''].includes(s)) return false;
+      // string JSON: "[1]" atau "true"
+      try {
+        const j = JSON.parse(val);
+        return normalizeBoolLike(j);
+      } catch { }
+    }
+    return !!val;
+  };
+
+  const getIsInformation = (ad) => {
+    // 1) bendera di cube/ad
+    const cubeInfo = normalizeBoolLike(ad?.cube?.is_information);
+    const adInfo = normalizeBoolLike(ad?.is_information);
+
+    // 2) content_type dari cube (kalau ada)
+    const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+    const contentTypeInfo = contentType === 'kubus-informasi';
+
+    // 3) tipe/kategori sebagai fallback terakhir
+    const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+    const looksInfoType = ['information', 'informasi'].includes(typeStr);
+
+    // 4) kategori (kalau BE nyebut Advertising, tetap bukan informasi)
+    return cubeInfo || adInfo || contentTypeInfo || looksInfoType;
+  };
+
+  const getCategoryLabel = (ad) => {
+    // 1) Utamakan flag Informasi
+    if (getIsInformation(ad)) return 'Informasi';
+
+    // 2) Mapping berdasarkan type dari BE
+    const typeStr = String(ad?.type || '').toLowerCase();
+    if (typeStr === 'iklan') return 'Advertising';
+    if (typeStr === 'voucher') return 'Voucher';
+
+    // 3) Fallback ke kategori dari BE
+    const rawCat = (ad?.ad_category?.name || '').trim();
+    if (!rawCat) return 'Promo';
+
+    // kalau kategori BE memang “Advertising”, tampilkan apa adanya
+    if (rawCat.toLowerCase() === 'advertising') return 'Advertising';
+
+    return rawCat; // pakai nama kategori asli
+  };
+
+  const AdCardBySize = ({ ad, size = 'M' }) => {
+    const img = getAdImage(ad);
+    const title = ad?.title || 'Promo';
+
+    // Gunakan helper yang sudah kamu buat di atas file
+    const isInformation = getIsInformation(ad);
+
+    const category = getCategoryLabel(ad);
+
+    const address = ad?.cube?.address;
+    if (size === 'XL-Ads') {
+      return (
+        <div className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+          style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', background: '#fffaf0' }}>
+          <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
+            <img src={img} alt={title} className="object-contain w-full h-full p-2" />
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4"
+            style={{ background: 'rgba(90,110,29,0.9)', borderTop: '1px solid #cdd0b3' }}>
+            <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">{title}</h3>
+            <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40">
+              {category}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    if (size === 'XL') {
+      return (
+        <div className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#fffaf0] shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+          style={{ minWidth: 320, maxWidth: 360 }}>
+          <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
+            <img src={img} alt={title} className="object-contain w-full h-full p-2" />
+          </div>
+          <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+            <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">{title}</h3>
+            {address && <p className="text-[13px] text-slate-700 line-clamp-2 mb-3">{address}</p>}
+            <div className="flex items-center justify-between">
+              <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (size === 'L') {
+      return (
+        <div className="flex items-center rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+          style={{ minWidth: 280, maxWidth: 320, height: 130 }}>
+          <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
+            <img src={img} alt={title} className="object-contain w-[90%] h-[90%] rounded-[10px]" />
+          </div>
+          <div className="flex-1 h-full p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
+            <div>
+              <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">{title}</h3>
+              {address && <p className="text-[13px] text-slate-700 line-clamp-2">{address}</p>}
+            </div>
+            <div className="mt-1 flex items-center justify-between">
+              <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // S / M
+    const isM = size === 'M';
+    return (
+      <div className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
+        style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160 }}>
+        <div className="relative w-full bg-white flex items-center justify-center overflow-hidden" style={{ height: isM ? 150 : 120 }}>
+          <img src={img} alt={title} className="object-contain w-[90%] h-[90%] rounded-[8px]" />
+        </div>
+        <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+          <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-slate-900 line-clamp-2 mb-0.5`}>{title}</h3>
+          {address && <p className={`${isM ? 'text-[12px]' : 'text-[11px]'} text-slate-700 line-clamp-1`}>{address}</p>}
+          <div className="mt-1 flex items-center justify-between">
+            <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">{category}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingBanner, codeBanner, dataBanner] = useGet({
@@ -275,7 +421,7 @@ export default function Index() {
                                 </div>
                               </div>
                             </div>
-                            
+
                             {/* Alternatif: Icon dengan border */}
                             {/* <div className="w-8 h-8 border-2 border-white border-dashed rounded-lg flex items-center justify-center">
                               <FontAwesomeIcon
@@ -283,7 +429,7 @@ export default function Index() {
                                 className="text-lg text-white"
                               />
                             </div> */}
-                            
+
                             <div className="absolute bottom-0 left-0 w-full text-center bg-white bg-opacity-40 backdrop-blur-md py-2 text-xs font-medium">
                               Lainnya
                             </div>
@@ -316,11 +462,11 @@ export default function Index() {
                       <div className="flex flex-col gap-3 mt-4">
                         {dataNear?.data?.map((item, key) => {
                           return (
-                            <Link href={`/app/${item?.cube?.code}`} key={key}>
+                            <Link href={`/app/detail/${item?.cube?.code}`} key={key}>
                               <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
                                 <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                                   <img
-                                    src={item?.picture_source}
+                                    src={getAdImage(item)}
                                     height={700}
                                     width={700}
                                     alt=""
@@ -378,11 +524,11 @@ export default function Index() {
                         <div className="flex flex-nowrap gap-4 w-max">
                           {dataRecommendation?.data?.map((item, key) => {
                             return (
-                              <Link href={`/app/${item?.cube?.code}`} key={key}>
+                              <Link href={`/app/detail/${item?.cube?.code}`} key={key}>
                                 <div className="relative snap-center w-[330px] shadow-sm bg-white bg-opacity-40 backdrop-blur-sm rounded-[14px] overflow-hidden p-3">
                                   <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90">
                                     <img
-                                      src={item?.picture_source}
+                                      src={getAdImage(item)}
                                       height={1200}
                                       width={600}
                                       alt=""
@@ -404,12 +550,12 @@ export default function Index() {
 
                                       {(item?.total_remaining ||
                                         item?.max_grab) && (
-                                        <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                          Sisa{' '}
-                                          {item?.total_remaining ||
-                                            item?.max_grab}
-                                        </p>
-                                      )}
+                                          <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                            Sisa{' '}
+                                            {item?.total_remaining ||
+                                              item?.max_grab}
+                                          </p>
+                                        )}
                                     </div>
                                   </div>
                                 </div>
@@ -473,16 +619,16 @@ export default function Index() {
                             </div>
 
                             <div className="flex flex-col gap-4 mt-4">
-                              {category?.ads?.map((ad, ad_key) => {
+                              {category?.ads?.filter(ad => ad?.cube?.code).map((ad, ad_key) => {
                                 return (
                                   <Link
-                                    href={`/app/${ad?.cube?.code}`}
+                                    href={`/app/detail/${ad?.cube?.code}`}
                                     key={ad_key}
                                   >
                                     <div className="relative">
                                       <div className="aspect-[4/3] bg-slate-400 rounded-[20px] overflow-hidden brightness-90">
                                         <img
-                                          src={ad?.picture_source}
+                                          src={getAdImage(ad)}
                                           height={1200}
                                           width={600}
                                           alt=""
@@ -500,12 +646,12 @@ export default function Index() {
                                               </p>
                                               {(ad?.total_remaining ||
                                                 ad?.max_grab) && (
-                                                <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                                  Sisa{' '}
-                                                  {ad?.total_remaining ||
-                                                    ad?.max_grab}
-                                                </p>
-                                              )}
+                                                  <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                                    Sisa{' '}
+                                                    {ad?.total_remaining ||
+                                                      ad?.max_grab}
+                                                  </p>
+                                                )}
                                             </div>
                                           </div>
                                         </div>
@@ -519,6 +665,74 @@ export default function Index() {
                         );
                       })}
                     </>
+                  );
+                } else if (menu.content_type === 'promo' && menu.is_active) {
+                  // Widget Promo/Iklan (home): dukung sumber 'cube' & 'shuffle_cube' (ambil ads dari cube)
+                  const adsFromCubes = (menu?.dynamic_content_cubes || [])
+                    .flatMap((dcc) => {
+                      const infoFlag = dcc?.cube?.is_information;
+                      const ctFlag = dcc?.cube?.content_type;
+                      const cubeCode = dcc?.cube?.code;
+                      return (dcc?.cube?.ads || []).map((ad) => ({
+                        ...ad,
+                        // wariskan flag dari cube jika ad belum punya
+                        is_information: ad?.is_information ?? infoFlag,
+                        cube: {
+                          ...(ad?.cube || {}),
+                          code: ad?.cube?.code || cubeCode, // pastikan code tersedia
+                          is_information: ad?.cube?.is_information ?? infoFlag,
+                          content_type: ad?.cube?.content_type ?? ctFlag,
+                        },
+                      }));
+                    })
+                    .filter(Boolean);
+
+                  // Fallback: jika source_type 'ad_category', ambil dari dataCategories
+                  const adsFromAdCategory =
+                    menu?.source_type === 'ad_category'
+                      ? ((dataCategories?.data || []).find((c) => c?.id === menu?.ad_category_id)?.ads || [])
+                      : [];
+
+                  // Pakai hasil dari cubes dulu; kalau kosong pakai dari kategori
+                  const ads = adsFromCubes.length ? adsFromCubes : adsFromAdCategory;
+                  if (!ads?.length) return null;
+
+                  return (
+                    <div className="px-4 mt-8" key={key}>
+                      <div className="flex justify-between items-center gap-2">
+                        <div>
+                          <p className="font-semibold">{menu?.name || 'Promo Spesial'}</p>
+                          {menu?.description && (
+                            <p className="text-xs text-slate-500">{menu.description}</p>
+                          )}
+                        </div>
+                        <Link href={`/app/cari?berdasarkan=Promo`}>
+                          <div className="text-sm text-primary font-semibold">
+                            Lainnya
+                            <FontAwesomeIcon icon={faChevronRight} className="ml-2" />
+                          </div>
+                        </Link>
+                      </div>
+
+                      <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-3">
+                        <div className="flex flex-nowrap gap-4 w-max">
+                          {ads.map((ad, i) => {
+                            // Pastikan ada cube code, jika tidak skip item ini
+                            const cubeCode = ad?.cube?.code;
+                            if (!cubeCode) {
+                              // eslint-disable-next-line no-console
+                              console.warn('Ad without cube code:', ad);
+                              return null;
+                            }
+                            return (
+                              <Link href={`/app/detail/${cubeCode}`} key={i}>
+                                <AdCardBySize ad={ad} size={menu?.size || 'M'} />
+                              </Link>
+                            );
+                          }).filter(Boolean)}
+                        </div>
+                      </div>
+                    </div>
                   );
                 } else if (
                   (menu.content_type == 'vertical' ||

@@ -101,12 +101,11 @@ export function SelectComponent({
         const mapped = serverOptionControl?.mapOptions
           ? serverOptionControl.mapOptions(payload)
           : Array.isArray(payload)
-            ? payload.map((item: any) => ({
-                label: item?.label ?? item?.name ?? String(item?.id ?? ''),
-                value:
-                  item?.value ?? item?.id ?? item?.code ?? item?.key ?? item,
-              }))
-            : [];
+          ? payload.map((item: any) => ({
+              label: item?.label ?? item?.name ?? String(item?.id ?? ''),
+              value: item?.value ?? item?.id ?? item?.code ?? item?.key ?? item,
+            }))
+          : [];
         setDataOptions(mapped);
         setShowOption(true);
         standIn.set({
@@ -244,19 +243,17 @@ export function SelectComponent({
 
       if (searchable && !searchServer) {
         if (e.target.value) {
-          newFilteredOptions = dataOptions
-            .filter(
-              (Option) =>
-                Option.label
-                  ?.toLowerCase()
-                  .indexOf(e.target.value.toLowerCase()) > -1
-            )
-            .slice(0, 10);
+          newFilteredOptions = dataOptions.filter(
+            (Option) =>
+              Option.label
+                ?.toLowerCase()
+                .indexOf(e.target.value.toLowerCase()) > -1
+          );
         } else {
-          newFilteredOptions = dataOptions.slice(0, 10);
+          newFilteredOptions = dataOptions; // tampilkan semua
         }
       } else {
-        newFilteredOptions = dataOptions;
+        newFilteredOptions = dataOptions; // tampilkan semua
       }
 
       setActiveOption(-1);

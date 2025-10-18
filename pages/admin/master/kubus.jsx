@@ -2181,7 +2181,7 @@ function Kubus() {
 
             return {
               cube_type_id: data?.cube_type_id,
-              is_recommendation: data?.is_recommendation ? 1 : 0,
+              is_recommendation: data?.is_recommendation ? [1] : [],
               is_information: data?.is_information ? 1 : 0,
               link_information: data?.link_information || '',
               // Simpan data map original untuk ditampilkan saat toggle aktif
@@ -2636,6 +2636,151 @@ function Kubus() {
                         Anda dapat memilih beberapa pengguna sekaligus
                       </span>
                     </label>
+                  </div>
+                );
+              },
+            },
+
+            // Additional Images for Update Mode (image_1, image_2, image_3)
+            {
+              type: 'custom',
+              custom: ({ formControl, values }) => {
+                const isInfo = !!values.find(i => i.name === 'is_information')?.value?.at?.(0);
+                if (isInfo) return null; // Hide for information cubes
+
+                // Helper untuk membuat field gambar dengan crop di form ads (update mode)
+                const createAdsImageFieldUpdate = (fieldName, label) => {
+                  const fc = formControl(fieldName);
+                  const formId = values?.find?.((v) => v.name === 'id')?.value;
+                  const adsImageKey = `ads-${fieldName}-${formSessionId}-${formId || 'new'}-update`;
+                  const isEditMode = Boolean(selected?.ads?.at(0)?.id);
+
+                  // Server image untuk update mode
+                  const serverImageUrl = isEditMode ? getServerImageUrl(fieldName, values, selected) : null;
+
+                  const valMap = (name) => values?.find?.((v) => v.name === name)?.value;
+                  const imageVersion =
+                    valMap(`${fieldName}_updated_at`) ||
+                    valMap('updated_at') ||
+                    selected?.ads?.[0]?.updated_at ||
+                    formId ||
+                    Date.now();
+
+                  const serverSrc = serverImageUrl ? withVersion(serverImageUrl, imageVersion) : '';
+
+                  // Prioritas File object dan blob preview
+                  const currentValue = fc.value;
+                  const hasFileObject = currentValue instanceof File;
+                  const canUseBlob = Boolean(previewUrl) && String(previewOwnerKey) === String(adsImageKey);
+
+                  let finalPreviewSrc = '';
+                  if (hasFileObject && canUseBlob) {
+                    finalPreviewSrc = previewUrl;
+                  } else if (hasFileObject) {
+                    // Fallback: buat blob baru untuk File object
+                    finalPreviewSrc = URL.createObjectURL(currentValue);
+                  } else if (serverSrc) {
+                    finalPreviewSrc = serverSrc;
+                  }
+
+                  // File input handler
+                  const handleFileChange = (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    // Set ke form dan trigger crop
+                    fc.onChange(file);
+                    setPreviewOwnerKey(adsImageKey);
+                    handleFileInput(e, fc, adsImageKey);
+                  };
+
+                  const fileInfo = hasFileObject ? `File: ${currentValue.name} (${(currentValue.size / 1024).toFixed(1)}KB)` : '';
+
+                  return (
+                    <div className="form-control" key={`${fieldName}-ads-field-${adsImageKey}`}>
+                      <label className="label">
+                        <span className="label-text font-medium">{label}</span>
+                        {hasFileObject && (
+                          <span className="label-text-alt text-green-600 text-xs">📁 {fileInfo}</span>
+                        )}
+                      </label>
+
+                      <div className="mb-4">
+                        {finalPreviewSrc ? (
+                          <div className="w-full h-32 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                            <Image
+                              src={finalPreviewSrc}
+                              alt="Preview"
+                              width={128}
+                              height={128}
+                              className="max-w-full max-h-full object-contain"
+                              unoptimized
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-full h-32 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                            <div className="text-center">
+                              <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <p className="text-gray-500 text-xs">Belum ada gambar</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="file-input file-input-bordered file-input-sm"
+                          onChange={handleFileChange}
+                          key={`${fieldName}-ads-file-input-${adsImageKey}-${imageVersion}`}
+                        />
+                        {finalPreviewSrc && (
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-xs"
+                              onClick={() => handleRecrop(fc)}
+                              title="Crop ulang"
+                            >
+                              Crop
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-error btn-xs"
+                              onClick={() => {
+                                // Clear preview dan form value
+                                if (previewUrl?.startsWith('blob:')) {
+                                  URL.revokeObjectURL(previewUrl);
+                                }
+                                setPreviewUrl('');
+                                setPreviewOwnerKey('');
+                                fc.onChange('');
+                              }}
+                              title="Hapus gambar"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500 mt-1">
+                        PNG/JPG/WEBP, maks 10MB
+                      </span>
+                    </div>
+                  );
+                };
+
+                return (
+                  <div className="mt-6 space-y-4">
+                    <div className="font-semibold text-base text-slate-700">Gambar</div>
+                    <div className="grid grid-cols-3 gap-4 px-6">
+                      {createAdsImageFieldUpdate('ads[image_1]', 'Gambar 1')}
+                      {createAdsImageFieldUpdate('ads[image_2]', 'Gambar 2')}
+                      {createAdsImageFieldUpdate('ads[image_3]', 'Gambar 3')}
+                    </div>
                   </div>
                 );
               },
