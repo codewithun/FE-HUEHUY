@@ -33,7 +33,7 @@ import { useUserContext } from '../../../../context/user.context';
 // Import components dan hooks
 import { useManagersData, useUsersData } from '../../../../features/kubus/hooks/useDataFetching';
 import { useCropFunctionality } from '../../../../features/kubus/hooks/useCropFunctionality';
-import ContentTypeSelector from '../../../../features/kubus/components/ContentTypeSelector';
+import CreateOnlyFields from '../../../../features/kubus/components/CreateOnlyFields';
 import ManagerTenantSelector from '../../../../features/kubus/components/ManagerTenantSelector';
 import ImageFieldComponent from '../../../../features/kubus/components/ImageFieldComponent';
 import InformationForm from '../../../../features/kubus/forms/InformationForm';
@@ -62,6 +62,16 @@ function KubusMain() {
   // Custom hooks
   const { merchantManagers, managersLoading, managersError } = useManagersData();
   // const { onlyUsers } = useUsersData(); // used in voucher user selection in future step
+
+  const [pendingEditRow, setPendingEditRow] = useState(null);
+
+  // Simpan context dari TableSupervisionComponent (setModalForm, setDataSelected)
+  const [tableCtx, setTableCtx] = useState(null);
+
+  const [formSessionKey, setFormSessionKey] = useState(Date.now());
+  // Tambah flag khusus untuk status form edit/create
+  const [isFormEdit, setIsFormEdit] = useState(false);
+
   const { onlyUsers } = useUsersData();
   const {
     cropOpen,
@@ -85,6 +95,17 @@ function KubusMain() {
       resetCropState();
     }
   }, [previewUrl, previewOwnerKey, resetCropState]);
+
+  // Handle pending edit row
+
+  useEffect(() => {
+    if (editMode === 'ad' && pendingEditRow && tableCtx) {
+      tableCtx.setModalForm?.(true);
+      tableCtx.setDataSelected?.(pendingEditRow);
+      setPendingEditRow(null);
+    }
+  }, [editMode, pendingEditRow, tableCtx]);
+
 
   // Admin guard: ensure only role_id 1 can access
   useEffect(() => {
@@ -288,7 +309,7 @@ function KubusMain() {
     // Collect custom_days dari form values
     const customDays = {};
     const regularFields = [];
-    
+
     for (const { name, value } of formValues) {
       if (name && name.match(/^ads\[custom_days\]\[(\w+)\]$/)) {
         const dayName = name.match(/^ads\[custom_days\]\[(\w+)\]$/)[1];
@@ -303,11 +324,11 @@ function KubusMain() {
       if (!name || name.startsWith('_original_') || name === 'change_map' || name === 'content_type') continue;
 
       const convertedValue = convertValue(value);
-      
+
       if (name.startsWith('ads[')) {
         const key = name.replace(/^ads\[|\]$/g, '');
         let originalValue = originalData?.ads?.[0]?.[key];
-        
+
         // Special handling for custom_days
         if (key === 'custom_days') {
           if (!isEqual(customDays, originalValue)) {
@@ -317,7 +338,7 @@ function KubusMain() {
           }
           continue;
         }
-        
+
         if (!isEqual(convertedValue, originalValue)) {
           deltaAds[key] = convertedValue;
           hasChanges = true;
@@ -326,7 +347,7 @@ function KubusMain() {
       } else {
         // Handle special cases for cube fields
         let originalValue;
-        
+
         if (name === 'is_recommendation') {
           originalValue = originalData?.is_recommendation ? [1] : [];
         } else if (name === 'is_information') {
@@ -389,14 +410,14 @@ function KubusMain() {
         const formValue = formValues.find(v => v.name === field)?.value;
         const convertedValue = convertValue(formValue);
         const originalValue = originalData?.[field];
-        
+
         if (!isEqual(convertedValue, originalValue)) {
           deltaCube[field] = convertedValue;
           hasChanges = true;
           console.log(`LOCATION CHANGE - ${field}: ${originalValue} → ${convertedValue}`);
         }
       });
-      
+
       // Tambahkan flag update_location
       deltaCube.update_location = 1;
       hasChanges = true;
@@ -416,7 +437,7 @@ function KubusMain() {
     console.log('Received values:', values);
     console.log('Received data:', data);
     console.log('Original data for comparison:', originalData);
-    
+
     const cubeId = data?.id;
     const adId = data?.ads?.[0]?.id;
 
@@ -428,7 +449,7 @@ function KubusMain() {
 
     // Gunakan originalData untuk comparison, data untuk ID saja
     const comparisonData = originalData || data;
-    
+
     // Deteksi perubahan dengan delta
     const { deltaCube, deltaAds, hasChanges } = createDeltaPayload(values, comparisonData);
 
@@ -519,7 +540,7 @@ function KubusMain() {
       resetCropState();
     } catch (err) {
       console.error('Gagal update cube/ads:', err);
-      
+
       // Handle 401 seperti di file lain
       if (err.message?.includes('401') || err.response?.status === 401) {
         Cookies.remove(token_cookie_name);
@@ -529,7 +550,7 @@ function KubusMain() {
         }
         return;
       }
-      
+
       if (typeof window !== 'undefined') window.alert('Gagal memperbarui data. Cek console untuk detail.');
     }
   };
@@ -539,6 +560,7 @@ function KubusMain() {
       <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Kubus</h1>
 
       <TableSupervisionComponent
+        key={formSessionKey}
         setToRefresh={refresh}
         title="Kubus"
         fetchControl={{
@@ -660,73 +682,28 @@ function KubusMain() {
             'is_recommendation': []
           },
           onModalOpen: (isEdit) => {
+            setIsFormEdit(!!isEdit);
             if (!isEdit) {
               setSelected(null);
+              setEditMode('cube');
+              setOriginalData(null);
+              formValuesRef.current = [];
+              resetCropState();
+              setFormSessionKey(Date.now());
             }
           },
           custom: [
-            // Global Form Values Tracker (aktif untuk create dan edit iklan)
-            {
-              type: 'custom',
-              custom: ({ values }) => {
-                if (values && Array.isArray(values) && values.length > 0) {
-                  // Simpan snapshot ke ref tanpa memicu rerender
-                  formValuesRef.current = values;
-                }
-                return null;
-              },
-            },
-            // Content Type Selection (hidden on edit)
+            // Create-only fields wrapped into one component
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
-                if (selected) return null;
-                return <ContentTypeSelector values={values} setValues={setValues} />;
-              },
-            },
-
-            // Information Checkbox (hidden on edit)
-            {
-              type: 'custom',
-              custom: ({ formControl }) => {
-                if (selected) return null;
+                // Sembunyikan saat EDIT dengan dua penjaga:
+                // - isFormEdit: flag dari onModalOpen
+                // - selected: akan terisi oleh mapUpdateDefault saat update (lebih andal)
+                if (isFormEdit || selected) return null;
                 return (
-                  <CheckboxComponent
-                    name="is_information"
-                    options={[{ label: 'Kubus Informasi', value: 1 }]}
-                    {...formControl('is_information')}
-                  />
+                  <CreateOnlyFields values={values} setValues={setValues} formSessionKey={formSessionKey} />
                 );
-              },
-            },
-
-            // Information Type Sync (hidden on edit)
-            {
-              type: 'custom',
-              custom: ({ values, setValues }) => {
-                if (selected) return null;
-                const isInformation = !!values.find(i => i.name === 'is_information')?.value?.at?.(0);
-                const ct = values.find(i => i.name === 'content_type')?.value || 'promo';
-
-                if (isInformation && ct !== 'kubus-informasi') {
-                  const contentTypeIndex = values.findIndex(i => i.name === 'content_type');
-                  if (contentTypeIndex >= 0) {
-                    const newValues = [...values];
-                    newValues[contentTypeIndex] = { ...newValues[contentTypeIndex], value: 'kubus-informasi' };
-                    setValues(newValues);
-                  }
-                }
-
-                if (!isInformation && ct === 'kubus-informasi') {
-                  const contentTypeIndex = values.findIndex(i => i.name === 'content_type');
-                  if (contentTypeIndex >= 0) {
-                    const newValues = [...values];
-                    newValues[contentTypeIndex] = { ...newValues[contentTypeIndex], value: 'promo' };
-                    setValues(newValues);
-                  }
-                }
-
-                return null;
               },
             },
 
@@ -1426,7 +1403,7 @@ function KubusMain() {
                 return null;
               },
             },
-            
+
             // Manager Tenant (editable on update)
             {
               type: 'custom',
@@ -1540,7 +1517,7 @@ function KubusMain() {
           except: ['edit'],
           include: (row, ctx) => {
 
-            const { setModalForm, setDataSelected } = ctx || {};
+            // ctx is forwarded and used later via setTableCtx + useEffect
 
             return (
               <>
@@ -1551,7 +1528,11 @@ function KubusMain() {
                   paint={'warning'}
                   size={'xs'}
                   rounded
-                  onClick={() => { setEditMode('ad'); setModalForm?.(true); setDataSelected?.(row); }}
+                  onClick={() => {
+                    setEditMode('ad');
+                    setTableCtx(ctx); // simpan ctx agar useEffect bisa memicu modal
+                    setPendingEditRow(row);
+                  }}
                 />
                 <ButtonComponent
                   label={row?.status === 'active' ? 'Non-Aktifkan' : 'Aktifkan'}
@@ -1580,10 +1561,12 @@ function KubusMain() {
         }}
 
         onModalClose={() => {
+          setSelected(null);
           resetCropState();
           setEditMode('cube');
           setOriginalData(null);
           formValuesRef.current = [];
+          setIsFormEdit(false);
         }}
       />
 
