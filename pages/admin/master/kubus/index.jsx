@@ -465,12 +465,17 @@ function KubusMain() {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
       const baseUrl = apiBase.replace(/\/+$/, '');
 
-      // Update cube hanya jika ada perubahan cube
-      if (Object.keys(deltaCube).length > 0) {
-        console.log('Sending cube request with delta payload:', deltaCube);
+      // Siapkan payload cube: selalu sertakan status (required oleh backend)
+      const statusFromForm = values.find?.(v => v.name === 'status')?.value;
+      const ensuredStatus = statusFromForm ?? comparisonData?.status ?? 'active';
+      const cubePayload = { ...deltaCube, status: ensuredStatus };
+
+      // Update cube jika ada perubahan atau memang ada field wajib yang harus ikut (status)
+      if (Object.keys(deltaCube).length > 0 || ensuredStatus !== undefined) {
+        console.log('Sending cube request with delta payload:', cubePayload);
         const cubeResponse = await fetch(`${baseUrl}/admin/cubes/${cubeId}`, {
           ...config,
-          body: JSON.stringify(deltaCube),
+          body: JSON.stringify(cubePayload),
           headers: {
             ...config.headers,
             'Content-Type': 'application/json',
