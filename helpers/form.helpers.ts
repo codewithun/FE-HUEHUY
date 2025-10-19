@@ -58,164 +58,237 @@ export const useForm = (
     setLoading(true);
 
     const formData = new FormData();
-    
-    // Group ads fields for backend processing
+
+    // --- endpoint override opsional dari form values
+    const endpointOverrideField =
+      formValues.find(v => v.name === '__endpoint_override')?.value ||
+      formValues.find(v => v.name === '__endpoint')?.value;
+
+    // Path efektif untuk request
+    let effectivePath = submitControl?.path || '';
+    if (endpointOverrideField) {
+      effectivePath = String(endpointOverrideField).replace(/^\/+/, '');
+    }
+
+    // URL full (untuk regex deteksi)
+    const requestUrlFull = submitControl?.url
+      ? `${submitControl.url.replace(/\/+$/, '')}/${effectivePath.replace(/^\/+/, '')}`
+      : effectivePath;
+
+    // Deteksi mode update ads/cube BERDASARKAN effectivePath
+    const isAdUpdate =
+      /(^|\/)admin\/ads\/\d+($|\/)/.test(effectivePath) ||
+      /(^|\/)admin\/ads\/\d+($|\/)/.test(requestUrlFull);
+
+    const isCubeUpdate =
+      /(^|\/)admin\/cubes\/\d+($|\/)/.test(effectivePath) ||
+      /(^|\/)admin\/cubes\/\d+($|\/)/.test(requestUrlFull);
+
+    const isAnyUpdate = isAdUpdate || isCubeUpdate;
+    if (isAnyUpdate) formData.set('_method', 'PUT');
+
+    // field khusus cube—SKIP saat update ads
+    const cubeOnly = new Set([
+      'cube_type_id', 'is_recommendation', 'is_information', 'link_information',
+      '_original_map_lat', '_original_map_lng', '_original_address',
+      'map_lat', 'map_lng', 'address',
+      'cube_tags[0][map_lat]', 'cube_tags[0][map_lng]', 'cube_tags[0][address]',
+      'content_type', 'status', 'owner_user_id', 'world_id', 'corporate_id', 'image'
+    ]);
+
+    // helper: convert HH:mm:ss → HH:mm
+    const normalizeTime = (s?: string) =>
+      (typeof s === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(s)) ? s.substring(0, 5) : s;
+
+    // untuk hindari duplikasi key append
+    const appended = new Set<string>();
+
+    // Kumpulkan ads object JSON hanya untuk create/edit cube (BUKAN update ads)
     const adsFields: Record<string, any> = {};
-    
-    formValues.map((val) => {
-      const v = val.value;
-      let fieldName = val.name;
-      
-      // Handle ads fields specially  
-      if (fieldName.startsWith('ads[') && fieldName.endsWith(']')) {
-        const innerField = fieldName.slice(4, -1); // Extract field name from ads[field]
-        
-        // Handle nested custom_days fields specially
-        if (innerField.includes('][')) {
-          // This is a nested field like custom_days][saturday
-          const parts = innerField.split('][');
-          const mainField = parts[0]; // custom_days
-          const subField = parts[1]; // saturday
-          
-          if (!adsFields[mainField]) {
-            adsFields[mainField] = {};
-          }
-          adsFields[mainField][subField] = v;
-          
-          // Send as nested dot notation
-          const nestedDotName = `ads.${mainField}.${subField}`;
-          formData.append(nestedDotName, v != undefined ? String(v) : '');
-          
-          // Debug log
-          // eslint-disable-next-line no-console
-          console.log(`[DEBUG] Processing nested ads field: ${fieldName} -> ${nestedDotName}`, { value: v });
-          
-          return; // Skip further processing for nested fields
-        }
-        
-        // Regular ads field processing
-        // Don't include File objects in JSON - handle them separately
-        if (!(v instanceof File)) {
-          // Handle time format conversion for JSON object too
-          let jsonValue = v;
-          if (innerField === 'validation_time_limit' || innerField === 'jam_mulai' || innerField === 'jam_berakhir') {
-            if (typeof jsonValue === 'string' && jsonValue.match(/^\d{2}:\d{2}:\d{2}$/)) {
-              jsonValue = jsonValue.substring(0, 5); // Remove seconds for JSON too
+
+    // === Build FormData ===
+    for (const val of formValues) {
+      const name = val.name;
+      let v = val.value;
+
+      if (isAdUpdate) {
+        // ---------------------------
+        // MODE UPDATE ADS
+        // ---------------------------
+
+        // a) skip semua field khusus cube saat update ads
+        if (cubeOnly.has(name)) continue;
+
+        // b) flatten ads[...] → root, dan JANGAN kirim 'ads.xxx' (dot)
+        const m = name.match(/^ads\[(.+)\]$/);
+
+        if (m) {
+          const inner = m[1]; // e.g. 'title', 'custom_days][saturday', dst.
+
+          // nested: ads[custom_days][saturday] -> custom_days[saturday]
+          if (inner.includes('][')) {
+            const [main, sub] = inner.split('][');     // 'custom_days', 'saturday'
+            const flat = `${main}[${sub}]`;            // 'custom_days[saturday]'
+
+            if (v instanceof File) {
+              if (!appended.has(flat)) { formData.append(flat, v); appended.add(flat); }
+            } else {
+              if (typeof v === 'boolean') v = v ? '1' : '0';
+              if (!appended.has(flat)) { formData.append(flat, v ?? ''); appended.add(flat); }
             }
+            continue;
           }
-          adsFields[innerField] = jsonValue;
+
+          // waktu: normalisasi HH:mm:ss ke HH:mm di root
+          if (['validation_time_limit', 'jam_mulai', 'jam_berakhir'].includes(inner)) {
+            v = normalizeTime(v);
+          }
+
+          // regular ads field → root: 'title', 'image_1', ...
+          const flatKey = inner;
+
+          if (v instanceof File) {
+            if (!appended.has(flatKey)) { formData.append(flatKey, v); appended.add(flatKey); }
+          } else if (Array.isArray(v)) {
+            for (const item of v) formData.append(`${flatKey}[]`, String(item));
+          } else if (v !== undefined && v !== null && typeof v === 'object') {
+            if (!appended.has(flatKey)) { formData.append(flatKey, JSON.stringify(v)); appended.add(flatKey); }
+          } else {
+            if (!appended.has(flatKey)) { formData.append(flatKey, v != null ? String(v) : ''); appended.add(flatKey); }
+          }
+          continue;
         }
-        
-        // Send in multiple formats for maximum backend compatibility
-        const dotNotationName = `ads.${innerField}`;
-        
-        // Debug log for field conversion
-        // eslint-disable-next-line no-console
-        console.log(`[DEBUG] Processing ads field: ${fieldName} -> ${dotNotationName}`, { value: v, type: typeof v });
-        
-        // Send as dot notation (ads.field)
-        if (v instanceof File) {
-          formData.append(dotNotationName, v);
+
+        // c) untuk field non-ads[...], kirim seperti biasa (kecuali ads.dot sisa log)
+        if (name.startsWith('ads.')) continue;
+
+        if (Array.isArray(v) && (name === 'is_information' || name === 'is_recommendation')) {
+          if (!appended.has(name)) { formData.append(name, v.length > 0 ? '1' : '0'); appended.add(name); }
+        } else if (v instanceof File) {
+          if (!appended.has(name)) { formData.append(name, v); appended.add(name); }
         } else if (Array.isArray(v)) {
-          v.forEach((item) => formData.append(`${dotNotationName}[]`, String(item)));
+          v.forEach((item: any) => formData.append(`${name}[]`, String(item)));
         } else if (v !== undefined && v !== null && typeof v === 'object') {
-          formData.append(dotNotationName, JSON.stringify(v));
+          if (!appended.has(name)) { formData.append(name, JSON.stringify(v)); appended.add(name); }
         } else {
-          // Handle time format conversion for specific fields
-          let processedValue = v != undefined ? String(v) : '';
-          if (innerField === 'validation_time_limit' || innerField === 'jam_mulai' || innerField === 'jam_berakhir') {
-            // Convert HH:mm:ss to HH:mm format for backend validation
-            if (processedValue && processedValue.match(/^\d{2}:\d{2}:\d{2}$/)) {
-              processedValue = processedValue.substring(0, 5); // Remove seconds
-              // eslint-disable-next-line no-console
-              console.log(`[DEBUG] Time format conversion for ${innerField}: ${v} -> ${processedValue}`);
-            }
-          }
-          formData.append(dotNotationName, processedValue);
+          if (!appended.has(name)) { formData.append(name, v != null ? String(v) : ''); appended.add(name); }
         }
-        
-        // Also send as root level field (fallback for backend's $request->input($field))
-        const rootFieldName = innerField;
-        if (v instanceof File) {
-          formData.append(rootFieldName, v);
-        } else if (Array.isArray(v)) {
-          v.forEach((item) => formData.append(`${rootFieldName}[]`, String(item)));
-        } else if (v !== undefined && v !== null && typeof v === 'object') {
-          formData.append(rootFieldName, JSON.stringify(v));
-        } else {
-          // Handle time format conversion for specific fields
-          let processedValue = v != undefined ? String(v) : '';
-          if (innerField === 'validation_time_limit' || innerField === 'jam_mulai' || innerField === 'jam_berakhir') {
-            // Convert HH:mm:ss to HH:mm format for backend validation
-            if (processedValue && processedValue.match(/^\d{2}:\d{2}:\d{2}$/)) {
-              processedValue = processedValue.substring(0, 5); // Remove seconds
-            }
-          }
-          formData.append(rootFieldName, processedValue);
-        }
-        
-        return; // Skip regular processing for ads fields
-      }
-      
-      // Regular field processing
-      // Special handling for boolean checkbox fields
-      if (Array.isArray(v) && (val.name === 'is_information' || val.name === 'is_recommendation')) {
-        // For boolean checkboxes, send 1 if checked, 0 if not checked
-        formData.append(fieldName, v.length > 0 ? '1' : '0');
-      } else if (v instanceof File) {
-        formData.append(fieldName, v);
-      } else if (Array.isArray(v)) {
-        // Append arrays with [] notation for backend (e.g., dynamic_content_cubes[])
-        v.forEach((item) => formData.append(`${fieldName}[]`, String(item)));
-      } else if (v !== undefined && v !== null && typeof v === 'object') {
-        // Serialize objects safely
-        formData.append(fieldName, JSON.stringify(v));
+
       } else {
-        formData.append(fieldName, v != undefined ? String(v) : '');
+        // ---------------------------
+        // MODE CREATE / EDIT CUBE
+        // ---------------------------
+
+        // Tangkap pola ads[...] utk bangun JSON ads + kirim multi format (seperti sebelumnya)
+        const m = name.match(/^ads\[(.+)\]$/);
+        if (m) {
+          const inner = m[1];
+
+          // Simpan ke adsFields (kecuali File)
+          if (!(v instanceof File)) {
+            // Normalisasi time di JSON juga
+            let jsonValue = v;
+            if (['validation_time_limit', 'jam_mulai', 'jam_berakhir'].includes(inner)) {
+              jsonValue = normalizeTime(jsonValue);
+            }
+
+            // nested ads[custom_days][saturday]
+            if (inner.includes('][')) {
+              const [main, sub] = inner.split('][');
+              adsFields[main] = adsFields[main] || {};
+              adsFields[main][sub] = jsonValue;
+            } else {
+              adsFields[inner] = jsonValue;
+            }
+          }
+
+          // 1) Kirim dalam bentuk dot notation (ads.inner)
+          const dot = `ads.${inner}`;
+          if (v instanceof File) {
+            if (!appended.has(dot)) { formData.append(dot, v); appended.add(dot); }
+          } else if (Array.isArray(v)) {
+            v.forEach((item: any) => formData.append(`${dot}[]`, String(item)));
+          } else if (v !== undefined && v !== null && typeof v === 'object') {
+            if (!appended.has(dot)) { formData.append(dot, JSON.stringify(v)); appended.add(dot); }
+          } else {
+            let processed = v != null ? String(v) : '';
+            if (['validation_time_limit', 'jam_mulai', 'jam_berakhir'].includes(inner)) {
+              processed = normalizeTime(processed) || processed;
+            }
+            if (!appended.has(dot)) { formData.append(dot, processed); appended.add(dot); }
+          }
+
+          // 2) Kirim versi root (inner)
+          const root = inner;
+          if (v instanceof File) {
+            if (!appended.has(root)) { formData.append(root, v); appended.add(root); }
+          } else if (Array.isArray(v)) {
+            v.forEach((item: any) => formData.append(`${root}[]`, String(item)));
+          } else if (v !== undefined && v !== null && typeof v === 'object') {
+            if (!appended.has(root)) { formData.append(root, JSON.stringify(v)); appended.add(root); }
+          } else {
+            let processed = v != null ? String(v) : '';
+            if (['validation_time_limit', 'jam_mulai', 'jam_berakhir'].includes(inner)) {
+              processed = normalizeTime(processed) || processed;
+            }
+            if (!appended.has(root)) { formData.append(root, processed); appended.add(root); }
+          }
+
+          continue;
+        }
+
+        // Handler umum non-ads
+        if (Array.isArray(v) && (name === 'is_information' || name === 'is_recommendation')) {
+          if (!appended.has(name)) { formData.append(name, v.length > 0 ? '1' : '0'); appended.add(name); }
+        } else if (v instanceof File) {
+          if (!appended.has(name)) { formData.append(name, v); appended.add(name); }
+        } else if (Array.isArray(v)) {
+          v.forEach((item: any) => formData.append(`${name}[]`, String(item)));
+        } else if (v !== undefined && v !== null && typeof v === 'object') {
+          if (!appended.has(name)) { formData.append(name, JSON.stringify(v)); appended.add(name); }
+        } else {
+          if (!appended.has(name)) { formData.append(name, v != null ? String(v) : ''); appended.add(name); }
+        }
       }
-    });
-    
-    // Send ads object as JSON for backend's normalizeArrayInput method
-    if (Object.keys(adsFields).length > 0) {
+    }
+
+    // Kirim ads JSON HANYA saat BUKAN update ads
+    if (!isAdUpdate && Object.keys(adsFields).length > 0) {
       formData.append('ads', JSON.stringify(adsFields));
       // eslint-disable-next-line no-console
       console.log('[DEBUG] Sending ads JSON object:', adsFields);
     }
-    
-    // Handle opening hours data conversion
+
+    // Handle opening hours data conversion (tetap)
     const openingHoursData: any[] = [];
     const openingHoursFields = formValues.filter(val => val.name.startsWith('data[') && val.name.includes(']['));
-    
+
     if (openingHoursFields.length > 0) {
-      // Group opening hours by index
       const hoursGrouped: { [key: string]: any } = {};
-      
+
       openingHoursFields.forEach(val => {
         const match = val.name.match(/data\[(\d+)\]\[([^\]]+)\]/);
         if (match) {
           const index = match[1];
           const field = match[2];
-          
+
           if (!hoursGrouped[index]) {
             hoursGrouped[index] = {};
           }
           hoursGrouped[index][field] = val.value;
         }
       });
-      
-      // Convert to array format with day mapping
+
       const dayMapping = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
-      
+
       Object.keys(hoursGrouped).forEach(index => {
         const hourData = hoursGrouped[index];
-        // Add day field based on index
         if (!hourData.day && dayMapping[parseInt(index)]) {
           hourData.day = dayMapping[parseInt(index)];
         }
         openingHoursData.push(hourData);
       });
-      
-      // Send as opening_hours JSON
+
       if (openingHoursData.length > 0) {
         formData.append('opening_hours', JSON.stringify(openingHoursData));
         // eslint-disable-next-line no-console
@@ -223,14 +296,12 @@ export const useForm = (
       }
     }
 
-    // Debug logging for form data
+    // Debug logging
     // eslint-disable-next-line no-console
     console.log('[DEBUG] Form submission data:');
     if (formData instanceof FormData) {
-      // Convert FormData to array for logging
       const entries = Array.from(formData.entries());
-      
-      // Special attention to ads fields
+
       const adsEntries = entries.filter(([key]) => key.startsWith('ads'));
       if (adsEntries.length > 0) {
         // eslint-disable-next-line no-console
@@ -240,8 +311,7 @@ export const useForm = (
           console.log(`  ${key}:`, value, typeof value);
         });
       }
-      
-      // Log all entries
+
       entries.forEach(([key, value]) => {
         // eslint-disable-next-line no-console
         console.log(`  ${key}:`, value);
@@ -251,9 +321,10 @@ export const useForm = (
       console.log('  Form data:', formData);
     }
 
+    // === Request ===
     const mutate = await post({
       url: submitControl.url,
-      path: submitControl.path,
+      path: effectivePath, // <— PAKAI effectivePath
       bearer: submitControl.bearer,
       includeHeaders: submitControl.includeHeaders,
       contentType: submitControl.contentType,
@@ -272,15 +343,14 @@ export const useForm = (
       console.log('[DEBUG] 422 Validation Error Response:', mutate.data);
       // eslint-disable-next-line no-console
       console.log('[DEBUG] Detailed errors:', mutate.data.errors);
-      
-      // Log specific error messages
+
       if (mutate.data.errors) {
         Object.entries(mutate.data.errors).forEach(([field, messages]: [string, any]) => {
           // eslint-disable-next-line no-console
           console.log(`[DEBUG] Field "${field}" error:`, Array.isArray(messages) ? messages[0] : messages);
         });
       }
-      
+
       let errors: { name: string; error?: any }[] = [];
 
       if (typeof mutate.data == 'string') {
@@ -317,7 +387,7 @@ export const useForm = (
         data: mutate?.data,
         message: mutate?.message
       });
-      
+
       onFailed?.(mutate?.status || 500);
       setShowConfirm(false);
       setLoading(false);
