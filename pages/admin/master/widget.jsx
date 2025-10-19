@@ -195,7 +195,7 @@ export default function Widget() {
                 ],
               },
             },
-           {
+            {
               type: 'custom',
               custom: ({ formControl, values }) => {
                 const content_type = values.find(
@@ -259,15 +259,15 @@ export default function Widget() {
                                       values.find(
                                         (val) => val.name === 'size'
                                       )?.value ||
-                                        formControl('size')?.value ||
-                                        ''
+                                      formControl('size')?.value ||
+                                      ''
                                     ) === opt
                                   }
                                   onChange={() => {
                                     if (
                                       formControl('size') &&
                                       typeof formControl('size').onChange ===
-                                        'function'
+                                      'function'
                                     ) {
                                       formControl('size').onChange(opt);
                                     }
@@ -291,12 +291,12 @@ export default function Widget() {
                               mapOptions: (data) =>
                                 Array.isArray(data)
                                   ? data.map((item) => ({
-                                      label:
-                                        item?.label ||
-                                        item?.name ||
-                                        `Kategori #${item?.id}`,
-                                      value: item?.value || item?.id,
-                                    }))
+                                    label:
+                                      item?.label ||
+                                      item?.name ||
+                                      `Kategori #${item?.id}`,
+                                    value: item?.value || item?.id,
+                                  }))
                                   : [],
                             }}
                           />
@@ -322,14 +322,16 @@ export default function Widget() {
                       label="Kubus"
                       placeholder="Pilih kubus..."
                       serverOptionControl={{
-                        path: 'admin/options/cube',
-                        mapOptions: (data) =>
-                          Array.isArray(data)
-                            ? data.map((item) => ({
-                                label: item?.label || item?.name || `Cube #${item?.id}`,
-                                value: item?.value || item?.id,
-                              }))
-                            : [],
+                        path: 'admin/options/cube?paginate=all',
+                        mapOptions: (resp) => {
+                          const list = Array.isArray(resp?.data) ? resp.data
+                            : Array.isArray(resp) ? resp
+                              : [];
+                          return list.map(item => ({
+                            label: item?.label || item?.name || `Cube #${item?.id}`,
+                            value: item?.value || item?.id,
+                          }));
+                        },
                       }}
                       searchable
                       multiple

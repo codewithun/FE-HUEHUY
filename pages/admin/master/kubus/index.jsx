@@ -7,7 +7,6 @@ import {
   ButtonComponent,
   CheckboxComponent,
   InputComponent,
-  TextareaComponent,
   InputNumberComponent,
   InputTimeComponent,
   InputMapComponent,
@@ -27,19 +26,20 @@ import UpdateCubeStatusModal from '../../../../components/construct.components/m
 import VoucherModal from '../../../../components/construct.components/modal/Voucher.modal';
 import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../../helpers';
-import { Decrypt } from '../../../../helpers/encryption.helpers';
+
 import { useUserContext } from '../../../../context/user.context';
 
 // Import components dan hooks
 import { useManagersData, useUsersData } from '../../../../features/kubus/hooks/useDataFetching';
 import { useCropFunctionality } from '../../../../features/kubus/hooks/useCropFunctionality';
-import CreateOnlyFields from '../../../../features/kubus/components/CreateOnlyFields';
 import ManagerTenantSelector from '../../../../features/kubus/components/ManagerTenantSelector';
 import ImageFieldComponent from '../../../../features/kubus/components/ImageFieldComponent';
 import InformationForm from '../../../../features/kubus/forms/InformationForm';
 import PromoForm from '../../../../features/kubus/forms/PromoForm';
 import VoucherForm from '../../../../features/kubus/forms/VoucherForm';
+import IklanForm from '../../../../features/kubus/forms/IklanForm';
 import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
+import { flushSync } from 'react-dom';
 // Note: Real modals are imported above
 function KubusMain() {
   // States
@@ -51,8 +51,9 @@ function KubusMain() {
   const [formSessionId] = useState(0);
   // Edit target: 'cube' (default) or 'ad'
   const [editMode, setEditMode] = useState('cube');
-  // Store original data and track form values for delta detection
-  const [originalData, setOriginalData] = useState(null);
+  // Flag persistent untuk ads edit yang tidak ter-reset oleh modal
+  const [isAdsEditMode, setIsAdsEditMode] = useState(false);
+
   // Use ref to track latest form values without triggering re-render loops
   const formValuesRef = useRef([]);
 
@@ -62,8 +63,6 @@ function KubusMain() {
   // Custom hooks
   const { merchantManagers, managersLoading, managersError } = useManagersData();
   // const { onlyUsers } = useUsersData(); // used in voucher user selection in future step
-
-  const [pendingEditRow, setPendingEditRow] = useState(null);
 
   // Simpan context dari TableSupervisionComponent (setModalForm, setDataSelected)
   const [tableCtx, setTableCtx] = useState(null);
@@ -95,17 +94,6 @@ function KubusMain() {
       resetCropState();
     }
   }, [previewUrl, previewOwnerKey, resetCropState]);
-
-  // Handle pending edit row
-
-  useEffect(() => {
-    if (editMode === 'ad' && pendingEditRow && tableCtx) {
-      tableCtx.setModalForm?.(true);
-      tableCtx.setDataSelected?.(pendingEditRow);
-      setPendingEditRow(null);
-    }
-  }, [editMode, pendingEditRow, tableCtx]);
-
 
   // Admin guard: ensure only role_id 1 can access
   useEffect(() => {
@@ -145,23 +133,7 @@ function KubusMain() {
   // Mapper default value untuk mode update (dipakai untuk Ubah Kubus maupun Ubah Iklan)
   const mapUpdateDefault = (data) => {
     setSelected(data);
-    setOriginalData(data); // Store original data for delta comparison
     const ad = data?.ads?.[0] || {};
-
-    // Debug: Log data structure untuk melihat struktur gambar yang sebenarnya
-    console.log('=== DEBUG KUBUS DATA ===');
-    console.log('Full data:', data);
-    console.log('Ads data:', ad);
-    console.log('Data images:', {
-      'data.image': data?.image,
-      'data.picture_source': data?.picture_source,
-      'ad.image': ad?.image,
-      'ad.picture_source': ad?.picture_source,
-      'ad.image_1': ad?.image_1,
-      'ad.image_2': ad?.image_2,
-      'ad.image_3': ad?.image_3,
-    });
-    console.log('=== END DEBUG ===');
 
     const contentType = data?.is_information
       ? 'kubus-informasi'
@@ -180,7 +152,7 @@ function KubusMain() {
       return result;
     };
 
-    // Format tanggal untuk input date (YYYY-MM-DD)
+    // Format tanggal untuk input date (YYYY-MM-DD untuk display form, DD-MM-YYYY untuk backend)
     const formatDateForInput = (dateStr) => {
       if (!dateStr) return '';
       try {
@@ -199,7 +171,6 @@ function KubusMain() {
       _original_map_lng: data?.map_lng,
       _original_address: data?.address,
       // IMPORTANT: Always send root-level address & coords on update to satisfy backend required fields
-      // Even for Promo Online, backend update() requires these three fields
       address: data?.address || '',
       map_lat: data?.map_lat || '',
       map_lng: data?.map_lng || '',
@@ -234,9 +205,22 @@ function KubusMain() {
       'ads[jam_mulai]': ad?.jam_mulai ? String(ad.jam_mulai).substring(0, 5) : '',
       'ads[jam_berakhir]': ad?.jam_berakhir ? String(ad.jam_berakhir).substring(0, 5) : '',
       'ads[day_type]': ad?.day_type || 'custom',
-      // Tanggal validasi dalam format yang benar untuk input date
+      // Tanggal validasi dalam format untuk input date (YYYY-MM-DD untuk form display)
       'ads[start_validate]': formatDateForInput(ad?.start_validate),
       'ads[finish_validate]': formatDateForInput(ad?.finish_validate),
+
+      // Debug log untuk format tanggal
+      ...((() => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📅 DATE MAPPING DEBUG:', {
+            original_start: ad?.start_validate,
+            formatted_start: formatDateForInput(ad?.start_validate),
+            original_finish: ad?.finish_validate,
+            formatted_finish: formatDateForInput(ad?.finish_validate)
+          });
+        }
+        return {};
+      })()),
       'ads[validation_time_limit]': ad?.validation_time_limit || '',
       ...mapCustomDays(ad?.custom_days),
       ...(data?.world_id ? { world_id: data.world_id } : {}),
@@ -244,316 +228,12 @@ function KubusMain() {
       ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
     };
 
-    // Debug: Log hasil mapping
-    console.log('=== HASIL MAPPING ===');
-    console.log('Mapped Images:', {
-      'image': mappedData.image,
-      'ads[image]': mappedData['ads[image]'],
-      'ads[image_1]': mappedData['ads[image_1]'],
-      'ads[image_2]': mappedData['ads[image_2]'],
-      'ads[image_3]': mappedData['ads[image_3]'],
-    });
-    console.log('Mapped Dates:', {
-      'ads[start_validate]': mappedData['ads[start_validate]'],
-      'ads[finish_validate]': mappedData['ads[finish_validate]'],
-    });
-    console.log('Full mapped data:', mappedData);
-    console.log('=== END HASIL MAPPING ===');
-
     return mappedData;
   };
 
-  // const validate = selected?.ads?.at(0)?.start_validate && selected?.ads?.at(0)?.finish_validate
-  //   ? {
-  //       start_validate: moment(selected?.ads[0].start_validate).format('DD-MM-YYYY'),
-  //       finish_validate: moment(selected?.ads[0].finish_validate).format('DD-MM-YYYY'),
-  //     }
-  //   : null;
 
-  // Helper function untuk membandingkan dan membuat delta payload
-  const createDeltaPayload = (formValues, originalData) => {
-    console.log('=== DELTA DETECTION START ===');
-    console.log('Form values:', formValues);
-    console.log('Original data:', originalData);
 
-    const deltaCube = {};
-    const deltaAds = {};
-    let hasChanges = false;
 
-    // Helper untuk compare values
-    const isEqual = (a, b) => {
-      if (a === b) return true;
-      if (a == null && b == null) return true;
-      if ((a == null || a === '') && (b == null || b === '')) return true;
-      if (Array.isArray(a) && Array.isArray(b)) {
-        return a.length === b.length && a.every((val, i) => val === b[i]);
-      }
-      // Deep compare objects
-      if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
-        const keysA = Object.keys(a);
-        const keysB = Object.keys(b);
-        if (keysA.length !== keysB.length) return false;
-        return keysA.every(key => isEqual(a[key], b[key]));
-      }
-      return false;
-    };
-
-    // Helper untuk convert value ke format yang benar
-    const convertValue = (value) => {
-      if (value === '' || value === undefined) return null;
-      if (value === 'true' || value === true) return true;
-      if (value === 'false' || value === false) return false;
-      return value;
-    };
-
-    // Collect custom_days dari form values
-    const customDays = {};
-    const regularFields = [];
-
-    for (const { name, value } of formValues) {
-      if (name && name.match(/^ads\[custom_days\]\[(\w+)\]$/)) {
-        const dayName = name.match(/^ads\[custom_days\]\[(\w+)\]$/)[1];
-        customDays[dayName] = convertValue(value);
-      } else {
-        regularFields.push({ name, value });
-      }
-    }
-
-    // Process regular fields
-    for (const { name, value } of regularFields) {
-      if (!name || name.startsWith('_original_') || name === 'change_map' || name === 'content_type') continue;
-
-      const convertedValue = convertValue(value);
-
-      if (name.startsWith('ads[')) {
-        const key = name.replace(/^ads\[|\]$/g, '');
-        let originalValue = originalData?.ads?.[0]?.[key];
-
-        // Special handling for custom_days
-        if (key === 'custom_days') {
-          if (!isEqual(customDays, originalValue)) {
-            deltaAds.custom_days = Object.keys(customDays).length > 0 ? customDays : null;
-            hasChanges = true;
-            console.log(`ADS CHANGE - custom_days: ${JSON.stringify(originalValue)} → ${JSON.stringify(customDays)}`);
-          }
-          continue;
-        }
-
-        if (!isEqual(convertedValue, originalValue)) {
-          deltaAds[key] = convertedValue;
-          hasChanges = true;
-          console.log(`ADS CHANGE - ${key}: ${originalValue} → ${convertedValue}`);
-        }
-      } else {
-        // Handle special cases for cube fields
-        let originalValue;
-
-        if (name === 'is_recommendation') {
-          originalValue = originalData?.is_recommendation ? [1] : [];
-        } else if (name === 'is_information') {
-          originalValue = originalData?.is_information ? [1] : [];
-        } else if (name === 'target_user_ids') {
-          originalValue = originalData?.ads?.[0]?.target_user_ids || [];
-          if (!isEqual(convertedValue, originalValue)) {
-            deltaAds.target_user_ids = convertedValue;
-            hasChanges = true;
-            console.log(`ADS CHANGE - target_user_ids: ${JSON.stringify(originalValue)} → ${JSON.stringify(convertedValue)}`);
-          }
-          continue;
-        } else if (name === 'community_id') {
-          originalValue = originalData?.ads?.[0]?.community_id;
-          if (!isEqual(convertedValue, originalValue)) {
-            deltaAds.community_id = convertedValue;
-            hasChanges = true;
-            console.log(`ADS CHANGE - community_id: ${originalValue} → ${convertedValue}`);
-          }
-          continue;
-        } else if (name === 'target_type') {
-          originalValue = originalData?.ads?.[0]?.target_type || 'all';
-          if (!isEqual(convertedValue, originalValue)) {
-            deltaAds.target_type = convertedValue;
-            hasChanges = true;
-            console.log(`ADS CHANGE - target_type: ${originalValue} → ${convertedValue}`);
-          }
-          continue;
-        } else if (name.startsWith('cube_tags[')) {
-          // Skip cube_tags comparison for now, handle separately
-          continue;
-        } else {
-          originalValue = originalData?.[name];
-        }
-
-        if (!isEqual(convertedValue, originalValue)) {
-          deltaCube[name] = convertedValue;
-          hasChanges = true;
-          console.log(`CUBE CHANGE - ${name}: ${originalValue} → ${convertedValue}`);
-        }
-      }
-    }
-
-    // Add custom_days to deltaAds if there are any changes
-    if (Object.keys(customDays).length > 0) {
-      const originalCustomDays = originalData?.ads?.[0]?.custom_days || {};
-      if (!isEqual(customDays, originalCustomDays)) {
-        deltaAds.custom_days = customDays;
-        hasChanges = true;
-        console.log(`ADS CHANGE - custom_days: ${JSON.stringify(originalCustomDays)} → ${JSON.stringify(customDays)}`);
-      }
-    }
-
-    // Handle location update kondisional
-    const changeMapValue = formValues.find(v => v.name === 'change_map')?.value;
-    if (changeMapValue) {
-      // User ingin mengubah lokasi
-      const locationFields = ['address', 'map_lat', 'map_lng'];
-      locationFields.forEach(field => {
-        const formValue = formValues.find(v => v.name === field)?.value;
-        const convertedValue = convertValue(formValue);
-        const originalValue = originalData?.[field];
-
-        if (!isEqual(convertedValue, originalValue)) {
-          deltaCube[field] = convertedValue;
-          hasChanges = true;
-          console.log(`LOCATION CHANGE - ${field}: ${originalValue} → ${convertedValue}`);
-        }
-      });
-
-      // Tambahkan flag update_location
-      deltaCube.update_location = 1;
-      hasChanges = true;
-    }
-
-    console.log('Delta cube:', deltaCube);
-    console.log('Delta ads:', deltaAds);
-    console.log('Has changes:', hasChanges);
-    console.log('=== DELTA DETECTION END ===');
-
-    return { deltaCube, deltaAds, hasChanges };
-  };
-
-  // Tambahkan fungsi ini setelah deklarasi state, sebelum return
-  const handleUpdateCubeAndAd = async (values, data) => {
-    console.log('=== handleUpdateCubeAndAd START ===');
-    console.log('Received values:', values);
-    console.log('Received data:', data);
-    console.log('Original data for comparison:', originalData);
-
-    const cubeId = data?.id;
-    const adId = data?.ads?.[0]?.id;
-
-    if (!cubeId || !adId) {
-      console.error('Cube ID atau Ad ID tidak ditemukan:', { cubeId, adId });
-      if (typeof window !== 'undefined') window.alert('ID data tidak lengkap untuk update.');
-      return;
-    }
-
-    // Gunakan originalData untuk comparison, data untuk ID saja
-    const comparisonData = originalData || data;
-
-    // Deteksi perubahan dengan delta
-    const { deltaCube, deltaAds, hasChanges } = createDeltaPayload(values, comparisonData);
-
-    // Jika tidak ada perubahan, skip update
-    if (!hasChanges) {
-      console.log('Tidak ada perubahan, skip update');
-      if (typeof window !== 'undefined') window.alert('Tidak ada perubahan untuk disimpan.');
-      return;
-    }
-
-    try {
-      // Gunakan helper dari proyek seperti di file lain
-      const encryptedToken = Cookies.get(token_cookie_name);
-      const token = encryptedToken ? Decrypt(encryptedToken) : '';
-
-      if (!token) {
-        if (typeof window !== 'undefined') {
-          window.alert('Token tidak ditemukan. Silakan login kembali.');
-          window.location.href = '/admin';
-        }
-        return;
-      }
-
-      const config = {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      };
-
-      // Gunakan endpoint yang sama seperti di TableSupervisionComponent
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const baseUrl = apiBase.replace(/\/+$/, '');
-
-      // Siapkan payload cube: selalu sertakan status (required oleh backend)
-      const statusFromForm = values.find?.(v => v.name === 'status')?.value;
-      const ensuredStatus = statusFromForm ?? comparisonData?.status ?? 'active';
-      const cubePayload = { ...deltaCube, status: ensuredStatus };
-
-      // Update cube jika ada perubahan atau memang ada field wajib yang harus ikut (status)
-      if (Object.keys(deltaCube).length > 0 || ensuredStatus !== undefined) {
-        console.log('Sending cube request with delta payload:', cubePayload);
-        const cubeResponse = await fetch(`${baseUrl}/admin/cubes/${cubeId}`, {
-          ...config,
-          body: JSON.stringify(cubePayload),
-          headers: {
-            ...config.headers,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!cubeResponse.ok) {
-          const errorText = await cubeResponse.text();
-          console.error('Cube update response:', errorText);
-          throw new Error(`Cube update failed: ${cubeResponse.status}`);
-        }
-        console.log('Cube update berhasil');
-      } else {
-        console.log('Tidak ada perubahan cube, skip cube update');
-      }
-
-      // Update ads hanya jika ada perubahan ads
-      if (Object.keys(deltaAds).length > 0) {
-        console.log('Sending ads request with delta payload:', deltaAds);
-        const adsResponse = await fetch(`${baseUrl}/admin/ads/${adId}`, {
-          ...config,
-          body: JSON.stringify(deltaAds),
-          headers: {
-            ...config.headers,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!adsResponse.ok) {
-          const errorText = await adsResponse.text();
-          console.error('Ads update response:', errorText);
-          throw new Error(`Ads update failed: ${adsResponse.status}`);
-        }
-        console.log('Ads update berhasil');
-      } else {
-        console.log('Tidak ada perubahan ads, skip ads update');
-      }
-
-      if (typeof window !== 'undefined') window.alert('Data berhasil diperbarui!');
-      setRefresh(r => !r);
-      resetCropState();
-    } catch (err) {
-      console.error('Gagal update cube/ads:', err);
-
-      // Handle 401 seperti di file lain
-      if (err.message?.includes('401') || err.response?.status === 401) {
-        Cookies.remove(token_cookie_name);
-        if (typeof window !== 'undefined') {
-          window.alert('Sesi login telah berakhir. Silakan login kembali.');
-          window.location.href = '/admin';
-        }
-        return;
-      }
-
-      if (typeof window !== 'undefined') window.alert('Gagal memperbarui data. Cek console untuk detail.');
-    }
-  };
 
   return (
     <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
@@ -682,28 +362,128 @@ function KubusMain() {
             'is_recommendation': []
           },
           onModalOpen: (isEdit) => {
+            console.log('📖 MODAL OPEN - isEdit:', isEdit, 'currentEditMode:', editMode);
             setIsFormEdit(!!isEdit);
-            if (!isEdit) {
+            if (!isEdit && editMode !== 'ad') {
+              // Hanya reset jika bukan mode edit ads
               setSelected(null);
               setEditMode('cube');
-              setOriginalData(null);
               formValuesRef.current = [];
               resetCropState();
               setFormSessionKey(Date.now());
             }
           },
           custom: [
-            // Create-only fields wrapped into one component
+            // Content Type Selection (Radio Buttons) - seperti referensi file
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
                 // Sembunyikan saat EDIT dengan dua penjaga:
-                // - isFormEdit: flag dari onModalOpen
-                // - selected: akan terisi oleh mapUpdateDefault saat update (lebih andal)
                 if (isFormEdit || selected) return null;
+
+                const isInformation = values.find((i) => i.name == 'is_information')?.value?.at?.(0);
+                const currentTab = values.find((i) => i.name == 'content_type')?.value || 'promo';
+
+                const handleContentTypeChange = (newType) => {
+                  // set content_type
+                  let next = [
+                    ...values.filter((i) => i.name !== 'content_type'),
+                    { name: 'content_type', value: newType },
+                  ];
+
+                  // auto-reset is_information jika bukan mode informasi
+                  if (newType !== 'kubus-informasi') {
+                    next = [
+                      ...next.filter((i) => i.name !== 'is_information'),
+                      { name: 'is_information', value: [] },
+                    ];
+                  }
+
+                  // auto-set cube putih utk promo/voucher
+                  if (['promo', 'voucher'].includes(newType)) {
+                    next = [
+                      ...next.filter((i) => i.name !== 'cube_type_id'),
+                      { name: 'cube_type_id', value: 1 },
+                    ];
+                  }
+
+                  setValues(next);
+                };
+
+                const options = [
+                  { key: 'promo', label: 'Promo' },
+                  { key: 'voucher', label: 'Voucher' },
+                  { key: 'iklan', label: 'Iklan' },
+                ];
+
                 return (
-                  <CreateOnlyFields values={values} setValues={setValues} formSessionKey={formSessionKey} />
+                  <div className="space-y-3">
+                    <div className="font-semibold text-base text-slate-700">Jenis Konten</div>
+
+                    {/* Kontainer radio seperti "Hanya Di Waktu Tertentu" */}
+                    <div className="border border-slate-200 bg-white rounded-xl p-3 w-full">
+                      <div className="flex items-center gap-6">
+                        {options.map(opt => {
+                          const checked = currentTab === opt.key;
+                          return (
+                            <label key={opt.key} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="content_type"
+                                value={opt.key}
+                                checked={checked}
+                                disabled={!!isInformation} // kalau kubus informasi aktif, kunci pilihan
+                                onChange={() => handleContentTypeChange(opt.key)}
+                                className="h-4 w-4 accent-green-600 disabled:opacity-50"
+                                style={{ accentColor: '#16a34a' }} // fallback
+                              />
+                              <span className={checked ? 'font-semibold text-slate-800' : 'text-slate-600'}>
+                                {opt.label}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 );
+              },
+            },
+            // Checkbox untuk Kubus Informasi (hanya muncul saat tambah baru)
+            ...(editMode === 'ad' || isFormEdit || selected ? [] : [{
+              type: 'check',
+              construction: {
+                name: 'is_information',
+                options: [{ label: 'Kubus Informasi', value: 1 }],
+              },
+            }]),
+
+            // watcher kecil untuk sinkronkan content_type dengan is_information
+            {
+              type: 'custom',
+              custom: ({ values, setValues }) => {
+                if (isFormEdit || selected) return null;
+
+                const isInfo = !!values.find(i => i.name === 'is_information')?.value?.at?.(0);
+                const ct = values.find(i => i.name === 'content_type')?.value || 'promo';
+
+                // set ke 'kubus-informasi' saat dicentang
+                if (isInfo && ct !== 'kubus-informasi') {
+                  setValues([
+                    ...values.filter(i => i.name !== 'content_type'),
+                    { name: 'content_type', value: 'kubus-informasi' },
+                  ]);
+                }
+
+                // kembalikan ke 'promo' saat tidak dicentang
+                if (!isInfo && ct === 'kubus-informasi') {
+                  setValues([
+                    ...values.filter(i => i.name !== 'content_type'),
+                    { name: 'content_type', value: 'promo' },
+                  ]);
+                }
+
+                return null; // tidak render UI apa-apa
               },
             },
 
@@ -850,58 +630,11 @@ function KubusMain() {
                 if (isInformation || contentType !== 'iklan') return null;
 
                 return (
-                  <div className="mt-6 space-y-4">
-                    <div className="font-semibold text-lg text-slate-700 border-b pb-2">Iklan</div>
-                    <InputComponent
-                      name="ads[title]"
-                      label="Judul Iklan"
-                      placeholder="Masukan Judul Iklan..."
-                      {...formControl('ads[title]')}
-                    />
-                    {TextareaComponent && (
-                      <TextareaComponent
-                        name="ads[description]"
-                        label="Deskripsi Iklan"
-                        placeholder="Masukan Deskripsi Iklan..."
-                        {...formControl('ads[description]')}
-                        rows={5}
-                      />
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <SelectComponent
-                        name="ads[ad_category_id]"
-                        label="Kategori Iklan"
-                        placeholder="Pilih Kategori Iklan..."
-                        {...formControl('ads[ad_category_id]')}
-                        serverOptionControl={{ path: 'admin/options/ad-category' }}
-                      />
-                      <SelectComponent
-                        name="ads[promo_type]"
-                        label="Tipe Promo"
-                        placeholder="Pilih Tipe Promo..."
-                        {...formControl('ads[promo_type]')}
-                        options={[
-                          { label: 'Online', value: 'online' },
-                          { label: 'Offline', value: 'offline' },
-                        ]}
-                      />
-                    </div>
-                    {values.find(i => i.name === 'ads[promo_type]')?.value === 'online' && (
-                      <InputComponent
-                        type="url"
-                        name="cube_tags[0][link]"
-                        label="Tautan/Link"
-                        placeholder="Masukkan tautan/link promo online..."
-                        onChange={(e) => {
-                          setValues([
-                            ...values.filter(i => i.name !== 'cube_tags[0][link]'),
-                            { name: 'cube_tags[0][link]', value: e || '' },
-                          ]);
-                        }}
-                        value={values.find(i => i.name === 'cube_tags[0][link]')?.value || ''}
-                      />
-                    )}
-                  </div>
+                  <IklanForm
+                    formControl={formControl}
+                    values={values}
+                    setValues={setValues}
+                  />
                 );
               },
             },
@@ -1022,16 +755,12 @@ function KubusMain() {
                       ]}
                       value={values.find((i) => i.name == 'ads[validation_type]')?.value || 'auto'}
                       onChange={(value) => {
-                        setValues([
-                          ...values.filter((i) => i.name != 'ads[validation_type]'),
-                          { name: 'ads[validation_type]', value: value },
-                        ]);
-                        if (value === 'auto') {
-                          setValues(prev => [
-                            ...prev.filter((i) => i.name != 'ads[code]'),
-                            { name: 'ads[code]', value: '' },
-                          ]);
-                        }
+                        const next = [
+                          ...values.filter((i) => !['ads[validation_type]', 'ads[code]'].includes(i.name)),
+                          { name: 'ads[validation_type]', value },
+                        ];
+                        if (value === 'auto') next.push({ name: 'ads[code]', value: '' });
+                        setValues(next);
                       }}
                       validations={{ required: true }}
                     />
@@ -1385,10 +1114,16 @@ function KubusMain() {
           ],
         }}
 
-        formUpdateControl={editMode === 'ad' ? {
-          customDefaultValue: mapUpdateDefault,
+        formUpdateControl={(editMode === 'ad' || isAdsEditMode) ? {
+          customDefaultValue: (data) => ({
+            ...mapUpdateDefault(data),
+            _method: 'PUT',
+            id: data?.ads?.[0]?.id,
+            __endpoint_override: `admin/ads/${data?.ads?.[0]?.id}`,
+            cube_id: data?.id,
+          }),
           contentType: 'multipart/form-data',
-          // penting: TANPA 'custom' agar fallback ke formControl.custom (form buat konten)
+          updateEndpointOverride: (data) => `admin/ads/${data?.ads?.[0]?.id}`,
         } : {
           customDefaultValue: mapUpdateDefault,
           contentType: 'multipart/form-data',
@@ -1490,6 +1225,7 @@ function KubusMain() {
                 );
               },
             },
+
             // Hidden field to flag update_location
             {
               type: 'custom',
@@ -1516,9 +1252,6 @@ function KubusMain() {
           // non-aktifkan tombol "Ubah" bawaan dengan except
           except: ['edit'],
           include: (row, ctx) => {
-
-            // ctx is forwarded and used later via setTableCtx + useEffect
-
             return (
               <>
                 <ButtonComponent
@@ -1529,9 +1262,22 @@ function KubusMain() {
                   size={'xs'}
                   rounded
                   onClick={() => {
-                    setEditMode('ad');
-                    setTableCtx(ctx); // simpan ctx agar useEffect bisa memicu modal
-                    setPendingEditRow(row);
+                    console.log('🔄 SWITCHING TO AD EDIT MODE');
+                    console.log('🔄 ROW DATA:', row);
+                    console.log('🔄 ADS ID:', row?.ads?.[0]?.id);
+
+                    // Pastikan state KESET sebelum buka modal
+                    flushSync(() => {
+                      setEditMode('ad');
+                      setIsAdsEditMode(true);
+                      setSelected(row);
+                    });
+
+                    // Baru buka modal dengan ctx yang sama
+                    ctx.setDataSelected?.(row);
+                    ctx.setModalForm?.(true);
+
+                    setTableCtx(ctx);
                   }}
                 />
                 <ButtonComponent
@@ -1549,24 +1295,38 @@ function KubusMain() {
           }
         }}
         onStoreSuccess={() => {
+          // Reset selected setelah berhasil create
+          setSelected(null);
           setRefresh(r => !r);
           resetCropState();
+          setFormSessionKey(Date.now()); // Force remount untuk clean state
         }}
 
         onUpdateSuccess={(response) => {
-          const data = response?.data || response;
-          if (!data || !data.id) return;
-          const values = Array.isArray(formValuesRef.current) ? [...formValuesRef.current] : [];
-          handleUpdateCubeAndAd(values, data);
+          console.log('🎉 UPDATE SUCCESS:', response);
+          console.log('🎉 CURRENT EDIT MODE:', editMode);
+
+          // Reset states dan refresh data
+          setSelected(null);
+          setEditMode('cube');
+          setIsAdsEditMode(false);
+          formValuesRef.current = [];
+          resetCropState();
+          setRefresh(r => !r);
         }}
 
         onModalClose={() => {
+          console.log('🚪 MODAL CLOSE - currentEditMode:', editMode);
+          // Reset semua state untuk mencegah field nyangkut
           setSelected(null);
           resetCropState();
           setEditMode('cube');
-          setOriginalData(null);
+          setIsAdsEditMode(false);
           formValuesRef.current = [];
           setIsFormEdit(false);
+          setPendingEditRow(null);
+          setTableCtx(null);
+          setFormSessionKey(Date.now()); // Force remount untuk clean state
         }}
       />
 
