@@ -17,7 +17,7 @@ export default function NotificationPage() {
   const [version, setVersion] = useState(0);
   const [localItems, setLocalItems] = useState([]);
   const [clearing, setClearing] = useState(false);
-  
+
   // Infinite scroll states
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -110,7 +110,7 @@ export default function NotificationPage() {
     if (n?.live_expired === true) return false;
     if (n?.live_out_of_stock === true) return false;
     if (n?.live_inactive === true) return false;
-    
+
     // Fallback ke logika lama
     return !isVoucherExpired(n);
   };
@@ -134,7 +134,7 @@ export default function NotificationPage() {
 
     console.log('📥 Loading notifications:', { type, cursor, reset });
     setLoading(true);
-    
+
     try {
       const params = new URLSearchParams({
         type: type,
@@ -161,7 +161,7 @@ export default function NotificationPage() {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       }
-      
+
       const data = await res.json();
       const newItems = Array.isArray(data.data) ? data.data : [];
 
@@ -228,10 +228,10 @@ export default function NotificationPage() {
   // Debug logging
   useEffect(() => {
     if (!DEBUG) return;
-    console.log('NOTIF DEBUG', { 
-      type, loading, hasMore, cursor, 
-      itemsCount: localItems.length, 
-      initialLoad, version 
+    console.log('NOTIF DEBUG', {
+      type, loading, hasMore, cursor,
+      itemsCount: localItems.length,
+      initialLoad, version
     });
   }, [type, loading, hasMore, cursor, localItems.length, initialLoad, version]);
 
@@ -250,19 +250,19 @@ export default function NotificationPage() {
       if (!res.ok) return null;
       const data = await res.json().catch(() => null);
       const voucher = data?.data || data || null;
-      
+
       // Konsistensi dengan format live dari notifikasi
       if (voucher) {
         const validUntil = voucher.valid_until;
         const expired = validUntil ? new Date(validUntil).getTime() < Date.now() : false;
         const stock = voucher.stock ?? 0;
         const outOfStock = !isNaN(stock) && stock <= 0;
-        
+
         voucher.live_expired = expired;
         voucher.live_out_of_stock = outOfStock;
         voucher.live_available = !expired && !outOfStock;
       }
-      
+
       return voucher;
     } catch {
       return null;
@@ -354,9 +354,9 @@ export default function NotificationPage() {
         }
 
         if (
-          json?.message?.includes('out of stock') || 
-          json?.message?.includes('stok habis') || 
-          json?.message?.includes('voucher habis') || 
+          json?.message?.includes('out of stock') ||
+          json?.message?.includes('stok habis') ||
+          json?.message?.includes('voucher habis') ||
           res.status === 410
         ) {
           setShowVoucherOutOfStockModal(true);
@@ -392,7 +392,7 @@ export default function NotificationPage() {
     setShowErrorModal(false);
     setShowSuccessModal(false);
     setClearing(true);
-    
+
     try {
       const res = await fetch(`${apiBase}/api/notification?type=${encodeURIComponent(tab)}`, {
         method: 'DELETE',
@@ -400,7 +400,7 @@ export default function NotificationPage() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await res.text();
-      
+
       setLocalItems([]);
       setCursor(null);
       setHasMore(true);
@@ -417,20 +417,34 @@ export default function NotificationPage() {
     if (!n || typeof n !== 'object') {
       return { img: null, title: 'Notifikasi', isVoucher: false, isPromo: false };
     }
+
+    // Ambil gambar dengan prioritas baru (ads.image_1 > ads.picture_source > image_url)
+    const ad = n?.ad || n?.grab?.ad || n?.promo?.ad || n?.voucher?.ad;
     const img =
-      n.image_url ||
-      n?.grab?.ad?.picture_source ||
-      n?.ad?.picture_source ||
-      n?.ad?.image_url ||
-      n?.cube?.logo || null;
+       n?.live_status?.image_url || 
+      n?.ad_picture || // dari accessor backend
+      ad?.image_1 ||
+      ad?.image_2 ||
+      ad?.image_3 ||
+      ad?.picture_source ||
+      n?.image_url ||
+      n?.cube?.logo ||
+      null;
 
     const title =
-      n.title || n?.grab?.ad?.title || n?.ad?.title || n?.cube?.name || 'Notifikasi';
+      n?.live_voucher_name ||
+      n?.ad_title ||
+      n?.title ||
+      ad?.title ||
+      n?.cube?.name ||
+      'Notifikasi';
 
     const isVoucher = n.type === 'voucher' || n.target_type === 'voucher';
-    const isPromo   = n.type === 'promo'   || n.target_type === 'promo';
+    const isPromo = n.type === 'promo' || n.target_type === 'promo';
+
     return { img, title, isVoucher, isPromo };
   };
+
 
   return (
     <>
@@ -452,9 +466,8 @@ export default function NotificationPage() {
                   setShowConfirmModal(true);
                 }}
                 disabled={clearing}
-                className={`px-3 py-2 rounded-lg text-sm font-semibold border border-white/40 text-white hover:bg-white/15 transition ${
-                  clearing ? 'opacity-60 cursor-not-allowed' : ''
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold border border-white/40 text-white hover:bg-white/15 transition ${clearing ? 'opacity-60 cursor-not-allowed' : ''
+                  }`}
                 title="Hapus semua notifikasi"
               >
                 {clearing ? 'Menghapus…' : 'Hapus semua'}
@@ -476,11 +489,10 @@ export default function NotificationPage() {
             <div className="grid grid-cols-2 gap-1">
               <button
                 type="button"
-                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${
-                  type === 'hunter'
+                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${type === 'hunter'
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
-                }`}
+                  }`}
                 onClick={() => handleTabChange('hunter')}
                 disabled={loading && initialLoad}
               >
@@ -488,11 +500,10 @@ export default function NotificationPage() {
               </button>
               <button
                 type="button"
-                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${
-                  type === 'merchant'
+                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${type === 'merchant'
                     ? 'bg-white text-primary border-b-2 border-primary'
                     : 'bg-white/80 text-gray-600'
-                }`}
+                  }`}
                 onClick={() => handleTabChange('merchant')}
                 disabled={loading && initialLoad}
               >
@@ -517,9 +528,8 @@ export default function NotificationPage() {
 
                     return (
                       <div
-                        className={`bg-white rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
-                          isUnread ? 'border-l-4 border-primary' : ''
-                        }`}
+                        className={`bg-white rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md ${isUnread ? 'border-l-4 border-primary' : ''
+                          }`}
                         key={item?.id ?? `notif-${idx}`}
                       >
                         <div className="flex gap-4">
@@ -530,7 +540,7 @@ export default function NotificationPage() {
                                   src={img}
                                   className="w-full h-full object-cover"
                                   alt={title}
-                                  onError={(e) => { 
+                                  onError={(e) => {
                                     // Gunakan base64 placeholder atau SVG inline untuk menghindari 404 berulang
                                     e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNNCAzQTIgMiAwIDAwMiA1VjE5QTIgMiAwIDAwNCAyMUgyMEEyIDIgMCAwMDIyIDE5VjVBMiAyIDAgMDAyMCAzSDRaTTIwIDE5SDRWNUgyMFYxOVoiIGZpbGw9IiM5Q0E0QjAiLz4KPHBhdGggZD0iTTggOUMxMC4yMDkxIDkgMTIgMTAuNzkwOSAxMiAxM0MxMiAxNS4yMDkxIDEwLjIwOTEgMTcgOCAxN0M1Ljc5MDg2IDE3IDQgMTUuMjA5MSA0IDEzQzQgMTAuNzkwOSA1Ljc5MDg2IDkgOCA9WiIgZmlsbD0iIzlDQTNCMCIvPgo8L3N2Zz4K';
                                   }}
@@ -568,9 +578,8 @@ export default function NotificationPage() {
                                   type="button"
                                   onClick={() => claimVoucher(item.target_id, item.id)}
                                   disabled={claimingId === item.id}
-                                  className={`inline-flex items-center font-medium text-sm transition-colors ${
-                                    claimingId === item.id ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:text-primary-dark'
-                                  }`}
+                                  className={`inline-flex items-center font-medium text-sm transition-colors ${claimingId === item.id ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:text-primary-dark'
+                                    }`}
                                 >
                                   {claimingId === item.id ? 'Memproses…' : 'Klaim voucher'}
                                   <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -582,9 +591,9 @@ export default function NotificationPage() {
                               {/* Status indicator berdasarkan kondisi live */}
                               {isVoucher && !available && (
                                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-500">
-                                  {expired ? 'Voucher kadaluwarsa' : 
-                                   outOfStock ? 'Voucher habis' : 
-                                   'Voucher tidak tersedia'}
+                                  {expired ? 'Voucher kadaluwarsa' :
+                                    outOfStock ? 'Voucher habis' :
+                                      'Voucher tidak tersedia'}
                                 </span>
                               )}
                             </div>
@@ -621,7 +630,7 @@ export default function NotificationPage() {
                 </>
               ) : loading && initialLoad ? (
                 <>
-                  {[1,2,3,4,5].map((i) => (
+                  {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} className="bg-white rounded-2xl p-4 shadow-sm">
                       <div className="flex gap-4">
                         <div className="w-16 h-16 rounded-xl bg-gray-200 animate-pulse flex-shrink-0" />
@@ -700,7 +709,7 @@ export default function NotificationPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Konfirmasi Hapus</h3>
                 <p className="text-gray-600 text-sm mb-6">{modalMessage}</p>
-                
+
                 <div className="flex gap-3 justify-center">
                   <button
                     type="button"
@@ -710,9 +719,8 @@ export default function NotificationPage() {
                       fn && fn();
                     }}
                     disabled={clearing}
-                    className={`px-6 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition ${
-                      clearing ? 'opacity-60 cursor-not-allowed' : ''
-                    }`}
+                    className={`px-6 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition ${clearing ? 'opacity-60 cursor-not-allowed' : ''
+                      }`}
                   >
                     {clearing ? 'Menghapus...' : 'Ya, Hapus'}
                   </button>
