@@ -39,18 +39,16 @@ import PromoForm from '../../../../features/kubus/forms/PromoForm';
 import VoucherForm from '../../../../features/kubus/forms/VoucherForm';
 import IklanForm from '../../../../features/kubus/forms/IklanForm';
 import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
-import { flushSync } from 'react-dom';
 // Note: Real modals are imported above
 function KubusMain() {
   // States
   const [selected, setSelected] = useState(null);
+  const [pendingEditRow, setPendingEditRow] = useState(null);
   // const [formAds, setFormAds] = useState(false); // not used in this simplified refactor yet
   const [refresh, setRefresh] = useState(false);
   const [updateStatus, setUpdateStatus] = useState(false);
   const [voucherModal, setVoucherModal] = useState(false);
   const [formSessionId] = useState(0);
-  // Edit target: 'cube' (default) or 'ad'
-  const [editMode, setEditMode] = useState('cube');
   // Flag persistent untuk ads edit yang tidak ter-reset oleh modal
   const [isAdsEditMode, setIsAdsEditMode] = useState(false);
 
@@ -67,9 +65,16 @@ function KubusMain() {
   // Simpan context dari TableSupervisionComponent (setModalForm, setDataSelected)
   const [tableCtx, setTableCtx] = useState(null);
 
-  const [formSessionKey, setFormSessionKey] = useState(Date.now());
   // Tambah flag khusus untuk status form edit/create
-  const [isFormEdit, setIsFormEdit] = useState(false);
+  const [, setIsFormEdit] = useState(false);
+
+  // Pastikan reset state saat modal opens untuk create
+  useEffect(() => {
+    if (!pendingEditRow && !selected) {
+      // Ini adalah sesi "Tambah Baru"
+      setIsAdsEditMode(false);
+    }
+  }, [pendingEditRow, selected]);
 
   const { onlyUsers } = useUsersData();
   const {
@@ -132,7 +137,6 @@ function KubusMain() {
 
   // Mapper default value untuk mode update (dipakai untuk Ubah Kubus maupun Ubah Iklan)
   const mapUpdateDefault = (data) => {
-    setSelected(data);
     const ad = data?.ads?.[0] || {};
 
     const contentType = data?.is_information
@@ -240,7 +244,6 @@ function KubusMain() {
       <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Kubus</h1>
 
       <TableSupervisionComponent
-        key={formSessionKey}
         setToRefresh={refresh}
         title="Kubus"
         fetchControl={{
@@ -361,16 +364,36 @@ function KubusMain() {
             'is_information': [],
             'is_recommendation': []
           },
-          onModalOpen: (isEdit) => {
-            console.log('📖 MODAL OPEN - isEdit:', isEdit, 'currentEditMode:', editMode);
-            setIsFormEdit(!!isEdit);
-            if (!isEdit && editMode !== 'ad') {
-              // Hanya reset jika bukan mode edit ads
+          onModalOpen: () => {
+            // Jika ada pendingEditRow atau sudah ada selected dengan ads, ini edit mode
+            if (pendingEditRow || (selected?.ads?.[0]?.id && isAdsEditMode)) {
+              // Sesi Ubah Iklan
+              setIsFormEdit(true);
+              setIsAdsEditMode(true);
+              
+              // Gunakan data yang tersedia
+              const editData = pendingEditRow || selected;
+              setSelected(editData);
+              tableCtx?.setDataSelected?.(editData);
+              setPendingEditRow(null); // habiskan tag agar tidak nempel ke sesi berikutnya
+            } else {
+              // Sesi Tambah Baru / Ubah Kubus biasa
+              
+              // Reset semua state secara eksplisit PERTAMA
+              setIsAdsEditMode(false); // pastikan reset isAdsEditMode untuk Tambah Baru
+              setIsFormEdit(false);
               setSelected(null);
-              setEditMode('cube');
+              setPendingEditRow(null); // double ensure
+              
+              tableCtx?.setDataSelected?.(null);
               formValuesRef.current = [];
               resetCropState();
-              setFormSessionKey(Date.now());
+              
+              // Force state update dengan setTimeout
+              setTimeout(() => {
+                setIsAdsEditMode(false);
+                setSelected(null);
+              }, 0);
             }
           },
           custom: [
@@ -378,8 +401,21 @@ function KubusMain() {
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
-                // Sembunyikan saat EDIT dengan dua penjaga:
-                if (isFormEdit || selected) return null;
+                // Logika yang lebih deterministic: 
+                // Jika selected ada dan memiliki ads[0].id, dan values belum banyak,
+                // kemungkinan besar ini adalah mode edit iklan
+                const hasSelectedWithAds = selected?.ads?.[0]?.id;
+                const isEditingAdBased = hasSelectedWithAds && isAdsEditMode;
+                
+                // TAPI: jika ini adalah form create (tidak ada ID di values), paksa tampilkan field
+                const isCreateMode = !values.find(v => v.name === 'id')?.value;
+                
+                // Tampilkan field jika: create mode ATAU bukan editing ad
+                const shouldShow = isCreateMode || !isEditingAdBased;
+                
+                if (!shouldShow) {
+                  return null;
+                }
 
                 const isInformation = values.find((i) => i.name == 'is_information')?.value?.at?.(0);
                 const currentTab = values.find((i) => i.name == 'content_type')?.value || 'promo';
@@ -450,7 +486,7 @@ function KubusMain() {
               },
             },
             // Checkbox untuk Kubus Informasi (hanya muncul saat tambah baru)
-            ...(editMode === 'ad' || isFormEdit || selected ? [] : [{
+            ...(isAdsEditMode && selected?.ads?.[0]?.id ? [] : [{
               type: 'check',
               construction: {
                 name: 'is_information',
@@ -462,7 +498,8 @@ function KubusMain() {
             {
               type: 'custom',
               custom: ({ values, setValues }) => {
-                if (isFormEdit || selected) return null;
+                const isActuallyEditingAd = isAdsEditMode && selected?.ads?.[0]?.id;
+                if (isActuallyEditingAd) return null;
 
                 const isInfo = !!values.find(i => i.name === 'is_information')?.value?.at?.(0);
                 const ct = values.find(i => i.name === 'content_type')?.value || 'promo';
@@ -1114,7 +1151,7 @@ function KubusMain() {
           ],
         }}
 
-        formUpdateControl={(editMode === 'ad' || isAdsEditMode) ? {
+        formUpdateControl={isAdsEditMode ? {
           customDefaultValue: (data) => ({
             ...mapUpdateDefault(data),
             _method: 'PUT',
@@ -1262,22 +1299,20 @@ function KubusMain() {
                   size={'xs'}
                   rounded
                   onClick={() => {
-                    console.log('🔄 SWITCHING TO AD EDIT MODE');
-                    console.log('🔄 ROW DATA:', row);
-                    console.log('🔄 ADS ID:', row?.ads?.[0]?.id);
-
-                    // Pastikan state KESET sebelum buka modal
-                    flushSync(() => {
-                      setEditMode('ad');
-                      setIsAdsEditMode(true);
-                      setSelected(row);
-                    });
-
-                    // Baru buka modal dengan ctx yang sama
+                    // Reset crop state
+                    resetCropState();
+                    formValuesRef.current = [];
+                    
+                    // Set states untuk edit mode
+                    setPendingEditRow(row);
+                    setIsAdsEditMode(true);
+                    setSelected(row);
+                    setIsFormEdit(true);
+                    setTableCtx(ctx);
+                    
+                    // Buka modal langsung tanpa delay
                     ctx.setDataSelected?.(row);
                     ctx.setModalForm?.(true);
-
-                    setTableCtx(ctx);
                   }}
                 />
                 <ButtonComponent
@@ -1299,34 +1334,30 @@ function KubusMain() {
           setSelected(null);
           setRefresh(r => !r);
           resetCropState();
-          setFormSessionKey(Date.now()); // Force remount untuk clean state
+          setIsAdsEditMode(false); // pastikan reset ads edit mode
+          formValuesRef.current = [];
         }}
 
-        onUpdateSuccess={(response) => {
-          console.log('🎉 UPDATE SUCCESS:', response);
-          console.log('🎉 CURRENT EDIT MODE:', editMode);
-
+        onUpdateSuccess={() => {
           // Reset states dan refresh data
           setSelected(null);
-          setEditMode('cube');
           setIsAdsEditMode(false);
+          setIsFormEdit(false);
+          setPendingEditRow(null);
           formValuesRef.current = [];
           resetCropState();
           setRefresh(r => !r);
         }}
 
         onModalClose={() => {
-          console.log('🚪 MODAL CLOSE - currentEditMode:', editMode);
           // Reset semua state untuk mencegah field nyangkut
           setSelected(null);
           resetCropState();
-          setEditMode('cube');
-          setIsAdsEditMode(false);
+          setIsAdsEditMode(false); // pastikan reset untuk modal close
           formValuesRef.current = [];
           setIsFormEdit(false);
-          setPendingEditRow(null);
+          setPendingEditRow(null); // pastikan clear pending edit
           setTableCtx(null);
-          setFormSessionKey(Date.now()); // Force remount untuk clean state
         }}
       />
 

@@ -96,6 +96,142 @@ export const useForm = (
       'content_type', 'status', 'owner_user_id', 'world_id', 'corporate_id', 'image'
     ]);
 
+    // Deteksi field ads yang perlu di-update
+    const adsFieldNames = new Set([
+      'level_umkm', 'max_production_per_day', 'sell_per_day',
+      'title', 'description', 'ad_category_id', 'promo_type', 'max_grab',
+      'unlimited_grab', 'is_daily_grab', 'validation_type', 'code',
+      'target_type', 'target_user_ids', 'community_id', 'start_validate',
+      'finish_validate', 'validation_time_limit', 'jam_mulai', 'jam_berakhir',
+      'day_type', 'custom_days', 'image_1', 'image_2', 'image_3'
+    ]);
+
+    // Periksa apakah ada field ads yang akan di-update
+    const hasAdsFieldUpdate = formValues.some(val => {
+      const name = val.name;
+      return adsFieldNames.has(name) || 
+             name.startsWith('ads[') || 
+             name.startsWith('ads.') || 
+             name.startsWith('ads_');
+    });
+
+    // Debug khusus untuk field yang bermasalah
+    const problemFieldsInForm = formValues.filter(val => {
+      const name = val.name;
+      return ['ads[level_umkm]', 'ads[max_production_per_day]', 'ads[sell_per_day]'].includes(name) ||
+             ['level_umkm', 'max_production_per_day', 'sell_per_day'].includes(name);
+    });
+    
+    if (problemFieldsInForm.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] 🎯 PROBLEM FIELDS DETECTED IN FORM VALUES:');
+      problemFieldsInForm.forEach(val => {
+        // eslint-disable-next-line no-console
+        console.log(`  ${val.name}:`, val.value, `(${typeof val.value})`);
+      });
+    }
+
+    // Periksa apakah ada field cube yang akan di-update  
+    const hasCubeFieldUpdate = formValues.some(val => {
+      const name = val.name;
+      return cubeOnly.has(name) || 
+             name === '__endpoint_override' || 
+             name === '__endpoint';
+    });
+
+    // === STRATEGY FOR MIXED UPDATES ===
+    // Jika ada mixed update (cube + ads), lakukan 2 request terpisah
+    if (hasAdsFieldUpdate && hasCubeFieldUpdate && isAdUpdate) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] Mixed update detected - will perform 2 separate requests');
+      
+      try {
+        // 1. Update cube fields first
+        const cubeId = formValues.find(v => v.name === 'cube_id')?.value;
+        if (cubeId) {
+          const cubeFormData = new FormData();
+          cubeFormData.set('_method', 'PUT');
+          
+          // Kirim hanya field cube
+          for (const val of formValues) {
+            const name = val.name;
+            let v = val.value;
+            
+            if (cubeOnly.has(name)) {
+              if (Array.isArray(v) && (name === 'is_information' || name === 'is_recommendation')) {
+                cubeFormData.append(name, v.length > 0 ? '1' : '0');
+              } else if (v instanceof File) {
+                cubeFormData.append(name, v);
+              } else if (Array.isArray(v)) {
+                v.forEach((item: any) => cubeFormData.append(`${name}[]`, String(item)));
+              } else if (v !== undefined && v !== null && typeof v === 'object') {
+                cubeFormData.append(name, JSON.stringify(v));
+              } else {
+                cubeFormData.append(name, v != null ? String(v) : '');
+              }
+            }
+          }
+
+          // eslint-disable-next-line no-console
+          console.log('[DEBUG] Sending cube update request...');
+          const cubeResult = await post({
+            url: submitControl.url,
+            path: `admin/cubes/${cubeId}`,
+            bearer: submitControl.bearer,
+            includeHeaders: submitControl.includeHeaders,
+            contentType: submitControl.contentType,
+            body: cubeFormData,
+          });
+
+          if (cubeResult?.status !== 200 && cubeResult?.status !== 201) {
+            // eslint-disable-next-line no-console
+            console.error('[DEBUG] Cube update failed:', cubeResult);
+            setLoading(false);
+            onFailed?.(cubeResult?.status || 500);
+            return;
+          }
+        }
+
+        // 2. Continue with ads update menggunakan logica original
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG] Proceeding with ads update...');
+        
+        // Tidak perlu reset formData, lanjut ke logika build FormData normal
+        // Logika di bawah akan handle field ads dengan benar
+        
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('[DEBUG] Mixed update error:', error);
+        setLoading(false);
+        onFailed?.(500);
+        return;
+      }
+    }
+
+    // Override detection: Jika ada field cube yang diubah, gunakan endpoint cube
+    let actualIsAdUpdate = isAdUpdate;
+    if (hasCubeFieldUpdate && !hasAdsFieldUpdate) {
+      actualIsAdUpdate = false; // Paksa ke mode cube update
+      
+      // Override endpoint untuk update cube jika sedang dalam mode ads update
+      if (isAdUpdate) {
+        const adsIdMatch = effectivePath.match(/admin\/ads\/(\d+)/);
+        if (adsIdMatch) {
+          const adsId = adsIdMatch[1];
+          // Ambil cube_id dari form values
+          const cubeId = formValues.find(v => v.name === 'cube_id')?.value;
+          if (cubeId) {
+            effectivePath = `admin/cubes/${cubeId}`;
+            // eslint-disable-next-line no-console
+            console.log(`[DEBUG] Switched endpoint from ads/${adsId} to cubes/${cubeId}`);
+          }
+        }
+      }
+      
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] Detected cube field updates, switching to cube update mode');
+    }
+
     // helper: convert HH:mm:ss → HH:mm
     const normalizeTime = (s?: string) =>
       (typeof s === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(s)) ? s.substring(0, 5) : s;
@@ -111,13 +247,13 @@ export const useForm = (
       const name = val.name;
       let v = val.value;
 
-      if (isAdUpdate) {
+      if (actualIsAdUpdate) {
         // ---------------------------
         // MODE UPDATE ADS
         // ---------------------------
 
-        // a) skip semua field khusus cube saat update ads
-        if (cubeOnly.has(name)) continue;
+        // a) skip semua field khusus cube saat update ads, KECUALI sudah diproses di mixed update
+        if (cubeOnly.has(name) && !(hasAdsFieldUpdate && hasCubeFieldUpdate && isAdUpdate)) continue;
 
         // b) flatten ads[...] → root, dan JANGAN kirim 'ads.xxx' (dot)
         const m = name.match(/^ads\[(.+)\]$/);
@@ -146,6 +282,12 @@ export const useForm = (
 
           // regular ads field → root: 'title', 'image_1', ...
           const flatKey = inner;
+
+          // Debug khusus untuk field yang bermasalah
+          if (['level_umkm', 'max_production_per_day', 'sell_per_day'].includes(inner)) {
+            // eslint-disable-next-line no-console
+            console.log(`[DEBUG] 🎯 Processing ads field: ads[${inner}] → ${flatKey}, value:`, v);
+          }
 
           if (v instanceof File) {
             if (!appended.has(flatKey)) { formData.append(flatKey, v); appended.add(flatKey); }
@@ -253,7 +395,7 @@ export const useForm = (
     }
 
     // Kirim ads JSON HANYA saat BUKAN update ads
-    if (!isAdUpdate && Object.keys(adsFields).length > 0) {
+    if (!actualIsAdUpdate && Object.keys(adsFields).length > 0) {
       formData.append('ads', JSON.stringify(adsFields));
       // eslint-disable-next-line no-console
       console.log('[DEBUG] Sending ads JSON object:', adsFields);
@@ -301,6 +443,24 @@ export const useForm = (
     console.log('[DEBUG] Form submission data:');
     if (formData instanceof FormData) {
       const entries = Array.from(formData.entries());
+
+      // Debug khusus untuk field yang bermasalah
+      const problemFields = ['level_umkm', 'max_production_per_day', 'sell_per_day'];
+      const foundProblemFields = entries.filter(([key]) => 
+        problemFields.some(field => key === field || key.includes(field))
+      );
+      
+      if (foundProblemFields.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG] 🎯 PROBLEM FIELDS BEING SENT:');
+        foundProblemFields.forEach(([key, value]) => {
+          // eslint-disable-next-line no-console
+          console.log(`  ✅ ${key}:`, value, `(${typeof value})`);
+        });
+      } else {
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG] ❌ PROBLEM FIELDS NOT FOUND IN FORM DATA!');
+      }
 
       const adsEntries = entries.filter(([key]) => key.startsWith('ads'));
       if (adsEntries.length > 0) {
