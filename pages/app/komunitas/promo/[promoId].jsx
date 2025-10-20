@@ -532,7 +532,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       }
 
       // 2) Fallback: coba endpoint ads langsung jika ada
-      response = await get({ path: `admin/ads/${effectivePromoId}` });
+      response = await get({ path: `ads/${effectivePromoId}` });
       if (response?.status === 200 && (response?.data?.data || response?.data)) {
         const ad = response.data?.data || response.data;
         // Collect all available images from ad
@@ -1130,10 +1130,13 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       const apiUrl = rawApi.replace(/\/+$/, '');
 
       // Try primary endpoint first, then fallback
-      // In [promoId].jsx, replace the endpoints array with:
       const endpoints = [
-        `${apiUrl}/admin/promos/${promoData.id}/items`, // matches storeForPromo()
-        `${apiUrl}/admin/promo-items` // matches store() - add promo_id in payload
+        // unified claim endpoint (auto-handle promo/voucher)
+        `${apiUrl}/ads/${promoData.id}/claim`,
+        // promo item storeForPromo (tanpa /admin)
+        `${apiUrl}/promos/${promoData.id}/items`,
+        // direct claim ke promo-items (butuh promo_id & claim=true)
+        `${apiUrl}/admin/promo-items`
       ];
 
       const claimHeaders = {
@@ -1144,66 +1147,43 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       
       const payload = {
         promo_id: promoData.id,
-        claim: true, // signal claim action; backend will set status and decrement stock transactionally
+        claim: true,
         expires_at: promoData.expires_at || null,
       };
 
       let savedItem = null;
       let lastError = '';
 
-      // Try endpoints one by one with delay to prevent rate limiting
       for (let i = 0; i < endpoints.length; i++) {
         const url = endpoints[i];
-        
         try {
-          const res = await fetch(url, { 
-            method: 'POST', 
-            headers: claimHeaders, 
-            body: JSON.stringify(payload) 
+          const isUnified = /\/ads\/\d+\/claim$/.test(url);
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: claimHeaders,
+            body: isUnified ? undefined : JSON.stringify(payload),
           });
-          
           const txt = await res.text().catch(() => '');
           let json = {};
-          try {
-            json = txt ? JSON.parse(txt) : {};
-          } catch {
-            json = { raw: txt };
-          }
+          try { json = txt ? JSON.parse(txt) : {}; } catch { json = { raw: txt }; }
 
           if (res.ok) {
             savedItem = json?.data ?? json;
             break;
           }
 
-          if (res.status === 401) {
-            lastError = 'Sesi berakhir. Silakan login ulang.';
-            break;
-          }
-          
-          if (res.status === 429) {
-            lastError = 'Terlalu banyak percobaan. Silakan tunggu sebentar.';
-            break;
-          }
-          
+          if (res.status === 401) { lastError = 'Sesi berakhir. Silakan login ulang.'; break; }
+          if (res.status === 429) { lastError = 'Terlalu banyak percobaan. Silakan tunggu sebentar.'; break; }
           if (res.status === 422 && json?.errors) {
             lastError = Object.values(json.errors).flat().join(', ');
             break;
           }
-          
+
           lastError = json?.message || json?.error || `HTTP ${res.status}`;
-          
-          // Add small delay between attempts to prevent rate limiting
-          if (i < endpoints.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-          
+          if (i < endpoints.length - 1) await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           lastError = e?.message || 'Network error';
-          
-          // Add delay on network error too
-          if (i < endpoints.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
+          if (i < endpoints.length - 1) await new Promise(r => setTimeout(r, 500));
         }
       }
 
