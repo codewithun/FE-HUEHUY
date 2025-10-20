@@ -30,6 +30,27 @@ const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
   .replace(/\/$/, '')
   .replace(/\/api$/, '');
 
+// +++ Tambah helper normalisasi URL media +++
+const toAbsMediaUrl = (raw) => {
+  if (!raw || typeof raw !== 'string') return null;
+  let s = raw.trim();
+  if (!s) return null;
+  // absolute?
+  if (/^https?:\/\//i.test(s)) return s;
+  // hilangkan leading slash
+  s = s.replace(/^\/+/, '');
+  // handle api/storage
+  s = s.replace(/^api\/storage\//i, 'storage/');
+  // jika sudah storage/ → gabungkan dengan base
+  if (/^storage\//i.test(s)) return `${apiUrl}/${s}`;
+  // jika path folder file storage laravel → prefiks storage/
+  if (/^(ads|promos|uploads|images|files|banners)\//i.test(s)) {
+    return `${apiUrl}/storage/${s}`;
+  }
+  // fallback
+  return `${apiUrl}/${s}`;
+};
+
 export default function Save() {
   const router = useRouter();
   const [modalValidation, setModalValidation] = useState(false);
@@ -103,27 +124,48 @@ export default function Save() {
           (it) => !currentUserId || String(it.user_id) === String(currentUserId)
         );
 
+        // Di dalam fetchData() mapping PROMO ITEMS, ganti blok mapping 'mapped' → isi gambar & kontak
         const mapped = userFilteredRows.map((it) => {
           const ad = it.promo || it.ad || {};
           const claimedAt = it.created_at || it.reserved_at || null;
           const expiredAt = it.expires_at || ad.end_date || null;
-          // Backend PromoItem menggunakan 'redeemed_at'
           const redeemedAt = it.redeemed_at || null;
           const isRedeemed = !!(redeemedAt || it.status === 'redeemed');
 
           const validation_type = ad.validation_type || it.validation_type || 'auto';
 
-          const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
-            .replace(/\/api\/?$/, '')
-            .replace(/\/$/, '');
+          // Pilih kandidat gambar terbaik
+          const imgCandidates = [
+            ad.picture_source,
+            ad.image_1,
+            ad.image_2,
+            ad.image_3,
+            ad.image,
+          ];
+          const picture =
+            toAbsMediaUrl(imgCandidates.find((u) => u && String(u).trim() !== '')) ||
+            '/default-avatar.png';
+
+          // Owner/contact (ambil dari ad.owner_* atau cube.user/corporate jika ada)
+          const ownerName =
+            ad.owner_name ||
+            ad?.cube?.user?.name ||
+            ad?.cube?.corporate?.name ||
+            'Merchant';
+
+          const ownerPhone =
+            ad.owner_contact ||
+            ad?.cube?.user?.phone ||
+            ad?.cube?.corporate?.phone ||
+            '';
 
           return {
-            id: it.id, // ini adalah promo_item.id
+            id: it.id,
             type: 'promo',
             code: it.code,
             claimed_at: claimedAt,
             expired_at: expiredAt,
-            validated_at: redeemedAt, // FE mapping
+            validated_at: redeemedAt,
             validation_type,
             user_id: it.user_id,
             promo_item: {
@@ -140,20 +182,28 @@ export default function Save() {
             ad: {
               id: ad.id,
               title: ad.title || ad.name || 'Promo',
-              picture_source: ad.image
-                ? `${base}/storage/${ad.image}`
-                : ad.picture_source || '/default-avatar.png',
+              picture_source: picture,
               status: ad.status || 'active',
               description: ad.description,
               validation_type,
+              // simpan juga owner_* agar modal bisa akses langsung
+              owner_name: ownerName,
+              owner_contact: ownerPhone,
               cube: {
                 community_id: ad.community_id || ad?.cube?.community_id || 1,
                 user: {
-                  name: ad.owner_name || ad?.cube?.user?.name || 'Merchant',
-                  phone: ad.owner_contact || '',
+                  name: ownerName,
+                  phone: ownerPhone,
                 },
                 corporate: ad?.cube?.corporate || null,
-                tags: [{ address: ad.location || '', link: null, map_lat: null, map_lng: null }],
+                tags: [
+                  {
+                    address: ad.location || ad?.cube?.tags?.[0]?.address || '',
+                    link: ad?.cube?.tags?.[0]?.link || null,
+                    map_lat: ad?.cube?.tags?.[0]?.map_lat || null,
+                    map_lng: ad?.cube?.tags?.[0]?.map_lng || null,
+                  },
+                ],
               },
             },
           };
@@ -172,24 +222,30 @@ export default function Save() {
           (it) => !currentUserId || String(it.user_id) === String(currentUserId)
         );
 
+        // Di mapping VOUCHER ITEMS, normalisasi gambar juga
         const mapped = userFilteredRows.map((it) => {
           const voucher = it.voucher || {};
-          const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api')
-            .replace(/\/api\/?$/, '')
-            .replace(/\/$/, '');
-
           const validation_type = voucher.validation_type || it.validation_type || 'auto';
 
-          // VoucherItem hanya punya: id, user_id, voucher_id, code, used_at
+          const imgCandidates = [
+            voucher.image,
+            voucher.image_1,
+            voucher.image_2,
+            voucher.image_3,
+          ];
+          const picture =
+            toAbsMediaUrl(imgCandidates.find((u) => u && String(u).trim() !== '')) ||
+            '/default-avatar.png';
+
           const usedAt = it.used_at || null;
 
           return {
-            id: it.id, // ini adalah voucher_item.id
+            id: it.id,
             type: 'voucher',
             code: it.code,
             claimed_at: it.created_at,
             expired_at: voucher.valid_until || null,
-            validated_at: usedAt, // FE mapping
+            validated_at: usedAt,
             validation_type,
             user_id: it.user_id,
             voucher_item: {
@@ -203,7 +259,7 @@ export default function Save() {
             ad: {
               id: voucher.id,
               title: voucher.name || voucher.title || 'Voucher',
-              picture_source: voucher.image ? `${base}/storage/${voucher.image}` : '/default-avatar.png',
+              picture_source: picture,
               status: 'active',
               description: voucher.description,
               type: voucher.type,
@@ -214,12 +270,12 @@ export default function Save() {
               validation_type,
               cube: voucher.community
                 ? {
-                  community_id: voucher.community.id,
-                  code: `community-${voucher.community.id}`,
-                  user: { name: voucher.community.name || 'Community', phone: '' },
-                  corporate: null,
-                  tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
-                }
+                    community_id: voucher.community.id,
+                    code: `community-${voucher.community.id}`,
+                    user: { name: voucher.community.name || 'Community', phone: '' },
+                    corporate: null,
+                    tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
+                  }
                 : {},
             },
           };
@@ -1188,7 +1244,7 @@ export default function Save() {
                           : isItemValidatable(selected)
                             ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
                             : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                          }`}
+                        }`}
                         onClick={() => {
                           if (isItemValidatable(selected)) {
                             submitValidation(validationCode);
