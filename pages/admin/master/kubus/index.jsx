@@ -370,7 +370,7 @@ function KubusMain() {
               // Sesi Ubah Iklan
               setIsFormEdit(true);
               setIsAdsEditMode(true);
-              
+
               // Gunakan data yang tersedia
               const editData = pendingEditRow || selected;
               setSelected(editData);
@@ -378,17 +378,17 @@ function KubusMain() {
               setPendingEditRow(null); // habiskan tag agar tidak nempel ke sesi berikutnya
             } else {
               // Sesi Tambah Baru / Ubah Kubus biasa
-              
+
               // Reset semua state secara eksplisit PERTAMA
               setIsAdsEditMode(false); // pastikan reset isAdsEditMode untuk Tambah Baru
               setIsFormEdit(false);
               setSelected(null);
               setPendingEditRow(null); // double ensure
-              
+
               tableCtx?.setDataSelected?.(null);
               formValuesRef.current = [];
               resetCropState();
-              
+
               // Force state update dengan setTimeout
               setTimeout(() => {
                 setIsAdsEditMode(false);
@@ -406,13 +406,13 @@ function KubusMain() {
                 // kemungkinan besar ini adalah mode edit iklan
                 const hasSelectedWithAds = selected?.ads?.[0]?.id;
                 const isEditingAdBased = hasSelectedWithAds && isAdsEditMode;
-                
+
                 // TAPI: jika ini adalah form create (tidak ada ID di values), paksa tampilkan field
                 const isCreateMode = !values.find(v => v.name === 'id')?.value;
-                
+
                 // Tampilkan field jika: create mode ATAU bukan editing ad
                 const shouldShow = isCreateMode || !isEditingAdBased;
-                
+
                 if (!shouldShow) {
                   return null;
                 }
@@ -608,8 +608,16 @@ function KubusMain() {
               type: 'custom',
               custom: ({ values, setValues, errors }) => {
                 const ct = getCT(values);
-                if (!['promo', 'voucher'].includes(ct)) return null;
-                if (values.find((val) => val.name == 'ads[promo_type]')?.value !== 'offline') return null;
+                const promoType = values.find((val) => val.name == 'ads[promo_type]')?.value;
+
+                // === Logic baru ===
+                // Munculkan map jika:
+                // - Voucher (selalu tampil)
+                // - Atau Promo dengan tipe offline
+                const showMap =
+                  ct === 'voucher' || (ct === 'promo' && promoType === 'offline');
+
+                if (!showMap) return null;
 
                 return (
                   <div className="mt-4 space-y-4">
@@ -1302,14 +1310,14 @@ function KubusMain() {
                     // Reset crop state
                     resetCropState();
                     formValuesRef.current = [];
-                    
+
                     // Set states untuk edit mode
                     setPendingEditRow(row);
                     setIsAdsEditMode(true);
                     setSelected(row);
                     setIsFormEdit(true);
                     setTableCtx(ctx);
-                    
+
                     // Buka modal langsung tanpa delay
                     ctx.setDataSelected?.(row);
                     ctx.setModalForm?.(true);
