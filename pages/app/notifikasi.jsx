@@ -235,11 +235,9 @@ export default function NotificationPage() {
     });
   }, [type, loading, hasMore, cursor, localItems.length, initialLoad, version]);
 
-  // NEW: fetch live voucher detail to avoid stale meta in notifications
-  const fetchVoucherDetail = useCallback(async (voucherId) => {
-    if (!voucherId) return null;
+  async function fetchVoucherDetail(voucherId) {
     try {
-      const res = await fetch(`${apiBase}/api/vouchers/${voucherId}`, {
+      const res = await fetch(`${apiBase}/api/ads/${voucherId}`, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
@@ -247,27 +245,19 @@ export default function NotificationPage() {
           ...authHeader(),
         },
       });
-      if (!res.ok) return null;
-      const data = await res.json().catch(() => null);
-      const voucher = data?.data || data || null;
 
-      // Konsistensi dengan format live dari notifikasi
-      if (voucher) {
-        const validUntil = voucher.valid_until;
-        const expired = validUntil ? new Date(validUntil).getTime() < Date.now() : false;
-        const stock = voucher.stock ?? 0;
-        const outOfStock = !isNaN(stock) && stock <= 0;
-
-        voucher.live_expired = expired;
-        voucher.live_out_of_stock = outOfStock;
-        voucher.live_available = !expired && !outOfStock;
+      if (!res.ok) {
+        console.error('fetchVoucherDetail error:', res.status);
+        return null;
       }
 
-      return voucher;
-    } catch {
+      const json = await res.json();
+      return json?.data || null;
+    } catch (e) {
+      console.error('fetchVoucherDetail failed:', e);
       return null;
     }
-  }, []);
+  }
 
   async function claimVoucher(voucherId, notificationId) {
     try {
@@ -317,7 +307,7 @@ export default function NotificationPage() {
         }
       }
 
-      const res = await fetch(`${apiBase}/api/vouchers/${voucherId}/claim`, {
+      const res = await fetch(`${apiBase}/api/ads/${voucherId}/claim`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -421,7 +411,7 @@ export default function NotificationPage() {
     // Ambil gambar dengan prioritas baru (ads.image_1 > ads.picture_source > image_url)
     const ad = n?.ad || n?.grab?.ad || n?.promo?.ad || n?.voucher?.ad;
     const img =
-       n?.live_status?.image_url || 
+      n?.live_status?.image_url ||
       n?.ad_picture || // dari accessor backend
       ad?.image_1 ||
       ad?.image_2 ||
@@ -490,8 +480,8 @@ export default function NotificationPage() {
               <button
                 type="button"
                 className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${type === 'hunter'
-                    ? 'bg-white text-primary border-b-2 border-primary'
-                    : 'bg-white/80 text-gray-600'
+                  ? 'bg-white text-primary border-b-2 border-primary'
+                  : 'bg-white/80 text-gray-600'
                   }`}
                 onClick={() => handleTabChange('hunter')}
                 disabled={loading && initialLoad}
@@ -501,8 +491,8 @@ export default function NotificationPage() {
               <button
                 type="button"
                 className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${type === 'merchant'
-                    ? 'bg-white text-primary border-b-2 border-primary'
-                    : 'bg-white/80 text-gray-600'
+                  ? 'bg-white text-primary border-b-2 border-primary'
+                  : 'bg-white/80 text-gray-600'
                   }`}
                 onClick={() => handleTabChange('merchant')}
                 disabled={loading && initialLoad}
