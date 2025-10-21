@@ -1,233 +1,195 @@
-/* eslint-disable @next/next/no-img-element */
-import {
-  faArrowLeftLong,
-  faPaperPlane,
-} from '@fortawesome/free-solid-svg-icons';
-import Link from 'next/link';
+/* eslint-disable no-console */
+import { faArrowLeft, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
-import {
-  DateFormatComponent,
-  IconButtonComponent,
-  InputComponent,
-} from '../../../components/base.components';
-import { post, useGet } from '../../../helpers';
+import { useEffect, useMemo, useState } from 'react';
+import Cookies from 'js-cookie';
+import { token_cookie_name } from '../../../helpers';
+import { Decrypt } from '../../../helpers/encryption.helpers';
+import { InputComponent, IconButtonComponent } from '../../../components/base.components';
 
-export default function Pesan() {
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const apiJoin = (path = "") => {
+  const base = API_BASE.replace(/\/+$/, "");
+  const ensured = /\/api$/i.test(base) ? base : `${base}/api`;
+  return `${ensured}/${String(path).replace(/^\/+/, "")}`;
+};
+
+export default function ChatCommunityAdmin() {
   const router = useRouter();
-  const { id, communityId, adminName, type } = router.query;
+  const isReady = router.isReady;
+  const { communityId, adminName } = router.query;
+  const rawId = router.query.id;
+
+  // Jika URL `/app/pesan/community-admin-XX` -> adminId
+  // Jika URL `/app/pesan/123` -> chatId
+  const adminId = useMemo(() => {
+    const v = String(rawId || '');
+    return v.startsWith('community-admin-') ? v.replace('community-admin-', '') : null;
+  }, [rawId]);
+
+  const [chatId, setChatId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  
-  // Check if this is a community admin chat
-  const isCommunityAdminChat = type === 'admin' && id?.toString().startsWith('community-admin-');
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loading, code, dataChat, reset] = useGet({
-    path: id && !isCommunityAdminChat && `chat-rooms/${id}`,
-  });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loadingUser, codeUser, dataUser] = useGet({
-    path: `account`,
-  });
+  const token = useMemo(() => {
+    const enc = Cookies.get(token_cookie_name);
+    return enc ? Decrypt(enc) : '';
+  }, []);
 
-  // Demo data for community admin chat
-  const [adminChatData] = useState({
-    data: {
-      id: id,
-      admin_name: adminName,
-      community_id: communityId,
-      chats: [
-        {
-          id: 1,
-          message: 'Halo! Selamat datang di komunitas kami. Ada yang bisa saya bantu?',
-          is_my_reply: false,
-          created_at: new Date().toISOString(),
-          user_sender: { name: adminName }
+  const fetchMessages = async (idToUse = chatId, isBackground = false) => {
+    if (!idToUse) return;
+    try {
+      if (isBackground) {
+        setRefreshing(true); // fetch diam-diam, tanpa "Memuat chat..."
+      } else {
+        setInitialLoading(true);
+      }
+
+      const res = await fetch(apiJoin(`admin/chat/${idToUse}/messages`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+
+      // cuma update kalau beda, biar gak flicker
+      setMessages((prev) => {
+        const newMessages = json.data || [];
+        if (JSON.stringify(prev) !== JSON.stringify(newMessages)) {
+          return newMessages;
         }
-      ]
-    }
-  });
-
-  // Use admin chat data if it's a community admin chat
-  const currentChatData = isCommunityAdminChat ? adminChatData : dataChat;
-
-  // Handle back navigation
-  const handleBackNavigation = () => {
-    if (isCommunityAdminChat && communityId) {
-      // If it's a community admin chat, go back to admin chat list
-      router.push(`/app/komunitas/admin-chat/${communityId}`);
-    } else {
-      // For regular chats, use default back behavior
-      router.back();
+        return prev;
+      });
+    } catch (err) {
+      console.error('Gagal ambil chat:', err);
+    } finally {
+      if (isBackground) setRefreshing(false);
+      else setInitialLoading(false);
     }
   };
 
-  useEffect(() => {
-    setTimeout(() => {
-      document.getElementById('chat-box').scrollTo({
-        top: currentChatData?.data?.chats.length * 100,
-        behavior: 'smooth',
+  // Coba temukan/buat room agar dapat chatId ketika masuk via community-admin-XX
+  const resolveChatRoom = async () => {
+    if (!adminId || !communityId) return null;
+    try {
+      setInitialLoading(true);
+      const res = await fetch(apiJoin('admin/chat/resolve'), { // TODO: sesuaikan path
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          receiver_id: Number(adminId),
+          receiver_type: 'admin',
+          community_id: communityId,
+        }),
       });
-    }, 100);
-  }, [currentChatData]);
+      const json = await res.json();
+      const id = json?.chat?.id || json?.data?.id;
+      if (id) setChatId(id);
+      return id || null;
+    } catch (e) {
+      console.error('Gagal resolve room:', e);
+      return null;
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  // Tentukan sumber chatId: dari URL angka, atau resolve dari adminId+communityId
+  useEffect(() => {
+    if (!isReady || !token) return;
+    const v = String(rawId || '');
+    if (/^\d+$/.test(v)) {
+      setInitialLoading(true);
+      setChatId(Number(v));
+    } else {
+      // masuk via community-admin-XX -> coba resolve chat room
+      resolveChatRoom().then((id) => {
+        if (!id) setInitialLoading(false); // tidak ada room -> tampil "Belum ada pesan"
+      });
+    }
+  }, [isReady, rawId, adminId, communityId, token]);
+
+  // Fetch pertama + polling berkala ketika sudah punya chatId
+  useEffect(() => {
+    if (!chatId) return;
+    fetchMessages(chatId);
+    const itv = setInterval(() => fetchMessages(chatId, true), 5000);
+    return () => clearInterval(itv);
+  }, [chatId, token]);
+
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+    try {
+      const res = await fetch(apiJoin('admin/chat/send'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          receiver_id: Number(adminId),
+          receiver_type: 'admin',
+          community_id: communityId,
+          message: message.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setChatId(json.chat.id);
+        setMessages((prev) => [...prev, json.message]);
+        setMessage('');
+        // pastikan state sinkron
+        fetchMessages(json.chat.id, true);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
-    <>
-      <div className="lg:mx-auto relative lg:max-w-md">
-        <div className="bg-primary h-10"></div>
-        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
-          <div className="flex justify-between items-center gap-2 p-2 sticky top-0 z-30 bg-white bg-opacity-40 backdrop-blur-sm border-b ">
-            <div className="px-2">
-              <IconButtonComponent
-                icon={faArrowLeftLong}
-                variant="simple"
-                size="lg"
-                onClick={handleBackNavigation}
-              />
-            </div>
-
-            <div className="font-semibold w-full text-lg">
-              {isCommunityAdminChat 
-                ? `Admin ${adminName}`
-                : currentChatData?.data?.world
-                ? currentChatData?.data?.world?.name
-                : currentChatData?.data?.user_merchant_id == dataUser?.data?.id
-                ? currentChatData?.data?.user_hunter?.name
-                : currentChatData?.data?.user_merchant?.name}
-            </div>
-          </div>
-
-          <div
-            className="overflow-y-auto overflow-x-hidden scroll h-[90vh] pb-10"
-            id="chat-box"
-          >
-            {currentChatData?.data?.chats.map((item, key) => {
-              if (item.is_my_reply) {
-                return (
-                  <div
-                    className="p-5 flex flex-col justify-end h-max"
-                    key={key}
-                  >
-                    <div className="bg-green-200 w-max max-w-[240px] p-3 rounded-xl rounded-tr-none self-end">
-                      {item?.message}
-                      {item?.cube && (
-                        <>
-                          Kubus:
-                          <Link href={`/app/${item?.cube?.code}`} key={key}>
-                            <div className="grid grid-cols-4 gap-3 py-2 px-3 shadow-sm rounded-[10px] relative bg-white bg-opacity-40 backdrop-blur-sm mt-1">
-                              <div className="col-span-3">
-                                <p className="font-semibold">
-                                  {item?.cube?.code}
-                                </p>
-                              </div>
-                            </div>
-                          </Link>
-                        </>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-400 self-end mt-2">
-                      <DateFormatComponent
-                        date={item?.created_at}
-                        format="DD/MM/YYYY HH:mm"
-                      />
-                    </div>
-                  </div>
-                );
-              } else {
-                return (
-                  <div
-                    className="p-5 flex flex-col justify-end h-max"
-                    key={key}
-                  >
-                    <div className="bg-gray-200 w-max max-w-[240px] p-3 rounded-xl rounded-tl-none">
-                      {currentChatData?.data?.world && (
-                        <p className="font-semibold mb-1">
-                          {item?.user_sender?.name}
-                        </p>
-                      )}
-                      {item?.message}
-                      {item?.cube && (
-                        <>
-                          Kubus:
-                          <Link href={`/app/${item?.cube?.code}`} key={key}>
-                            <div className="grid grid-cols-4 gap-3 py-2 px-3 shadow-sm rounded-[10px] relative bg-white bg-opacity-40 backdrop-blur-sm mt-1">
-                              <div className="col-span-3">
-                                <p className="font-semibold">
-                                  {item?.cube?.code}
-                                </p>
-                              </div>
-                            </div>
-                          </Link>
-                        </>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-2">
-                      <DateFormatComponent
-                        date={item?.created_at}
-                        format="DD/MM/YYYY HH:mm"
-                      />
-                    </div>
-                  </div>
-                );
-              }
-            })}
-          </div>
-        </div>
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <div className="flex items-center gap-3 p-4 bg-primary text-white">
+        <button onClick={() => router.back()}>
+          <FontAwesomeIcon icon={faArrowLeft} />
+        </button>
+        <h1 className="font-semibold text-lg">Admin {adminName}</h1>
       </div>
 
-      <div
-        className={`fixed bottom-0 left-0 w-screen pt-3 pb-2 px-6 bg-slate-100 rounded-t-[25px] z-20`}
-      >
-        <div className="lg:max-w-md mx-auto flex gap-4 items-center">
-          <div className="w-full">
-            <InputComponent
-              placeholder="Tulis pesan disini..."
-              onChange={(e) => setMessage(e)}
-              value={message}
-            />
-          </div>
-          <div>
-            <IconButtonComponent
-              icon={faPaperPlane}
-              size="lg"
-              className=" rounded-lg"
-              loading={chatLoading}
-              onClick={async () => {
-                if (isCommunityAdminChat) {
-                  // For community admin chat, show a demo response
-                  setChatLoading(true);
-                  // Simulate sending message and getting response
-                  setTimeout(() => {
-                    alert('Pesan terkirim! (Demo: Admin akan merespons dalam aplikasi nyata)');
-                    setMessage('');
-                    setChatLoading(false);
-                  }, 1000);
-                  return;
-                }
-
-                setChatLoading(true);
-                const execute = await post({
-                  path: `chats`,
-                  body: {
-                    chat_room_id: currentChatData?.data?.id,
-                    message: message,
-                  },
-                });
-
-                if (execute.status == 201) {
-                  setChatLoading(false);
-                  setMessage('');
-                  reset();
-                } else {
-                  setChatLoading(false);
-                }
-              }}
-            />
-          </div>
-        </div>
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {initialLoading ? (
+          <p className="text-center text-gray-500 mt-10">Memuat chat...</p>
+        ) : messages.length ? (
+          messages.map((m) => (
+            <div key={m.id} className={`mb-3 flex ${m.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                className={`max-w-xs px-4 py-2 rounded-2xl ${m.sender_type === 'admin'
+                    ? 'bg-blue-500 text-white rounded-br-none'
+                    : 'bg-gray-200 text-gray-900 rounded-bl-none'
+                  }`}
+              >
+                {m.message}
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-center text-gray-500 mt-10">Belum ada pesan</p>
+        )}
       </div>
-    </>
+
+      {/* Input */}
+      <div className="p-3 bg-white flex gap-2 items-center border-t">
+        <InputComponent
+          placeholder="Tulis pesan..."
+          onChange={(v) => setMessage(v)}
+          value={message}
+        />
+        <IconButtonComponent
+          icon={faPaperPlane}
+          size="lg"
+          onClick={sendMessage}
+        />
+      </div>
+    </div>
   );
 }
