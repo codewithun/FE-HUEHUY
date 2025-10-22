@@ -1,9 +1,13 @@
+/* eslint-disable no-console */
 import {
   faArrowLeft,
   faCheckCircle,
+  faClock,
+  faGlobe,
   faLock,
+  faPlus,
   faSearch,
-  faTimes,
+  faTags,
   faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -11,8 +15,9 @@ import Cookies from "js-cookie";
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
+import FlexibleNotification from '../../../components/construct.components/notification/FlexibleNotification';
 import { token_cookie_name } from "../../../helpers";
 import { Decrypt } from "../../../helpers/encryption.helpers";
 
@@ -80,8 +85,14 @@ const joinCommunityAPI = async (communityId) => {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.message || err?.error || 'Gagal bergabung dengan komunitas');
+    const errBody = await res.json().catch(() => ({}));
+    const error = new Error(errBody?.message || errBody?.error || 'Gagal bergabung dengan komunitas');
+    // sematkan properti tambahan supaya caller bisa memutuskan fallback
+    error.code = res.status;
+    if (errBody && typeof errBody === 'object') {
+      try { Object.assign(error, errBody); } catch {}
+    }
+    throw error;
   }
   return res.json();
 };
@@ -140,12 +151,12 @@ const normalizeCommunities = (raw) => {
   // backend kita sekarang balikin { data: [...] }, tapi handle array langsung
   const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
   return list.map((c) => {
-    // Normalisasi privacy dari beberapa kemungkinan field
-    const privacyRaw = c.privacy ?? c.world_type ?? c.type ?? 'public';
-    const privacyStr = String(privacyRaw || '').toLowerCase();
+  // Normalisasi privacy dari beberapa kemungkinan field
+  const privacyRaw = c.privacy ?? c.world_type ?? c.type ?? 'public';
+  const privacyStr = String(privacyRaw || '').toLowerCase();
 
-    // Hanya "private" yang benar-benar private. "pribadi" tidak lagi dianggap private.
-    let privacy = (privacyStr === 'private') ? 'private' : (privacyStr || 'public');
+  // Selaraskan dengan backend: treat 'pribadi' as private
+  let privacy = privacyStr === 'pribadi' ? 'private' : (privacyStr || 'public');
 
     // Tetap hormati flag boolean is_private/private bila ada.
     const isPrivateFlag = (c.is_private ?? c.private);
@@ -174,6 +185,8 @@ const normalizeCommunities = (raw) => {
       name: String(c.name ?? ''),
       description: c.description ?? '',
       category: c.category ?? '',
+      bg_color_1: c.bg_color_1 ?? null,
+      bg_color_2: c.bg_color_2 ?? null,
       logo: c.logo ?? null,
       privacy,
       isVerified: Boolean(c.isVerified ?? c.is_verified ?? false),
@@ -256,8 +269,27 @@ export default function Komunitas() {
   const [isClient, setIsClient] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showJoinPopup, setShowJoinPopup] = useState(false);
-  const [selectedCommunity, setSelectedCommunity] = useState(null);
+  
+  // Notification states
+  const [notification, setNotification] = useState({
+    show: false,
+    type: 'info',
+    title: '',
+    message: '',
+    actionText: '',
+    onAction: null
+  });
+
+  const showNotification = (config) => {
+    setNotification({
+      show: true,
+      ...config
+    });
+  };
+
+  const hideNotification = () => {
+    setNotification(prev => ({ ...prev, show: false }));
+  };
 
   useEffect(() => {
     setIsClient(true);
@@ -334,9 +366,11 @@ export default function Komunitas() {
     data = data.filter((c) => (c.is_active === undefined ? true : Boolean(c.is_active)));
 
     if (activeTab === 'komunitasku') {
-      data = data.filter(c => Boolean(c.isJoined));
+      // Termasuk yang sudah request (pending) sebagai bagian dari komunitas saya
+      data = data.filter(c => Boolean(c.isJoined) || Boolean(c.hasRequested));
     } else if (activeTab === 'belum-gabung') {
-      data = data.filter(c => !c.isJoined);
+      // Tersedia = belum bergabung dan belum request
+      data = data.filter(c => !c.isJoined && !c.hasRequested);
     }
 
     if (searchQuery.trim()) {
@@ -349,6 +383,13 @@ export default function Komunitas() {
 
     return data;
   }, [communities, activeTab, searchQuery]);
+
+  // Hitung statistik ringkas: gabungkan pending sebagai "Bergabung" (sudah ajukan)
+  const stats = useMemo(() => {
+    const joined = communities.filter(c => Boolean(c.isJoined) || Boolean(c.hasRequested)).length;
+    const available = communities.filter(c => !c.isJoined && !c.hasRequested).length;
+    return { joined, available };
+  }, [communities]);
 
   const handleOpenCommunity = (communityId) => {
     router.push(`/app/komunitas/dashboard/${communityId}`);
@@ -364,147 +405,182 @@ export default function Komunitas() {
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="container mx-auto relative z-10 pb-28">
-          {/* Header */}
-          <div className="w-full bg-primary relative overflow-hidden">
-            <div className="absolute inset-0">
-              <div className="absolute top-4 right-4 w-16 h-16 bg-cyan-400 rounded-full opacity-15"></div>
-              <div className="absolute bottom-8 left-8 w-12 h-12 bg-teal-300 rounded-full opacity-10"></div>
-              <div className="absolute top-12 left-1/4 w-8 h-8 bg-cyan-300 rounded-full opacity-15"></div>
-            </div>
-
-            <div className="relative px-4 py-6 text-white">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <Link href="/app">
-                    <FontAwesomeIcon icon={faArrowLeft} className="text-xl" />
-                  </Link>
-                  <h1 className="text-xl font-bold">Komunitas</h1>
-                </div>
-              </div>
-
-              {/* Ilustrasi */}
-              <div className="flex items-center justify-center py-6 relative">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
-                      <div className="w-8 h-8 bg-orange-200 rounded-full"></div>
-                    </div>
-                    <div className="absolute -top-6 -left-1 bg-white text-primary px-2 py-1 rounded-lg text-xs shadow-sm">
-                      💬
-                    </div>
-                  </div>
-
-                  <div className="relative">
-                    <div className="w-18 h-18 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
-                      <div className="w-12 h-12 bg-blue-200 rounded-full"></div>
-                    </div>
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold shadow-sm">
-                      ADS
-                    </div>
-                    <div className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-primary px-2 py-1 rounded-lg text-xs shadow-sm">
-                      👑
-                    </div>
-                  </div>
-
-                  <div className="relative">
-                    <div className="w-14 h-14 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full flex items-center justify-center shadow-lg">
-                      <div className="w-8 h-8 bg-gray-100 rounded-full"></div>
-                    </div>
-                    <div className="absolute -top-6 -right-1 bg-white text-primary px-2 py-1 rounded-lg text-xs shadow-sm">
-                      📋
-                    </div>
-                  </div>
-                </div>
-
-                <div className="absolute top-2 left-6 bg-blue-400 text-white p-1.5 rounded-lg text-xs shadow-sm">
-                  👍
-                </div>
-                <div className="absolute bottom-2 right-6 bg-green-400 text-white p-1.5 rounded-lg text-xs shadow-sm">
-                  📢
-                </div>
-              </div>
-
-              <div className="text-center mt-6 mb-4">
-                <p className="text-lg font-semibold text-white drop-shadow-md">
-                  Lebih mudah berbagi promo sesama anggota komunitas
-                </p>
+          <div className="relative">
+            {/* Banner (centered) */}
+            <div className="w-full aspect-[16/6] overflow-hidden bg-gradient-to-r from-[#0b2e13] to-[#14532d] flex items-center justify-center z-10" />
+            {/* Glass header overlay at top-left */}
+            <div className="absolute top-3 left-4 z-30">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/25 backdrop-blur-md border border-white/40 shadow-sm">
+                <Link href="/app" title="Kembali" className="text-white">
+                  <FontAwesomeIcon icon={faArrowLeft} className="text-base" />
+                </Link>
+                <h1 className="text-sm font-semibold text-white drop-shadow-sm">Kelola Komunitas</h1>
               </div>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
-            <div className="relative -top-5 px-4">
-              <div className="mb-6">
-                <div className="w-full bg-white border border__primary px-6 py-4 rounded-[20px] flex justify-between items-center shadow-sm">
-                  <input
-                    type="text"
-                    placeholder="Cari komunitas?..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 outline-none bg-transparent"
-                  />
-                  <FontAwesomeIcon icon={faSearch} className="text__primary" />
+          <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-4 relative z-20 bg-gradient-to-br from-cyan-50">
+            <div className="relative -top-4 px-4">
+              <div className="bg-white border border__primary rounded-[20px] flex items-center overflow-hidden">
+                <div className="flex-1">
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <FontAwesomeIcon icon={faSearch} className="text__primary" />
+                    <input
+                      type="text"
+                      placeholder="Cari komunitas..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-transparent outline-none text-slate-800 placeholder-slate-400"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="px-4 pb-6">
-              <div className="flex mb-4 border-b border-slate-200">
-                <button
-                  className={`px-4 py-2 ${activeTab === 'semua' ? 'text-primary font-semibold border-b-2 border-primary' : 'text-slate-600'}`}
-                  onClick={() => setActiveTab('semua')}
-                >
-                  Semua
-                </button>
-                <button
-                  className={`px-4 py-2 ${activeTab === 'komunitasku' ? 'text-primary font-semibold border-b-2 border-primary' : 'text-slate-600'}`}
-                  onClick={() => setActiveTab('komunitasku')}
-                >
-                  Komunitasku
-                </button>
-                <button
-                  className={`px-4 py-2 ${activeTab === 'belum-gabung' ? 'text-primary font-semibold border-b-2 border-primary' : 'text-slate-600'}`}
-                  onClick={() => setActiveTab('belum-gabung')}
-                >
-                  Belum Gabung
-                </button>
+            <div className="bg-transparent border-b border-[#cdd0b3]">
+              <div className="px-4">
+                <div className="flex space-x-8">
+                  <button
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'semua'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                    onClick={() => setActiveTab('semua')}
+                  >
+                    Semua Komunitas
+                  </button>
+                  <button
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'komunitasku'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                    onClick={() => setActiveTab('komunitasku')}
+                  >
+                    Komunitas Saya
+                  </button>
+                  <button
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'belum-gabung'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                    onClick={() => setActiveTab('belum-gabung')}
+                  >
+                    Tersedia
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 py-6">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#0b2e13]/5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#0b2e13] text-white">
+                      <FontAwesomeIcon icon={faUsers} className="text-sm" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-[#14532d]">Bergabung</p>
+                      <p className="text-lg font-semibold text-slate-900">{stats.joined}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#0b2e13]/5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#14532d] text-white">
+                      <FontAwesomeIcon icon={faGlobe} className="text-sm" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-[#14532d]">Tersedia</p>
+                      <p className="text-lg font-semibold text-slate-900">{stats.available}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="mb-6">
                 <div className="mb-4">
-                  <h2 className="text-slate-900 text-lg font-semibold">Komunitas Lainnya</h2>
-                  <p className="text-slate-600 text-sm">Temukan komunitas baru yang menarik</p>
+                  <h2 className="text-slate-900 text-lg font-semibold">
+                    {activeTab === 'semua' ? 'Semua Komunitas' :
+                      activeTab === 'komunitasku' ? 'Komunitas Saya' : 'Komunitas Tersedia'}
+                  </h2>
+                  <p className="text-slate-600 text-sm">
+                    {activeTab === 'semua' ? 'Daftar lengkap komunitas yang tersedia' :
+                      activeTab === 'komunitasku' ? 'Komunitas yang sudah Anda ikuti' : 'Komunitas yang bisa Anda ikuti'}
+                  </p>
                 </div>
 
                 <div className="space-y-3">
                   {loading ? (
-                    <div>Loading komunitas...</div>
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
+                        <p className="text-slate-500">Memuat komunitas...</p>
+                      </div>
+                    </div>
+                  ) : filteredCommunities.length === 0 ? (
+                    <div className="bg-white rounded-xl p-8 text-center border border-[#d8d8d8] bg-[#0b2e13]/5">
+                      <div className="w-16 h-16 bg-white border border-[#d8d8d8] rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FontAwesomeIcon icon={faUsers} className="text-[#14532d] text-xl" />
+                      </div>
+                      <h3 className="font-semibold text-slate-900 mb-2">
+                        {activeTab === 'komunitasku' ? 'Belum Ada Komunitas' : 'Tidak Ada Hasil'}
+                      </h3>
+                      <p className="text-slate-600 text-sm">
+                        {activeTab === 'komunitasku'
+                          ? 'Anda belum bergabung dengan komunitas apapun'
+                          : searchQuery
+                            ? `Tidak ditemukan komunitas dengan kata kunci "${searchQuery}"`
+                            : 'Belum ada komunitas yang tersedia'
+                        }
+                      </p>
+                    </div>
                   ) : (
                     filteredCommunities.map((community) => (
                       <CommunityCard
                         key={community.id}
                         community={community}
-                        type={community.isJoined ? 'joined' : 'notJoined'}
                         onOpenCommunity={handleOpenCommunity}
                         formatNumber={formatNumber}
-                        refreshCommunities={fetchCommunities}
-                        setActiveTab={setActiveTab}
-                        onShowJoinPopup={(c) => {
-                          setSelectedCommunity(c);
-                          setShowJoinPopup(true);
-                        }}
-                        // ====== Tambahkan updater agar parent bisa update state setelah join ======
-                        onApplyDelta={(id, joinOrLeave, delta) => {
-                          setCommunities(prev => prev.map(item => {
-                            if (item.id !== id) return item;
-                            const d = Number.isFinite(delta) ? delta : (joinOrLeave === 'join' ? +1 : -1);
-                            return {
-                              ...item,
-                              isJoined: joinOrLeave === 'join',
-                              members: Math.max(0, (item.members || 0) + d),
-                            };
-                          }));
+                        onShowJoinPopup={async (c) => {
+                          try {
+                            const rawPrivacy = String(c?.privacy || '').toLowerCase();
+                            const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
+                            if (privacy === 'private') {
+                              await requestJoinCommunityAPI(c.id);
+                              showNotification({
+                                type: 'success',
+                                title: 'Permintaan dikirim',
+                                message: 'Tunggu persetujuan admin komunitas.',
+                                autoClose: 3000,
+                              });
+                            } else {
+                              await joinCommunityAPI(c.id);
+                              showNotification({
+                                type: 'success',
+                                title: 'Berhasil bergabung',
+                                message: `Anda sekarang anggota ${c.name}.`,
+                                autoClose: 3000,
+                              });
+                              try {
+                                localStorage.setItem(
+                                  'community:membership',
+                                  JSON.stringify({ id: c.id, action: 'join', delta: +1, at: Date.now() })
+                                );
+                              } catch {}
+                              fetchCommunities();
+                            }
+                          } catch (error) {
+                            console.error('Join error:', error);
+                            showNotification({
+                              type: 'error',
+                              title: 'Gagal',
+                              message: error?.message || 'Gagal memproses permintaan.',
+                              autoClose: 5000,
+                            });
+                          }
                         }}
                       />
                     ))
@@ -512,168 +588,25 @@ export default function Komunitas() {
                 </div>
               </div>
             </div>
+
+            <FlexibleNotification
+              show={notification.show}
+              onClose={hideNotification}
+              type={notification.type}
+              title={notification.title}
+              message={notification.message}
+              actionText={notification.actionText}
+              onAction={notification.onAction}
+              autoClose={notification.autoClose}
+              position="center"
+              size="md"
+            />
+
+            <BottomBarComponent active={'community'} />
           </div>
         </div>
-
-        {/* Join Popup */}
-        {showJoinPopup && selectedCommunity && (
-          <JoinConfirmationPopup
-            community={selectedCommunity}
-            isPrivate={String(selectedCommunity?.privacy || '').toLowerCase() === 'private'}
-            onConfirm={async () => {
-              try {
-                const isPriv = String(selectedCommunity?.privacy || '').toLowerCase() === 'private';
-                if (isPriv) {
-                  await requestJoinCommunityAPI(selectedCommunity.id);
-                  setShowJoinPopup(false);
-                  setSelectedCommunity(null);
-
-                  // Tandai sebagai sudah mengirim permintaan (pending)
-                  setCommunities(prev => prev.map(c => (
-                    c.id === selectedCommunity.id ? { ...c, hasRequested: true } : c
-                  )));
-
-                  alert('Permintaan bergabung terkirim. Menunggu persetujuan admin.');
-                } else {
-                  await joinCommunityAPI(selectedCommunity.id);
-                  setShowJoinPopup(false);
-                  setSelectedCommunity(null);
-
-                  // Optimistic + update angka members
-                  setCommunities(prev =>
-                    prev.map(c =>
-                      c.id === selectedCommunity.id
-                        ? { ...c, isJoined: true, members: Math.max(0, (c.members || 0) + 1) }
-                        : c
-                    )
-                  );
-                  setActiveTab('komunitasku');
-
-                  // Broadcast ke tab/halaman lain
-                  localStorage.setItem(
-                    'community:membership',
-                    JSON.stringify({ id: selectedCommunity.id, action: 'join', delta: +1, at: Date.now() })
-                  );
-                }
-              } catch (error) {
-                alert(error?.message || (String(selectedCommunity?.privacy || '').toLowerCase() === 'private' ? 'Gagal mengirim permintaan bergabung' : 'Gagal bergabung'));
-                setShowJoinPopup(false);
-                setSelectedCommunity(null);
-              }
-            }}
-            onCancel={() => {
-              setShowJoinPopup(false);
-              setSelectedCommunity(null);
-            }}
-          />
-        )}
-
-        <BottomBarComponent active={'community'} />
       </div>
     </>
-  );
-}
-
-/** =========================
- * Join Confirmation Popup
- * ========================= */
-function JoinConfirmationPopup({
-  community,
-  isPrivate,
-  onConfirm,
-  onCancel,
-}) {
-  const [isJoining, setIsJoining] = useState(false);
-
-  const handleConfirm = async () => {
-    setIsJoining(true);
-    try {
-      await onConfirm();
-    } finally {
-      setIsJoining(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-auto shadow-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800">{isPrivate ? 'Minta Bergabung' : 'Bergabung Komunitas'}</h3>
-          <button
-            onClick={onCancel}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <FontAwesomeIcon icon={faTimes} className="text-gray-500" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {community.logo && /^https?:\/\/[^ "]+$/.test(community.logo) ? (
-              <Image
-                src={community.logo}
-                width={48}
-                height={48}
-                alt="Community Logo"
-                className="object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">
-                  {community.name.substring(0, 2).toUpperCase()}
-                </span>
-              </div>
-            )}
-          </div>
-          <div>
-            <h4 className="font-semibold text-slate-900">{community.name}</h4>
-            <p className="text-sm text-slate-600">{(community.members ?? 0).toString()} anggota</p>
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <p className="text-slate-700 text-center leading-relaxed">
-            {isPrivate ? (
-              <>Kirim permintaan untuk bergabung ke komunitas <span className="font-semibold">{community.name}</span>. Permintaan Anda akan menunggu persetujuan admin.</>
-            ) : (
-              <>Apakah Anda yakin ingin bergabung dengan komunitas <span className="font-semibold">{community.name}</span>?</>
-            )}
-          </p>
-          <div className="mt-4 bg-blue-50 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-sm text-blue-800">
-              <FontAwesomeIcon icon={faCheckCircle} className="text-blue-600" />
-              <span>{isPrivate ? 'Permintaan akan muncul pada daftar persetujuan admin.' : 'Anda akan mendapatkan akses ke promo eksklusif komunitas'}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-3 px-4 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Batal
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={isJoining}
-            className="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isJoining ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                {isPrivate ? 'Mengirim...' : 'Bergabung...'}
-              </>
-            ) : (
-              <>
-                <FontAwesomeIcon icon={faUsers} />
-                {isPrivate ? 'Kirim Permintaan' : 'Bergabung'}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -687,8 +620,24 @@ function CommunityCard({
   onShowJoinPopup,
 }) {
   const [isJoined, setIsJoined] = useState(Boolean(community.isJoined));
-  const isPrivate = String(community.privacy || '').toLowerCase() === 'private';
+  
+  // Gunakan privacy yang sudah dinormalisasi; map 'pribadi' -> 'private'
+  const rawPrivacy = String(community?.privacy || '').toLowerCase();
+  const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
+  const isPrivate = privacy === 'private';
+  
   const [justJoined, setJustJoined] = useState(false);
+
+  // Gradient murni dari warna BE (tanpa dummy kategori)
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    if (bgColor1 && bgColor2) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})` };
+    }
+    if (bgColor1) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)` };
+    }
+    return { backgroundImage: 'linear-gradient(135deg, #0b2e13, #14532d)' };
+  };
 
   useEffect(() => {
     const next = Boolean(community.isJoined);
@@ -710,115 +659,152 @@ function CommunityCard({
 
   const getCategoryColor = (category) => {
     const colors = {
-      'Shopping': 'bg-purple-100 text-purple-800',
-      'Event': 'bg-blue-100 text-blue-800',
-      'Kuliner': 'bg-orange-100 text-orange-800',
-      'Otomotif': 'bg-gray-100 text-gray-800',
-      'Fashion': 'bg-pink-100 text-pink-800',
-      'Hobi': 'bg-green-100 text-green-800',
-      'Bisnis': 'bg-indigo-100 text-indigo-800',
-      'Kesehatan': 'bg-red-100 text-red-800',
-      'Teknologi': 'bg-cyan-100 text-cyan-800',
-      'Travel': 'bg-yellow-100 text-yellow-800'
+      'Shopping': 'bg-purple-50 text-purple-700 border-purple-200',
+      'Event': 'bg-blue-50 text-blue-700 border-blue-200',
+      'Kuliner': 'bg-orange-50 text-orange-700 border-orange-200',
+      'Otomotif': 'bg-slate-50 text-slate-700 border-slate-200',
+      'Fashion': 'bg-pink-50 text-pink-700 border-pink-200',
+      'Hobi': 'bg-green-50 text-green-700 border-green-200',
+      'Bisnis': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      'Kesehatan': 'bg-red-50 text-red-700 border-red-200',
+      'Teknologi': 'bg-cyan-50 text-cyan-700 border-cyan-200',
+      'Travel': 'bg-yellow-50 text-yellow-700 border-yellow-200'
     };
-    return colors[category || ''] || 'bg-gray-100 text-gray-800';
+    return colors[category || ''] || 'bg-slate-50 text-slate-700 border-slate-200';
   };
 
   return (
     <div
-      className={`bg-white bg-opacity-60 backdrop-blur-sm rounded-[15px] p-4 shadow-sm border transition-all duration-300 ${
-        justJoined
-          ? 'border-green-300 bg-green-50 shadow-md'
+      className={`
+        bg-white rounded-xl border shadow-sm transition-all duration-200 hover:shadow-md
+        ${justJoined
+          ? 'border-green-300 bg-green-50 ring-2 ring-green-200'
           : isJoined
-            ? 'border-primary bg-primary/5 hover:shadow-md cursor-pointer'
-            : isPrivate && !community.hasRequested
-              ? 'border-slate-200 hover:shadow-md cursor-pointer'
-              : 'border-slate-200 cursor-default'
-      }`}
+            ? 'border-primary/20 hover:border-primary/30 cursor-pointer'
+            : 'border-slate-200 hover:border-slate-300'
+        }
+        ${isJoined ? 'cursor-pointer' : isPrivate && !community.hasRequested ? 'cursor-pointer' : 'cursor-default'}
+      `}
       onClick={() => {
         if (isJoined) return handleClickCard();
         if (isPrivate && !community.hasRequested) return onShowJoinPopup(community);
       }}
-      aria-disabled={!isJoined}
       title={
         isJoined
-          ? undefined
+          ? 'Klik untuk masuk ke komunitas'
           : isPrivate
             ? (community.hasRequested ? 'Permintaan bergabung menunggu persetujuan' : 'Komunitas privat — klik untuk minta bergabung')
             : 'Gabung dulu untuk membuka komunitas'
       }
     >
-      <div className="flex gap-3">
-        <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-          {community.logo && /^https?:\/\/[^ "]+$/.test(community.logo) ? (
-            <Image
-              src={community.logo}
-              width={48}
-              height={48}
-              alt="Community Logo"
-              className="object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">
-                {community.name.substring(0, 2).toUpperCase()}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between mb-1">
-            <h3 className="font-semibold text-slate-900 text-sm truncate pr-2">
-              {community.name}
-              {justJoined && <span className="ml-2 text-xs text-green-600 font-medium">✓ Bergabung!</span>}
-            </h3>
-            <div className="flex items-center gap-2">
-              {community.isVerified && <span className="text-blue-500 text-xs">✓</span>}
-              {community.privacy === 'private' && (
-                <span className="text-gray-300 text-xs" title="Komunitas privat">
-                  <FontAwesomeIcon icon={faLock} />
-                </span>
+      {/* Community Color Banner */}
+      <div 
+        className="h-3 w-full rounded-t-xl"
+        style={getCommunityGradient(community.bg_color_1, community.bg_color_2)}
+      />
+      
+      <div className="p-5">
+        <div className="flex gap-4">
+          {/* Community Logo */}
+          <div className="flex-shrink-0">
+            <div className="w-14 h-14 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+              {community.logo && /^https?:\/\/[^ "]+$/.test(community.logo) ? (
+                <Image
+                  src={community.logo}
+                  width={56}
+                  height={56}
+                  alt="Community Logo"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div 
+                  className="w-full h-full rounded-xl flex items-center justify-center"
+                  style={getCommunityGradient(community.bg_color_1, community.bg_color_2)}
+                >
+                  <span className="text-white text-sm font-bold drop-shadow">
+                    {community.name.substring(0, 2).toUpperCase()}
+                  </span>
+                </div>
               )}
             </div>
           </div>
 
-          <p className="text-slate-600 text-xs leading-relaxed mb-2">
-            {community.description || '-'}
-          </p>
-
-          <div className="flex items-center justify-between">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(community.category)}`}>
-              {community.category || 'Umum'}
-            </span>
-
-            <div className="flex items-center gap-3 text-xs text-slate-500">
-              <span>{formatNumber(community.members)} anggota</span>
-              {isJoined ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-primary font-medium">
-                    {community.activePromos || 0} promo
+          {/* Community Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-slate-900 text-base leading-tight truncate">
+                  {community.name}
+                  {justJoined && (
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      ✓ Bergabung!
+                    </span>
+                  )}
+                </h3>
+                <div className="flex items-center gap-2 mt-1">
+                  {community.isVerified && (
+                    <span className="inline-flex items-center text-blue-600" title="Terverifikasi">
+                      <FontAwesomeIcon icon={faCheckCircle} className="text-xs" />
+                    </span>
+                  )}
+                  {isPrivate && (
+                    <span className="inline-flex items-center text-slate-400" title="Komunitas privat">
+                      <FontAwesomeIcon icon={faLock} className="text-xs" />
+                    </span>
+                  )}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getCategoryColor(community.category)}`}>
+                    {community.category || 'Umum'}
                   </span>
-                  <span className="text-green-600 text-sm">✓</span>
                 </div>
-              ) : (
-                community.hasRequested ? (
-                  <button
-                    disabled
-                    className="bg-gray-200 text-gray-600 px-3 py-1 rounded-full font-medium cursor-not-allowed"
-                    title="Menunggu persetujuan admin"
-                  >
-                    Menunggu Persetujuan
-                  </button>
+              </div>
+            </div>
+
+            {/* Description */}
+            <p className="text-slate-600 text-sm leading-relaxed mb-3 line-clamp-2">
+              {community.description || 'Tidak ada deskripsi tersedia.'}
+            </p>
+
+            {/* Stats & Actions */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4 text-sm text-slate-500">
+                <div className="flex items-center gap-1">
+                  <FontAwesomeIcon icon={faUsers} className="text-xs" />
+                  <span>{formatNumber(community.members)} anggota</span>
+                </div>
+                {isJoined && (
+                  <div className="flex items-center gap-1">
+                    <FontAwesomeIcon icon={faTags} className="text-xs" />
+                    <span className="text-primary font-medium">
+                      {community.activePromos || 0} promo
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <div className="flex items-center">
+                {isJoined ? (
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-green-100 text-green-700 border border-green-200">
+                      <FontAwesomeIcon icon={faCheckCircle} className="mr-1 text-xs" />
+                      Anggota
+                    </span>
+                  </div>
+                ) : community.hasRequested ? (
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
+                    <FontAwesomeIcon icon={faClock} className="mr-1 text-xs" />
+                    Menunggu
+                  </span>
                 ) : (
                   <button
                     onClick={handleJoinCommunity}
-                    className="bg-primary text-white px-3 py-1 rounded-full font-medium hover:bg-primary/90 transition-colors"
+                    className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors shadow-sm"
                   >
+                    <FontAwesomeIcon icon={isPrivate ? faUsers : faPlus} className="mr-1.5 text-xs" />
                     {isPrivate ? 'Minta Bergabung' : 'Gabung'}
                   </button>
-                )
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { faGift, faSearch, faTag } from '@fortawesome/free-solid-svg-icons';
+import { faGift, faSearch } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
@@ -141,20 +141,15 @@ const CommunityPromoPage = () => {
           id: community.id,
           name: community.name || 'Komunitas',
           location: community.location || 'Location',
+          bg_color_1: community.bg_color_1 ?? null,
+          bg_color_2: community.bg_color_2 ?? null,
         });
       } else {
-        setCommunityData({
-          id: communityId,
-          name: 'dbotanica Bandung',
-          location: 'Bandung',
-        });
+        // Jangan pakai dummy; biarkan null agar UI menampilkan state kosong
+        setCommunityData(null);
       }
     } catch (error) {
-      setCommunityData({
-        id: communityId,
-        name: 'dbotanica Bandung',
-        location: 'Bandung',
-      });
+      setCommunityData(null);
     }
   };
 
@@ -253,6 +248,18 @@ const CommunityPromoPage = () => {
 
 
 
+  // ======== HELPER FUNCTIONS ========
+  // Function gradient murni dari warna BE (tanpa dummy mapping kategori)
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    if (bgColor1 && bgColor2) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})` };
+    }
+    if (bgColor1) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)` };
+    }
+    return { backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)' };
+  };
+
   const handlePromoClick = (promoId) => {
     router.push(
       `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
@@ -260,12 +267,7 @@ const CommunityPromoPage = () => {
   };
 
   // ======== UI TOKENS (BIAR KONSISTEN) ========
-  const COLORS = {
-    olive: '#5a6e1d',
-    oliveSoft: 'rgba(90,110,29,0.1)',
-    oliveBorder: '#cdd0b3',
-    textDark: '#2B3A55',
-  };
+  // (Removed unused COLORS to satisfy lint)
 
   // ======== WIDGET RENDERER (S, M, L, XL, XL-Ads) ========
   const WidgetRenderer = ({ widget }) => {
@@ -358,12 +360,11 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube?.id || index}
-                  className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+                  className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
                   style={{
                     minWidth: 320,
                     maxWidth: 360,
                     borderColor: '#d8d8d8',
-                    background: '#fffaf0',
                     cursor: 'pointer',
                   }}
                   onClick={() => {
@@ -381,19 +382,18 @@ const CommunityPromoPage = () => {
                       fill
                       className="object-contain p-2"
                     />
-                    <div className="absolute top-3 left-3 bg-white/70 text-[#5a6e1d] text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm">
+                    <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
                       {merchant}
                     </div>
                   </div>
 
-                  {/* Overlay bawah warna hijau */}
-                  <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4"
-                    style={{ background: 'rgba(90,110,29,0.9)', borderTop: `1px solid ${COLORS.oliveBorder}` }}>
+                  {/* Bottom gradient glass overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
                     <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
                       {title}
                     </h3>
                     <div className="flex items-center justify-between">
-                      <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40">
+                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm">
                         {category}
                       </span>
                     </div>
@@ -407,7 +407,7 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube.id || index}
-                  className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#fffaf0] shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+                  className="rounded-[16px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
                   style={{
                     minWidth: 320,
                     maxWidth: 360,
@@ -434,7 +434,7 @@ const CommunityPromoPage = () => {
                   </div>
 
                   {/* Konten bawah */}
-                  <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                  <div className="p-4 bg-white border-t border-[#e6e6e6]">
                     <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">
                       {title}
                     </h3>
@@ -443,7 +443,7 @@ const CommunityPromoPage = () => {
                     </p>
 
                     <div className="flex items-center justify-between">
-                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
                         {cube.category || 'Informasi'}
                       </span>
                       <FontAwesomeIcon
@@ -461,7 +461,7 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex items-center rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+                  className="flex items-center rounded-[14px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
                   style={{
                     minWidth: 280,
                     maxWidth: 320,
@@ -487,7 +487,7 @@ const CommunityPromoPage = () => {
                   </div>
 
                   {/* Konten kanan */}
-                  <div className="flex-1 h-full p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
+                  <div className="flex-1 h-full p-3 flex flex-col justify-between bg-white border-l border-[#e6e6e6]">
                     <div>
                       <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">
                         {title}
@@ -498,7 +498,7 @@ const CommunityPromoPage = () => {
                     </div>
 
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
                         {cube.category || 'Advertising'}
                       </span>
                       <FontAwesomeIcon
@@ -517,7 +517,7 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
+                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#e6e6e6] bg-white shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
                   style={{
                     minWidth: isM ? 180 : 140,
                     maxWidth: isM ? 200 : 160,
@@ -545,7 +545,7 @@ const CommunityPromoPage = () => {
                   </div>
 
                   {/* Konten bawah */}
-                  <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                  <div className="p-2 bg-white border-t border-[#e6e6e6]">
                     <h3
                       className={`${isM ? 'text-[14px]' : 'text-[13px]'
                         } font-bold text-slate-900 line-clamp-2 mb-0.5`}
@@ -560,7 +560,7 @@ const CommunityPromoPage = () => {
                     </p>
 
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">
                         {cube.category || 'Advertising'}
                       </span>
                       <FontAwesomeIcon
@@ -609,10 +609,16 @@ const CommunityPromoPage = () => {
     </div>
   );
 
+  // Get community background style
+  const communityBgStyle = getCommunityGradient(
+    communityData?.bg_color_1,
+    communityData?.bg_color_2
+  );
+
   if (!communityData) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen flex items-center justify-center px-4 py-4">
-        <div className="text-center bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm p-8">
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen flex items-center justify-center px-4 py-4">
+        <div className="text-center bg-white rounded-2xl shadow-sm p-8 border border-slate-200">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-slate-600">Memuat data komunitas...</p>
         </div>
@@ -621,25 +627,28 @@ const CommunityPromoPage = () => {
   }
 
   return (
-    <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
-      {/* Header */}
-      <div className="bg-primary w-full h-[100px] rounded-b-[30px] shadow-sm px-6 mb-4 relative">
-        <div className="flex items-center justify-center h-full">
-          <div className="w-full bg-white px-4 py-3 rounded-[20px] flex items-center shadow-sm">
-            <FontAwesomeIcon icon={faSearch} className="text-gray-400 mr-3" />
+    <div className="relative lg:mx-auto lg:max-w-md min-h-screen" style={typeof communityBgStyle === 'object' ? communityBgStyle : {}}>
+      {/* Dimmer overlay to ensure readability over strong backgrounds */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] z-0 pointer-events-none" />
+
+      {/* Content */}
+      <div className="px-6 pb-24 relative z-10">
+        <div className="pt-6" />
+        {/* Page title + search (glass) */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white drop-shadow-sm mb-3">Promo Komunitas</h1>
+          <div className="bg-white/20 backdrop-blur-md p-3 rounded-lg shadow-sm border border-white/30 flex items-center">
+            <FontAwesomeIcon icon={faSearch} className="text-white/80 mr-3" />
             <input
               type="text"
               placeholder="Cari promo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 text-gray-700 placeholder-gray-400 bg-transparent outline-none"
+              className="flex-1 text-white placeholder-white/70 bg-transparent outline-none"
             />
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="px-4 pb-24">
         <div className="lg:mx-auto lg:max-w-md">
           {/* Render Widgets dengan level-aware ordering */}
           {(widgetData.length > 0 || adCategories.length > 0) && (
@@ -721,7 +730,7 @@ const CommunityPromoPage = () => {
           {promoData.length > 0 && (
             <div className="mb-6">
               <div className="mb-2">
-                <h2 className="text-lg font-bold text-slate-900">Promo Terbaru</h2>
+                <h2 className="text-lg font-bold text-white">Promo Terbaru</h2>
               </div>
               <div className="flex gap-3 overflow-x-auto pb-3 hide-scrollbar">
                 {promoData.map((p) => (

@@ -11,15 +11,17 @@ export default function CommunityDashboardPage() {
         setIsClient(true);
     }, []);
 
-    // Tunggu sampai router ready dan client-side rendering
+    // Admin-style loading state
     if (!isClient || !router.isReady) {
         return (
-            <div className="lg:mx-auto lg:relative lg:max-w-md">
+            <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
                 <div className="container mx-auto relative z-10 pb-28">
-                    <div className="w-full bg-gradient-to-br from-red-400 to-red-600 h-32 flex items-center justify-center">
-                        <div className="text-white text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-                            <p className="mt-2 text-sm">Loading...</p>
+                    <div className="bg-slate-50 p-6 border-b border-slate-200">
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                                <p className="mt-2 text-sm text-slate-600">Loading...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
