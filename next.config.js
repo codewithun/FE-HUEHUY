@@ -36,8 +36,7 @@ const withPWA = require('next-pwa')({
   register: true,
   skipWaiting: true,
   runtimeCaching,
-  // Matikan PWA sementara untuk memastikan build dan next start lancar
-  disable: true,
+  disable: process.env.NODE_ENV === 'development',
 });
 
 /** @type {import('next').NextConfig} */
@@ -80,32 +79,29 @@ module.exports = withPWA({
       },
     ];
   },
-  reactStrictMode: true,
-  // Permudah proses build dulu; nanti bisa dinormalkan lagi
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  reactStrictMode: false,
   images: {
     // (tetap persis seperti punyamu)
     remotePatterns: [
-      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/**' },
-      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/storage/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/' },
+      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/storage/' },
       // izinkan jika backend kadang melayani /ads/** langsung
-      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/ads/**' },
-      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/ads/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/ads/' },
+      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/ads/' },
 
-      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/storage/**' },
-      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/ads/**' },
+      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/storage/' },
+      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/ads/' },
 
-      { protocol: 'https', hostname: '159.223.48.146', pathname: '/storage/**' },
-      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/storage/**' },
-      { protocol: 'https', hostname: '159.223.48.146', pathname: '/ads/**' },
-      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/ads/**' },
+      { protocol: 'https', hostname: '159.223.48.146', pathname: '/storage/' },
+      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/storage/' },
+      { protocol: 'https', hostname: '159.223.48.146', pathname: '/ads/' },
+      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/ads/' },
 
       // Allow Google profile images
-      { protocol: 'https', hostname: 'lh3.googleusercontent.com', pathname: '/**' },
-      { protocol: 'https', hostname: 'lh4.googleusercontent.com', pathname: '/**' },
-      { protocol: 'https', hostname: 'lh5.googleusercontent.com', pathname: '/**' },
-      { protocol: 'https', hostname: 'lh6.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com', pathname: '/' },
+      { protocol: 'https', hostname: 'lh4.googleusercontent.com', pathname: '/' },
+      { protocol: 'https', hostname: 'lh5.googleusercontent.com', pathname: '/' },
+      { protocol: 'https', hostname: 'lh6.googleusercontent.com', pathname: '/' },
     ],
     // unoptimized: true,
   },
