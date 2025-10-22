@@ -3,13 +3,6 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
-import React, { useEffect, useState } from 'react';
-import {
-  ButtonComponent,
-  DateFormatComponent,
-  IconButtonComponent,
-  ModalConfirmComponent,
-} from '../../components/base.components';
 import {
   faArrowLeftLong,
   faArrowRight,
@@ -21,15 +14,24 @@ import {
   faShareSquare,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation } from 'swiper';
-import { useRouter } from 'next/router';
-import { get, post, useGet } from '../../helpers';
-import Link from 'next/link';
-import Head from 'next/head';
-import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
-import { TextareaComponent } from '../../components/base.components/input/Textarea.component';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import dynamic from 'next/dynamic';
+import Head from 'next/head';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
+import { Navigation } from 'swiper';
+import {
+  ButtonComponent,
+  DateFormatComponent,
+  IconButtonComponent,
+  ModalConfirmComponent,
+} from '../../components/base.components';
+import { TextareaComponent } from '../../components/base.components/input/Textarea.component';
+import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
+import { get, post, useGet } from '../../helpers';
+const Swiper = dynamic(() => import('swiper/react').then(m => m.Swiper), { ssr: false });
+const SwiperSlide = dynamic(() => import('swiper/react').then(m => m.SwiperSlide), { ssr: false });
 
 export function Cube({ cubeData }) {
   const router = useRouter();
@@ -42,6 +44,7 @@ export function Cube({ cubeData }) {
   const [expandContent, setExpandContent] = useState(false);
   const [showHuehuyAds, setShowHuehuyAds] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loading, codeData, data] = useGet({
@@ -58,6 +61,10 @@ export function Cube({ cubeData }) {
       setShowHuehuyAds(true);
     }
   }, [dataHuehuyAd]);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   return (
     <>
@@ -132,32 +139,34 @@ export function Cube({ cubeData }) {
             )}
           </div>
 
-          <Swiper
-            spaceBetween={10}
-            centeredSlides={true}
-            loop={false}
-            modules={[Navigation]}
-            className="w-full"
-            autoplay={false}
-            onActiveIndexChange={(e) => setActiveIndex(e?.activeIndex)}
-          >
-            {data?.data?.ads?.map((item, key) => {
-              return (
-                <SwiperSlide key={key} className="overflow-hidden">
-                  <div className="w-full min-h-[400px] overflow-hidden bg-slate-200">
-                    {item?.picture_source && activeIndex == key && (
-                      <img
-                        src={item?.picture_source}
-                        height={700}
-                        width={700}
-                        alt=""
-                      />
-                    )}
-                  </div>
-                </SwiperSlide>
-              );
-            })}
-          </Swiper>
+          {isClient && Array.isArray(data?.data?.ads) && data.data.ads.length > 0 && (
+            <Swiper
+              spaceBetween={10}
+              centeredSlides={true}
+              loop={false}
+              modules={[Navigation]}
+              className="w-full"
+              autoplay={false}
+              onActiveIndexChange={(e) => setActiveIndex(e?.activeIndex)}
+            >
+              {data.data.ads.map((item, key) => {
+                return (
+                  <SwiperSlide key={key} className="overflow-hidden">
+                    <div className="w-full min-h-[400px] overflow-hidden bg-slate-200">
+                      {item?.picture_source && activeIndex == key && (
+                        <img
+                          src={item?.picture_source}
+                          height={700}
+                          width={700}
+                          alt=""
+                        />
+                      )}
+                    </div>
+                  </SwiperSlide>
+                );
+              })}
+            </Swiper>
+          )}
 
           <div className="bg-background w-full rounded-t-[15px] -mt-6 relative z-20 bg-gradient-to-br from-white">
             <div className="py-6 pb-32">
