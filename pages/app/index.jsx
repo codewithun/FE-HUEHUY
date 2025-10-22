@@ -1,8 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
-import 'swiper/css';
-import 'swiper/css/navigation';
-import 'swiper/css/pagination';
 
 import {
   faBell,
@@ -16,7 +13,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Autoplay, Navigation } from 'swiper';
 import {
   ButtonComponent,
@@ -321,18 +318,20 @@ export default function Index() {
                 <Swiper
                   spaceBetween={20}
                   centeredSlides={true}
-                  loop={true}
+                  loop={dataBanner.data.length > 1}
                   modules={[Autoplay, Navigation]}
-                  slidesPerView={'auto'}
-                  autoplay={{
+                  slidesPerView={1}
+                  observer={true}
+                  observeParents={true}
+                  autoplay={dataBanner.data.length > 1 ? {
                     delay: 5000,
                     disableOnInteraction: false,
-                  }}
+                  } : false}
                   className="w-full"
                 >
                   {dataBanner.data.map((item, key) => {
                     return (
-                      <SwiperSlide key={key} className="overflow-hidden">
+                      <SwiperSlide key={item?.id ?? item?.slug ?? item?.picture_source ?? key} className="overflow-hidden">
                         <div className="w-full aspect-[16/8] overflow-hidden bg-primary">
                           <img
                             src={item.picture_source}
@@ -407,7 +406,7 @@ export default function Index() {
                           return (
                             <Link
                               href={`/app/cari?cari=${category?.name}`}
-                              key={key}
+                              key={category?.id ?? category?.name ?? key}
                             >
                               <div className="w-full aspect-square bg-slate-400 rounded-[12px] relative overflow-hidden flex justify-center items-center">
                                 <img
@@ -478,7 +477,7 @@ export default function Index() {
                       <div className="flex flex-col gap-3 mt-4">
                         {dataNear?.data?.map((item, key) => {
                           return (
-                            <Link href={buildPromoLink(item)} key={key}>
+                            <Link href={buildPromoLink(item)} key={item?.id ?? item?.ad_id ?? item?.cube?.code ?? key}>
                               <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
                                 <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                                   <img
@@ -525,7 +524,7 @@ export default function Index() {
                   menu.is_active
                 ) {
                   return (
-                    <>
+                    <React.Fragment key={menu?.id ?? `menu-reco-${key}`}>
                       <div className="px-4 mt-8">
                         <div className="flex justify-between items-center gap-2">
                           <div>
@@ -540,7 +539,7 @@ export default function Index() {
                         <div className="flex flex-nowrap gap-4 w-max">
                           {dataRecommendation?.data?.map((item, key) => {
                             return (
-                              <Link href={buildPromoLink(item)} key={key}>
+                              <Link href={buildPromoLink(item)} key={item?.id ?? key}>
                                 <div className="relative snap-center w-[330px] shadow-sm bg-white bg-opacity-40 backdrop-blur-sm rounded-[14px] overflow-hidden p-3">
                                   <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90">
                                     <img
@@ -558,9 +557,9 @@ export default function Index() {
                                       <p className="text-slate-600 text-xs my-1 limit__line__2">
                                         {item?.cube?.address}
                                         {item?.cube?.is_information && (
-                                          <p className="text-primary bg-green-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                          <span className="text-primary bg-green-200 text-sm whitespace-nowrap px-1 rounded-md mt-1 inline-block">
                                             Informasi
-                                          </p>
+                                          </span>
                                         )}
                                       </p>
 
@@ -580,14 +579,14 @@ export default function Index() {
                           })}
                         </div>
                       </div>
-                    </>
+                    </React.Fragment>
                   );
                 } else if (
                   menu.content_type == 'ad_category' &&
                   menu.is_active
                 ) {
                   return (
-                    <>
+                    <React.Fragment key={menu?.id ?? `menu-adcat-${key}`}>
                       {dataCategories?.data?.map((category, key) => {
                         return (
                           <div className="px-4 mt-8" key={key}>
@@ -637,7 +636,7 @@ export default function Index() {
                             <div className="flex flex-col gap-4 mt-4">
                               {category?.ads?.filter(ad => ad?.id || ad?.cube?.code).map((ad, ad_key) => {
                                 return (
-                                  <Link href={buildPromoLink(ad)} key={ad_key}>
+                                  <Link href={buildPromoLink(ad)} key={ad?.id ?? ad?.cube?.code ?? ad_key}>
                                     <div className="relative">
                                       <div className="aspect-[4/3] bg-slate-400 rounded-[20px] overflow-hidden brightness-90">
                                         <img
@@ -677,7 +676,7 @@ export default function Index() {
                           </div>
                         );
                       })}
-                    </>
+                    </React.Fragment>
                   );
                 } else if (menu.content_type === 'promo' && menu.is_active) {
                   // Widget Promo/Iklan (home): dukung sumber 'cube' & 'shuffle_cube' (ambil ads dari cube)
@@ -730,7 +729,7 @@ export default function Index() {
                       <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-3">
                         <div className="flex flex-nowrap gap-4 w-max">
                           {ads.map((ad, i) => (
-                            <Link href={buildPromoLink(ad)} key={i}>
+                            <Link href={buildPromoLink(ad)} key={ad?.id ?? ad?.cube?.code ?? i}>
                               <AdCardBySize ad={ad} size={menu?.size || 'M'} />
                             </Link>
                           ))}
