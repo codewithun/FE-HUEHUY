@@ -13,6 +13,7 @@ import { ButtonComponent } from '../../components/base.components';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
 import { token_cookie_name, useGet } from '../../helpers';
+import { resolveUserImageUrl } from '../../helpers/image.helpers';
 
 export default function Akun() {
   const router = useRouter();
@@ -33,9 +34,7 @@ export default function Akun() {
             <div className="w-20 h-20 rounded-full overflow-hidden shadow-neuro-in flex items-center justify-center bg-white">
               <img
                 src={
-                  data?.data?.profile?.picture_source
-                    ? data?.data?.profile?.picture_source
-                    : '/avatar.jpg'
+                  resolveUserImageUrl(data?.data?.profile) || '/avatar.jpg'
                 }
                 width={80}
                 height={80}
