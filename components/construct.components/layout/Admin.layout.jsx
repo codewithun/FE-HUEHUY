@@ -1,6 +1,5 @@
 import {
   faBullhorn, // Tambahkan icon komunitas, import dulu di atas
-  faCalendarAlt,
   faChartSimple,
   faCubes,
   faGlobe,
@@ -105,11 +104,6 @@ export function AdminLayout({ children }) {
           label: 'Manajemen Komunitas',
           icon: faUsers, // Tambahkan icon komunitas, import dulu di atas
           path: 'master/komunitas_dashboard',
-        },
-        {
-          label: 'Event',
-          icon: faCalendarAlt,
-          path: 'master/event',
         },
       ],
     },
