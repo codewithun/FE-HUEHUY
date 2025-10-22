@@ -7,11 +7,70 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import useDetectKeyboardOpen from 'use-detect-keyboard-open';
+// NOTE: Avoid SSR issues from external hooks by using a local keyboard-open detector
+// that only runs on the client.
+
+import { useEffect, useRef, useState } from 'react';
+
+// Lightweight, SSR-safe keyboard detector for mobile browsers
+function useKeyboardOpenSafe() {
+  const [open, setOpen] = useState(false);
+  const baseHeightRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const vv = window.visualViewport;
+
+    const updateFromViewport = () => {
+      if (!vv) return;
+      // Heuristic: if viewport height shrinks by > 150px, assume keyboard open
+      const delta = (baseHeightRef.current || vv.height) - vv.height;
+      setOpen(delta > 150);
+    };
+
+    const updateFromWindow = () => {
+      // Fallback if visualViewport isn't supported
+      const h = window.innerHeight;
+      if (!baseHeightRef.current) baseHeightRef.current = h;
+      const delta = baseHeightRef.current - h;
+      setOpen(delta > 150);
+    };
+
+    // Initialize base height after a tick to avoid SSR mismatch
+    const init = () => {
+      if (vv) {
+        baseHeightRef.current = vv.height;
+        vv.addEventListener('resize', updateFromViewport);
+        vv.addEventListener('scroll', updateFromViewport);
+      } else {
+        baseHeightRef.current = window.innerHeight;
+        window.addEventListener('resize', updateFromWindow);
+        window.addEventListener('orientationchange', updateFromWindow);
+      }
+    };
+
+    // Small timeout to capture the correct base height after page paint
+    const t = setTimeout(init, 0);
+
+    return () => {
+      clearTimeout(t);
+      if (vv) {
+        vv.removeEventListener('resize', updateFromViewport);
+        vv.removeEventListener('scroll', updateFromViewport);
+      } else {
+        window.removeEventListener('resize', updateFromWindow);
+        window.removeEventListener('orientationchange', updateFromWindow);
+      }
+    };
+  }, []);
+
+  return open;
+}
 
 const CommunityBottomBar = ({ active, communityId }) => {
   const router = useRouter();
-  const isKeyboardOpen = useDetectKeyboardOpen();
+  const isKeyboardOpen = useKeyboardOpenSafe();
 
   const handleLogout = () => {
     // Redirect ke halaman home
