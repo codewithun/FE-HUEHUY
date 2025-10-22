@@ -33,6 +33,15 @@ export default function Index() {
   const [map, setMap] = useState(null);
   const [apiReady, setApiReady] = useState(false);
 
+  // Build consistent link to unified Promo Detail page
+  // Prefer ad.id; fallback to cube detail when id is missing
+  const buildPromoLink = (ad) => {
+    const id = ad?.id || ad?.ad_id;
+    if (id) return `/app/komunitas/promo/${id}?source=home`;
+    const cubeCode = ad?.cube?.code;
+    return cubeCode ? `/app/detail/${cubeCode}` : '#';
+  };
+
   const getAdImage = (ad) =>
     ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
 
@@ -462,7 +471,7 @@ export default function Index() {
                       <div className="flex flex-col gap-3 mt-4">
                         {dataNear?.data?.map((item, key) => {
                           return (
-                            <Link href={`/app/detail/${item?.cube?.code}`} key={key}>
+                            <Link href={buildPromoLink(item)} key={key}>
                               <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
                                 <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                                   <img
@@ -524,7 +533,7 @@ export default function Index() {
                         <div className="flex flex-nowrap gap-4 w-max">
                           {dataRecommendation?.data?.map((item, key) => {
                             return (
-                              <Link href={`/app/detail/${item?.cube?.code}`} key={key}>
+                              <Link href={buildPromoLink(item)} key={key}>
                                 <div className="relative snap-center w-[330px] shadow-sm bg-white bg-opacity-40 backdrop-blur-sm rounded-[14px] overflow-hidden p-3">
                                   <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90">
                                     <img
@@ -619,12 +628,9 @@ export default function Index() {
                             </div>
 
                             <div className="flex flex-col gap-4 mt-4">
-                              {category?.ads?.filter(ad => ad?.cube?.code).map((ad, ad_key) => {
+                              {category?.ads?.filter(ad => ad?.id || ad?.cube?.code).map((ad, ad_key) => {
                                 return (
-                                  <Link
-                                    href={`/app/detail/${ad?.cube?.code}`}
-                                    key={ad_key}
-                                  >
+                                  <Link href={buildPromoLink(ad)} key={ad_key}>
                                     <div className="relative">
                                       <div className="aspect-[4/3] bg-slate-400 rounded-[20px] overflow-hidden brightness-90">
                                         <img
@@ -716,20 +722,11 @@ export default function Index() {
 
                       <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-3">
                         <div className="flex flex-nowrap gap-4 w-max">
-                          {ads.map((ad, i) => {
-                            // Pastikan ada cube code, jika tidak skip item ini
-                            const cubeCode = ad?.cube?.code;
-                            if (!cubeCode) {
-                              // eslint-disable-next-line no-console
-                              console.warn('Ad without cube code:', ad);
-                              return null;
-                            }
-                            return (
-                              <Link href={`/app/detail/${cubeCode}`} key={i}>
-                                <AdCardBySize ad={ad} size={menu?.size || 'M'} />
-                              </Link>
-                            );
-                          }).filter(Boolean)}
+                          {ads.map((ad, i) => (
+                            <Link href={buildPromoLink(ad)} key={i}>
+                              <AdCardBySize ad={ad} size={menu?.size || 'M'} />
+                            </Link>
+                          ))}
                         </div>
                       </div>
                     </div>
