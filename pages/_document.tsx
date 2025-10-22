@@ -3,15 +3,18 @@ import { Head, Html, Main, NextScript } from 'next/document';
 export default function Document() {
   return (
     <Html lang="en">
-      <Head>
-        {/* Title should be managed per-page via next/head; avoid <title> in _document to stay compatible */}
-        {/* Favicon and PWA links must be inside <Head> */}
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#015850" />
-        <link rel="shortcut icon" href="/favicon.ico" />
-      </Head>
+      <Head />
+      <title>{process.env.NEXT_PUBLIC_APP_NAME || ''}</title>
+      <link rel="icon" type="image/png" sizes="32x32" href="/" />
+      <link
+        rel="icon"
+        type="image/png"
+        sizes="16x16"
+        href="/icons/favicon-16x16.png"
+      />
+      <link rel="manifest" href="/manifest.json" />
+      <link rel="mask-icon" href="/" color="#015850" />
+      <link rel="shortcut icon" href="/" />
       <body>
         <Main />
         <NextScript />

@@ -14,10 +14,10 @@ import {
   faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Autoplay, Navigation } from 'swiper';
-import { Swiper, SwiperSlide } from 'swiper/react';
 import {
   ButtonComponent,
   FormSupervisionComponent,
@@ -28,10 +28,13 @@ import MenuAdPage from '../../components/construct.components/partial-page/MenuA
 import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
 import { useGet } from '../../helpers';
 import { distanceConvert } from '../../helpers/distanceConvert.helpers';
+const Swiper = dynamic(() => import('swiper/react').then(m => m.Swiper), { ssr: false });
+const SwiperSlide = dynamic(() => import('swiper/react').then(m => m.SwiperSlide), { ssr: false });
 
 export default function Index() {
   const [map, setMap] = useState(null);
   const [apiReady, setApiReady] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   // Build consistent link to unified Promo Detail page
   // Prefer ad.id; fallback to cube detail when id is missing
@@ -57,6 +60,10 @@ export default function Index() {
       setApiReady(true);
     }, 200);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    setIsClient(true);
   }, []);
 
   // ----- HELPERS: baca flag informasi dari BE apapun bentuknya -----
@@ -310,7 +317,7 @@ export default function Index() {
         <div className="lg:mx-auto lg:relative lg:max-w-md">
           <div className="container mx-auto relative z-10 pb-28">
             <div className="relative">
-              {dataBanner?.data && (
+              {isClient && Array.isArray(dataBanner?.data) && dataBanner.data.length > 0 && (
                 <Swiper
                   spaceBetween={20}
                   centeredSlides={true}
@@ -323,7 +330,7 @@ export default function Index() {
                   }}
                   className="w-full"
                 >
-                  {dataBanner?.data?.map((item, key) => {
+                  {dataBanner.data.map((item, key) => {
                     return (
                       <SwiperSlide key={key} className="overflow-hidden">
                         <div className="w-full aspect-[16/8] overflow-hidden bg-primary">
