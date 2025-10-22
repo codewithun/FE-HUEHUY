@@ -304,7 +304,8 @@ export const useForm = (
         // c) untuk field non-ads[...], kirim seperti biasa (kecuali ads.dot sisa log)
         if (name.startsWith('ads.')) continue;
 
-        if (Array.isArray(v) && (name === 'is_information' || name === 'is_recommendation')) {
+        if (Array.isArray(v) && (name === 'is_information' || name === 'is_recommendation' || name === 'is_active')) {
+          // Khusus checkbox boolean: kirim selalu '1' atau '0' (bukan array [])
           if (!appended.has(name)) { formData.append(name, v.length > 0 ? '1' : '0'); appended.add(name); }
         } else if (v instanceof File) {
           if (!appended.has(name)) { formData.append(name, v); appended.add(name); }
@@ -380,7 +381,8 @@ export const useForm = (
         }
 
         // Handler umum non-ads
-        if (Array.isArray(v) && (name === 'is_information' || name === 'is_recommendation')) {
+        if (Array.isArray(v) && (name === 'is_information' || name === 'is_recommendation' || name === 'is_active')) {
+          // Khusus checkbox boolean: kirim selalu '1' atau '0' (bukan array [])
           if (!appended.has(name)) { formData.append(name, v.length > 0 ? '1' : '0'); appended.add(name); }
         } else if (v instanceof File) {
           if (!appended.has(name)) { formData.append(name, v); appended.add(name); }

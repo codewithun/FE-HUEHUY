@@ -315,7 +315,20 @@ export default function KomunitasDashboard() {
         label: "Status",
         width: "110px",
         item: (row) => {
-          const active = !!(row?.is_active || row?.status === "active" || row?.active);
+          // NORMALISASI: jangan pakai truthy langsung, karena string "0" dianggap truthy di JS
+          const normalizeActive = (v) => {
+            if (v === true || v === 1) return true;
+            if (v === false || v === 0 || v === null || v === undefined) return false;
+            if (typeof v === "string") {
+              const s = v.trim().toLowerCase();
+              if (["1", "true", "on", "yes"].includes(s)) return true;
+              if (["0", "false", "off", "no"].includes(s)) return false;
+            }
+            return false;
+          };
+
+          const active = normalizeActive(row?.is_active ?? row?.active) ||
+            (String(row?.status || "").toLowerCase() === "active");
           const cls = active
             ? "bg-green-100 text-green-700 border-green-200"
             : "bg-red-100 text-red-700 border-red-200";
