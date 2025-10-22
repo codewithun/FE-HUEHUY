@@ -16,7 +16,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Autoplay, Navigation } from 'swiper';
+import { Autoplay } from 'swiper';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import {
   ButtonComponent,
@@ -315,9 +315,9 @@ export default function Index() {
                   spaceBetween={20}
                   centeredSlides={true}
                   loop={true}
-                  modules={[Autoplay, Navigation]}
+                  modules={[Autoplay]} // HAPUS Navigation dari sini
                   slidesPerView={'auto'}
-                  autoplay={{
+                  autoplay={{ 
                     delay: 5000,
                     disableOnInteraction: false,
                   }}
