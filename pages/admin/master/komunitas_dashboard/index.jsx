@@ -478,10 +478,10 @@ export default function KomunitasDashboard() {
               type: "select",
               construction: {
                 name: "world_type",
-                label: "Jenis Dunia",
-                placeholder: "Pilih Jenis Dunia..",
+                label: "Akses Komunitas",
+                placeholder: "Pilih Akses Komunitas..",
                 options: [
-                  { label: "Pribadi", value: "pribadi" },
+                  { label: "Publik", value: "pribadi" },
                   { label: "Private", value: "private" },
                 ],
                 searchable: false,

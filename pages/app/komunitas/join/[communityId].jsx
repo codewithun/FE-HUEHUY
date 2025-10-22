@@ -6,12 +6,15 @@ import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import JoinRequestPopup from '../../../../components/construct.components/modal/JoinRequestPopup';
 
 export default function JoinCommunity() {
   const router = useRouter();
   const { communityId } = router.query;
   const [message, setMessage] = useState('Memproses join komunitas...');
   const [done, setDone] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [communityName, setCommunityName] = useState('');
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -28,7 +31,7 @@ export default function JoinCommunity() {
       const apiBase = baseUrl.replace(/\/api\/?$/, '');
 
       try {
-        // 🔹 1. Ambil detail komunitas dulu
+        // 1. Ambil detail komunitas dulu
         const communityRes = await fetch(`${apiBase}/api/communities/${communityId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -38,10 +41,15 @@ export default function JoinCommunity() {
         const communityJson = await communityRes.json();
         const community = communityJson.data || communityJson;
 
-        // 🔹 2. Cek jenis privacy
-        if (community.privacy === 'private') {
-          setMessage('Mengirim permintaan bergabung ke admin komunitas...');
-          const reqRes = await fetch(`${apiBase}/api/communities/${communityId}/request`, {
+        // 2. Cek jenis privacy (normalisasi agar tahan variasi nilai)
+        const rawPrivacy = String(
+          community?.privacy ?? community?.world_type ?? community?.type ?? ''
+        ).toLowerCase();
+        const isPrivate = rawPrivacy === 'private' || rawPrivacy === 'pribadi' ||
+          community?.is_private === true || community?.private === true;
+
+        if (isPrivate) {
+          const res = await fetch(`${apiBase}/api/communities/${communityId}/join-request`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -49,41 +57,24 @@ export default function JoinCommunity() {
             },
           });
 
-          if (reqRes.ok) {
-            setMessage('Permintaan bergabung telah dikirim! Menunggu persetujuan admin.');
-            setDone(true);
-          } else {
-            setMessage('Gagal mengirim permintaan. Coba lagi nanti.');
-            setDone(true);
-          }
-          return; // stop di sini, jangan auto redirect
-        }
+          let data = {};
+          try { data = await res.json(); } catch {}
+          console.log('Join request result:', data);
 
-        // 🔹 3. Kalau publik → langsung join
-        const joinRes = await fetch(`${apiBase}/api/communities/${communityId}/join`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (joinRes.ok) {
-          // broadcast ke localStorage biar dashboard update
-          localStorage.setItem(
-            'community:membership',
-            JSON.stringify({
-              id: Number(communityId),
-              action: 'join',
-              delta: +1,
-              at: Date.now(),
-            })
-          );
-
-          router.replace(`/app/komunitas/profile/${communityId}`);
-        } else {
-          setMessage('Gagal bergabung ke komunitas.');
+          setCommunityName(community.name);
+          setShowPopup(true);
+          setMessage('Permintaan bergabung telah dikirim. Menunggu persetujuan admin.');
           setDone(true);
+        } else {
+          // langsung join
+          await fetch(`${apiBase}/api/communities/${communityId}/join`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          router.replace(`/app/komunitas/profile/${communityId}`);
         }
       } catch (err) {
         console.error(err);
@@ -114,6 +105,11 @@ export default function JoinCommunity() {
           <p className="text-gray-700">{message}</p>
         </>
       )}
+      <JoinRequestPopup
+        show={showPopup}
+        onClose={() => router.replace(`/app/komunitas/profile/${communityId}`)}
+        communityName={communityName}
+      />
     </div>
   );
 }
