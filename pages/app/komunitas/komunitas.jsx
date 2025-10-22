@@ -132,6 +132,7 @@ const requestJoinCommunityAPI = async (communityId) => {
  * @property {boolean|number=} isJoined
  * @property {number|string=} members
  * @property {number=} activePromos
+ * @property {boolean=} is_active
  */
 
 /** Normalisasi bentuk respons dari backend menjadi array CommunityItem */
@@ -164,6 +165,10 @@ const normalizeCommunities = (raw) => {
       : Boolean(hasRequestedRaw);
 
     const membersNum = Number(c.members ?? 0);
+    // Normalisasi status aktif
+    const isActive = (typeof c?.is_active === 'boolean')
+      ? c.is_active
+      : (typeof c?.is_active === 'number' ? c.is_active > 0 : undefined);
     return {
       id: Number(c.id),
       name: String(c.name ?? ''),
@@ -176,6 +181,7 @@ const normalizeCommunities = (raw) => {
       hasRequested,
       members: Number.isFinite(membersNum) ? membersNum : 0,
       activePromos: Number(c.activePromos ?? 0),
+      is_active: isActive,
     };
   });
 };
@@ -323,6 +329,9 @@ export default function Komunitas() {
 
   const filteredCommunities = useMemo(() => {
     let data = [...communities];
+
+    // Tampilkan hanya komunitas aktif (is_active === true). Jika field tidak ada, biarkan tampil.
+    data = data.filter((c) => (c.is_active === undefined ? true : Boolean(c.is_active)));
 
     if (activeTab === 'komunitasku') {
       data = data.filter(c => Boolean(c.isJoined));

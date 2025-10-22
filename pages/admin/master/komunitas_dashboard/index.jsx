@@ -135,17 +135,32 @@ export default function KomunitasDashboard() {
 
     try {
       const res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/member-history`));
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json().catch(() => ({}));
-      const rows = Array.isArray(json?.data) ? json.data : [];
+
+      // ✅ normalize data (gabung yang dari BE fix terbaru)
+      const rows = Array.isArray(json?.data) ? json.data.map((r) => ({
+        ...r,
+        action: (r?.action || '').toLowerCase(),
+        created_at: r?.created_at || null,
+        user_name: r?.user_name || r?.user?.name || "-",
+      })) : [];
+
+      // ✅ urutkan descending by waktu
+      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setMemberHistoryList(rows);
     } catch (err) {
       console.error("Gagal memuat riwayat member:", err);
       setMemberHistoryError("Tidak bisa memuat riwayat member");
     } finally {
       setMemberHistoryLoading(false);
+    }
+  };
+
+  // Tambahkan fungsi auto-refresh riwayat member
+  const refreshMemberHistory = () => {
+    if (activeCommunity) {
+      openMemberHistoryModal(activeCommunity);
     }
   };
 
@@ -160,6 +175,7 @@ export default function KomunitasDashboard() {
       }
       // Trigger table refresh
       setRefreshRequestsToggle((s) => !s);
+      refreshMemberHistory(); // ⬅️ auto-refresh riwayat member setelah approve/reject
     } catch (err) {
       console.error(`Gagal ${action} permintaan:`, err);
       alert(`Gagal ${action === 'approve' ? 'menyetujui' : 'menolak'} permintaan`);
@@ -315,7 +331,20 @@ export default function KomunitasDashboard() {
         label: "Status",
         width: "110px",
         item: (row) => {
-          const active = !!(row?.is_active || row?.status === "active" || row?.active);
+          // NORMALISASI: jangan pakai truthy langsung, karena string "0" dianggap truthy di JS
+          const normalizeActive = (v) => {
+            if (v === true || v === 1) return true;
+            if (v === false || v === 0 || v === null || v === undefined) return false;
+            if (typeof v === "string") {
+              const s = v.trim().toLowerCase();
+              if (["1", "true", "on", "yes"].includes(s)) return true;
+              if (["0", "false", "off", "no"].includes(s)) return false;
+            }
+            return false;
+          };
+
+          const active = normalizeActive(row?.is_active ?? row?.active) ||
+            (String(row?.status || "").toLowerCase() === "active");
           const cls = active
             ? "bg-green-100 text-green-700 border-green-200"
             : "bg-red-100 text-red-700 border-red-200";
@@ -465,10 +494,10 @@ export default function KomunitasDashboard() {
               type: "select",
               construction: {
                 name: "world_type",
-                label: "Jenis Dunia",
-                placeholder: "Pilih Jenis Dunia..",
+                label: "Akses Komunitas",
+                placeholder: "Pilih Akses Komunitas..",
                 options: [
-                  { label: "Pribadi", value: "pribadi" },
+                  { label: "Publik", value: "public" },
                   { label: "Private", value: "private" },
                 ],
                 searchable: false,
@@ -511,14 +540,30 @@ export default function KomunitasDashboard() {
                 appendField("type", payload.world_type);
               }
 
-              // PERBAIKI: is_active → selalu kirim sebagai string "1" atau "0"
-              const isActiveBool =
-                Array.isArray(payload.is_active)
-                  ? payload.is_active.includes(1) || payload.is_active.includes("1")
-                  : !!payload.is_active;
+              if (!("is_active" in payload)) {
+                payload.is_active = []; // default empty kalau gak dikirim
+              }
 
-              if (isActiveBool !== undefined && isActiveBool !== null)
-                appendField("is_active", isActiveBool ? "1" : "0");
+              let isActiveBool = false;
+
+              if (Array.isArray(payload.is_active)) {
+                // untuk bentuk [1], ['1'], [], dll
+                isActiveBool =
+                  payload.is_active.includes(1) ||
+                  payload.is_active.includes("1") ||
+                  payload.is_active.includes(true);
+              } else if (typeof payload.is_active === "string") {
+                // untuk bentuk "1", "0", "true", "false"
+                isActiveBool = ["1", "true", "on", "yes"].includes(payload.is_active.toLowerCase());
+              } else if (typeof payload.is_active === "boolean" || typeof payload.is_active === "number") {
+                // boolean atau angka
+                isActiveBool = Boolean(payload.is_active);
+              }
+
+              // SELALU kirim
+              appendField("is_active", isActiveBool ? "1" : "0");
+
+              console.log("[FIX] Appended is_active:", isActiveBool ? "1" : "0");
 
               // ===== FIX FINAL: Logo Handling (robust) =====
               console.log("Logo payload:", payload.logo);
@@ -997,20 +1042,30 @@ export default function KomunitasDashboard() {
                     ),
                   },
                   {
-                    selector: "action",
-                    label: "Aksi",
-                    item: (history) => (
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${history.action === 'joined'
-                        ? 'bg-green-100 text-green-800'
-                        : history.action === 'left'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                        }`}>
-                        {history.action === 'joined' ? 'Bergabung' :
-                          history.action === 'left' ? 'Keluar' :
-                            history.action || '-'}
-                      </span>
-                    ),
+                    selector: "status",
+                    label: "Status",
+                    item: (history) => {
+                      const action = (history?.action || "").toLowerCase();
+                      let text = "-";
+                      let cls = "bg-gray-100 text-gray-800";
+
+                      if (action === "joined") {
+                        text = "Masuk";
+                        cls = "bg-green-100 text-green-800";
+                      } else if (action === "left") {
+                        text = "Keluar";
+                        cls = "bg-yellow-100 text-yellow-800";
+                      } else if (["removed", "deleted", "kicked"].includes(action)) {
+                        text = "Dihapus";
+                        cls = "bg-red-100 text-red-800";
+                      }
+
+                      return (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${cls}`}>
+                          {text}
+                        </span>
+                      );
+                    },
                   },
                   {
                     selector: "created_at",

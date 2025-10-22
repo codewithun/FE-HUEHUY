@@ -11,11 +11,15 @@ import GiveCubeModal from '../../../components/construct.components/modal/GiveCu
 import UserDetailComponent from '../../../components/construct.components/partial-page/UserDetail.component';
 import { useUserContext } from '../../../context/user.context';
 import { token_cookie_name } from '../../../helpers';
+import { resolveUserImageUrl } from '../../../helpers/image.helpers';
 
 export default function ManageUser() {
   const [selected, setSelected] = useState(null);
   const [modalGive, setModalGive] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { profile: Profile } = useUserContext();
+
+  // Use shared resolver to support Google URLs and storage paths
 
   useEffect(() => {
     if (Cookies.get(token_cookie_name) && Profile) {
@@ -33,6 +37,7 @@ export default function ManageUser() {
         fetchControl={{
           path: 'admin/users',
         }}
+        setToRefresh={refreshKey}
         columnControl={{
           custom: [
             {
@@ -85,7 +90,7 @@ export default function ManageUser() {
             {
               construction: {
                 name: 'phone',
-                label: 'No. Telepon (Opsional)',
+                label: 'No. Telepon',
                 placeholder: 'Tambahkan No Telepon...',
                 validations: {
                   required: true,
@@ -150,8 +155,9 @@ export default function ManageUser() {
               name: data?.name,
               email: data?.email,
               phone: data?.phone,
-              role_id: data?.role_id,
-              image: data?.picture_source,
+              // role_id ikut diubah dalam form ini; default mungkin tidak terisi jika API list belum mengirim id
+              role_id: data?.role_id || data?.role?.id || '',
+              image: resolveUserImageUrl(data),
             };
           },
           contentType: 'multipart/form-data',
@@ -180,7 +186,7 @@ export default function ManageUser() {
             {
               construction: {
                 name: 'phone',
-                label: 'No. Telepon (Opsional)',
+                label: 'No. Telepon',
                 placeholder: 'Tambahkan No Telepon...',
                 validations: {
                   required: true,
@@ -225,6 +231,7 @@ export default function ManageUser() {
                 serverOptionControl: {
                   path: 'admin/options/role?isCorporate=0',
                 },
+                validations: { required: true },
               },
             },
             {

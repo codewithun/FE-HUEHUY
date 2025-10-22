@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
 import { faCamera, faHandHolding } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useEffect, useRef, useState } from 'react';
 // import AvatarEditor from 'react-avatar-editor';
-import { inputImageProps } from './props/input-image.props';
-import styles from './input.module.css';
+import { useValidationHelper } from '../../../helpers';
 import { validationLangs } from '../../../langs';
 import { inputLabel } from './input.decorate';
-import { useValidationHelper } from '../../../helpers';
+import styles from './input.module.css';
+import { inputImageProps } from './props/input-image.props';
 
 export function InputImageComponent({
   name,
@@ -196,7 +196,8 @@ inputImageProps) {
           <div
             // htmlFor={name}
             style={{
-              backgroundImage: 'url(' + inputValue + ')',
+              // Keep background color as placeholder; real preview uses <img /> below for better cross-origin support
+              backgroundImage: inputValue ? undefined : undefined,
               filter: inputValue ? 'brightness(0.9)' : '',
               aspectRatio: aspect || '1/1',
             }}
@@ -208,6 +209,19 @@ inputImageProps) {
             `}
             onDragEnter={handleDrag}
           >
+            {inputValue && (
+              <img
+                src={String(inputValue)}
+                alt="preview"
+                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
+                className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                onError={() => {
+                  // fallback: clear preview when external image blocked
+                  try { setInputValue(''); } catch {}
+                }}
+              />
+            )}
             {!disabled &&
               (inputValue ? (
                 <FontAwesomeIcon className="text-3xl" icon={faCamera} />

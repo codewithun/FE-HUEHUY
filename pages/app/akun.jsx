@@ -1,21 +1,19 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useState } from 'react';
-import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronRight,
-  faCoins,
-  faCubes,
   faPowerOff,
 } from '@fortawesome/free-solid-svg-icons';
-import Link from 'next/link';
-import { token_cookie_name, useGet } from '../../helpers';
-import CubeComponent from '../../components/construct.components/CubeComponent';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
-import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
-import { ButtonComponent } from '../../components/base.components';
 import QRCode from 'qrcode.react';
+import { useState } from 'react';
+import { ButtonComponent } from '../../components/base.components';
+import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
+import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
+import { token_cookie_name, useGet } from '../../helpers';
+import { resolveUserImageUrl } from '../../helpers/image.helpers';
 
 export default function Akun() {
   const router = useRouter();
@@ -27,16 +25,6 @@ export default function Akun() {
     path: `account`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loadingArticle, codeArticle, dataArticle] = useGet({
-    path: `article`,
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loadingCubeType, codeCubeType, dataCubeType] = useGet({
-    path: `cube-type`,
-  });
-
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
@@ -46,9 +34,7 @@ export default function Akun() {
             <div className="w-20 h-20 rounded-full overflow-hidden shadow-neuro-in flex items-center justify-center bg-white">
               <img
                 src={
-                  data?.data?.profile?.picture_source
-                    ? data?.data?.profile?.picture_source
-                    : '/avatar.jpg'
+                  resolveUserImageUrl(data?.data?.profile) || '/avatar.jpg'
                 }
                 width={80}
                 height={80}
@@ -76,41 +62,7 @@ export default function Akun() {
           </button>
         </div>
 
-        {/* Info Card */}
-        <div className="px-4 pb-4">
-          <div className="bg-white rounded-2xl p-6 grid grid-cols-2 gap-6 shadow-neuro">
-            <div className="flex gap-4 items-center border-r border-slate-200 pr-4">
-              <div className="w-14 h-14 flex justify-center items-center bg-gray-100 rounded-xl shadow-neuro-in">
-                <FontAwesomeIcon
-                  icon={faCoins}
-                  className="text-2xl text-slate-400"
-                />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Huehuy Poin</p>
-                <p className="font-semibold text-primary">
-                  {data?.data?.profile?.point} Poin
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-4 items-center">
-              <div className="w-14 h-14 flex justify-center items-center bg-gray-100 rounded-xl shadow-neuro-in">
-                <FontAwesomeIcon
-                  icon={faCubes}
-                  className="text-2xl text-slate-400"
-                />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Kubus Kamu</p>
-                <p className="font-semibold text-primary">
-                  {data?.data?.profile?.cubes?.length} Kubus
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-4 -mt-8 pb-28">
+        <div className="px-4 pb-28">
           <p className="text-sm font-semibold mt-6">Inventory</p>
           <div className="flex flex-col gap-3 mt-2">
             <Link href="/app/kubusku">
@@ -166,88 +118,9 @@ export default function Akun() {
             </Link>
           </div>
 
-          <p className="text-sm font-semibold mt-6">Informasi Kubus</p>
-          <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2">
-            <div className="flex flex-nowrap gap-4 w-max">
-              {dataCubeType?.data?.map((item, key) => (
-                <div
-                  className="w-[280px] grid grid-cols-5 gap-3 p-3 shadow-neuro rounded-2xl relative bg-white bg-opacity-60 backdrop-blur-sm"
-                  key={key}
-                >
-                  <div className="w-full aspect-square rounded-lg flex items-center justify-center bg-gray-100 shadow-neuro-in">
-                    <CubeComponent size={18} color={item?.color} />
-                  </div>
-                  <div className="col-span-4">
-                    <p className="font-semibold">
-                      {item?.name} ({item?.code})
-                    </p>
-                    <p className="text-slate-600 text-xs">
-                      {item?.description}⏎····················
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-sm font-semibold mt-4">Berita Huehuy</p>
-          <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2">
-            <div className="flex flex-nowrap gap-4 w-max">
-              {dataArticle?.data?.map((item, key) => (
-                <Link href={`/app/berita/${item?.slug}`} key={key}>
-                  <div className="w-[320px] bg-white bg-opacity-60 backdrop-blur-sm grid grid-cols-4 gap-3 p-3 shadow-neuro rounded-2xl relative hover:scale-[1.01] transition">
-                    <div className="w-full aspect-square rounded-lg bg-slate-40 overflow-hidden shadow-neuro-in">
-                      <img
-                        src={item?.picture_source}
-                        height={700}
-                        width={700}
-                        alt=""
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <p className="font-semibold limit__line__1">
-                        {item?.title}
-                      </p>
-                      <p className="text-slate-600 text-xs mt-1 limit__line__2">
-                        {item?.description}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* QR Popup */}
-          {showQR && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-              <div className="bg-white rounded-2xl shadow-neuro-in p-6 flex flex-col items-center relative">
-                <button
-                  className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"
-                  onClick={() => setShowQR(false)}
-                  aria-label="Close QR"
-                >
-                  &times;
-                </button>
-                <p className="text-sm font-semibold mb-2">Barcode Akun Anda</p>
-                <QRCode
-                  value={data?.data?.profile?.code || 'huehuy-user'}
-                  size={160}
-                  bgColor="#f8fafc"
-                  fgColor="#0f172a"
-                  level="H"
-                  includeMargin={true}
-                  className="rounded-lg"
-                />
-                <p className="text-xs text-slate-400 mt-2">
-                  {data?.data?.profile?.code}
-                </p>
-              </div>
-            </div>
-          )}
-
+          {/* Logout Button */}
           <div
-            className="bg-red-50 text-red-700 rounded-xl mt-4 p-4 flex gap-4 items-center border-b border-b-gray-200 shadow-neuro-in cursor-pointer hover:scale-[1.01] transition"
+            className="bg-red-50 text-red-700 rounded-xl mt-8 p-4 flex gap-4 items-center shadow-neuro-in cursor-pointer hover:scale-[1.01] transition"
             onClick={() => {
               setModalConfirm(true);
             }}
@@ -256,6 +129,35 @@ export default function Akun() {
             <p className="font-medium">Keluar</p>
           </div>
         </div>
+
+        {/* QR Popup */}
+        {showQR && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-2xl shadow-neuro-in p-6 flex flex-col items-center relative">
+              <button
+                className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"
+                onClick={() => setShowQR(false)}
+                aria-label="Close QR"
+              >
+                &times;
+              </button>
+              <p className="text-sm font-semibold mb-2">Barcode Akun Anda</p>
+              <QRCode
+                value={data?.data?.profile?.code || 'huehuy-user'}
+                size={160}
+                bgColor="#f8fafc"
+                fgColor="#0f172a"
+                level="H"
+                includeMargin={true}
+                className="rounded-lg"
+              />
+              <p className="text-xs text-slate-400 mt-2">
+                {data?.data?.profile?.code}
+              </p>
+            </div>
+          </div>
+        )}
+
         <BottomBarComponent active={'user'} />
       </div>
 

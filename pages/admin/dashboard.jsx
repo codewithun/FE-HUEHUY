@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
-    faCalendarAlt,
     faCrosshairs,
     faCubes,
     faGlobe,
@@ -11,7 +10,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import Cookies from 'js-cookie';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardCard from '../../components/construct.components/card/Dashboard.card';
 import { AdminLayout } from '../../components/construct.components/layout/Admin.layout';
 import { useUserContext } from '../../context/user.context';
@@ -142,13 +141,7 @@ export default function Index() {
           icon={faGlobe}
           linkPath="/admin/master/dunia"
         />
-        <DashboardCard
-          label="Event"
-          // loading={dashboardLoading}
-          value={data?.data?.events}
-          icon={faCalendarAlt}
-          linkPath="/admin/master/event"
-        />
+        {/* Event card removed as the feature is no longer used */}
         <DashboardCard
           label="Iklan"
           // loading={dashboardLoading}

@@ -1,17 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 
-import React from 'react';
+import { resolveUserImageUrl } from '../../../helpers/image.helpers';
 
 const UserDetailComponent = ({ data, customRole }) => {
   return (
     <div className="px-10">
       <img
         class="h-44 aspect-square rounded-full border-4 border-slate-300 dark:border-gray-800 mx-auto my-4 object-cover"
-        src={
-          data?.picture_source
-            ? `http://localhost:8000/storage/${data?.picture_source}`
-            : '/default-avatar.png'
-        }
+        src={resolveUserImageUrl(data) || '/default-avatar.png'}
         alt="Foto Profil"
       />
       <div className="w-full border-b grid grid-cols-12 p-4">

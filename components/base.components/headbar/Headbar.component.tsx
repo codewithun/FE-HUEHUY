@@ -68,15 +68,16 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
           onClick={() => setProfile(!profile)}
         >
           <div className="h-10 bg-background rounded-full aspect-square overflow-hidden border border-white/30 shadow-sm">
-            {/* <Image
+            <img
               src={
-                `http://localhost:8000/storage/${dataProfile?.data?.picture_source}` ||
+                dataProfile?.data?.profile?.picture_source ||
                 `/default-avatar.png`
               }
-              width={150}
-              height={150}
+              width={40}
+              height={40}
               alt="avatar"
-            /> */}
+              className="h-full w-full object-cover"
+            />
           </div>
 
           <div className="hidden lg:block w-[150px] text-slate-50">
@@ -102,15 +103,16 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
         >
           <div className="flex items-center gap-6 px-8 py-6 rounded-b-xl shadow-md">
             <div className="h-16 bg-background border-2 border-light-primary rounded-full aspect-square overflow-hidden">
-              {/* <Image
+              <img
                 src={
                   dataProfile?.data?.profile?.picture_source ||
                   `/default-avatar.png`
                 }
-                width={150}
-                height={150}
+                width={64}
+                height={64}
                 alt="avatar"
-              /> */}
+                className="h-full w-full object-cover"
+              />
             </div>
             <div className="pr-5 w-[160px]">
               <h6 className="text-lg font-bold text-slate-600">
