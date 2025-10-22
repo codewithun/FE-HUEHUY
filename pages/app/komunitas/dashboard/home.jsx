@@ -381,6 +381,8 @@ export default function CommunityDashboard({ communityId }) {
             privacy: community.privacy ?? null,
             isVerified: community.isVerified ?? community.is_verified ?? null,
             avatar: community.logo ?? null,
+            bg_color_1: community.bg_color_1 ?? null,
+            bg_color_2: community.bg_color_2 ?? null,
           });
         } else {
           // No dummy fallback — set null so UI shows "not found" or handle accordingly
@@ -399,17 +401,24 @@ export default function CommunityDashboard({ communityId }) {
 
   // Note: promo fetching removed from this screen to keep component focused.
 
-  // Function untuk menentukan gradient berdasarkan kategori
-  const getCommunityGradient = (category) => {
-    const gradients = {
-      'Shopping': 'bg-gradient-to-r from-blue-500 to-blue-600',
-      'Event': 'bg-gradient-to-r from-purple-500 to-purple-600',
-      'Kuliner': 'bg-gradient-to-r from-orange-500 to-orange-600',
-      'Otomotif': 'bg-gradient-to-r from-gray-600 to-gray-700',
-      'Fashion': 'bg-gradient-to-r from-pink-500 to-pink-600',
-      'default': 'bg-gradient-to-r from-green-500 to-green-600'
+  // Function untuk menentukan gradient berdasarkan bg_color dari backend (tanpa dummy fallback)
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    // Jika ada bg_color_1 dan bg_color_2 dari backend, gunakan itu
+    if (bgColor1 && bgColor2) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})`,
+      };
+    }
+    // Jika hanya ada bg_color_1, buat gradasi dengan versi transparan/gelapnya
+    if (bgColor1) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)`,
+      };
+    }
+    // Fallback minimal jika BE tidak mengirim warna
+    return {
+      backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)',
     };
-    return gradients[category] || gradients.default;
   };
 
   // Admin-style loading state
@@ -451,19 +460,28 @@ export default function CommunityDashboard({ communityId }) {
     );
   }
 
+  // Get community background style
+  const communityBgStyle = getCommunityGradient(
+    communityData?.bg_color_1,
+    communityData?.bg_color_2
+  );
+
   // Admin-style dashboard layout
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
         <div className="container mx-auto relative z-10 pb-28">
-          {/* Admin-style header */}
-          <div className="bg-slate-50 p-6 border-b border-slate-200">
+          {/* Admin-style header with community colors */}
+          <div 
+            className="p-6 border-b border-slate-200"
+            style={typeof communityBgStyle === 'object' ? communityBgStyle : {}}
+          >
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-slate-800">
+              <h1 className="text-2xl font-bold text-white drop-shadow-lg">
                 Dashboard Komunitas
               </h1>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+            <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-sm border border-white/20">
               <h2 className="text-lg font-semibold text-slate-800 mb-2">
                 {communityData.name}
               </h2>

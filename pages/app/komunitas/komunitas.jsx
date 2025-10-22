@@ -185,6 +185,8 @@ const normalizeCommunities = (raw) => {
       name: String(c.name ?? ''),
       description: c.description ?? '',
       category: c.category ?? '',
+      bg_color_1: c.bg_color_1 ?? null,
+      bg_color_2: c.bg_color_2 ?? null,
       logo: c.logo ?? null,
       privacy,
       isVerified: Boolean(c.isVerified ?? c.is_verified ?? false),
@@ -687,6 +689,17 @@ function CommunityCard({
   
   const [justJoined, setJustJoined] = useState(false);
 
+  // Gradient murni dari warna BE (tanpa dummy kategori)
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    if (bgColor1 && bgColor2) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})` };
+    }
+    if (bgColor1) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)` };
+    }
+    return { backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)' };
+  };
+
   useEffect(() => {
     const next = Boolean(community.isJoined);
     if (next && !isJoined) {
@@ -745,6 +758,12 @@ function CommunityCard({
             : 'Gabung dulu untuk membuka komunitas'
       }
     >
+      {/* Community Color Banner */}
+      <div 
+        className="h-3 w-full rounded-t-xl"
+        style={getCommunityGradient(community.bg_color_1, community.bg_color_2)}
+      />
+      
       <div className="p-5">
         <div className="flex gap-4">
           {/* Community Logo */}
@@ -759,8 +778,11 @@ function CommunityCard({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">
+                <div 
+                  className="w-full h-full rounded-xl flex items-center justify-center"
+                  style={getCommunityGradient(community.bg_color_1, community.bg_color_2)}
+                >
+                  <span className="text-white text-sm font-bold drop-shadow">
                     {community.name.substring(0, 2).toUpperCase()}
                   </span>
                 </div>

@@ -65,6 +65,17 @@ export default function CommunityProfile() {
     return fromQuery ? fromQuery.toString() : null;
   }, [id, idFromQueryAlt]);
 
+  // Gradient murni dari warna BE (hapus semua dummy mapping kategori)
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    if (bgColor1 && bgColor2) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})` };
+    }
+    if (bgColor1) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)` };
+    }
+    return { backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)' };
+  };
+
   // Fetch community data from API
   useEffect(() => {
     const fetchCommunityData = async () => {
@@ -106,6 +117,8 @@ export default function CommunityProfile() {
             unreadMessages: 0, // This would come from chat/message API
             isVerified: community.isVerified ?? community.is_verified ?? false,
             avatar: community.logo ?? '/api/placeholder/80/80',
+            bg_color_1: community.bg_color_1 ?? null,
+            bg_color_2: community.bg_color_2 ?? null,
           });
         } else {
           setCommunityData(null);
@@ -318,20 +331,29 @@ export default function CommunityProfile() {
     );
   }
 
+  // Get community background style
+  const communityBgStyle = getCommunityGradient(
+    communityData?.bg_color_1,
+    communityData?.bg_color_2
+  );
+
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
         <div className="container mx-auto relative z-10 pb-28 min-h-screen">
-          {/* Admin-style header */}
-          <div className="bg-slate-50 p-6 border-b border-slate-200">
+          {/* Admin-style header with community colors */}
+          <div 
+            className="p-6 border-b border-slate-200"
+            style={typeof communityBgStyle === 'object' ? communityBgStyle : {}}
+          >
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-slate-800">
+              <h1 className="text-2xl font-bold text-white drop-shadow-lg">
                 Profile Komunitas
               </h1>
             </div>
 
             {/* User Profile Card */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-4">
+            <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-sm border border-white/20 mb-4">
               <div className="flex items-center gap-4">
                 {loadingProfile ? (
                   <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center">

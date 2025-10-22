@@ -141,20 +141,15 @@ const CommunityPromoPage = () => {
           id: community.id,
           name: community.name || 'Komunitas',
           location: community.location || 'Location',
+          bg_color_1: community.bg_color_1 ?? null,
+          bg_color_2: community.bg_color_2 ?? null,
         });
       } else {
-        setCommunityData({
-          id: communityId,
-          name: 'dbotanica Bandung',
-          location: 'Bandung',
-        });
+        // Jangan pakai dummy; biarkan null agar UI menampilkan state kosong
+        setCommunityData(null);
       }
     } catch (error) {
-      setCommunityData({
-        id: communityId,
-        name: 'dbotanica Bandung',
-        location: 'Bandung',
-      });
+      setCommunityData(null);
     }
   };
 
@@ -252,6 +247,18 @@ const CommunityPromoPage = () => {
   };
 
 
+
+  // ======== HELPER FUNCTIONS ========
+  // Function gradient murni dari warna BE (tanpa dummy mapping kategori)
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    if (bgColor1 && bgColor2) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})` };
+    }
+    if (bgColor1) {
+      return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)` };
+    }
+    return { backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)' };
+  };
 
   const handlePromoClick = (promoId) => {
     router.push(
@@ -609,6 +616,12 @@ const CommunityPromoPage = () => {
     </div>
   );
 
+  // Get community background style
+  const communityBgStyle = getCommunityGradient(
+    communityData?.bg_color_1,
+    communityData?.bg_color_2
+  );
+
   if (!communityData) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen flex items-center justify-center px-4 py-4">
@@ -622,12 +635,15 @@ const CommunityPromoPage = () => {
 
   return (
     <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
-      {/* Admin-style header */}
-      <div className="bg-slate-50 p-6 border-b border-slate-200">
+      {/* Admin-style header with community colors */}
+      <div 
+        className="p-6 border-b border-slate-200"
+        style={typeof communityBgStyle === 'object' ? communityBgStyle : {}}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-slate-800">Promo Komunitas</h1>
+          <h1 className="text-2xl font-bold text-white drop-shadow-lg">Promo Komunitas</h1>
         </div>
-        <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex items-center">
+        <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-white/20 flex items-center">
           <FontAwesomeIcon icon={faSearch} className="text-slate-400 mr-3" />
           <input
             type="text"
