@@ -511,14 +511,30 @@ export default function KomunitasDashboard() {
                 appendField("type", payload.world_type);
               }
 
-              // PERBAIKI: is_active → selalu kirim sebagai string "1" atau "0"
-              const isActiveBool =
-                Array.isArray(payload.is_active)
-                  ? payload.is_active.includes(1) || payload.is_active.includes("1")
-                  : !!payload.is_active;
+              if (!("is_active" in payload)) {
+                payload.is_active = []; // default empty kalau gak dikirim
+              }
 
-              if (isActiveBool !== undefined && isActiveBool !== null)
-                appendField("is_active", isActiveBool ? "1" : "0");
+              let isActiveBool = false;
+
+              if (Array.isArray(payload.is_active)) {
+                // untuk bentuk [1], ['1'], [], dll
+                isActiveBool =
+                  payload.is_active.includes(1) ||
+                  payload.is_active.includes("1") ||
+                  payload.is_active.includes(true);
+              } else if (typeof payload.is_active === "string") {
+                // untuk bentuk "1", "0", "true", "false"
+                isActiveBool = ["1", "true", "on", "yes"].includes(payload.is_active.toLowerCase());
+              } else if (typeof payload.is_active === "boolean" || typeof payload.is_active === "number") {
+                // boolean atau angka
+                isActiveBool = Boolean(payload.is_active);
+              }
+
+              // SELALU kirim
+              appendField("is_active", isActiveBool ? "1" : "0");
+
+              console.log("[FIX] Appended is_active:", isActiveBool ? "1" : "0");
 
               // ===== FIX FINAL: Logo Handling (robust) =====
               console.log("Logo payload:", payload.logo);
