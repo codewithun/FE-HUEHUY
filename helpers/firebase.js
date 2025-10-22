@@ -1,19 +1,25 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp } from 'firebase/app';
-import { GoogleAuthProvider } from 'firebase/auth';
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import { GoogleAuthProvider, getAuth } from 'firebase/auth';
 
+// Prefer environment variables (NEXT_PUBLIC_*) so values can differ per env
 const firebaseConfig = {
-  apiKey: 'AIzaSyDAgc1gO1h8U60Iy3ydxIoqeUboA4mZbkI',
-  authDomain: 'huehuy-c43c3.firebaseapp.com',
-  projectId: 'huehuy-c43c3',
-  storageBucket: 'huehuy-c43c3.appspot.com',
-  messagingSenderId: '10845575851',
-  appId: '1:10845575851:web:ef1e1e1e2c9deaa44c75ee',
-  measurementId: 'G-4DEEX27GPF',
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const app = initializeApp(firebaseConfig);
+// Initialize once (safe for Next.js SSR/CSR)
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
+// Export auth instance for convenience (optional in current usage)
+export const auth = getAuth(app);
+
+// Google provider with a friendlier UX prompt
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 // export const facebookProvider = new FacebookAuthProvider();

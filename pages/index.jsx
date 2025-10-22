@@ -81,7 +81,9 @@ export default function Login() {
     // sudah verified → simpan token
     const token = res?.data?.token || res?.token;
     if (token) {
-      Cookies.set(token_cookie_name, Encrypt(token), { expires: 365, secure: true });
+      // Gunakan secure cookie hanya di production agar tersimpan saat dev (http)
+      const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
+      Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
       const nextUrl = consumeNext(router);
       setTimeout(() => { window.location.href = nextUrl || '/app'; }, 100);
       return;
@@ -115,30 +117,24 @@ export default function Login() {
     url_path = 'auth/login-firebase'
   ) => {
     try {
-      const formData = new FormData();
-      formData.append('idToken', idToken);
-
+      // Send JSON body with correct header; helpers.post sets Content-Type automatically
       const response = await post({
         path: url_path,
-        body: formData,
-        contentType: 'multipart/form-data'
+        body: { idToken },
       });
 
       if (response?.status === 200) {
-        // Backend returns token directly in response for Firebase
         const token = response?.data?.token || response?.token;
-
         if (token) {
-          Cookies.set(
-            token_cookie_name,
-            Encrypt(token),
-            { expires: 365, secure: true }
-          );
+          const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
+          Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
         }
       }
 
       return response;
     } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('login-firebase failed:', error);
       return null;
     }
   };
@@ -149,8 +145,9 @@ export default function Login() {
 
     try {
       const result = await signInWithPopup(auth, provider);
-
-      const response = await loginFirebase(result.user.accessToken, true);
+      // Use Firebase ID token, not OAuth accessToken
+      const idToken = await result.user.getIdToken();
+      const response = await loginFirebase(idToken, true);
 
       if (response?.status === 200) {
         const nextUrl = consumeNext(router);

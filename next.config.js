@@ -1,5 +1,36 @@
 // next.config.js
-const runtimeCaching = require('next-pwa/cache');
+// Base runtime caching from next-pwa and a custom rule for API requests
+const baseRuntimeCaching = require('next-pwa/cache');
+const runtimeCaching = [
+  // Ensure API calls are always NetworkFirst (avoid stale cache for auth/data)
+  {
+    urlPattern: /^https:\/\/api\.huehuy\.com\/api\//,
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'api-cache',
+      networkTimeoutSeconds: 10,
+    },
+  },
+  // Dev/local API
+  {
+    urlPattern: /^http:\/\/localhost:8000\/api\//,
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'api-cache',
+      networkTimeoutSeconds: 10,
+    },
+  },
+  // Same-origin API calls when using Next.js rewrites (relative path)
+  {
+    urlPattern: /^\/api\//,
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'api-cache',
+      networkTimeoutSeconds: 10,
+    },
+  },
+  ...baseRuntimeCaching,
+];
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -29,6 +60,9 @@ module.exports = withPWA({
 
       // opsional: supaya fallback lama tidak 400
       { source: '/api/placeholder/:w/:h', destination: '/default-avatar.png' },
+
+      // Generic API proxy to avoid CORS entirely; keep specific rules above
+      { source: '/api/:path*', destination: `${API_BASE}/:path*` },
     ];
   },
 
@@ -36,7 +70,12 @@ module.exports = withPWA({
     return [
       {
         source: '/(.*)',
-        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // Allow OAuth popups (e.g., Google) to close themselves without COOP blocking warnings
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          // Note: Avoid setting COEP in development to prevent noisy warnings
+        ],
       },
     ];
   },
@@ -57,6 +96,12 @@ module.exports = withPWA({
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/storage/**' },
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/ads/**' },
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/ads/**' },
+
+      // Allow Google profile images
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'lh4.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'lh5.googleusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'lh6.googleusercontent.com', pathname: '/**' },
     ],
     // unoptimized: true,
   },
