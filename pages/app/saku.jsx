@@ -270,12 +270,12 @@ export default function Save() {
               validation_type,
               cube: voucher.community
                 ? {
-                    community_id: voucher.community.id,
-                    code: `community-${voucher.community.id}`,
-                    user: { name: voucher.community.name || 'Community', phone: '' },
-                    corporate: null,
-                    tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
-                  }
+                  community_id: voucher.community.id,
+                  code: `community-${voucher.community.id}`,
+                  user: { name: voucher.community.name || 'Community', phone: '' },
+                  corporate: null,
+                  tags: [{ address: voucher.tenant_location || '', link: null, map_lat: null, map_lng: null }],
+                }
                 : {},
             },
           };
@@ -574,6 +574,7 @@ export default function Save() {
       }
 
       const headers = {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       };
@@ -595,14 +596,16 @@ export default function Save() {
           return;
         }
 
-        res = await fetch(`${apiUrl}/api/promos/validate`, {
+        let url = `${apiUrl}/api/promos/validate`;
+        res = await fetch(url, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            code: codeToValidate,     // kode unik yang kamu input
-            item_id: targetId,        // Wajib: promo_item.id
+            code: codeToValidate.trim(),
+            item_id: targetId,
+            item_owner_id: selected?.promo_item?.user_id,
             expected_type: 'promo',
-            validation_purpose: 'tenant_scan',
+            validation_purpose: 'manual_input',
           }),
         });
         result = await res.json().catch(() => null);
@@ -620,10 +623,11 @@ export default function Save() {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            code: codeToValidate,
+            code: codeToValidate.trim(),
             item_id: targetId,
+            item_owner_id: selected?.voucher_item?.user_id,
             expected_type: 'voucher',
-            validation_purpose: 'tenant_scan',
+            validation_purpose: 'manual_input',
           }),
         });
         result = await res.json().catch(() => null);
@@ -634,64 +638,90 @@ export default function Save() {
         return;
       }
 
-      if (res && res.ok) {
-        setValidationMessage('Berhasil divalidasi.');
-        setShowValidationSuccess(true);
-        setValidationCode('');
+      // ✅ FIXED: Handle response berdasarkan success flag dari backend
+      if (res && res.ok && result?.success) {
+        // Backend return success: true - validasi berhasil atau sudah divalidasi sebelumnya
+        const msg = result?.message || '';
 
-        // Update local state untuk UX cepat
-        if (selected) {
-          const now = new Date().toISOString();
-          setData((prev) => ({
-            ...prev,
-            data: prev.data.map((it) => {
-              const sameItem =
-                it.promo_item?.id === selected?.promo_item?.id ||
-                it.voucher_item?.id === selected?.voucher_item?.id;
-              if (!sameItem) return it;
+        if (msg.toLowerCase().includes('sudah') && msg.toLowerCase().includes('sebelum')) {
+          // Case: sudah divalidasi sebelumnya
+          setValidationMessage(`${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`);
+          setShowValidationFailed(true);
+        } else {
+          // Case: validasi berhasil baru
+          setValidationMessage('Berhasil divalidasi.');
+          setShowValidationSuccess(true);
 
-              if (it.type === 'promo' && it.promo_item) {
-                return {
-                  ...it,
-                  validated_at: now,
-                  promo_item: { ...it.promo_item, redeemed_at: now, status: 'redeemed' },
-                };
-              }
-              if (it.type === 'voucher' && it.voucher_item) {
-                return {
-                  ...it,
-                  validated_at: now,
-                  voucher_item: { ...it.voucher_item, used_at: now },
-                };
-              }
-              return { ...it, validated_at: now };
-            }),
-          }));
+          // Update local state untuk UX cepat
+          if (selected) {
+            const now = new Date().toISOString();
+            setData((prev) => ({
+              ...prev,
+              data: prev.data.map((it) => {
+                const sameItem =
+                  it.promo_item?.id === selected?.promo_item?.id ||
+                  it.voucher_item?.id === selected?.voucher_item?.id;
+                if (!sameItem) return it;
+
+                if (it.type === 'promo' && it.promo_item) {
+                  return {
+                    ...it,
+                    validated_at: now,
+                    promo_item: { ...it.promo_item, redeemed_at: now, status: 'redeemed' },
+                  };
+                }
+                if (it.type === 'voucher' && it.voucher_item) {
+                  return {
+                    ...it,
+                    validated_at: now,
+                    voucher_item: { ...it.voucher_item, used_at: now },
+                  };
+                }
+                return { ...it, validated_at: now };
+              }),
+            }));
+          }
+
+          // Refresh dari server
+          setTimeout(() => {
+            setRefreshTrigger((p) => p + 1);
+            fetchData();
+          }, 100);
         }
-
-        // Refresh dari server
-        setTimeout(() => {
-          setRefreshTrigger((p) => p + 1);
-          fetchData();
-        }, 100);
+        setValidationCode('');
       } else {
+        // ✅ FIXED: Handle response berdasarkan success flag dan status code
         const msg = (result?.message || '').toString();
         let errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
 
-        if (res?.status === 409) {
-          errorMessage = /stok/i.test(msg) ? 'Stok promo habis.' : 'Kode unik sudah pernah divalidasi.';
-        } else if (res?.status === 404) {
-          errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" tidak ditemukan.`;
-        } else if (res?.status === 422) {
-          errorMessage = result?.message || 'Kode unik tidak valid atau format salah.';
-        } else if (res?.status === 400) {
-          if (msg.toLowerCase().includes('sudah') || msg.toLowerCase().includes('digunakan') || msg.toLowerCase().includes('already')) {
+        // Check jika backend return success: false dengan pesan khusus
+        if (result?.success === false) {
+          if (msg.toLowerCase().includes('sudah') && (msg.toLowerCase().includes('divalidasi') || msg.toLowerCase().includes('digunakan'))) {
             errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
+          } else if (msg.toLowerCase().includes('tidak ditemukan') || msg.toLowerCase().includes('not found')) {
+            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" tidak ditemukan.`;
+          } else if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('kedaluwarsa')) {
+            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah kedaluwarsa.`;
           } else {
-            errorMessage = result?.message || 'Kode unik tidak valid.';
+            errorMessage = result?.message || 'Validasi gagal. Silakan periksa kode Anda.';
           }
         } else {
-          errorMessage = result?.message || 'Terjadi kesalahan saat validasi.';
+          // Handle berdasarkan HTTP status code untuk kasus lain
+          if (res?.status === 409) {
+            errorMessage = /stok/i.test(msg) ? 'Stok promo habis.' : 'Kode unik sudah pernah divalidasi.';
+          } else if (res?.status === 404) {
+            errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" tidak ditemukan.`;
+          } else if (res?.status === 422) {
+            errorMessage = result?.message || 'Kode unik tidak valid atau format salah.';
+          } else if (res?.status === 400) {
+            if (msg.toLowerCase().includes('sudah') || msg.toLowerCase().includes('digunakan') || msg.toLowerCase().includes('already')) {
+              errorMessage = `${selected?.type === 'voucher' ? 'Voucher' : 'Promo'} dengan kode "${codeToValidate}" sudah pernah divalidasi sebelumnya.`;
+            } else {
+              errorMessage = result?.message || 'Kode unik tidak valid.';
+            }
+          } else {
+            errorMessage = result?.message || 'Terjadi kesalahan saat validasi.';
+          }
         }
 
         setValidationMessage(errorMessage);
@@ -1244,7 +1274,7 @@ export default function Save() {
                           : isItemValidatable(selected)
                             ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-xl transform hover:scale-[1.02]'
                             : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                        }`}
+                          }`}
                         onClick={() => {
                           if (isItemValidatable(selected)) {
                             submitValidation(validationCode);
