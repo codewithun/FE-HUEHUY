@@ -23,7 +23,7 @@ const CommunityBottomBar = ({ active, communityId }) => {
       <div
         className={`fixed ${
           isKeyboardOpen ? '-bottom-60' : 'bottom-0'
-        } left-0 w-screen pt-3 pb-2 px-6 bg-white border-t border-slate-200 shadow-lg z-40`}
+        } left-0 w-screen pt-3 pb-2 px-6 bg-white/30 backdrop-blur-md border-t border-white/30 shadow-lg z-40`}
       >
         <div className="lg:mx-auto lg:relative lg:max-w-md">
           <div className="grid grid-cols-4 gap-1">
@@ -33,11 +33,11 @@ const CommunityBottomBar = ({ active, communityId }) => {
                 <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-lg ${
-                      active == 'community' ? 'text-primary' : 'text-slate-500'
+                      active == 'community' ? 'text-white' : 'text-white/70'
                     }`}
                     icon={faHome}
                   />
-                  {active == 'community' && <p className="text-xs mt-1">Home</p>}
+                  {active == 'community' && <p className="text-xs mt-1 text-white">Home</p>}
                 </div>
               </Link>
 
@@ -46,11 +46,11 @@ const CommunityBottomBar = ({ active, communityId }) => {
                 <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-lg ${
-                      active == 'promo' ? 'text-primary' : 'text-slate-500'
+                      active == 'promo' ? 'text-white' : 'text-white/70'
                     }`}
                     icon={faTag}
                   />
-                  {active == 'promo' && <p className="text-xs mt-1">Promo</p>}
+                  {active == 'promo' && <p className="text-xs mt-1 text-white">Promo</p>}
                 </div>
               </Link>
 
@@ -59,11 +59,11 @@ const CommunityBottomBar = ({ active, communityId }) => {
                 <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-lg ${
-                      active == 'profile' ? 'text-primary' : 'text-slate-500'
+                      active == 'profile' ? 'text-white' : 'text-white/70'
                     }`}
                     icon={faUser}
                   />
-                  {active == 'profile' && <p className="text-xs mt-1">Profile</p>}
+                  {active == 'profile' && <p className="text-xs mt-1 text-white">Profile</p>}
                 </div>
               </Link>
 
@@ -72,11 +72,11 @@ const CommunityBottomBar = ({ active, communityId }) => {
                 <div className="flex flex-col justify-center items-center py-2">
                   <FontAwesomeIcon
                     className={`text-lg ${
-                      active == 'exit' ? 'text-primary' : 'text-slate-500'
+                      active == 'exit' ? 'text-white' : 'text-white/70'
                     }`}
                     icon={faSignOutAlt}
                   />
-                  {active == 'exit' && <p className="text-xs mt-1">Keluar</p>}
+                  {active == 'exit' && <p className="text-xs mt-1 text-white">Keluar</p>}
                 </div>
               </button>
             </>

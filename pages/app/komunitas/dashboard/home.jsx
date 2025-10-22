@@ -151,8 +151,8 @@ export default function CommunityDashboard({ communityId }) {
       return (
         <div className="mb-6">
           <div className="mb-2">
-            <h2 className="text-lg font-bold text-slate-900">{name}</h2>
-            {description && <p className="text-sm text-slate-600 mt-[1px]">{description}</p>}
+            <h2 className="text-lg font-bold text-white">{name}</h2>
+            {description && <p className="text-sm text-white/80 mt-[1px]">{description}</p>}
           </div>
 
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -204,9 +204,9 @@ export default function CommunityDashboard({ communityId }) {
         <div className="mb-6">
           {/* Header Widget */}
           <div className="mb-2">
-            <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+            <h2 className="text-lg font-bold text-white">{name}</h2>
             {widget.description && (
-              <p className="text-sm text-slate-600 mt-[1px]">{widget.description}</p>
+              <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
             )}
           </div>
 
@@ -232,22 +232,21 @@ export default function CommunityDashboard({ communityId }) {
                 return (
                   <div
                     key={cube?.id || index}
-                    className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
-                    style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', background: '#fffaf0', cursor: 'pointer' }}
+                    className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
+                    style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', cursor: 'pointer' }}
                     onClick={() => {
                       if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
                     }}
                   >
                     <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
                       <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain p-2" />
-                      <div className="absolute top-3 left-3 bg-white/70 text-[#5a6e1d] text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm">
+                      <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
                         {merchant}
                       </div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4"
-                      style={{ background: 'rgba(90,110,29,0.9)', borderTop: '1px solid #cdd0b3' }}>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
                       <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">{title}</h3>
-                      <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40">
+                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm">
                         {category}
                       </span>
                     </div>
@@ -269,11 +268,11 @@ export default function CommunityDashboard({ communityId }) {
                         {merchant}
                       </div>
                     </div>
-                    <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                    <div className="p-4 bg-white border-t border-[#e6e6e6]">
                       <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">{title}</h3>
                       {address && <p className="text-[13px] text-slate-700 line-clamp-2 mb-3">{address}</p>}
                       <div className="flex items-center justify-between">
-                        <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+                        <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
                       </div>
                     </div>
                   </div>
@@ -284,7 +283,7 @@ export default function CommunityDashboard({ communityId }) {
                 return (
                   <div
                     key={cube.id || index}
-                    className="flex items-center rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+                    className="flex items-center rounded-[14px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
                     style={{ minWidth: 280, maxWidth: 320, height: 130, cursor: 'pointer' }}
                     onClick={() => ad?.id && router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`)}
                   >
@@ -293,13 +292,13 @@ export default function CommunityDashboard({ communityId }) {
                         <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain rounded-[10px]" />
                       </div>
                     </div>
-                    <div className="flex-1 h-full p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
+                    <div className="flex-1 h-full p-3 flex flex-col justify-between bg-white border-l border-[#e6e6e6]">
                       <div>
                         <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">{title}</h3>
                         {address && <p className="text-[13px] text-slate-700 line-clamp-2">{address}</p>}
                       </div>
                       <div className="mt-1 flex items-center justify-between">
-                        <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+                        <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
                       </div>
                     </div>
                   </div>
@@ -311,7 +310,7 @@ export default function CommunityDashboard({ communityId }) {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
+                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#e6e6e6] bg-white shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
                   style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160, cursor: 'pointer' }}
                   onClick={() => ad?.id && router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`)}
                 >
@@ -320,11 +319,11 @@ export default function CommunityDashboard({ communityId }) {
                       <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain rounded-[8px]" />
                     </div>
                   </div>
-                  <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                  <div className="p-2 bg-white border-t border-[#e6e6e6]">
                     <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-slate-900 line-clamp-2 mb-0.5`}>{title}</h3>
                     {address && <p className={`${isM ? 'text-[12px]' : 'text-[11px]'} text-slate-700 line-clamp-1`}>{address}</p>}
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">{category}</span>
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">{category}</span>
                     </div>
                   </div>
                 </div>
@@ -469,31 +468,22 @@ export default function CommunityDashboard({ communityId }) {
   // Admin-style dashboard layout
   return (
     <>
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
+      <div className="relative lg:mx-auto lg:max-w-md min-h-screen" style={typeof communityBgStyle === 'object' ? communityBgStyle : {}}>
+        {/* Dimmer overlay to ensure content stays readable over strong backgrounds */}
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] z-0 pointer-events-none" />
         <div className="container mx-auto relative z-10 pb-28">
-          {/* Admin-style header with community colors */}
-          <div 
-            className="p-6 border-b border-slate-200"
-            style={typeof communityBgStyle === 'object' ? communityBgStyle : {}}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-white drop-shadow-lg">
-                Dashboard Komunitas
-              </h1>
-            </div>
-            <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-sm border border-white/20">
-              <h2 className="text-lg font-semibold text-slate-800 mb-2">
-                {communityData.name}
-              </h2>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                {communityData.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Admin-style content area */}
-          <div className="bg-slate-50 min-h-screen w-full">
+          {/* Content over full-page background (no header) */}
+          <div className="min-h-screen w-full">
             <div className="px-6 pt-6">
+              {/* Community intro block (not a header) */}
+              <div className="mb-6">
+                <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl p-4 text-white shadow-sm">
+                  <h2 className="text-lg font-semibold">{communityData.name}</h2>
+                  {communityData.description && (
+                    <p className="text-sm opacity-90 mt-1">{communityData.description}</p>
+                  )}
+                </div>
+              </div>
 
               {/* Widget Komunitas Section (type=information) */}
               {(widgetData.length > 0 || adCategories.length > 0) && (
