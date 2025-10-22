@@ -394,100 +394,99 @@ export default function Komunitas() {
 
   return (
     <>
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
-        <div className="relative">
-          {/* Header dengan Admin Style */}
-          <div className="bg-white shadow-sm border-b border-slate-200">
-            <div className="px-4 py-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <Link href="/app" className="text-slate-600 hover:text-slate-800 transition-colors">
-                    <FontAwesomeIcon icon={faArrowLeft} className="text-lg" />
-                  </Link>
-                  <h1 className="text-xl font-bold text-slate-800">Kelola Komunitas</h1>
-                </div>
-              </div>
-
-              {/* Search Box dengan Admin Style */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FontAwesomeIcon icon={faSearch} className="text-slate-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Cari komunitas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white text-slate-900 placeholder-slate-500"
-                />
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="relative">
+            {/* Banner (centered) */}
+            <div className="w-full aspect-[16/6] overflow-hidden bg-gradient-to-r from-[#5a6e1d] to-[#7a8e3a] flex items-center justify-center z-10" />
+            {/* Glass header overlay at top-left */}
+            <div className="absolute top-3 left-4 z-30">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/25 backdrop-blur-md border border-white/40 shadow-sm">
+                <Link href="/app" title="Kembali" className="text-white">
+                  <FontAwesomeIcon icon={faArrowLeft} className="text-base" />
+                </Link>
+                <h1 className="text-sm font-semibold text-white drop-shadow-sm">Kelola Komunitas</h1>
               </div>
             </div>
           </div>
 
-          {/* Tab Navigation dengan Admin Style */}
-          <div className="bg-white border-b border-slate-200">
-            <div className="px-4">
-              <div className="flex space-x-8">
-                <button
-                  className={`py-3 border-b-2 font-medium text-sm transition-colors ${
-                    activeTab === 'semua' 
-                      ? 'border-primary text-primary' 
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`}
-                  onClick={() => setActiveTab('semua')}
-                >
-                  Semua Komunitas
-                </button>
-                <button
-                  className={`py-3 border-b-2 font-medium text-sm transition-colors ${
-                    activeTab === 'komunitasku' 
-                      ? 'border-primary text-primary' 
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`}
-                  onClick={() => setActiveTab('komunitasku')}
-                >
-                  Komunitas Saya
-                </button>
-                <button
-                  className={`py-3 border-b-2 font-medium text-sm transition-colors ${
-                    activeTab === 'belum-gabung' 
-                      ? 'border-primary text-primary' 
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`}
-                  onClick={() => setActiveTab('belum-gabung')}
-                >
-                  Tersedia
-                </button>
+          <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-4 relative z-20 bg-gradient-to-br from-cyan-50">
+            <div className="relative -top-4 px-4">
+              <div className="bg-white border border__primary rounded-[20px] flex items-center overflow-hidden">
+                <div className="flex-1">
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <FontAwesomeIcon icon={faSearch} className="text__primary" />
+                    <input
+                      type="text"
+                      placeholder="Cari komunitas..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-transparent outline-none text-slate-800 placeholder-slate-400"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Content dengan Admin Style */}
-          <div className="bg-slate-50 min-h-screen pb-24">
+            <div className="bg-transparent border-b border-[#cdd0b3]">
+              <div className="px-4">
+                <div className="flex space-x-8">
+                  <button
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'semua'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                    onClick={() => setActiveTab('semua')}
+                  >
+                    Semua Komunitas
+                  </button>
+                  <button
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'komunitasku'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                    onClick={() => setActiveTab('komunitasku')}
+                  >
+                    Komunitas Saya
+                  </button>
+                  <button
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'belum-gabung'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                    onClick={() => setActiveTab('belum-gabung')}
+                  >
+                    Tersedia
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="px-4 py-6">
-
-              {/* Statistics Cards */}
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#5a6e1d]/5">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                      <FontAwesomeIcon icon={faUsers} className="text-white text-sm" />
+                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#5a6e1d] text-white">
+                      <FontAwesomeIcon icon={faUsers} className="text-sm" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-slate-600">Bergabung</p>
+                      <p className="text-sm font-medium text-[#3f4820]">Bergabung</p>
                       <p className="text-lg font-semibold text-slate-900">
                         {filteredCommunities.filter(c => c.isJoined).length}
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#5a6e1d]/5">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-8 w-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-                      <FontAwesomeIcon icon={faGlobe} className="text-white text-sm" />
+                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#7a8e3a] text-white">
+                      <FontAwesomeIcon icon={faGlobe} className="text-sm" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-slate-600">Tersedia</p>
+                      <p className="text-sm font-medium text-[#3f4820]">Tersedia</p>
                       <p className="text-lg font-semibold text-slate-900">
                         {filteredCommunities.filter(c => !c.isJoined).length}
                       </p>
@@ -496,16 +495,15 @@ export default function Komunitas() {
                 </div>
               </div>
 
-              {/* Community List */}
               <div className="mb-6">
                 <div className="mb-4">
                   <h2 className="text-slate-900 text-lg font-semibold">
-                    {activeTab === 'semua' ? 'Semua Komunitas' : 
-                     activeTab === 'komunitasku' ? 'Komunitas Saya' : 'Komunitas Tersedia'}
+                    {activeTab === 'semua' ? 'Semua Komunitas' :
+                      activeTab === 'komunitasku' ? 'Komunitas Saya' : 'Komunitas Tersedia'}
                   </h2>
-                  <p className="text-slate-500 text-sm">
-                    {activeTab === 'semua' ? 'Daftar lengkap komunitas yang tersedia' : 
-                     activeTab === 'komunitasku' ? 'Komunitas yang sudah Anda ikuti' : 'Komunitas yang bisa Anda ikuti'}
+                  <p className="text-slate-600 text-sm">
+                    {activeTab === 'semua' ? 'Daftar lengkap komunitas yang tersedia' :
+                      activeTab === 'komunitasku' ? 'Komunitas yang sudah Anda ikuti' : 'Komunitas yang bisa Anda ikuti'}
                   </p>
                 </div>
 
@@ -518,17 +516,17 @@ export default function Komunitas() {
                       </div>
                     </div>
                   ) : filteredCommunities.length === 0 ? (
-                    <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
-                      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FontAwesomeIcon icon={faUsers} className="text-slate-400 text-xl" />
+                    <div className="bg-white rounded-xl p-8 text-center border border-[#d8d8d8] bg-[#5a6e1d]/5">
+                      <div className="w-16 h-16 bg-white border border-[#d8d8d8] rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FontAwesomeIcon icon={faUsers} className="text-[#3f4820] text-xl" />
                       </div>
                       <h3 className="font-semibold text-slate-900 mb-2">
                         {activeTab === 'komunitasku' ? 'Belum Ada Komunitas' : 'Tidak Ada Hasil'}
                       </h3>
-                      <p className="text-slate-500 text-sm">
-                        {activeTab === 'komunitasku' 
+                      <p className="text-slate-600 text-sm">
+                        {activeTab === 'komunitasku'
                           ? 'Anda belum bergabung dengan komunitas apapun'
-                          : searchQuery 
+                          : searchQuery
                             ? `Tidak ditemukan komunitas dengan kata kunci "${searchQuery}"`
                             : 'Belum ada komunitas yang tersedia'
                         }
@@ -539,108 +537,45 @@ export default function Komunitas() {
                       <CommunityCard
                         key={community.id}
                         community={community}
-                        type={community.isJoined ? 'joined' : 'notJoined'}
                         onOpenCommunity={handleOpenCommunity}
                         formatNumber={formatNumber}
-                        refreshCommunities={fetchCommunities}
-                        setActiveTab={setActiveTab}
                         onShowJoinPopup={async (c) => {
                           try {
-                            // Tentukan privacy: map 'pribadi' -> 'private'
                             const rawPrivacy = String(c?.privacy || '').toLowerCase();
                             const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
-                            
-                            console.log('Join attempt:', { 
-                              communityId: c.id, 
-                              name: c.name, 
-                              rawPrivacy, 
-                              finalPrivacy: privacy 
-                            });
-                            
                             if (privacy === 'private') {
-                              // Private community - send join request
                               await requestJoinCommunityAPI(c.id);
-                              
-                              // Update local state
-                              setCommunities(prev => prev.map(comm => (
-                                comm.id === c.id ? { ...comm, hasRequested: true } : comm
-                              )));
-
-                              // Show informational notification
-                              showNotification({
-                                type: 'pending',
-                                title: 'Permintaan Terkirim',
-                                message: `Permintaan bergabung ke komunitas "${c.name}" telah dikirim. Menunggu persetujuan admin.`,
-                                autoClose: 4000
-                              });
-                            } else {
-                              // Public community - join directly; fallback to request if server demands
-                              try {
-                                await joinCommunityAPI(c.id);
-                              } catch (err) {
-                                const msg = String(err?.message || '').toLowerCase();
-                                if (err?.need_request === true || err?.code === 403 || /private|permintaan bergabung|harus.*permintaan/.test(msg)) {
-                                  await requestJoinCommunityAPI(c.id);
-                                  setCommunities(prev => prev.map(comm => (
-                                    comm.id === c.id ? { ...comm, hasRequested: true } : comm
-                                  )));
-                                  showNotification({
-                                    type: 'pending',
-                                    title: 'Butuh Persetujuan Admin',
-                                    message: `Komunitas "${c.name}" bersifat privat. Permintaan bergabung telah dikirim.`,
-                                    autoClose: 4000
-                                  });
-                                  return;
-                                }
-                                throw err;
-                              }
-                              
-                              // Update local state
-                              setCommunities(prev =>
-                                prev.map(comm =>
-                                  comm.id === c.id
-                                    ? { ...comm, isJoined: true, members: Math.max(0, (comm.members || 0) + 1) }
-                                    : comm
-                                )
-                              );
-                              setActiveTab('komunitasku');
-
-                              // Show success notification
                               showNotification({
                                 type: 'success',
-                                title: 'Berhasil Bergabung!',
-                                message: `Selamat! Anda berhasil bergabung dengan komunitas "${c.name}".`,
-                                autoClose: 3000
+                                title: 'Permintaan dikirim',
+                                message: 'Tunggu persetujuan admin komunitas.',
+                                autoClose: 3000,
                               });
-
-                              // Broadcast to other tabs
-                              localStorage.setItem(
-                                'community:membership',
-                                JSON.stringify({ id: c.id, action: 'join', delta: +1, at: Date.now() })
-                              );
+                            } else {
+                              await joinCommunityAPI(c.id);
+                              showNotification({
+                                type: 'success',
+                                title: 'Berhasil bergabung',
+                                message: `Anda sekarang anggota ${c.name}.`,
+                                autoClose: 3000,
+                              });
+                              try {
+                                localStorage.setItem(
+                                  'community:membership',
+                                  JSON.stringify({ id: c.id, action: 'join', delta: +1, at: Date.now() })
+                                );
+                              } catch {}
+                              fetchCommunities();
                             }
                           } catch (error) {
                             console.error('Join error:', error);
-                            // Show error notification
                             showNotification({
                               type: 'error',
-                              title: 'Gagal Bergabung',
-                              message: error?.message || 'Terjadi kesalahan. Silakan coba lagi.',
-                              autoClose: 4000
+                              title: 'Gagal',
+                              message: error?.message || 'Gagal memproses permintaan.',
+                              autoClose: 5000,
                             });
                           }
-                        }}
-                        // ====== Tambahkan updater agar parent bisa update state setelah join ======
-                        onApplyDelta={(id, joinOrLeave, delta) => {
-                          setCommunities(prev => prev.map(item => {
-                            if (item.id !== id) return item;
-                            const d = Number.isFinite(delta) ? delta : (joinOrLeave === 'join' ? +1 : -1);
-                            return {
-                              ...item,
-                              isJoined: joinOrLeave === 'join',
-                              members: Math.max(0, (item.members || 0) + d),
-                            };
-                          }));
                         }}
                       />
                     ))
@@ -648,24 +583,23 @@ export default function Komunitas() {
                 </div>
               </div>
             </div>
+
+            <FlexibleNotification
+              show={notification.show}
+              onClose={hideNotification}
+              type={notification.type}
+              title={notification.title}
+              message={notification.message}
+              actionText={notification.actionText}
+              onAction={notification.onAction}
+              autoClose={notification.autoClose}
+              position="center"
+              size="md"
+            />
+
+            <BottomBarComponent active={'community'} />
           </div>
         </div>
-
-        {/* Flexible Notification */}
-        <FlexibleNotification
-          show={notification.show}
-          onClose={hideNotification}
-          type={notification.type}
-          title={notification.title}
-          message={notification.message}
-          actionText={notification.actionText}
-          onAction={notification.onAction}
-          autoClose={notification.autoClose}
-          position="center"
-          size="md"
-        />
-
-        <BottomBarComponent active={'community'} />
       </div>
     </>
   );
@@ -697,7 +631,7 @@ function CommunityCard({
     if (bgColor1) {
       return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)` };
     }
-    return { backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)' };
+    return { backgroundImage: 'linear-gradient(135deg, #5a6e1d, #3f4820)' };
   };
 
   useEffect(() => {
