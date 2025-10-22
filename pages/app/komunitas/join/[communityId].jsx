@@ -107,7 +107,7 @@ export default function JoinCommunity() {
       )}
       <JoinRequestPopup
         show={showPopup}
-        onClose={() => router.replace(`/app/komunitas/profile/${communityId}`)}
+        onClose={() => router.replace(`/app`)}
         communityName={communityName}
       />
     </div>
