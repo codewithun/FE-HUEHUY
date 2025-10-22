@@ -23,10 +23,21 @@ const PromoForm = ({ formControl, values, setValues }) => {
         <TextareaComponent
           name="ads[description]"
           label="Deskripsi Promo"
-          placeholder="Masukan Deskripsi Promo..."
+          placeholder="Masukan deskripsi singkat promo..."
           {...formControl('ads[description]')}
-          rows={5}
+          rows={4}
           validations={{ required: true }}
+        />
+      )}
+
+      {TextareaComponent && (
+        <TextareaComponent
+          name="ads[detail]"
+          label="Detail Promo"
+          placeholder="Masukan detail lengkap promo untuk disimpan di manajemen promo..."
+          {...formControl('ads[detail]')}
+          rows={6}
+          validations={{ required: false }}
         />
       )}
 
@@ -134,6 +145,12 @@ const PromoForm = ({ formControl, values, setValues }) => {
           value={values.find(i => i.name === 'cube_tags[0][link]')?.value || ''}
           validations={{ required: true }}
         />
+      )}
+
+      {/* Lokasi untuk promo offline */}
+      {values.find(i => i.name === 'ads[promo_type]')?.value === 'offline' && (
+        <div className="grid grid-cols-2 gap-4">
+        </div>
       )}
     </div>
   );

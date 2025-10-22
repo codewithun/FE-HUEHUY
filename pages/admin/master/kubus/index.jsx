@@ -39,6 +39,11 @@ import PromoForm from '../../../../features/kubus/forms/PromoForm';
 import VoucherForm from '../../../../features/kubus/forms/VoucherForm';
 import IklanForm from '../../../../features/kubus/forms/IklanForm';
 import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
+import { 
+  prepareKubusVoucherData, 
+  validateVoucherData,
+  transformKubusVoucherToManagement 
+} from '../../../../helpers/voucher.helpers';
 // Note: Real modals are imported above
 function KubusMain() {
   // States
@@ -139,6 +144,13 @@ function KubusMain() {
   const mapUpdateDefault = (data) => {
     const ad = data?.ads?.[0] || {};
 
+    // Debug logging untuk field detail
+    console.log('[KUBUS EDIT] Raw data from backend:', { 
+      ad_detail: ad?.detail, 
+      ad_description: ad?.description,
+      full_ad: ad 
+    });
+
     const contentType = data?.is_information
       ? 'kubus-informasi'
       : ad?.type === 'voucher'
@@ -199,7 +211,9 @@ function KubusMain() {
       'ads[image_3]': ad?.image_3 || '',
       'ads[title]': ad?.title || '',
       'ads[description]': ad?.description || '',
+      'ads[detail]': ad?.detail || ad?.description || '', // Fallback ke description jika detail kosong
       'ads[ad_category_id]': ad?.ad_category_id || '',
+      'ads[level_umkm]': ad?.level_umkm || '',
       'ads[level_umkm]': ad?.level_umkm || '',
       'ads[max_production_per_day]': ad?.max_production_per_day || '',
       'ads[sell_per_day]': ad?.sell_per_day || '',
@@ -230,7 +244,20 @@ function KubusMain() {
       ...(data?.world_id ? { world_id: data.world_id } : {}),
       ...(data?.user_id ? { owner_user_id: data.user_id } : {}),
       ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
+      
+      // Promo fields using existing fields
+      // ads[description] sudah digunakan sebagai detail promo
+      // address sudah digunakan sebagai lokasi promo  
+      // owner_user_id sudah digunakan sebagai pemilik promo (manager tenant)
+      // ads[unlimited_grab] sudah digunakan sebagai promo tak terbatas
+      map_distance: 0, // Jarak maksimal untuk promo offline
     };
+
+    // Debug logging untuk mapped data
+    console.log('[KUBUS EDIT] Mapped data:', { 
+      description: mappedData['ads[description]'], 
+      detail: mappedData['ads[detail]']
+    });
 
     return mappedData;
   };
@@ -362,7 +389,33 @@ function KubusMain() {
             'target_user_ids': [],
             'community_id': '',
             'is_information': [],
-            'is_recommendation': []
+            'is_recommendation': [],
+            // Default values untuk promo (hanya yang diperlukan)
+            'map_distance': 0,
+            'ads[description]': '',
+            'ads[detail]': '',
+          },
+          transformData: (formData) => {
+            // ✅ CRITICAL FIX: Hanya call helper voucher jika content_type === 'voucher'
+            if (formData.content_type === 'voucher') {
+              console.log('📦 Processing voucher data...');
+              const transformedData = prepareKubusVoucherData(formData);
+              
+              // Validasi khusus untuk voucher
+              const validation = validateVoucherData(transformedData);
+              if (!validation.isValid) {
+                console.error('Voucher validation failed:', validation.errors);
+                // Bisa throw error atau return false untuk menghentikan submit
+                // throw new Error('Data voucher tidak valid: ' + Object.values(validation.errors).join(', '));
+              }
+              
+              console.log('📦 Voucher data after transformation:', transformedData);
+              return transformedData;
+            } else {
+              // ✅ PERBAIKAN: Untuk promo/iklan, return original data tanpa voucher processing
+              console.log('📦 Non-voucher content, returning original data for:', formData.content_type);
+              return formData;
+            }
           },
           onModalOpen: () => {
             // Jika ada pendingEditRow atau sudah ada selected dengan ads, ini edit mode
@@ -600,7 +653,7 @@ function KubusMain() {
                     />
                   );
                 }
-                return <VoucherForm formControl={formControl} />;
+                return <VoucherForm formControl={formControl} createImageField={createImageField} />;
               },
             },
             // Maps and Address for Offline Promo/Voucher

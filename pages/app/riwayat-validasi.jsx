@@ -400,11 +400,33 @@ export default function RiwayatValidasi() {
                         </p>
 
                         <p className="text-slate-600 text-sm mb-1">
-                          {view === 'tenant' ? (
-                            <>Promo milik: {v.owner?.name ?? '-'}</>
-                          ) : (
-                            <>Divalidasi oleh: {v.user?.name ?? '—'}</>
-                          )}
+                          {(() => {
+                            // Use the backend-provided context instead of frontend logic
+                            if (v.show_owner_info && v.owner) {
+                              // Show owner info when user is the validator (tenant view)
+                              return (
+                                <>
+                                  {v.itemType === 'voucher' ? 'Voucher' : 'Promo'} milik: {v.owner.name}
+                                </>
+                              );
+                            } else if (v.show_validator_info && v.user) {
+                              // Show validator info when user is the owner (user view)
+                              return (
+                                <>Divalidasi oleh: {v.user.name}</>
+                              );
+                            } else {
+                              // Fallback for unclear cases
+                              return (
+                                <>
+                                  {v.user_relationship === 'owner' ? (
+                                    <>Divalidasi oleh: {v.user?.name ?? '—'}</>
+                                  ) : (
+                                    <>{v.itemType === 'voucher' ? 'Voucher' : 'Promo'} milik: {v.owner?.name ?? '—'}</>
+                                  )}
+                                </>
+                              );
+                            }
+                          })()}
                         </p>
                       </>
                     );
