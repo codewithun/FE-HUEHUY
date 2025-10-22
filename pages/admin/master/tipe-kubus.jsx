@@ -90,12 +90,10 @@ export default function ManageCubeTypes() {
           ],
         }}
         formUpdateControl={{
-          customDefaultValue: (data) => {
-            return {
-              ...data,
-              role: data?.roles?.map((item) => item.id),
-            };
-          },
+          // Untuk tipe kubus tidak ada field "role", cukup kembalikan data apa adanya
+          customDefaultValue: (data) => ({
+            ...data,
+          }),
         }}
         actionControl={{ except: 'detail' }}
       />
