@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import CommunityBottomBar from '../dashboard/CommunityBottomBar';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function CommunityProfile() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function CommunityProfile() {
     if (router.isReady) setRouterReady(true);
   }, [router.isReady]);
 
-  // Real community data from API
+ 
   const [communityData, setCommunityData] = useState(null);
   const [loadingCommunity, setLoadingCommunity] = useState(true);
 
@@ -186,7 +187,7 @@ export default function CommunityProfile() {
       id: 'qr-community',
       title: 'QR Komunitas',
       icon: faQrcode,
-      action: () => router.push('/app/komunitas/scanner'),
+      action: () => setShowQRModal(true),
       hasChevron: true
     }
   ];
@@ -480,9 +481,9 @@ export default function CommunityProfile() {
         {/* QR Code Modal */}
         {showQRModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-neuro">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-slate-800">QR Komunitas</h3>
+            <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-neuro text-center">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-slate-800">Huehuy QR CODE</h3>
                 <button
                   onClick={() => setShowQRModal(false)}
                   className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
@@ -491,35 +492,25 @@ export default function CommunityProfile() {
                 </button>
               </div>
 
-              <div className="text-center">
-                <div className="bg-gray-100 rounded-xl p-6 mb-4">
-                  <div className="w-48 h-48 mx-auto bg-white rounded-lg p-4 shadow-neuro-in">
-                    {/* QR Code placeholder - in real app this would be generated */}
-                    <div className="w-full h-full bg-qr-pattern bg-center bg-no-repeat bg-contain"></div>
-                    <style jsx>{`
-                      .bg-qr-pattern {
-                        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23000'/%3E%3Crect x='10' y='10' width='10' height='10' fill='%23fff'/%3E%3Crect x='30' y='10' width='10' height='10' fill='%23fff'/%3E%3Crect x='50' y='10' width='10' height='10' fill='%23fff'/%3E%3Crect x='70' y='10' width='10' height='10' fill='%23fff'/%3E%3Crect x='10' y='30' width='10' height='10' fill='%23fff'/%3E%3Crect x='30' y='30' width='10' height='10' fill='%23fff'/%3E%3Crect x='50' y='30' width='10' height='10' fill='%23fff'/%3E%3Crect x='70' y='30' width='10' height='10' fill='%23fff'/%3E%3C/svg%3E");
-                      }
-                    `}</style>
-                  </div>
-                </div>
+              <p className="text-sm text-slate-500 mb-3">
+                QR Komunitas {communityData.name}
+              </p>
 
-                <h4 className="font-bold text-slate-800 mb-2">{communityData.name}</h4>
-                <p className="text-slate-600 text-sm mb-4">Scan QR code ini untuk bergabung dengan komunitas</p>
-
-                <button
-                  onClick={async () => {
-                    const shareUrl = `${window.location.origin}/app/komunitas/join/${effectiveCommunityId}`;
-                    try {
-                      await navigator.clipboard.writeText(shareUrl);
-                    } catch {}
-                  }}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <FontAwesomeIcon icon={faCopy} />
-                  Salin Link Komunitas
-                </button>
+              <div className="bg-gray-50 rounded-xl p-4 mb-4 flex justify-center">
+                <QRCodeSVG
+                  value={`${window.location.origin}/app/komunitas/join/${communityData?.id || effectiveCommunityId || 'NO_CODE'}`}
+                  size={180}
+                  level="H"
+                  bgColor="#f8fafc"
+                  fgColor="#0f172a"
+                  includeMargin={true}
+                  className="mx-auto rounded-lg"
+                />
               </div>
+
+              <p className="text-xs text-slate-500 mb-4">
+                Kode QR ini untuk membagikan komunitas agar bisa dibuka oleh calon pengunjung!
+              </p>
             </div>
           </div>
         )}
