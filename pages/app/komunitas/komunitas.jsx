@@ -366,9 +366,11 @@ export default function Komunitas() {
     data = data.filter((c) => (c.is_active === undefined ? true : Boolean(c.is_active)));
 
     if (activeTab === 'komunitasku') {
-      data = data.filter(c => Boolean(c.isJoined));
+      // Termasuk yang sudah request (pending) sebagai bagian dari komunitas saya
+      data = data.filter(c => Boolean(c.isJoined) || Boolean(c.hasRequested));
     } else if (activeTab === 'belum-gabung') {
-      data = data.filter(c => !c.isJoined);
+      // Tersedia = belum bergabung dan belum request
+      data = data.filter(c => !c.isJoined && !c.hasRequested);
     }
 
     if (searchQuery.trim()) {
@@ -381,6 +383,13 @@ export default function Komunitas() {
 
     return data;
   }, [communities, activeTab, searchQuery]);
+
+  // Hitung statistik ringkas: gabungkan pending sebagai "Bergabung" (sudah ajukan)
+  const stats = useMemo(() => {
+    const joined = communities.filter(c => Boolean(c.isJoined) || Boolean(c.hasRequested)).length;
+    const available = communities.filter(c => !c.isJoined && !c.hasRequested).length;
+    return { joined, available };
+  }, [communities]);
 
   const handleOpenCommunity = (communityId) => {
     router.push(`/app/komunitas/dashboard/${communityId}`);
@@ -474,9 +483,7 @@ export default function Komunitas() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-[#3f4820]">Bergabung</p>
-                      <p className="text-lg font-semibold text-slate-900">
-                        {filteredCommunities.filter(c => c.isJoined).length}
-                      </p>
+                      <p className="text-lg font-semibold text-slate-900">{stats.joined}</p>
                     </div>
                   </div>
                 </div>
@@ -487,9 +494,7 @@ export default function Komunitas() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-[#3f4820]">Tersedia</p>
-                      <p className="text-lg font-semibold text-slate-900">
-                        {filteredCommunities.filter(c => !c.isJoined).length}
-                      </p>
+                      <p className="text-lg font-semibold text-slate-900">{stats.available}</p>
                     </div>
                   </div>
                 </div>
