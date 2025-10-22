@@ -407,7 +407,7 @@ export default function Komunitas() {
         <div className="container mx-auto relative z-10 pb-28">
           <div className="relative">
             {/* Banner (centered) */}
-            <div className="w-full aspect-[16/6] overflow-hidden bg-gradient-to-r from-[#5a6e1d] to-[#7a8e3a] flex items-center justify-center z-10" />
+            <div className="w-full aspect-[16/6] overflow-hidden bg-gradient-to-r from-[#0b2e13] to-[#14532d] flex items-center justify-center z-10" />
             {/* Glass header overlay at top-left */}
             <div className="absolute top-3 left-4 z-30">
               <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/25 backdrop-blur-md border border-white/40 shadow-sm">
@@ -476,24 +476,24 @@ export default function Komunitas() {
 
             <div className="px-4 py-6">
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#5a6e1d]/5">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#0b2e13]/5">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#5a6e1d] text-white">
+                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#0b2e13] text-white">
                       <FontAwesomeIcon icon={faUsers} className="text-sm" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-[#3f4820]">Bergabung</p>
+                      <p className="text-sm font-medium text-[#14532d]">Bergabung</p>
                       <p className="text-lg font-semibold text-slate-900">{stats.joined}</p>
                     </div>
                   </div>
                 </div>
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#5a6e1d]/5">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#0b2e13]/5">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#7a8e3a] text-white">
+                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#14532d] text-white">
                       <FontAwesomeIcon icon={faGlobe} className="text-sm" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-[#3f4820]">Tersedia</p>
+                      <p className="text-sm font-medium text-[#14532d]">Tersedia</p>
                       <p className="text-lg font-semibold text-slate-900">{stats.available}</p>
                     </div>
                   </div>
@@ -521,9 +521,9 @@ export default function Komunitas() {
                       </div>
                     </div>
                   ) : filteredCommunities.length === 0 ? (
-                    <div className="bg-white rounded-xl p-8 text-center border border-[#d8d8d8] bg-[#5a6e1d]/5">
+                    <div className="bg-white rounded-xl p-8 text-center border border-[#d8d8d8] bg-[#0b2e13]/5">
                       <div className="w-16 h-16 bg-white border border-[#d8d8d8] rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FontAwesomeIcon icon={faUsers} className="text-[#3f4820] text-xl" />
+                        <FontAwesomeIcon icon={faUsers} className="text-[#14532d] text-xl" />
                       </div>
                       <h3 className="font-semibold text-slate-900 mb-2">
                         {activeTab === 'komunitasku' ? 'Belum Ada Komunitas' : 'Tidak Ada Hasil'}
@@ -636,7 +636,7 @@ function CommunityCard({
     if (bgColor1) {
       return { backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)` };
     }
-    return { backgroundImage: 'linear-gradient(135deg, #5a6e1d, #3f4820)' };
+    return { backgroundImage: 'linear-gradient(135deg, #0b2e13, #14532d)' };
   };
 
   useEffect(() => {
