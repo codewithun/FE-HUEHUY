@@ -1,8 +1,4 @@
 /* eslint-disable no-console */
-import {
-  faGift
-} from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -416,77 +412,70 @@ export default function CommunityDashboard({ communityId }) {
     return gradients[category] || gradients.default;
   };
 
-  // Loading state
+  // Admin-style loading state
   if (!isClient || loading) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
         <div className="container mx-auto relative z-10 pb-28">
-          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-              <p className="mt-2 text-sm drop-shadow-neuro">
-                Loading komunitas...
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!communityData) {
-    return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
-        <div className="container mx-auto relative z-10 pb-28">
-          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
-            <div className="text-white text-center">
-              <p className="mt-2 text-sm drop-shadow-neuro">
-                Komunitas tidak ditemukan
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Rest of your component remains the same...
-  return (
-    <>
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
-        <div className="container mx-auto relative z-10 pb-28">
-          {/* Header Banner */}
-          <div
-            className={`w-full relative overflow-hidden ${getCommunityGradient(
-              communityData.category
-            )} rounded-b-[40px] shadow-neuro`}
-          >
-            {/* Background decoration */}
-            <div className="absolute inset-0">
-              <div className="absolute top-4 right-4 w-16 h-16 bg-white rounded-full opacity-10"></div>
-              <div className="absolute bottom-8 left-8 w-12 h-12 bg-white rounded-full opacity-10"></div>
-              <div className="absolute top-12 left-1/4 w-8 h-8 bg-white rounded-full opacity-10"></div>
-            </div>
-
-            <div className="relative px-6 py-6 text-white">
-              {/* Welcome Message */}
-              <div className="mb-6">
-                <h1 className="text-xl font-bold mb-2 drop-shadow-neuro">
-                  Selamat Datang Di Komunitas
-                  <br />
-                  {`"${communityData.name}"`}
-                </h1>
-                {/* Tampilkan deskripsi dari database */}
-                <p className="text-white text-opacity-90 text-sm leading-relaxed drop-shadow-neuro">
-                  {communityData.description}
+          <div className="bg-slate-50 p-6 border-b border-slate-200">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-3 text-sm text-slate-600">
+                  Loading komunitas...
                 </p>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Content area */}
-          <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20">
-            <div className="px-4 pt-6">
+  // Admin-style error state
+  if (!communityData) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="bg-slate-50 p-6 border-b border-slate-200">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-sm text-slate-600">
+                  Komunitas tidak ditemukan
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin-style dashboard layout
+  return (
+    <>
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
+        <div className="container mx-auto relative z-10 pb-28">
+          {/* Admin-style header */}
+          <div className="bg-slate-50 p-6 border-b border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl font-bold text-slate-800">
+                Dashboard Komunitas
+              </h1>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800 mb-2">
+                {communityData.name}
+              </h2>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                {communityData.description}
+              </p>
+            </div>
+          </div>
+
+          {/* Admin-style content area */}
+          <div className="bg-slate-50 min-h-screen w-full">
+            <div className="px-6 pt-6">
 
               {/* Widget Komunitas Section (type=information) */}
               {(widgetData.length > 0 || adCategories.length > 0) && (
@@ -565,7 +554,6 @@ export default function CommunityDashboard({ communityId }) {
               )}
 
               {/* Upcoming Events removed - not used */}
-
 
             </div>
           </div>

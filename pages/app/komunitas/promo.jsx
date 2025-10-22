@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { faGift, faSearch, faTag } from '@fortawesome/free-solid-svg-icons';
+import { faGift, faSearch } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
@@ -611,8 +611,8 @@ const CommunityPromoPage = () => {
 
   if (!communityData) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen flex items-center justify-center px-4 py-4">
-        <div className="text-center bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm p-8">
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen flex items-center justify-center px-4 py-4">
+        <div className="text-center bg-white rounded-2xl shadow-sm p-8 border border-slate-200">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-slate-600">Memuat data komunitas...</p>
         </div>
@@ -621,25 +621,26 @@ const CommunityPromoPage = () => {
   }
 
   return (
-    <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
-      {/* Header */}
-      <div className="bg-primary w-full h-[100px] rounded-b-[30px] shadow-sm px-6 mb-4 relative">
-        <div className="flex items-center justify-center h-full">
-          <div className="w-full bg-white px-4 py-3 rounded-[20px] flex items-center shadow-sm">
-            <FontAwesomeIcon icon={faSearch} className="text-gray-400 mr-3" />
-            <input
-              type="text"
-              placeholder="Cari promo..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 text-gray-700 placeholder-gray-400 bg-transparent outline-none"
-            />
-          </div>
+    <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
+      {/* Admin-style header */}
+      <div className="bg-slate-50 p-6 border-b border-slate-200">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-slate-800">Promo Komunitas</h1>
+        </div>
+        <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex items-center">
+          <FontAwesomeIcon icon={faSearch} className="text-slate-400 mr-3" />
+          <input
+            type="text"
+            placeholder="Cari promo..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 text-slate-700 placeholder-slate-400 bg-transparent outline-none"
+          />
         </div>
       </div>
 
-      {/* Content */}
-      <div className="px-4 pb-24">
+      {/* Admin-style content */}
+      <div className="bg-slate-50 px-6 pb-24">
         <div className="lg:mx-auto lg:max-w-md">
           {/* Render Widgets dengan level-aware ordering */}
           {(widgetData.length > 0 || adCategories.length > 0) && (

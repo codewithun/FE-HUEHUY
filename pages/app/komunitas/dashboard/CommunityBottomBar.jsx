@@ -1,8 +1,8 @@
 import {
-    faHome,
-    faSignOutAlt,
-    faTag,
-    faUser
+  faHome,
+  faSignOutAlt,
+  faTag,
+  faUser
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
@@ -23,7 +23,7 @@ const CommunityBottomBar = ({ active, communityId }) => {
       <div
         className={`fixed ${
           isKeyboardOpen ? '-bottom-60' : 'bottom-0'
-        } left-0 w-screen pt-3 pb-2 px-6 bg-slate-100 rounded-t-[25px] z-40`}
+        } left-0 w-screen pt-3 pb-2 px-6 bg-white border-t border-slate-200 shadow-lg z-40`}
       >
         <div className="lg:mx-auto lg:relative lg:max-w-md">
           <div className="grid grid-cols-4 gap-1">
