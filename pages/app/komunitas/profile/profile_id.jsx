@@ -1,8 +1,11 @@
 /* eslint-disable no-console */
+import { faFacebook, faTelegram, faWhatsapp, faXTwitter } from '@fortawesome/free-brands-svg-icons';
 import {
   faCheck,
   faChevronRight,
   faComments,
+  faCopy,
+  faLink,
   faQrcode,
   faShare,
   faSignOutAlt,
@@ -32,6 +35,8 @@ export default function CommunityProfile() {
   const [membershipLoading, setMembershipLoading] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [leaveLoading, setLeaveLoading] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -218,28 +223,92 @@ export default function CommunityProfile() {
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/app/komunitas/join/${effectiveCommunityId}`;
+    if (!effectiveCommunityId || !communityData) return;
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${origin}/app/komunitas/join/${communityData?.id || effectiveCommunityId}`;
     const shareText = `Bergabung dengan komunitas ${communityData.name} di HueHuy!`;
 
-    if (navigator.share) {
+    if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
           title: `Komunitas ${communityData.name}`,
           text: shareText,
           url: shareUrl
         });
+        return; // done
       } catch (error) {
-        // silent fallback
-        if (error?.name !== 'AbortError') {
-          try {
-            await navigator.clipboard.writeText(shareUrl);
-          } catch {}
-        }
+        // if user cancels, just return silently; otherwise show modal fallback
+        if (error?.name === 'AbortError') return;
       }
-    } else {
-      // silent fallback
+    }
+
+    // Fallback: open share modal with options
+    setShowShareModal(true);
+  };
+
+  const getSharePayload = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = `${origin}/app/komunitas/join/${communityData?.id || effectiveCommunityId}`;
+    const title = `Komunitas ${communityData?.name ?? ''}`;
+    const text = `Bergabung dengan komunitas ${communityData?.name ?? ''} di HueHuy!`;
+    return { url, title, text };
+  };
+
+  const openShare = (platform) => {
+    const { url, title, text } = getSharePayload();
+    const enc = encodeURIComponent;
+    let shareLink = '';
+
+    switch (platform) {
+      case 'whatsapp':
+        shareLink = `https://wa.me/?text=${enc(`${text} ${url}`)}`;
+        break;
+      case 'telegram':
+        shareLink = `https://t.me/share/url?url=${enc(url)}&text=${enc(text)}`;
+        break;
+      case 'facebook':
+        shareLink = `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}`;
+        break;
+      case 'x':
+        shareLink = `https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`;
+        break;
+      case 'email':
+        shareLink = `mailto:?subject=${enc(title)}&body=${enc(`${text}\n\n${url}`)}`;
+        break;
+      default:
+        shareLink = url;
+    }
+
+    try {
+      if (platform === 'email') {
+        window.location.href = shareLink;
+      } else {
+        window.open(shareLink, '_blank', 'noopener,noreferrer');
+      }
+    } catch {}
+  };
+
+  const copyLink = async () => {
+    const { url } = getSharePayload();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Fallback for older browsers
       try {
-        await navigator.clipboard.writeText(shareUrl);
+        const el = document.createElement('textarea');
+        el.value = url;
+        el.setAttribute('readonly', '');
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
       } catch {}
     }
   };
@@ -297,14 +366,16 @@ export default function CommunityProfile() {
   // Loading state
   if (!isClient || !routerReady || loadingCommunity) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
         <div className="container mx-auto relative z-10 pb-28">
-          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-              <p className="mt-2 text-sm drop-shadow-neuro">
-                Loading komunitas...
-              </p>
+          <div className="bg-slate-50 p-6 border-b border-slate-200">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-3 text-sm text-slate-600">
+                  Loading komunitas...
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -526,6 +597,66 @@ export default function CommunityProfile() {
               <p className="text-xs text-slate-500 mb-4">
                 Kode QR ini untuk membagikan komunitas agar bisa dibuka oleh calon pengunjung!
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Share Modal (fallback when native share unavailable) */}
+        {showShareModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-neuro">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold text-lg text-slate-800">Bagikan Komunitas</h3>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-slate-600" />
+                </button>
+              </div>
+
+              <p className="text-sm text-slate-600 mb-4">
+                Pilih platform untuk membagikan link komunitas {communityData?.name}.
+              </p>
+
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <button onClick={() => openShare('whatsapp')} className="flex flex-col items-center gap-2 p-3 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200">
+                  <FontAwesomeIcon icon={faWhatsapp} className="text-green-600 text-xl" />
+                  <span className="text-xs text-green-700">WhatsApp</span>
+                </button>
+                <button onClick={() => openShare('telegram')} className="flex flex-col items-center gap-2 p-3 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200">
+                  <FontAwesomeIcon icon={faTelegram} className="text-sky-600 text-xl" />
+                  <span className="text-xs text-sky-700">Telegram</span>
+                </button>
+                <button onClick={() => openShare('facebook')} className="flex flex-col items-center gap-2 p-3 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200">
+                  <FontAwesomeIcon icon={faFacebook} className="text-blue-600 text-xl" />
+                  <span className="text-xs text-blue-700">Facebook</span>
+                </button>
+                <button onClick={() => openShare('x')} className="flex flex-col items-center gap-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200">
+                  <FontAwesomeIcon icon={faXTwitter} className="text-gray-800 text-xl" />
+                  <span className="text-xs text-gray-800">X/Twitter</span>
+                </button>
+                <button onClick={() => openShare('email')} className="flex flex-col items-center gap-2 p-3 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200">
+                  <FontAwesomeIcon icon={faShare} className="text-amber-700 text-xl" />
+                  <span className="text-xs text-amber-800">Email</span>
+                </button>
+                <button onClick={copyLink} className="flex flex-col items-center gap-2 p-3 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200">
+                  <FontAwesomeIcon icon={faCopy} className="text-slate-700 text-xl" />
+                  <span className="text-xs text-slate-700">Salin Link</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <FontAwesomeIcon icon={faLink} className="text-slate-500" />
+                  <span className="text-xs text-slate-600 truncate max-w-[15rem]">
+                    {getSharePayload().url}
+                  </span>
+                </div>
+                <button onClick={copyLink} className="text-xs font-medium text-primary hover:underline">
+                  {copied ? 'Tersalin!' : 'Salin'}
+                </button>
+              </div>
             </div>
           </div>
         )}
