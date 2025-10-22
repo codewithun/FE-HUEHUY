@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
+import { Autoplay } from 'swiper';
 import 'swiper/css';
-import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
 import {
@@ -16,7 +16,6 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Autoplay } from 'swiper';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import {
   ButtonComponent,
@@ -315,7 +314,7 @@ export default function Index() {
                   spaceBetween={20}
                   centeredSlides={true}
                   loop={true}
-                  modules={[Autoplay]} // HAPUS Navigation dari sini
+                  modules={[Autoplay]} // Navigation sudah dihapus
                   slidesPerView={'auto'}
                   autoplay={{ 
                     delay: 5000,
