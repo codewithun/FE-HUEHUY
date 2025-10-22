@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { post, postProps } from './api.helpers';
 import { validationHelper, validationRules } from './validation.helpers';
+import { prepareKubusVoucherData } from './voucher.helpers';
 
 export const useForm = (
   submitControl: postProps,
@@ -99,8 +100,8 @@ export const useForm = (
     // Deteksi field ads yang perlu di-update
     const adsFieldNames = new Set([
       'level_umkm', 'max_production_per_day', 'sell_per_day',
-      'title', 'description', 'ad_category_id', 'promo_type', 'max_grab',
-      'unlimited_grab', 'is_daily_grab', 'validation_type', 'code',
+      'title', 'description', 'detail', 'ad_category_id', 'promo_type',
+      'is_daily_grab', 'validation_type', 'code',
       'target_type', 'target_user_ids', 'community_id', 'start_validate',
       'finish_validate', 'validation_time_limit', 'jam_mulai', 'jam_berakhir',
       'day_type', 'custom_days', 'image_1', 'image_2', 'image_3'
@@ -266,6 +267,12 @@ export const useForm = (
             const [main, sub] = inner.split('][');     // 'custom_days', 'saturday'
             const flat = `${main}[${sub}]`;            // 'custom_days[saturday]'
 
+            // ✅ FIX: Debug logging untuk nested fields yang bermasalah
+            if (main === 'custom_days') {
+              // eslint-disable-next-line no-console
+              console.log(`[DEBUG] 🔧 Processing nested field: ads[${inner}] → ${flat}, value:`, v);
+            }
+
             if (v instanceof File) {
               if (!appended.has(flat)) { formData.append(flat, v); appended.add(flat); }
             } else {
@@ -339,6 +346,12 @@ export const useForm = (
               const [main, sub] = inner.split('][');
               adsFields[main] = adsFields[main] || {};
               adsFields[main][sub] = jsonValue;
+              
+              // ✅ FIX: Debug logging untuk nested ads fields
+              if (main === 'custom_days') {
+                // eslint-disable-next-line no-console
+                console.log(`[DEBUG] 🔧 Creating ads nested object: ${main}.${sub} =`, jsonValue);
+              }
             } else {
               adsFields[inner] = jsonValue;
             }
@@ -479,6 +492,147 @@ export const useForm = (
     } else {
       // eslint-disable-next-line no-console
       console.log('  Form data:', formData);
+    }
+
+    // === VOUCHER SYNC PREPARATION ===
+    // Check if this is a voucher creation from kubus
+    const contentType = formData.get('content_type');
+    // eslint-disable-next-line no-console
+    console.log('[DEBUG] 🔍 VOUCHER CHECK:', {
+      contentType,
+      path: submitControl.path,
+      url: submitControl.url,
+      condition1: contentType === 'voucher',
+      condition2: submitControl.path?.includes('/admin/cubes'),
+      finalCondition: contentType === 'voucher' && submitControl.path?.includes('/admin/cubes')
+    });
+    
+    if (contentType === 'voucher' && (submitControl.path?.includes('/admin/cubes') || submitControl.path?.includes('cubes'))) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] 🎯 VOUCHER DETECTED - Preparing voucher sync data...');
+      
+      // Convert FormData to object for voucher helper
+      const formDataObject: any = {};
+      const entries = Array.from(formData.entries());
+      
+      entries.forEach(([key, value]) => {
+        // Handle nested fields like ads[title], cube_tags[0][address], etc.
+        if (key.includes('[') && key.includes(']')) {
+          const parts = key.split(/[\[\]]+/).filter(Boolean);
+          let current = formDataObject;
+          
+          for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (!current[part]) {
+              // Check if next part is number (array index)
+              const nextPart = parts[i + 1];
+              current[part] = /^\d+$/.test(nextPart) ? [] : {};
+            }
+            current = current[part];
+          }
+          
+          const lastPart = parts[parts.length - 1];
+          current[lastPart] = value;
+        } else {
+          formDataObject[key] = value;
+        }
+      });
+
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] Form data object for voucher helper:', formDataObject);
+
+      // Prepare voucher sync data
+      const voucherData = prepareKubusVoucherData(formDataObject);
+      
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] 🔧 VOUCHER DATA PREPARED:', voucherData);
+      
+      // Add voucher sync data to form
+      if (voucherData._sync_to_voucher_management && voucherData._voucher_sync_data) {
+        formData.append('_sync_to_voucher_management', 'true');
+        
+        // ✅ FIX: Parse _voucher_sync_data as JSON string if it's string
+        let voucherSyncData = voucherData._voucher_sync_data;
+        if (typeof voucherSyncData === 'string') {
+          try {
+            voucherSyncData = JSON.parse(voucherSyncData);
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[DEBUG] ❌ Failed to parse voucher sync data as JSON:', e);
+          }
+        }
+        
+        formData.append('_voucher_sync_data', JSON.stringify(voucherSyncData));
+        
+        // ✅ CRITICAL FIX: Override code field untuk avoid duplicate constraint
+        const uniqueCode = `KUBUS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        
+        // Backend expects 'code' field, not 'ads[code]' for cube creation
+        formData.set('code', uniqueCode);
+        
+        // ✅ REMOVE potential duplicate/conflicting fields for backend
+        const fieldsToClean = ['ads.code', 'ads[code]'];
+        fieldsToClean.forEach(field => {
+          if (formData.has(field)) {
+            formData.delete(field);
+            // eslint-disable-next-line no-console
+            console.log(`[DEBUG] 🗑️ Removed conflicting field: ${field}`);
+          }
+        });
+        
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG] ✅ VOUCHER SYNC DATA ADDED:', {
+          flag: voucherData._sync_to_voucher_management,
+          data: voucherData._voucher_sync_data,
+          uniqueCode: uniqueCode
+        });
+        
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG] 📤 COMPLETE REQUEST DATA BEING SENT:');
+        const finalEntries = Array.from(formData.entries());
+        finalEntries.forEach(([key, value]) => {
+          if (key === '_voucher_sync_data') {
+            // eslint-disable-next-line no-console
+            console.log(`  ${key}:`, JSON.parse(value as string));
+          } else if (value instanceof File) {
+            // eslint-disable-next-line no-console
+            console.log(`  ${key}: [FILE] ${value.name} (${value.size} bytes)`);
+          } else {
+            // eslint-disable-next-line no-console
+            console.log(`  ${key}:`, value);
+          }
+        });
+      } else {
+        // eslint-disable-next-line no-console
+        console.log('[DEBUG] ❌ VOUCHER SYNC DATA NOT PREPARED');
+      }
+    }
+
+    // === PROMO SYNC PREPARATION ===
+    // Check if this is a promo creation from kubus
+    if (contentType === 'promo' && (submitControl.path?.includes('/admin/cubes') || submitControl.path?.includes('cubes'))) {
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] 🎯 PROMO DETECTED - Using existing fields for promo sync...');
+      
+      // Promo menggunakan field yang sudah ada, tidak perlu field tambahan
+      const existingPromoFields = [
+        'ads[title]',           // Judul promo
+        'ads[description]',     // Deskripsi/detail promo 
+        'ads[promo_type]',      // Tipe promo (online/offline)
+        'address',              // Lokasi promo (untuk offline)
+        'map_distance',         // Jarak maksimal (untuk offline)
+        'owner_user_id',        // Manager tenant sebagai pemilik
+      ];
+      
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG] 📤 EXISTING PROMO FIELDS BEING SENT:');
+      existingPromoFields.forEach(field => {
+        const value = formData.get(field);
+        if (value !== null) {
+          // eslint-disable-next-line no-console
+          console.log(`  ${field}:`, value);
+        }
+      });
     }
 
     // === Request ===

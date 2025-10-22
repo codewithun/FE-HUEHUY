@@ -6,7 +6,7 @@ import {
   InputNumberComponent 
 } from '../../../components/base.components';
 
-const VoucherForm = ({ formControl }) => {
+const VoucherForm = ({ formControl, createImageField }) => {
   return (
     <div className="mt-6 space-y-4">
       <div className="font-semibold text-lg text-slate-700 border-b pb-2">Voucher</div>
@@ -29,6 +29,9 @@ const VoucherForm = ({ formControl }) => {
           validations={{ required: true }}
         />
       )}
+
+      {/* Gambar Voucher */}
+      {createImageField && createImageField('voucher_image', 'Gambar Voucher')}
 
       <div className="grid grid-cols-3 gap-4">
         <SelectComponent

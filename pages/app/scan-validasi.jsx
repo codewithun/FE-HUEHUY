@@ -359,14 +359,16 @@ export default function ScanValidasi() {
 
       if (userId) tenantPayload.item_owner_id = userId;
       if (itemId) tenantPayload.item_id = itemId;
-      if (qrItemType && qrItemType !== 'unknown')
-        tenantPayload.expected_type = qrItemType;
-      if (validationData.validation_purpose)
-        tenantPayload.validation_purpose = validationData.validation_purpose;
-      if (validationData.timestamp)
-        tenantPayload.qr_timestamp = validationData.timestamp;
+      // ❌ REMOVED: expected_type tidak diperlukan backend
+      // ❌ REMOVED: validation_purpose tidak diperlukan backend  
+      // ❌ REMOVED: qr_timestamp tidak diperlukan backend
 
       dlog('🏢 Enhanced tenant validation payload:', tenantPayload);
+      
+      // ✅ DEBUG: Log final payload yang akan dikirim
+      dlog('🔍 FINAL PAYLOAD TO SEND:', JSON.stringify(tenantPayload, null, 2));
+      dlog('🔍 API URL:', apiUrl);
+      dlog('🔍 HEADERS:', headers);
 
       let primaryRes, primaryResult, primaryType;
       let fallbackRes, fallbackResult, fallbackType;
@@ -391,7 +393,6 @@ export default function ScanValidasi() {
 
       // --- pilih endpoint utama berdasarkan hint QR ---
       const hitVoucherFirst = qrItemType === 'voucher';
-      const hitPromoFirst = qrItemType === 'promo' || !hitVoucherFirst;
 
       // 1) HIT UTAMA
       if (hitVoucherFirst) {
@@ -400,6 +401,9 @@ export default function ScanValidasi() {
           method: 'POST',
           headers,
           body: JSON.stringify(tenantPayload),
+        }).catch(err => {
+          dlog('❌ FETCH ERROR for vouchers/validate:', err);
+          throw err;
         });
         primaryResult = await primaryRes.json().catch(() => null);
 
@@ -413,6 +417,9 @@ export default function ScanValidasi() {
             method: 'POST',
             headers,
             body: JSON.stringify(tenantPayload),
+          }).catch(err => {
+            dlog('❌ FETCH ERROR for promos/validate:', err);
+            throw err;
           });
           fallbackResult = await fallbackRes.json().catch(() => null);
         }
@@ -422,6 +429,9 @@ export default function ScanValidasi() {
           method: 'POST',
           headers,
           body: JSON.stringify(tenantPayload),
+        }).catch(err => {
+          dlog('❌ FETCH ERROR for promos/validate:', err);
+          throw err;
         });
         primaryResult = await primaryRes.json().catch(() => null);
 
@@ -435,6 +445,9 @@ export default function ScanValidasi() {
             method: 'POST',
             headers,
             body: JSON.stringify(tenantPayload),
+          }).catch(err => {
+            dlog('❌ FETCH ERROR for vouchers/validate:', err);
+            throw err;
           });
           fallbackResult = await fallbackRes.json().catch(() => null);
         }
