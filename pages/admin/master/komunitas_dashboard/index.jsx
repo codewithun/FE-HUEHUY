@@ -135,17 +135,32 @@ export default function KomunitasDashboard() {
 
     try {
       const res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/member-history`));
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json().catch(() => ({}));
-      const rows = Array.isArray(json?.data) ? json.data : [];
+
+      // ✅ normalize data (gabung yang dari BE fix terbaru)
+      const rows = Array.isArray(json?.data) ? json.data.map((r) => ({
+        ...r,
+        action: (r?.action || '').toLowerCase(),
+        created_at: r?.created_at || null,
+        user_name: r?.user_name || r?.user?.name || "-",
+      })) : [];
+
+      // ✅ urutkan descending by waktu
+      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setMemberHistoryList(rows);
     } catch (err) {
       console.error("Gagal memuat riwayat member:", err);
       setMemberHistoryError("Tidak bisa memuat riwayat member");
     } finally {
       setMemberHistoryLoading(false);
+    }
+  };
+
+  // Tambahkan fungsi auto-refresh riwayat member
+  const refreshMemberHistory = () => {
+    if (activeCommunity) {
+      openMemberHistoryModal(activeCommunity);
     }
   };
 
@@ -160,6 +175,7 @@ export default function KomunitasDashboard() {
       }
       // Trigger table refresh
       setRefreshRequestsToggle((s) => !s);
+      refreshMemberHistory(); // ⬅️ auto-refresh riwayat member setelah approve/reject
     } catch (err) {
       console.error(`Gagal ${action} permintaan:`, err);
       alert(`Gagal ${action === 'approve' ? 'menyetujui' : 'menolak'} permintaan`);
@@ -481,7 +497,7 @@ export default function KomunitasDashboard() {
                 label: "Akses Komunitas",
                 placeholder: "Pilih Akses Komunitas..",
                 options: [
-                  { label: "Publik", value: "pribadi" },
+                  { label: "Publik", value: "public" },
                   { label: "Private", value: "private" },
                 ],
                 searchable: false,
@@ -1026,20 +1042,30 @@ export default function KomunitasDashboard() {
                     ),
                   },
                   {
-                    selector: "action",
-                    label: "Aksi",
-                    item: (history) => (
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${history.action === 'joined'
-                        ? 'bg-green-100 text-green-800'
-                        : history.action === 'left'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                        }`}>
-                        {history.action === 'joined' ? 'Bergabung' :
-                          history.action === 'left' ? 'Keluar' :
-                            history.action || '-'}
-                      </span>
-                    ),
+                    selector: "status",
+                    label: "Status",
+                    item: (history) => {
+                      const action = (history?.action || "").toLowerCase();
+                      let text = "-";
+                      let cls = "bg-gray-100 text-gray-800";
+
+                      if (action === "joined") {
+                        text = "Masuk";
+                        cls = "bg-green-100 text-green-800";
+                      } else if (action === "left") {
+                        text = "Keluar";
+                        cls = "bg-yellow-100 text-yellow-800";
+                      } else if (["removed", "deleted", "kicked"].includes(action)) {
+                        text = "Dihapus";
+                        cls = "bg-red-100 text-red-800";
+                      }
+
+                      return (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${cls}`}>
+                          {text}
+                        </span>
+                      );
+                    },
                   },
                   {
                     selector: "created_at",
