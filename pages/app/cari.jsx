@@ -57,6 +57,53 @@ export default function Cari() {
     setSort(berdasarkan == 'Terdekat' ? 'distance' : 'created_at');
   }, [berdasarkan]);
 
+  const normalizeBoolLike = (val) => {
+    if (val === true || val === 1) return true;
+    if (typeof val === 'number') return val === 1;
+    if (Array.isArray(val)) {
+      return (
+        val.length > 0 &&
+        (val.includes(1) || val.includes('1') || val.includes(true))
+      );
+    }
+    if (typeof val === 'string') {
+      const s = val.trim().toLowerCase();
+      if (['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s)) return true;
+      if (['0', 'false', 'n', 'no', 'off', ''].includes(s)) return false;
+      try {
+        const j = JSON.parse(val);
+        return normalizeBoolLike(j);
+      } catch {}
+    }
+    return !!val;
+  };
+
+  const getIsInformation = (ad) => {
+    const cubeInfo = normalizeBoolLike(ad?.cube?.is_information);
+    const adInfo = normalizeBoolLike(ad?.is_information);
+    const contentType = String(ad?.cube?.content_type || ad?.content_type)
+      .toLowerCase();
+    const contentTypeInfo = contentType === 'kubus-informasi';
+    const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+    const looksInfoType = ['information', 'informasi'].includes(typeStr);
+    return cubeInfo || adInfo || contentTypeInfo || looksInfoType;
+  };
+
+  const isPromoOnly = (ad) => {
+    // 1) Exclude informasi
+    if (getIsInformation(ad)) return false;
+
+    // 2) Exclude voucher
+    const typeStr = String(ad?.type || '').toLowerCase();
+    if (typeStr === 'voucher') return false;
+
+    // 3) Exclude iklan advertising
+    const rawCat = (ad?.ad_category?.name || '').toLowerCase();
+    if (rawCat === 'advertising') return false;
+
+    return true;
+  };
+
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md">
@@ -110,46 +157,48 @@ export default function Cari() {
 
             <div className="flex flex-col gap-3 mt-4">
               {!loadingAds && (search || sort == 'distance') ? (
-                dataAds?.data?.map((item, key) => {
-                  return (
-                    <Link href={`/app/${item?.cube?.code}`} key={key}>
-                      <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
-                        <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
-                          <img
-                            src={item?.picture_source}
-                            height={700}
-                            width={700}
-                            alt=""
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <p className="font-semibold limit__line__1">
-                            {item?.title}
-                          </p>
-                          <p className="text-slate-600 text-xs my-1 limit__line__2">
-                            {item?.cube?.address}
-                          </p>
-                          <div className="flex gap-2 mt-2">
-                            <p className="text-xs text-slate-600 limit__line__1">
-                              <FontAwesomeIcon icon={faLocationDot} />.{' '}
-                              {distanceConvert(item?.distance)}
-                            </p>
-                            <p className="text-xs"> | </p>
-                            <p className="text-xs text-slate-600 limit__line__1">
-                              <FontAwesomeIcon icon={faGlobe} />.{' '}
-                              {item?.cube?.world?.name || 'General'}
-                            </p>
-                            {item?.cube?.world_affiliate_id && (
-                              <>
-                                <p className="text-xs"> | </p>
-                                <p className="text-xs text-slate-600 font-semibold limit__line__1 p-1">
-                                  Affiliate
-                                </p>
-                              </>
-                            )}
+                dataAds?.data
+                  ?.filter(isPromoOnly)
+                  ?.map((item, key) => {
+                    return (
+                      <Link href={`/app/${item?.cube?.code}`} key={key}>
+                        <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
+                          <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
+                            <img
+                              src={item?.picture_source}
+                              height={700}
+                              width={700}
+                              alt=""
+                            />
                           </div>
-                        </div>
-                        {/* <div className="absolute top-5 left-0 bg-white bg-opacity-50 backdrop-blur-md min-h-[20px] py-1 pl-2 pr-3 rounded-r-full flex gap-2 items-center">
+                          <div className="col-span-3">
+                            <p className="font-semibold limit__line__1">
+                              {item?.title}
+                            </p>
+                            <p className="text-slate-600 text-xs my-1 limit__line__2">
+                              {item?.cube?.address}
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                              <p className="text-xs text-slate-600 limit__line__1">
+                                <FontAwesomeIcon icon={faLocationDot} />.{' '}
+                                {distanceConvert(item?.distance)}
+                              </p>
+                              <p className="text-xs"> | </p>
+                              <p className="text-xs text-slate-600 limit__line__1">
+                                <FontAwesomeIcon icon={faGlobe} />.{' '}
+                                {item?.cube?.world?.name || 'General'}
+                              </p>
+                              {item?.cube?.world_affiliate_id && (
+                                <>
+                                  <p className="text-xs"> | </p>
+                                  <p className="text-xs text-slate-600 font-semibold limit__line__1 p-1">
+                                    Affiliate
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {/* <div className="absolute top-5 left-0 bg-white bg-opacity-50 backdrop-blur-md min-h-[20px] py-1 pl-2 pr-3 rounded-r-full flex gap-2 items-center">
                           <CubeComponent
                             size={9}
                             color={`${item?.cube?.cube_type?.color}`}
@@ -158,10 +207,10 @@ export default function Cari() {
                             {item?.cube?.cube_type?.code}
                           </p>
                         </div> */}
-                      </div>
-                    </Link>
-                  );
-                })
+                        </div>
+                      </Link>
+                    );
+                  })
               ) : (
                 <>
                   <div className="text-center">Isi kolom pencarian dulu...</div>
