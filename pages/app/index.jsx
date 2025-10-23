@@ -111,10 +111,40 @@ export default function Index() {
     const rawCat = (ad?.ad_category?.name || '').trim();
     if (!rawCat) return 'Promo';
 
-    // kalau kategori BE memang “Advertising”, tampilkan apa adanya
+    // kalau kategori BE memang "Advertising", tampilkan apa adanya
     if (rawCat.toLowerCase() === 'advertising') return 'Advertising';
 
     return rawCat; // pakai nama kategori asli
+  };
+
+  // Tambahkan fungsi isPromoOnly di sini
+  const isPromoOnly = (ad) => {
+    // 1) Exclude informasi
+    if (getIsInformation(ad)) return false;
+    
+    // 2) Exclude voucher
+    const typeStr = String(ad?.type || '').toLowerCase();
+    if (typeStr === 'voucher') return false;
+    
+    // 3) Exclude iklan advertising - lebih strict
+    if (typeStr === 'iklan') return false;
+    
+    // 4) Check kategori advertising
+    const rawCat = (ad?.ad_category?.name || '').toLowerCase();
+    if (rawCat === 'advertising') return false;
+    
+    // 5) Check apakah ini iklan berdasarkan field lain
+    if (ad?.is_advertising || ad?.advertising) return false;
+    
+    // 6) Check cube type jika ada
+    const cubeType = String(ad?.cube?.type || '').toLowerCase();
+    if (cubeType === 'iklan' || cubeType === 'advertising') return false;
+    
+    // 7) Check content_type cube
+    const contentType = String(ad?.cube?.content_type || '').toLowerCase();
+    if (contentType.includes('iklan') || contentType.includes('advertising')) return false;
+    
+    return true;
   };
 
   const AdCardBySize = ({ ad, size = 'M' }) => {
@@ -469,7 +499,7 @@ export default function Index() {
                       </div>
 
                       <div className="flex flex-col gap-3 mt-4">
-                        {dataNear?.data?.map((item, key) => {
+                        {dataNear?.data?.filter(isPromoOnly)?.map((item, key) => {
                           return (
                             <Link href={buildPromoLink(item)} key={key}>
                               <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
