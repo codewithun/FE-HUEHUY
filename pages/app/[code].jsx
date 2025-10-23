@@ -3,13 +3,6 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
-import React, { useEffect, useState } from 'react';
-import {
-  ButtonComponent,
-  DateFormatComponent,
-  IconButtonComponent,
-  ModalConfirmComponent,
-} from '../../components/base.components';
 import {
   faArrowLeftLong,
   faArrowRight,
@@ -21,15 +14,22 @@ import {
   faShareSquare,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation } from 'swiper';
-import { useRouter } from 'next/router';
-import { get, post, useGet } from '../../helpers';
-import Link from 'next/link';
-import Head from 'next/head';
-import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
-import { TextareaComponent } from '../../components/base.components/input/Textarea.component';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Head from 'next/head';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
+import { Navigation } from 'swiper';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import {
+  ButtonComponent,
+  DateFormatComponent,
+  IconButtonComponent,
+  ModalConfirmComponent,
+} from '../../components/base.components';
+import { TextareaComponent } from '../../components/base.components/input/Textarea.component';
+import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
+import { get, post, useGet } from '../../helpers';
 
 export function Cube({ cubeData }) {
   const router = useRouter();

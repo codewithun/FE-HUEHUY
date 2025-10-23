@@ -1,8 +1,4 @@
 /* eslint-disable no-console */
-import {
-  faGift
-} from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -155,8 +151,8 @@ export default function CommunityDashboard({ communityId }) {
       return (
         <div className="mb-6">
           <div className="mb-2">
-            <h2 className="text-lg font-bold text-slate-900">{name}</h2>
-            {description && <p className="text-sm text-slate-600 mt-[1px]">{description}</p>}
+            <h2 className="text-lg font-bold text-white">{name}</h2>
+            {description && <p className="text-sm text-white/80 mt-[1px]">{description}</p>}
           </div>
 
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -208,9 +204,9 @@ export default function CommunityDashboard({ communityId }) {
         <div className="mb-6">
           {/* Header Widget */}
           <div className="mb-2">
-            <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+            <h2 className="text-lg font-bold text-white">{name}</h2>
             {widget.description && (
-              <p className="text-sm text-slate-600 mt-[1px]">{widget.description}</p>
+              <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
             )}
           </div>
 
@@ -236,22 +232,21 @@ export default function CommunityDashboard({ communityId }) {
                 return (
                   <div
                     key={cube?.id || index}
-                    className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
-                    style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', background: '#fffaf0', cursor: 'pointer' }}
+                    className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
+                    style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', cursor: 'pointer' }}
                     onClick={() => {
                       if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
                     }}
                   >
                     <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
                       <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain p-2" />
-                      <div className="absolute top-3 left-3 bg-white/70 text-[#5a6e1d] text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm">
+                      <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
                         {merchant}
                       </div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4"
-                      style={{ background: 'rgba(90,110,29,0.9)', borderTop: '1px solid #cdd0b3' }}>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
                       <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">{title}</h3>
-                      <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40">
+                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm">
                         {category}
                       </span>
                     </div>
@@ -273,11 +268,11 @@ export default function CommunityDashboard({ communityId }) {
                         {merchant}
                       </div>
                     </div>
-                    <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                    <div className="p-4 bg-white border-t border-[#e6e6e6]">
                       <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">{title}</h3>
                       {address && <p className="text-[13px] text-slate-700 line-clamp-2 mb-3">{address}</p>}
                       <div className="flex items-center justify-between">
-                        <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+                        <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
                       </div>
                     </div>
                   </div>
@@ -288,7 +283,7 @@ export default function CommunityDashboard({ communityId }) {
                 return (
                   <div
                     key={cube.id || index}
-                    className="flex items-center rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+                    className="flex items-center rounded-[14px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
                     style={{ minWidth: 280, maxWidth: 320, height: 130, cursor: 'pointer' }}
                     onClick={() => ad?.id && router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`)}
                   >
@@ -297,13 +292,13 @@ export default function CommunityDashboard({ communityId }) {
                         <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain rounded-[10px]" />
                       </div>
                     </div>
-                    <div className="flex-1 h-full p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
+                    <div className="flex-1 h-full p-3 flex flex-col justify-between bg-white border-l border-[#e6e6e6]">
                       <div>
                         <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">{title}</h3>
                         {address && <p className="text-[13px] text-slate-700 line-clamp-2">{address}</p>}
                       </div>
                       <div className="mt-1 flex items-center justify-between">
-                        <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+                        <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
                       </div>
                     </div>
                   </div>
@@ -315,7 +310,7 @@ export default function CommunityDashboard({ communityId }) {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
+                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#e6e6e6] bg-white shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
                   style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160, cursor: 'pointer' }}
                   onClick={() => ad?.id && router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`)}
                 >
@@ -324,11 +319,11 @@ export default function CommunityDashboard({ communityId }) {
                       <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain rounded-[8px]" />
                     </div>
                   </div>
-                  <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
+                  <div className="p-2 bg-white border-t border-[#e6e6e6]">
                     <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-slate-900 line-clamp-2 mb-0.5`}>{title}</h3>
                     {address && <p className={`${isM ? 'text-[12px]' : 'text-[11px]'} text-slate-700 line-clamp-1`}>{address}</p>}
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">{category}</span>
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">{category}</span>
                     </div>
                   </div>
                 </div>
@@ -385,6 +380,8 @@ export default function CommunityDashboard({ communityId }) {
             privacy: community.privacy ?? null,
             isVerified: community.isVerified ?? community.is_verified ?? null,
             avatar: community.logo ?? null,
+            bg_color_1: community.bg_color_1 ?? null,
+            bg_color_2: community.bg_color_2 ?? null,
           });
         } else {
           // No dummy fallback — set null so UI shows "not found" or handle accordingly
@@ -403,90 +400,90 @@ export default function CommunityDashboard({ communityId }) {
 
   // Note: promo fetching removed from this screen to keep component focused.
 
-  // Function untuk menentukan gradient berdasarkan kategori
-  const getCommunityGradient = (category) => {
-    const gradients = {
-      'Shopping': 'bg-gradient-to-r from-blue-500 to-blue-600',
-      'Event': 'bg-gradient-to-r from-purple-500 to-purple-600',
-      'Kuliner': 'bg-gradient-to-r from-orange-500 to-orange-600',
-      'Otomotif': 'bg-gradient-to-r from-gray-600 to-gray-700',
-      'Fashion': 'bg-gradient-to-r from-pink-500 to-pink-600',
-      'default': 'bg-gradient-to-r from-green-500 to-green-600'
+  // Function untuk menentukan gradient berdasarkan bg_color dari backend (tanpa dummy fallback)
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    // Jika ada bg_color_1 dan bg_color_2 dari backend, gunakan itu
+    if (bgColor1 && bgColor2) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})`,
+      };
+    }
+    // Jika hanya ada bg_color_1, buat gradasi dengan versi transparan/gelapnya
+    if (bgColor1) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)`,
+      };
+    }
+    // Fallback minimal jika BE tidak mengirim warna
+    return {
+      backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)',
     };
-    return gradients[category] || gradients.default;
   };
 
-  // Loading state
+  // Admin-style loading state
   if (!isClient || loading) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
         <div className="container mx-auto relative z-10 pb-28">
-          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-              <p className="mt-2 text-sm drop-shadow-neuro">
-                Loading komunitas...
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!communityData) {
-    return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
-        <div className="container mx-auto relative z-10 pb-28">
-          <div className="w-full bg-primary h-32 flex items-center justify-center rounded-b-[40px] shadow-neuro">
-            <div className="text-white text-center">
-              <p className="mt-2 text-sm drop-shadow-neuro">
-                Komunitas tidak ditemukan
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Rest of your component remains the same...
-  return (
-    <>
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
-        <div className="container mx-auto relative z-10 pb-28">
-          {/* Header Banner */}
-          <div
-            className={`w-full relative overflow-hidden ${getCommunityGradient(
-              communityData.category
-            )} rounded-b-[40px] shadow-neuro`}
-          >
-            {/* Background decoration */}
-            <div className="absolute inset-0">
-              <div className="absolute top-4 right-4 w-16 h-16 bg-white rounded-full opacity-10"></div>
-              <div className="absolute bottom-8 left-8 w-12 h-12 bg-white rounded-full opacity-10"></div>
-              <div className="absolute top-12 left-1/4 w-8 h-8 bg-white rounded-full opacity-10"></div>
-            </div>
-
-            <div className="relative px-6 py-6 text-white">
-              {/* Welcome Message */}
-              <div className="mb-6">
-                <h1 className="text-xl font-bold mb-2 drop-shadow-neuro">
-                  Selamat Datang Di Komunitas
-                  <br />
-                  {`"${communityData.name}"`}
-                </h1>
-                {/* Tampilkan deskripsi dari database */}
-                <p className="text-white text-opacity-90 text-sm leading-relaxed drop-shadow-neuro">
-                  {communityData.description}
+          <div className="bg-slate-50 p-6 border-b border-slate-200">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-3 text-sm text-slate-600">
+                  Loading komunitas...
                 </p>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Content area */}
-          <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20">
-            <div className="px-4 pt-6">
+  // Admin-style error state
+  if (!communityData) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
+        <div className="container mx-auto relative z-10 pb-28">
+          <div className="bg-slate-50 p-6 border-b border-slate-200">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-sm text-slate-600">
+                  Komunitas tidak ditemukan
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get community background style
+  const communityBgStyle = getCommunityGradient(
+    communityData?.bg_color_1,
+    communityData?.bg_color_2
+  );
+
+  // Admin-style dashboard layout
+  return (
+    <>
+      <div className="relative lg:mx-auto lg:max-w-md min-h-screen" style={typeof communityBgStyle === 'object' ? communityBgStyle : {}}>
+        {/* Dimmer overlay to ensure content stays readable over strong backgrounds */}
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] z-0 pointer-events-none" />
+        <div className="container mx-auto relative z-10 pb-28">
+          {/* Content over full-page background (no header) */}
+          <div className="min-h-screen w-full">
+            <div className="px-6 pt-6">
+              {/* Community intro block (not a header) */}
+              <div className="mb-6">
+                <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl p-4 text-white shadow-sm">
+                  <h2 className="text-lg font-semibold">{communityData.name}</h2>
+                  {communityData.description && (
+                    <p className="text-sm opacity-90 mt-1">{communityData.description}</p>
+                  )}
+                </div>
+              </div>
 
               {/* Widget Komunitas Section (type=information) */}
               {(widgetData.length > 0 || adCategories.length > 0) && (
@@ -565,7 +562,6 @@ export default function CommunityDashboard({ communityId }) {
               )}
 
               {/* Upcoming Events removed - not used */}
-
 
             </div>
           </div>

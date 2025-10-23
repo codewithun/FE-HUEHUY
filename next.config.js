@@ -39,6 +39,22 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
 });
 
+// Derive host from NEXT_PUBLIC_API_URL to allow images from that origin too
+const API_BASE_FOR_IMAGES = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  .replace(/\/$/, '')
+  .replace(/\/api$/i, '');
+/** @type {import('next/dist/shared/lib/image-config').RemotePattern[]} */
+let envRemotePattern = [];
+try {
+  const u = new URL(API_BASE_FOR_IMAGES);
+  envRemotePattern.push({
+    protocol: u.protocol.replace(':', ''),
+    hostname: u.hostname,
+    ...(u.port ? { port: u.port } : {}),
+    pathname: '/**',
+  });
+} catch {}
+
 /** @type {import('next').NextConfig} */
 module.exports = withPWA({
   // ✅ Tambahan: proxy agar hindari CORS untuk file statis Laravel
@@ -81,8 +97,22 @@ module.exports = withPWA({
   },
   reactStrictMode: false,
   images: {
+    // Izinkan host gambar eksternal (untuk kompatibilitas semua versi Next)
+    // Catatan: domains tidak memeriksa port, jadi tambahkan juga remotePatterns di bawah.
+    domains: [
+      'localhost',
+      '127.0.0.1',
+      'api.huehuy.com',
+      '159.223.48.146',
+      'lh3.googleusercontent.com',
+      'lh4.googleusercontent.com',
+      'lh5.googleusercontent.com',
+      'lh6.googleusercontent.com',
+    ],
     // (tetap persis seperti punyamu)
     remotePatterns: [
+      // computed from NEXT_PUBLIC_API_URL (covers dev/prod backends)
+      ...envRemotePattern,
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/**' },
       { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/storage/**' },
       // izinkan jika backend kadang melayani /ads/** langsung
