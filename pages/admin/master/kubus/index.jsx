@@ -39,10 +39,10 @@ import PromoForm from '../../../../features/kubus/forms/PromoForm';
 import VoucherForm from '../../../../features/kubus/forms/VoucherForm';
 import IklanForm from '../../../../features/kubus/forms/IklanForm';
 import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
-import { 
-  prepareKubusVoucherData, 
+import {
+  prepareKubusVoucherData,
   validateVoucherData,
-  transformKubusVoucherToManagement 
+  transformKubusVoucherToManagement
 } from '../../../../helpers/voucher.helpers';
 // Note: Real modals are imported above
 function KubusMain() {
@@ -145,10 +145,10 @@ function KubusMain() {
     const ad = data?.ads?.[0] || {};
 
     // Debug logging untuk field detail
-    console.log('[KUBUS EDIT] Raw data from backend:', { 
-      ad_detail: ad?.detail, 
+    console.log('[KUBUS EDIT] Raw data from backend:', {
+      ad_detail: ad?.detail,
       ad_description: ad?.description,
-      full_ad: ad 
+      full_ad: ad
     });
 
     const contentType = data?.is_information
@@ -244,7 +244,7 @@ function KubusMain() {
       ...(data?.world_id ? { world_id: data.world_id } : {}),
       ...(data?.user_id ? { owner_user_id: data.user_id } : {}),
       ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
-      
+
       // Promo fields using existing fields
       // ads[description] sudah digunakan sebagai detail promo
       // address sudah digunakan sebagai lokasi promo  
@@ -254,8 +254,8 @@ function KubusMain() {
     };
 
     // Debug logging untuk mapped data
-    console.log('[KUBUS EDIT] Mapped data:', { 
-      description: mappedData['ads[description]'], 
+    console.log('[KUBUS EDIT] Mapped data:', {
+      description: mappedData['ads[description]'],
       detail: mappedData['ads[detail]']
     });
 
@@ -400,7 +400,7 @@ function KubusMain() {
             if (formData.content_type === 'voucher') {
               console.log('📦 Processing voucher data...');
               const transformedData = prepareKubusVoucherData(formData);
-              
+
               // Validasi khusus untuk voucher
               const validation = validateVoucherData(transformedData);
               if (!validation.isValid) {
@@ -408,7 +408,7 @@ function KubusMain() {
                 // Bisa throw error atau return false untuk menghentikan submit
                 // throw new Error('Data voucher tidak valid: ' + Object.values(validation.errors).join(', '));
               }
-              
+
               console.log('📦 Voucher data after transformation:', transformedData);
               return transformedData;
             } else {
@@ -1342,7 +1342,9 @@ function KubusMain() {
         customDetail={(data) => (
           <GrabListComponent
             data={data}
-            filter={[{ column: 'ad_id', type: 'equal', value: data?.ads.at(0)?.id }]}
+            filter={[{ column: 'ad_id', type: 'equal', value: data?.ads?.at(0)?.id }]}
+            mode={data?.ads?.at(0)?.type === 'voucher' ? 'voucher' : 'promo'}
+            voucherCode={data?.ads?.at(0)?.code}
           />
         )}
 
