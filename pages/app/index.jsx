@@ -33,11 +33,27 @@ export default function Index() {
   const [map, setMap] = useState(null);
   const [apiReady, setApiReady] = useState(false);
 
-  // Build consistent link to unified Promo Detail page
-  // Prefer ad.id; fallback to cube detail when id is missing
+  // Build consistent link to appropriate detail page
+  // Route iklan to iklan page, promo/voucher to promo page
   const buildPromoLink = (ad) => {
     const id = ad?.id || ad?.ad_id;
-    if (id) return `/app/komunitas/promo/${id}?source=home`;
+    if (id) {
+      // Check if this is iklan/advertising content
+      const typeStr = String(ad?.type || '').toLowerCase();
+      const cat = String(ad?.ad_category?.name || '').toLowerCase();
+      
+      if (
+        typeStr === 'iklan' ||
+        cat === 'advertising' ||
+        ad?.is_advertising === true ||
+        ad?.advertising === true
+      ) {
+        return `/app/iklan/${id}?source=home`;
+      }
+      
+      // Default to promo page for promo/voucher content
+      return `/app/komunitas/promo/${id}?source=home`;
+    }
     const cubeCode = ad?.cube?.code;
     return cubeCode ? `/app/detail/${cubeCode}` : '#';
   };
