@@ -114,36 +114,29 @@ export default function Index() {
     // kalau kategori BE memang "Advertising", tampilkan apa adanya
     if (rawCat.toLowerCase() === 'advertising') return 'Advertising';
 
-    return rawCat; // pakai nama kategori asli
+    return rawCat;
   };
 
-  // Tambahkan fungsi isPromoOnly di sini
   const isPromoOnly = (ad) => {
-    // 1) Exclude informasi
     if (getIsInformation(ad)) return false;
-    
-    // 2) Exclude voucher
+
     const typeStr = String(ad?.type || '').toLowerCase();
-    if (typeStr === 'voucher') return false;
-    
-    // 3) Exclude iklan advertising - lebih strict
-    if (typeStr === 'iklan') return false;
-    
-    // 4) Check kategori advertising
-    const rawCat = (ad?.ad_category?.name || '').toLowerCase();
-    if (rawCat === 'advertising') return false;
-    
-    // 5) Check apakah ini iklan berdasarkan field lain
-    if (ad?.is_advertising || ad?.advertising) return false;
-    
-    // 6) Check cube type jika ada
-    const cubeType = String(ad?.cube?.type || '').toLowerCase();
-    if (cubeType === 'iklan' || cubeType === 'advertising') return false;
-    
-    // 7) Check content_type cube
-    const contentType = String(ad?.cube?.content_type || '').toLowerCase();
-    if (contentType.includes('iklan') || contentType.includes('advertising')) return false;
-    
+    const cat = String(ad?.ad_category?.name || '').toLowerCase();
+
+    if (
+      typeStr === 'voucher' ||
+      cat === 'voucher' ||
+      ad?.is_voucher === true ||
+      ad?.voucher === true
+    ) return false;
+
+    if (
+      typeStr === 'iklan' ||
+      cat === 'advertising' ||
+      ad?.is_advertising === true ||
+      ad?.advertising === true
+    ) return false;
+
     return true;
   };
 

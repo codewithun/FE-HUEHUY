@@ -5,15 +5,10 @@ import { useGet } from '../../../helpers';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfinity } from '@fortawesome/free-solid-svg-icons';
 
-/**
- * List serbaguna: Promo & Voucher
- * - mode="promo": sumber utama admin/promo-validations?promo_code=...
- *   (fallback lama admin/grabs tetap dipakai bila dataValid kosong)
- * - mode="voucher": sumber admin/voucher-validations?voucher_code=...
- *   (tidak pakai fallback grabs)
- */
 const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherCodeProp }) => {
   const isVoucher = mode === 'voucher';
+
+  const normCode = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : '');
 
   const [paginate, setPaginate] = useState(10);
   const [page, setPage] = useState(1);
@@ -31,21 +26,20 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
   );
 
   // ===================== FETCH DATA =====================
-
   // Fallback lama (hanya untuk mode promo)
   const [loadingTable, codeTable, dataTable, resetTable] = useGet(
     !isVoucher && filter
       ? {
-          path: 'admin/grabs',
-          params: {
-            page,
-            paginate,
-            sortBy: sort.column,
-            sortDirection: sort.direction,
-            search,
-            filter,
-          },
-        }
+        path: 'admin/grabs',
+        params: {
+          page,
+          paginate,
+          sortBy: sort.column,
+          sortDirection: sort.direction,
+          search,
+          filter,
+        },
+      }
       : {}
   );
 
@@ -53,16 +47,16 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
   const [loadingPromo, codePromo, dataPromo, resetPromo] = useGet(
     !isVoucher && promoCode
       ? {
-          path: 'admin/promo-validations',
-          params: {
-            page,
-            paginate,
-            sortBy: 'validated_at',
-            sortDirection: 'desc',
-            search,
-            promo_code: promoCode,
-          },
-        }
+        path: 'admin/promo-validations',
+        params: {
+          page,
+          paginate,
+          sortBy: 'validated_at',
+          sortDirection: 'desc',
+          search,
+          promo_code: promoCode,
+        },
+      }
       : {}
   );
 
@@ -70,88 +64,217 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
   const [loadingVoucher, codeVoucher, dataVoucher, resetVoucher] = useGet(
     isVoucher && (voucherCodeProp || data?.voucher?.code)
       ? {
-          path: 'admin/voucher-validations',
-          params: {
-            page,
-            paginate,
-            sortBy: sort.column ?? 'validated_at',
-            sortDirection: sort.direction ?? 'desc',
-            search,
-            voucher_code: voucherCodeProp || data?.voucher?.code,
-          },
-        }
+        path: 'admin/voucher-validations',
+        params: {
+          page,
+          paginate,
+          sortBy: sort.column ?? 'validated_at',
+          sortDirection: sort.direction ?? 'desc',
+          search,
+          voucher_code: voucherCodeProp || data?.voucher?.code,
+        },
+      }
+      : {}
+  );
+
+  // === Tambahan: ambil list item yang sudah DIREBUT (claimed) ===
+  const adId = data?.ads?.at?.(0)?.id;
+  const voucherCode = voucherCodeProp || data?.voucher?.code;
+
+  // Claimed list (PROMO) per iklan/ad
+  const [loadingClaimedPromo, codeClaimedPromo, dataClaimedPromo, resetClaimedPromo] = useGet(
+    !isVoucher && adId
+      ? {
+        path: 'admin/promo-items',
+        params: {
+          promo_id: adId,
+          paginate: 999,
+          sortBy: 'created_at',
+          sortDirection: 'desc',
+        },
+      }
+      : {}
+  );
+
+  // Claimed list (VOUCHER) per voucher_code
+  const [loadingClaimedVoucher, codeClaimedVoucher, dataClaimedVoucher, resetClaimedVoucher] = useGet(
+    isVoucher && voucherCode
+      ? {
+        path: 'vouchers/voucher-items',
+        params: {
+          voucher_code: voucherCode,
+          paginate: 999,
+          sortBy: 'created_at',
+          sortDirection: 'desc',
+        },
+      }
       : {}
   );
 
   // Pilih dataset (prioritas: sumber utama; promo bisa fallback ke grabs)
+  // ===================== PILIH & GABUNG DATA =====================
+  // Prinsip: ambil SEMUA yang sudah direbut (claimed) → tampil di list,
+  // lalu “tempelkan” info validasi jika ada.
+
   const rows = useMemo(() => {
-    if (isVoucher) {
-      return {
-        data: dataVoucher?.data || [],
-        total_row: dataVoucher?.total_row || 0,
-        loading: loadingVoucher,
-        reset: resetVoucher,
-        source: 'voucher-validations',
-      };
-    }
+    // Normalisasi kode untuk konsistensi
+    const normCode = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : '');
 
-    const hasPromoValid =
-      dataPromo?.data && Array.isArray(dataPromo.data) && dataPromo.data.length > 0;
+    // Ambil sumber validations (yang sudah divalidasi)
+    const validations = isVoucher ? (dataVoucher?.data || []) : (dataPromo?.data || []);
 
-    if (hasPromoValid) {
-      return {
-        data: dataPromo.data,
-        total_row: dataPromo.total_row || 0,
-        loading: loadingPromo,
-        reset: resetPromo,
-        source: 'promo-validations',
-      };
-    }
+    // Ambil sumber claimed (yang sudah direbut)
+    const claimed = isVoucher
+      ? (dataClaimedVoucher?.data || dataClaimedVoucher || [])
+      : (dataClaimedPromo?.data || dataClaimedPromo || []);
+
+    // Kelompokkan data berdasarkan kode
+    const groupedByCode = new Map();
+
+    // Proses claimed items
+    (claimed || []).forEach(c => {
+      const key = normCode(isVoucher ? (c?.item_code || c?.code) : c?.code);
+      if (!key) return;
+
+      if (!groupedByCode.has(key)) {
+        groupedByCode.set(key, {
+          code: key,
+          users: new Set(),
+          validated_at: null,
+          validator_user: null,
+          claims: [],
+          validations: [],
+        });
+      }
+
+      const group = groupedByCode.get(key);
+      const ownerName =
+        c?.owner?.name ||
+        c?.owner_name ||
+        c?.user?.name ||
+        '-';
+      group.users.add(ownerName);
+      group.claims.push(c);
+    });
+
+    // Proses validations
+    (validations || []).forEach(v => {
+      const key = normCode(isVoucher ? (v?.item_code || v?.code) : v?.code);
+      if (!key) return;
+
+      if (!groupedByCode.has(key)) {
+        groupedByCode.set(key, {
+          code: key,
+          users: new Set(),
+          validated_at: null,
+          validator_user: null,
+          claims: [],
+          validations: [],
+        });
+      }
+
+      const group = groupedByCode.get(key);
+      const ownerName =
+        v?.owner?.name ||
+        v?.owner_name ||
+        v?.user_name ||
+        v?.user?.name ||
+        '-';
+      group.users.add(ownerName);
+      group.validations.push(v);
+
+      // Update validated_at dan validator_user dengan data terbaru
+      const validatedAt =
+        v?.validated_at ||
+        v?.validation_at ||
+        v?.latest_validation?.validated_at ||
+        v?.last_validation?.validated_at ||
+        null;
+      if (validatedAt && (!group.validated_at || new Date(validatedAt) > new Date(group.validated_at))) {
+        group.validated_at = validatedAt;
+        group.validator_user = v?.user || v?.validator || null;
+      }
+    });
+
+    // Konversi ke array untuk TableComponent
+    const unified = Array.from(groupedByCode.values()).map(group => ({
+      __raw_claims: group.claims,
+      __raw_validations: group.validations,
+      code: group.code || '-',
+      validated_at: group.validated_at,
+      validator_user: group.validator_user,
+      owner_name: Array.from(group.users).join(', ') || '-', // Gabungkan nama pengguna
+    }));
+
+    const loading =
+      (isVoucher
+        ? loadingVoucher || loadingClaimedVoucher
+        : loadingPromo || loadingClaimedPromo) || false;
+
+    const reset = () => {
+      if (isVoucher) {
+        resetVoucher?.();
+        resetClaimedVoucher?.();
+      } else {
+        resetPromo?.();
+        resetClaimedPromo?.();
+      }
+    };
 
     return {
-      data: dataTable?.data || [],
-      total_row: dataTable?.total_row || 0,
-      loading: loadingTable,
-      reset: resetTable,
-      source: 'grabs',
+      data: unified,
+      total_row: unified.length,
+      loading,
+      reset,
+      source: isVoucher ? 'voucher-merged' : 'promo-merged',
     };
-  }, [isVoucher, dataVoucher, loadingVoucher, resetVoucher, dataPromo, loadingPromo, resetPromo, dataTable, loadingTable, resetTable]);
+  }, [
+    isVoucher,
+    dataPromo, loadingPromo, resetPromo,
+    dataVoucher, loadingVoucher, resetVoucher,
+    dataClaimedPromo, loadingClaimedPromo, resetClaimedPromo,
+    dataClaimedVoucher, loadingClaimedVoucher, resetClaimedVoucher,
+  ]);
 
   // ===================== MAPPING UI =====================
 
   useEffect(() => {
     const prepared = (rows.data || []).map((item) => {
-      // Tanggal validasi dari berbagai bentuk respons
+      // Ambil tanggal validasi dari unified row (hasil merge),
+      // fallback ke bentuk raw (kalau ada)
       const validatedAt =
         item?.validated_at ||
         item?.validation_at ||
-        item?.latest_validation?.validated_at ||
-        item?.last_validation?.validated_at ||
+        item?.__raw_valid?.validated_at ||
+        item?.__raw_valid?.validation_at ||
+        item?.__raw_valid?.latest_validation?.validated_at ||
+        item?.__raw_valid?.last_validation?.validated_at ||
         null;
 
-      // Nama pemilik (OWNER) dulu; fallback ke validator (TENANT)
+      // Nama penampilkan: owner_name dari unified → fallback ke pola lama
       const displayName =
+        item?.owner_name ||
         item?.owner?.name ||
         item?.owner_name ||
         item?.user_name ||
         item?.user?.name ||
         '-';
 
-      // Kode kolom:
-      // - promo: item.code = kode promo (OK)
-      // - voucher: utamakan item.item_code jika tersedia (kode unik), fallback ke item.code (master)
+      // Kode unik:
+      // - voucher: utamakan item_code (kode item), fallback master code
+      // - promo: code saja
       const codeVal = isVoucher
-        ? (item?.item_code || item?.code || '-')
-        : (item?.code || '-');
+        ? (item?.code || item?.item_code || item?.__raw_claim?.item_code || item?.__raw_claim?.code || '-')
+        : (item?.code || item?.__raw_claim?.code || '-');
 
       return {
         user_id: displayName,
         validation_at: validatedAt ? (
           <div className="flex flex-col">
             <DateFormatComponent date={validatedAt} />
-            {item?.user?.name && (
+            {(item?.validator_user?.name || item?.user?.name) && (
               <span className="text-xs text-slate-500">
-                divalidasi oleh <b>{item.user.name}</b>
+                divalidasi oleh <b>{item?.validator_user?.name || item?.user?.name}</b>
               </span>
             )}
           </div>
@@ -166,8 +289,10 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
       const has =
         item?.validated_at ||
         item?.validation_at ||
-        item?.latest_validation?.validated_at ||
-        item?.last_validation?.validated_at;
+        item?.__raw_valid?.validated_at ||
+        item?.__raw_valid?.validation_at ||
+        item?.__raw_valid?.latest_validation?.validated_at ||
+        item?.__raw_valid?.last_validation?.validated_at;
       return acc + (has ? 1 : 0);
     }, 0);
 
@@ -258,9 +383,8 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
 
         <div className="col-span-3">
           <div
-            className={`w-fit h-fit p-3 float-right rounded-md shadow-md text-center mr-4 ${
-              rows.loading ? 'skeloton__loading' : ''
-            }`}
+            className={`w-fit h-fit p-3 float-right rounded-md shadow-md text-center mr-4 ${rows.loading ? 'skeloton__loading' : ''
+              }`}
           >
             <div className="text-medium">Tervalidasi</div>
             <div className="text-lg font-semibold truncate">

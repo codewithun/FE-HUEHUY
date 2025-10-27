@@ -42,15 +42,15 @@ export default function PromoDetailUnified() {
 
     // Legacy URL: /promo/detail_promo?... → ambil dari query string asli
     const qsFilter = getFromSearch('filter');     // dukung versi lama ?filter=123
-    const qsPromo  = getFromSearch('promoId');    // dukung ?promoId=1
-    const qsId     = getFromSearch('id');         // dukung ?id=1
+    const qsPromo = getFromSearch('promoId');    // dukung ?promoId=1
+    const qsId = getFromSearch('id');         // dukung ?id=1
 
     const candidate =
       qsFilter ||
-      qsPromo  ||
-      qsId     ||
+      qsPromo ||
+      qsId ||
       router.query.filter ||
-      router.query.id     ||
+      router.query.id ||
       null;
 
     // Pastikan tidak mengembalikan 'detail_promo' lagi
@@ -67,35 +67,35 @@ export default function PromoDetailUnified() {
 
   const [promoData, setPromoData] = useState(null);
 
-// Tambah: status "belum mulai" dan "mulai besok"
-const { isNotStarted, isStartTomorrow } = useMemo(() => {
-  if (!promoData) return { isNotStarted: false, isStartTomorrow: false };
+  // Tambah: status "belum mulai" dan "mulai besok"
+  const { isNotStarted, isStartTomorrow } = useMemo(() => {
+    if (!promoData) return { isNotStarted: false, isStartTomorrow: false };
 
-  const raw =
-    promoData.start_date ||
-    promoData.starts_at ||
-    promoData.start_at ||
-    promoData.valid_from ||
-    promoData.validFrom ||
-    promoData.start ||
-    null;
+    const raw =
+      promoData.start_date ||
+      promoData.starts_at ||
+      promoData.start_at ||
+      promoData.valid_from ||
+      promoData.validFrom ||
+      promoData.start ||
+      null;
 
-  if (!raw) return { isNotStarted: false, isStartTomorrow: false };
+    if (!raw) return { isNotStarted: false, isStartTomorrow: false };
 
-  const start = new Date(raw);
-  if (Number.isNaN(start.getTime())) return { isNotStarted: false, isStartTomorrow: false };
+    const start = new Date(raw);
+    if (Number.isNaN(start.getTime())) return { isNotStarted: false, isStartTomorrow: false };
 
-  const now = new Date();
-  const isNotStarted = start.getTime() > now.getTime();
+    const now = new Date();
+    const isNotStarted = start.getTime() > now.getTime();
 
-  const startDateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrowDateOnly = new Date(todayDateOnly.getTime() + 24 * 60 * 60 * 1000);
+    const startDateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowDateOnly = new Date(todayDateOnly.getTime() + 24 * 60 * 60 * 1000);
 
-  const isStartTomorrow = isNotStarted && startDateOnly.getTime() === tomorrowDateOnly.getTime();
+    const isStartTomorrow = isNotStarted && startDateOnly.getTime() === tomorrowDateOnly.getTime();
 
-  return { isNotStarted, isStartTomorrow };
-}, [promoData]);
+    return { isNotStarted, isStartTomorrow };
+  }, [promoData]);
 
   // Apakah promo sudah kadaluwarsa?
   const isExpired = useMemo(() => {
@@ -135,7 +135,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
   // Tambah helper URL gambar + baseUrl
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
   const baseUrl = (apiUrl || '').replace(/\/api\/?$/, '').replace(/\/+$/, '');
-  
+
   const buildImageUrl = useCallback((raw) => {
     const isAbs = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
     const fallback = '/default-avatar.png';
@@ -155,20 +155,20 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
   // ==== Hook gambar - mendukung multiple images ====
   const promoImages = useMemo(() => {
     if (!promoData) return ['/default-avatar.png'];
-    
+
     // Helper untuk memproses URL gambar
     const processImageUrl = (url) => {
       if (!url) return null;
       return buildImageUrl(url);
     };
-    
+
     const images = [];
-    
+
     // Priority order: gallery -> images (yang sudah dikumpulkan di fetchPromoDetails) -> image_1/image_2/image_3 -> picture_source -> image
     if (promoData.gallery && Array.isArray(promoData.gallery) && promoData.gallery.length > 0) {
       return promoData.gallery.map(processImageUrl).filter(Boolean);
     }
-    
+
     // Prioritas utama: gunakan images yang sudah dikumpulkan dari fetchPromoDetails
     if (promoData.images && Array.isArray(promoData.images) && promoData.images.length > 0) {
       const processedImages = promoData.images.map(processImageUrl).filter(Boolean);
@@ -177,7 +177,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         return processedImages;
       }
     }
-    
+
     // Fallback: ambil langsung dari database fields jika images array kosong/tidak ada
     if (promoData.image_1) {
       const img1 = processImageUrl(promoData.image_1);
@@ -191,13 +191,13 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       const img3 = processImageUrl(promoData.image_3);
       if (img3) images.push(img3);
     }
-    
+
     // Jika ada images dari image_1/2/3, return itu
     if (images.length > 0) {
       console.log('🖼️ Using fallback images from individual fields:', images);
       return images;
     }
-    
+
     // Fallback ke picture_source
     if (promoData.picture_source) {
       const pic = processImageUrl(promoData.picture_source);
@@ -206,7 +206,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         return [pic];
       }
     }
-    
+
     // Fallback ke single image
     if (promoData.image) {
       const img = processImageUrl(promoData.image);
@@ -215,7 +215,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         return [img];
       }
     }
-    
+
     console.log('🖼️ Using default image');
     return ['/default-avatar.png'];
   }, [promoData, buildImageUrl]);
@@ -253,17 +253,17 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
   // Cek status claimed dari API saat promo data berubah
   useEffect(() => {
     if (!promoData?.id) return;
-    
+
     const checkClaimedStatus = async () => {
       try {
         const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
         const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
-        
+
         if (!currentUserToken) {
           setIsAlreadyClaimed(false);
           return;
         }
-        
+
         // Check API untuk status claimed
         const headers = {
           'Content-Type': 'application/json',
@@ -284,10 +284,15 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
             if (response.ok) {
               const data = await response.json();
               const items = Array.isArray(data) ? data : (data?.data || []);
-              
+
               const apiClaimed = items.some(item => {
                 const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
-                return String(itemPromoId) === String(promoData.id);
+                const sameId = String(itemPromoId) === String(promoData.id);
+
+                const itemCode = item.promo?.code || item.code || null;
+                const sameCode = promoData?.code && itemCode && String(itemCode) === String(promoData.code);
+
+                return sameId || sameCode;
               });
 
               if (apiClaimed) {
@@ -299,7 +304,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
             console.warn('Error checking API for claimed status:', err);
           }
         }
-        
+
         setIsAlreadyClaimed(alreadyClaimed);
       } catch (error) {
         console.error('Error checking claimed status:', error);
@@ -327,7 +332,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     hasFetched.current = false;
   }, [effectivePromoId, communityId]);
 
-// +++ Helper jarak + koordinat +++
+  // +++ Helper jarak + koordinat +++
   const haversineKm = (lat1, lon1, lat2, lon2) => {
     const toRad = (v) => (v * Math.PI) / 180;
     const R = 6371; // km
@@ -378,7 +383,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     saturday: 'Sabtu',
     sunday: 'Minggu',
   };
-  const MONTH_ID = useMemo(() => ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'], []);
+  const MONTH_ID = useMemo(() => ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'], []);
 
   const pad2 = (n) => String(n).padStart(2, '0');
   const toHM = (val) => {
@@ -398,7 +403,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     if (Number.isNaN(d.getTime())) {
       // try dd-mm-yyyy
       const m = String(raw).match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
-      if (m) d = new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10));
+      if (m) d = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
     }
     if (Number.isNaN(d.getTime())) return String(raw);
     return `${d.getDate()} ${MONTH_ID[d.getMonth()]} ${d.getFullYear()}`;
@@ -470,12 +475,12 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         if (ad?.image_2) imageUrls.push(ad.image_2);
         if (ad?.image_3) imageUrls.push(ad.image_3);
         if (ad?.image) imageUrls.push(ad.image);
-        
+
         // Fallback to cube image if no ad images
         if (imageUrls.length === 0 && cube?.picture_source) {
           imageUrls.push(cube.picture_source);
         }
-        
+
         // Fallback to default if still no images
         if (imageUrls.length === 0) {
           imageUrls.push('/default-avatar.png');
@@ -501,6 +506,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
+          code: ad?.code || cube?.code || null,
           distance: '3 KM',
           location: loc.address || (loc.coordinates ? loc.coordinates : ''),
           coordinates: loc.coordinates,
@@ -542,7 +548,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         if (ad?.image_2) imageUrls.push(ad.image_2);
         if (ad?.image_3) imageUrls.push(ad.image_3);
         if (ad?.image) imageUrls.push(ad.image);
-        
+
         // Fallback to default if no images
         if (imageUrls.length === 0) {
           imageUrls.push('/default-avatar.png');
@@ -598,7 +604,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
               };
             }
           }
-        } catch {}
+        } catch { }
 
         const transformed = {
           id: ad?.id,
@@ -606,6 +612,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           merchant: ad?.merchant || cubeInfo.sellerName || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
+          code: ad?.code || cube?.code || null,
           distance: '3 KM',
           location: cubeInfo.address || cubeInfo.coordinates || ad?.location || '',
           coordinates: cubeInfo.coordinates || '',
@@ -647,7 +654,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         if (data.image_1) imageUrls.push(data.image_1);
         if (data.image_2) imageUrls.push(data.image_2);
         if (data.image_3) imageUrls.push(data.image_3);
-        
+
         // Fallback to default if no images
         if (imageUrls.length === 0) {
           imageUrls.push('/default-avatar.png');
@@ -659,6 +666,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           merchant: data.owner_name || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
+          code: ad?.code || cube?.code || null,
           distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
           location: data.location || '',
           coordinates: '',
@@ -713,13 +721,13 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       if (handleAutoRegister.isRunning) {
         return;
       }
-      
+
       handleAutoRegister.isRunning = true;
-      
+
       try {
         // Reset hasTriedAuth setelah mendapat token valid
         setHasTriedAuth(false);
-        
+
         const pd = await fetchPromoDetails();
         if (!pd) return;
 
@@ -744,10 +752,15 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
               if (response.ok) {
                 const data = await response.json();
                 const items = Array.isArray(data) ? data : (data?.data || []);
-                
+
                 const apiClaimed = items.some(item => {
                   const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
-                  return String(itemPromoId) === String(pd.id);
+                  const sameId = String(itemPromoId) === String(promoData.id);
+
+                  const itemCode = item.promo?.code || item.code || null;
+                  const sameCode = promoData?.code && itemCode && String(itemCode) === String(promoData.code);
+
+                  return sameId || sameCode;
                 });
 
                 if (apiClaimed) {
@@ -763,7 +776,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           if (alreadyClaimed) {
             setIsAlreadyClaimed(true);
           }
-          
+
           // TIDAK melakukan auto claim - biarkan user klik tombol manual
         } catch (checkError) {
           // Silent error checking claimed status
@@ -785,9 +798,9 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         console.log('checkUserVerificationStatus already running or done, skipping...');
         return;
       }
-      
+
       isCheckingRef.current = true;
-      
+
       try {
         console.log('Checking verification status with token:', token?.substring(0, 20) + '...');
 
@@ -851,13 +864,13 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         handleAutoRegister(token);
       } catch (err) {
         console.error('Error checking verification status:', err);
-        
+
         // Don't redirect on network errors to prevent session loss
         if (err?.message?.includes('Failed to fetch') || err?.code === 'NETWORK_ERROR') {
           console.warn('Network error, not redirecting to login');
           return;
         }
-        
+
         const next =
           typeof window !== 'undefined'
             ? window.location.href
@@ -1069,8 +1082,8 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         isExpired
           ? 'Promo sudah kadaluwarsa.'
           : isStartTomorrow
-          ? 'Promo mulai besok.'
-          : 'Promo belum dimulai.'
+            ? 'Promo mulai besok.'
+            : 'Promo belum dimulai.'
       );
       setShowErrorModal(true);
       return;
@@ -1080,14 +1093,14 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
     if (handleClaimPromo.isRunning) {
       return;
     }
-    
+
     handleClaimPromo.isRunning = true;
     setIsClaimedLoading(true);
-    
+
     try {
       const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
       const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
-      
+
       if (!token) {
         setErrorMessage('Sesi login telah berakhir. Silakan login kembali.');
         setShowErrorModal(true);
@@ -1105,14 +1118,19 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       try {
         const checkUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/admin/promo-items`;
         const response = await fetch(checkUrl, { headers });
-        
+
         if (response.ok) {
           const data = await response.json();
           const items = Array.isArray(data) ? data : (data?.data || []);
-          
+
           const apiClaimed = items.some(item => {
             const itemPromoId = item.promo?.id || item.ad?.id || item.promo_id;
-            return String(itemPromoId) === String(promoData.id);
+            const sameId = String(itemPromoId) === String(promoData.id);
+
+            const itemCode = item.promo?.code || item.code || null;
+            const sameCode = promoData?.code && itemCode && String(itemCode) === String(promoData.code);
+
+            return sameId || sameCode;
           });
 
           if (apiClaimed) {
@@ -1144,7 +1162,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
-      
+
       const payload = {
         promo_id: promoData.id,
         claim: true,
@@ -1206,7 +1224,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           setShowErrorModal(true);
           return;
         }
-        
+
         setErrorMessage(lastError || 'Gagal merebut promo. Silakan coba lagi.');
         setShowErrorModal(true);
         return;
@@ -1215,7 +1233,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
       // Promo successfully claimed via API
       setIsAlreadyClaimed(true);
       setShowSuccessModal(true);
-      
+
     } catch (e) {
       console.error('Claim error:', e);
       setErrorMessage('Terjadi kesalahan. Silakan coba lagi.');
@@ -1352,7 +1370,7 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
 
               <div className="text-left">
-                <button 
+                <button
                   onClick={() => setShowDetailExpanded(!showDetailExpanded)}
                   className="bg-primary text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:bg-opacity-90 transition-all flex items-center"
                 >
@@ -1362,11 +1380,10 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
                   </span>
                 </button>
               </div>
-              
+
               {/* Expandable Detail Section */}
-              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
-              }`}>
+              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
+                }`}>
                 <div className="border-t border-slate-200 pt-4">
                   {promoData?.detail && (
                     <div className="mb-4">
@@ -1425,15 +1442,14 @@ const { isNotStarted, isStartTomorrow } = useMemo(() => {
           <button
             onClick={handleClaimPromo}
             disabled={isExpired || isNotStarted || isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-              isExpired || isNotStarted
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isExpired || isNotStarted
                 ? 'bg-gray-400 text-white cursor-not-allowed'
                 : isAlreadyClaimed
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : isClaimedLoading
-                ? 'bg-slate-400 text-white cursor-not-allowed'
-                : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-            }`}
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : isClaimedLoading
+                    ? 'bg-slate-400 text-white cursor-not-allowed'
+                    : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
+              }`}
           >
             {isExpired ? (
               'Promo sudah kadaluwarsa'
