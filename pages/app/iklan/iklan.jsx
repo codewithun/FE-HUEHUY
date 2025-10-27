@@ -18,8 +18,8 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ImageCarousel } from '../../../../components/base.components';
-import { get } from '../../../../helpers/api.helpers';
+import { ImageCarousel } from '../../../components/base.components';
+import { get } from '../../../helpers/api.helpers';
 
 // Halaman detail Iklan (tanpa klaim promo, tanpa jam berlaku, tanpa jarak)
 export default function AdDetailUnified() {
