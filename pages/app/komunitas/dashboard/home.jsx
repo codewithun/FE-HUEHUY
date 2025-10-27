@@ -235,6 +235,11 @@ export default function CommunityDashboard({ communityId }) {
                     className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
                     style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', cursor: 'pointer' }}
                     onClick={() => {
+                      if (getIsInformation(ad)) {
+                        const code = ad?.cube?.code || ad?.code;
+                        if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                        return;
+                      }
                       if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
                     }}
                   >
@@ -260,7 +265,14 @@ export default function CommunityDashboard({ communityId }) {
                     key={cube.id || index}
                     className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#fffaf0] shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
                     style={{ minWidth: 320, maxWidth: 360, cursor: 'pointer' }}
-                    onClick={() => ad?.id && router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`)}
+                    onClick={() => {
+                      if (getIsInformation(ad)) {
+                        const code = ad?.cube?.code || ad?.code;
+                        if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                        return;
+                      }
+                      if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`);
+                    }}
                   >
                     <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
                       <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain p-2" />
@@ -285,7 +297,14 @@ export default function CommunityDashboard({ communityId }) {
                     key={cube.id || index}
                     className="flex items-center rounded-[14px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
                     style={{ minWidth: 280, maxWidth: 320, height: 130, cursor: 'pointer' }}
-                    onClick={() => ad?.id && router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`)}
+                    onClick={() => {
+                      if (getIsInformation(ad)) {
+                        const code = ad?.cube?.code || ad?.code;
+                        if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                        return;
+                      }
+                      if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`);
+                    }}
                   >
                     <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
                       <div className="w-[90%] h-[90%] relative">
@@ -312,7 +331,14 @@ export default function CommunityDashboard({ communityId }) {
                   key={cube.id || index}
                   className="flex flex-col rounded-[12px] overflow-hidden border border-[#e6e6e6] bg-white shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
                   style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160, cursor: 'pointer' }}
-                  onClick={() => ad?.id && router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`)}
+                  onClick={() => {
+                    if (getIsInformation(ad)) {
+                      const code = ad?.cube?.code || ad?.code;
+                      if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                      return;
+                    }
+                    if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`);
+                  }}
                 >
                   <div className="relative w-full bg-white flex items-center justify-center overflow-hidden" style={{ height: isM ? 150 : 120 }}>
                     <div className="w-[90%] h-[90%] relative">
