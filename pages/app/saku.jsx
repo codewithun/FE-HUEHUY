@@ -931,10 +931,36 @@ export default function Save() {
                 href={
                   selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher
                     ? `/app/voucher/${selected?.voucher_item?.voucher_id || selected?.voucher?.id || selected?.ad?.id}`
-                    : `/app/komunitas/promo/${selected?.ad?.id}?${new URLSearchParams({
-                      communityId: String(selected?.ad?.cube?.community_id || 1),
-                      from: 'saku',
-                    }).toString()}`
+                    : (() => {
+                        const ad = selected?.ad;
+                        const normBool = (v) => {
+                          if (v === true || v === 1) return true;
+                          if (typeof v === 'string') {
+                            const s = v.trim().toLowerCase();
+                            return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
+                          }
+                          return !!v;
+                        };
+                        const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+                        const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+                        const isInformation =
+                          normBool(ad?.cube?.is_information) ||
+                          normBool(ad?.is_information) ||
+                          contentType === 'information' ||
+                          contentType === 'kubus-informasi' ||
+                          typeStr === 'information' ||
+                          typeStr === 'informasi';
+
+                        if (isInformation) {
+                          const code = ad?.cube?.code || ad?.code;
+                          return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+                        }
+
+                        return `/app/komunitas/promo/${ad?.id}?${new URLSearchParams({
+                          communityId: String(ad?.cube?.community_id || 1),
+                          from: 'saku',
+                        }).toString()}`;
+                      })()
                 }
               >
                 <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors">

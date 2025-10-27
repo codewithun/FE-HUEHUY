@@ -33,13 +33,53 @@ export default function Index() {
   const [map, setMap] = useState(null);
   const [apiReady, setApiReady] = useState(false);
 
-  // Build consistent link to unified Promo Detail page
-  // Prefer ad.id; fallback to cube detail when id is missing
+  // Build consistent link to appropriate detail page
+  // Route iklan to iklan page, promo/voucher to promo page
   const buildPromoLink = (ad) => {
     const id = ad?.id || ad?.ad_id;
-    if (id) return `/app/komunitas/promo/${id}?source=home`;
+    const normBool = (v) => {
+        if (v === true || v === 1) return true;
+        if (typeof v === 'string') {
+            const s = v.trim().toLowerCase();
+            return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
+        }
+        return !!v;
+    };
+
+    const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+    const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+    const isInformation =
+        normBool(ad?.cube?.is_information) ||
+        normBool(ad?.is_information) ||
+        contentType === 'information' ||
+        contentType === 'kubus-informasi' ||
+        typeStr === 'information' ||
+        typeStr === 'informasi';
+
+    // Arahkan khusus ke Kubus Informasi bila bertipe informasi
+    if (isInformation) {
+        const code = ad?.cube?.code || ad?.code;
+        return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+    }
+
+    // Arahkan ke iklan jika advertising
+    if (id) {
+        const cat = String(ad?.ad_category?.name || '').toLowerCase();
+        if (
+            typeStr === 'iklan' ||
+            cat === 'advertising' ||
+            ad?.is_advertising === true ||
+            ad?.advertising === true
+        ) {
+            return `/app/iklan/${id}?source=home`;
+        }
+        // Default: promo
+        return `/app/komunitas/promo/${id}?source=home`;
+    }
+
+    // Fallback: bila tidak ada id tapi ada code kubus, pakai Kubus Informasi
     const cubeCode = ad?.cube?.code;
-    return cubeCode ? `/app/detail/${cubeCode}` : '#';
+    return cubeCode ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(cubeCode)}` : '#';
   };
 
   const getAdImage = (ad) =>
