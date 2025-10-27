@@ -66,6 +66,7 @@ export default function PromoDetailUnified() {
   }, [router.query.autoRegister, router.query.source]);
 
   const [promoData, setPromoData] = useState(null);
+  const [communityData, setCommunityData] = useState(null);
 
   // Tambah: status "belum mulai" dan "mulai besok"
   const { isNotStarted, isStartTomorrow } = useMemo(() => {
@@ -249,6 +250,50 @@ export default function PromoDetailUnified() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // checkUserVerificationStatus excluded to prevent re-renders
+
+  // Fetch community data berdasarkan communityId
+  useEffect(() => {
+    const fetchCommunityData = async () => {
+      if (!communityId || communityId === 'promo-entry') return;
+
+      try {
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : '';
+
+        // Handle API URL properly - remove /api if it exists, then add it back
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const apiUrl = baseUrl.replace(/\/api\/?$/, '');
+
+        const response = await fetch(`${apiUrl}/api/communities/${communityId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const community = result.data || result;
+
+          setCommunityData({
+            id: community.id,
+            name: community.name,
+            description: community.description ?? null,
+            bg_color_1: community.bg_color_1 ?? null,
+            bg_color_2: community.bg_color_2 ?? null,
+          });
+        } else {
+          setCommunityData(null);
+        }
+      } catch (error) {
+        console.error('Error fetching community data:', error);
+        setCommunityData(null);
+      }
+    };
+
+    fetchCommunityData();
+  }, [communityId]);
 
   // Cek status claimed dari API saat promo data berubah
   useEffect(() => {
@@ -449,6 +494,31 @@ export default function PromoDetailUnified() {
     time: buildTimeRange(ad),
     timeDetails: 'Jam Berlaku Promo',
   }), [fmtDateID, buildTimeRange, labelDayType]);
+
+  // Function untuk menentukan gradient berdasarkan bg_color dari community
+  const getCommunityGradient = useCallback((bgColor1, bgColor2) => {
+    // Jika ada bg_color_1 dan bg_color_2 dari community, gunakan itu
+    if (bgColor1 && bgColor2) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})`,
+      };
+    }
+    // Jika hanya ada bg_color_1, buat gradasi dengan versi transparan/gelapnya
+    if (bgColor1) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)`,
+      };
+    }
+    // Fallback default jika tidak ada warna dari community
+    return {
+      backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)',
+    };
+  }, []);
+
+  // Function untuk mendapatkan warna utama community
+  const getCommunityPrimaryColor = useCallback(() => {
+    return communityData?.bg_color_1 || '#16a34a'; // fallback ke green-600
+  }, [communityData?.bg_color_1]);
 
   // Ubah fetchPromoDetails: urutan cubes → ads → promos/public
   const fetchPromoDetails = useCallback(async () => {
@@ -1274,7 +1344,10 @@ export default function PromoDetailUnified() {
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
-      <div className="bg-primary w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl">
+      <div 
+        className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
+        style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+      >
         <div className="absolute inset-0">
           <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
           <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
@@ -1321,7 +1394,7 @@ export default function PromoDetailUnified() {
 
           {/* Info cards */}
           <div className="mb-4">
-            <div className="bg-primary rounded-[20px] p-4 shadow-lg">
+            <div className="rounded-[20px] p-4 shadow-lg" style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}>
               <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center">
                   <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
@@ -1372,7 +1445,8 @@ export default function PromoDetailUnified() {
               <div className="text-left">
                 <button
                   onClick={() => setShowDetailExpanded(!showDetailExpanded)}
-                  className="bg-primary text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:bg-opacity-90 transition-all flex items-center"
+                  className="text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all flex items-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
                 >
                   {showDetailExpanded ? 'Tutup Detail' : 'Selengkapnya'}
                   <span className={`ml-2 transition-transform duration-300 ${showDetailExpanded ? 'rotate-180' : ''}`}>
@@ -1405,7 +1479,7 @@ export default function PromoDetailUnified() {
             <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
               <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
               <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
-              <button onClick={openRoute} className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center">
+              <button onClick={openRoute} className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center" style={{ backgroundColor: getCommunityPrimaryColor() }}>
                 <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
                 Rute
               </button>
@@ -1420,7 +1494,8 @@ export default function PromoDetailUnified() {
                 <p className="font-semibold text-slate-900 text-xs">Nama: {promoData.seller?.name}</p>
                 <p className="text-xs text-slate-500">No Hp/WA: {promoData.seller?.phone || '-'}</p>
                 <button
-                  className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                  className="w-full text-white p-3 rounded-full hover:opacity-90 transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
                   onClick={() => {
                     if (promoData?.seller?.phone) {
                       const phone = String(promoData.seller.phone).replace(/\s+/g, '');
@@ -1448,8 +1523,16 @@ export default function PromoDetailUnified() {
                   ? 'bg-gray-400 text-white cursor-not-allowed'
                   : isClaimedLoading
                     ? 'bg-slate-400 text-white cursor-not-allowed'
-                    : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
+                    : 'text-white focus:ring-4 focus:ring-opacity-50'
               }`}
+            style={
+              !isExpired && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
+                ? {
+                    backgroundColor: getCommunityPrimaryColor(),
+                    '--tw-ring-color': `${getCommunityPrimaryColor()}50`
+                  }
+                : {}
+            }
           >
             {isExpired ? (
               'Promo sudah kadaluwarsa'
@@ -1476,18 +1559,26 @@ export default function PromoDetailUnified() {
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-3xl" />
+            <div 
+              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ backgroundColor: `${getCommunityPrimaryColor()}20` }}
+            >
+              <FontAwesomeIcon 
+                icon={faCheckCircle} 
+                className="text-3xl" 
+                style={{ color: getCommunityPrimaryColor() }}
+              />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
             <p className="text-slate-600 mb-6 leading-relaxed">
-              Promo <span className="font-semibold text-primary">{promoData?.title}</span> berhasil direbut dan masuk ke Saku
+              Promo <span className="font-semibold" style={{ color: getCommunityPrimaryColor() }}>{promoData?.title}</span> berhasil direbut dan masuk ke Saku
               Promo Anda!
             </p>
             <div className="space-y-3">
               <button
                 onClick={handleSuccessModalClose}
-                className="w-full bg-primary text-white py-3 rounded-[12px] font-semibold hover:bg-opacity-90 transition-all"
+                className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all"
+                style={{ backgroundColor: getCommunityPrimaryColor() }}
               >
                 Lihat Saku Promo
               </button>
@@ -1537,9 +1628,26 @@ export default function PromoDetailUnified() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => handleShareComplete('whatsapp')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-green-50 hover:border-green-300 transition-all"
+                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] transition-all"
+                style={{
+                  ':hover': {
+                    backgroundColor: `${getCommunityPrimaryColor()}10`,
+                    borderColor: `${getCommunityPrimaryColor()}50`
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
+                  e.target.style.borderColor = `${getCommunityPrimaryColor()}50`;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '';
+                  e.target.style.borderColor = '';
+                }}
               >
-                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
+                <div 
+                  className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+                >
                   <span className="text-white font-bold text-sm">WA</span>
                 </div>
                 <span className="text-xs text-slate-600">WhatsApp</span>
