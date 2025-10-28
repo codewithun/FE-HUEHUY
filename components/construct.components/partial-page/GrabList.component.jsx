@@ -8,8 +8,6 @@ import { faInfinity } from '@fortawesome/free-solid-svg-icons';
 const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherCodeProp }) => {
   const isVoucher = mode === 'voucher';
 
-  const normCode = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : '');
-
   const [paginate, setPaginate] = useState(10);
   const [page, setPage] = useState(1);
   const [totalRow, setTotalRow] = useState(0);
@@ -19,75 +17,120 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
   const [grabList, setGrabList] = useState([]);
   const [grabCount, setGrabCount] = useState(0);
 
-  // Kode promo dari ads aktif (untuk mode promo)
-  const promoCode = useMemo(
-    () => data?.ads?.at?.(0)?.code || data?.ads?.at?.(0)?.slug || null,
-    [data?.ads]
-  );
+  const currentAd = data?.ads?.at?.(0);
+  const adId = currentAd?.id;
+  const adType = currentAd?.type;
+  const adValidationType = currentAd?.validation_type || 'auto';
 
-  // ===================== FETCH DATA =====================
-  // Fallback lama (hanya untuk mode promo)
-  const [loadingTable, codeTable, dataTable, resetTable] = useGet(
-    !isVoucher && filter
+  const [loadingPromoMeta, codePromoMeta, dataPromoMeta] = useGet(
+    !isVoucher && adType === 'general' && currentAd?.code
       ? {
-        path: 'admin/grabs',
+        path: 'admin/promos',
         params: {
-          page,
-          paginate,
-          sortBy: sort.column,
-          sortDirection: sort.direction,
-          search,
-          filter,
+          code: currentAd.code,
+          paginate: 1,
         },
       }
       : {}
   );
 
-  // Sumber utama (mode promo)
-  const [loadingPromo, codePromo, dataPromo, resetPromo] = useGet(
-    !isVoucher && promoCode
+  const [loadingVoucherMeta, codeVoucherMeta, dataVoucherMeta] = useGet(
+    isVoucher && adType === 'voucher' && adId
+      ? {
+        path: 'admin/vouchers',
+        params: {
+          'filter[ad_id]': adId,
+          paginate: 1,
+        },
+      }
+      : {}
+  );
+
+  const promoData = useMemo(() => {
+    const arr = Array.isArray(dataPromoMeta?.data) ? dataPromoMeta.data :
+      Array.isArray(dataPromoMeta?.data?.data) ? dataPromoMeta.data.data : [];
+    const item = arr[0];
+    return {
+      id: item?.id || null,
+      code: item?.code || null,
+      validation_type: item?.validation_type || null,
+    };
+  }, [dataPromoMeta]);
+
+  const voucherData = useMemo(() => {
+    const arr = Array.isArray(dataVoucherMeta?.data) ? dataVoucherMeta.data :
+      Array.isArray(dataVoucherMeta?.data?.data) ? dataVoucherMeta.data.data : [];
+    const item = arr[0];
+    return {
+      id: item?.id || null,
+      code: item?.code || null,
+      validation_type: item?.validation_type || null,
+    };
+  }, [dataVoucherMeta]);
+
+  const finalId = isVoucher ? voucherData.id : promoData.id;
+  const finalCode = isVoucher ? voucherData.code : promoData.code;
+  const finalValidationType = isVoucher ? voucherData.validation_type : promoData.validation_type;
+
+  const shouldShowData = useMemo(() => {
+    if (!finalId) return false;
+
+    return adValidationType === finalValidationType;
+  }, [adValidationType, finalValidationType, finalId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[GrabList DEBUG]', {
+      mode: isVoucher ? 'voucher' : 'promo',
+      adId,
+      adType,
+      adValidationType,
+      finalId,
+      finalCode,
+      finalValidationType,
+      shouldShowData,
+      match: adValidationType === finalValidationType ? '✅ MATCH' : '❌ MISMATCH',
+    });
+  }, [isVoucher, adId, adType, adValidationType, finalId, finalCode, finalValidationType, shouldShowData]);
+
+  const [loadingPromoValidations, codePromoValidations, dataPromoValidations, resetPromoValidations] = useGet(
+    !isVoucher && finalId && shouldShowData
       ? {
         path: 'admin/promo-validations',
         params: {
+          promo_id: finalId,
           page,
-          paginate,
+          paginate: 999,
           sortBy: 'validated_at',
           sortDirection: 'desc',
           search,
-          promo_code: promoCode,
         },
       }
       : {}
   );
 
-  // Sumber utama (mode voucher)
-  const [loadingVoucher, codeVoucher, dataVoucher, resetVoucher] = useGet(
-    isVoucher && (voucherCodeProp || data?.voucher?.code)
+  const [loadingVoucherValidations, codeVoucherValidations, dataVoucherValidations, resetVoucherValidations] = useGet(
+    isVoucher && finalId && shouldShowData
       ? {
         path: 'admin/voucher-validations',
         params: {
+          voucher_id: finalId,
           page,
-          paginate,
-          sortBy: sort.column ?? 'validated_at',
-          sortDirection: sort.direction ?? 'desc',
+          paginate: 999,
+          sortBy: 'validated_at',
+          sortDirection: 'desc',
           search,
-          voucher_code: voucherCodeProp || data?.voucher?.code,
         },
       }
       : {}
   );
 
-  // === Tambahan: ambil list item yang sudah DIREBUT (claimed) ===
-  const adId = data?.ads?.at?.(0)?.id;
-  const voucherCode = voucherCodeProp || data?.voucher?.code;
-
-  // Claimed list (PROMO) per iklan/ad
-  const [loadingClaimedPromo, codeClaimedPromo, dataClaimedPromo, resetClaimedPromo] = useGet(
-    !isVoucher && adId
+  const [loadingPromoItems, codePromoItems, dataPromoItems, resetPromoItems] = useGet(
+    !isVoucher && finalId && shouldShowData
       ? {
         path: 'admin/promo-items',
         params: {
-          promo_id: adId,
+          promo_id: finalId,
           paginate: 999,
           sortBy: 'created_at',
           sortDirection: 'desc',
@@ -96,13 +139,12 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
       : {}
   );
 
-  // Claimed list (VOUCHER) per voucher_code
-  const [loadingClaimedVoucher, codeClaimedVoucher, dataClaimedVoucher, resetClaimedVoucher] = useGet(
-    isVoucher && voucherCode
+  const [loadingVoucherItems, codeVoucherItems, dataVoucherItems, resetVoucherItems] = useGet(
+    isVoucher && finalId && shouldShowData
       ? {
-        path: 'vouchers/voucher-items',
+        path: 'admin/voucher-items',
         params: {
-          voucher_code: voucherCode,
+          voucher_id: finalId,
           paginate: 999,
           sortBy: 'created_at',
           sortDirection: 'desc',
@@ -111,203 +153,330 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
       : {}
   );
 
-  // Pilih dataset (prioritas: sumber utama; promo bisa fallback ke grabs)
-  // ===================== PILIH & GABUNG DATA =====================
-  // Prinsip: ambil SEMUA yang sudah direbut (claimed) → tampil di list,
-  // lalu “tempelkan” info validasi jika ada.
+  const [userIdsParam, setUserIdsParam] = useState('');
+  const [loadingUsers, codeUsers, dataUsers, resetUsers] = useGet(
+    userIdsParam
+      ? {
+        path: 'admin/users',
+        params: { ids: userIdsParam },
+      }
+      : {}
+  );
+
+  const normalizedFilter = useMemo(() => {
+    const base = filter || {};
+    if (isVoucher) {
+      return {
+        ...base,
+        voucher_id: finalId,
+        voucher_code: finalCode || '',
+      };
+    } else {
+      return {
+        ...base,
+        promo_id: finalId,
+        promo_code: finalCode || '',
+      };
+    }
+  }, [filter, isVoucher, finalId, finalCode]);
+
+  const toArray = (res) => {
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.data?.data)) return res.data.data;
+    return [];
+  };
+
+  const userMap = useMemo(() => {
+    const arr = toArray(dataUsers);
+    const map = new Map();
+    arr.forEach(u => {
+      const id = u?.id ?? u?.user_id;
+      const name =
+        u?.name ||
+        u?.full_name ||
+        u?.username ||
+        u?.email ||
+        (id ? `User#${id}` : '-');
+      if (id) map.set(Number(id), name);
+    });
+    return map;
+  }, [dataUsers]);
 
   const rows = useMemo(() => {
-    // Normalisasi kode untuk konsistensi
-    const normCode = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : '');
+    if (!shouldShowData) {
+      return {
+        data: [],
+        total_row: 0,
+        loading: false,
+        reset: () => { },
+        source: 'filtered-out-by-validation-type',
+        user_ids: [],
+      };
+    }
 
-    // Ambil sumber validations (yang sudah divalidasi)
-    const validations = isVoucher ? (dataVoucher?.data || []) : (dataPromo?.data || []);
+    const parseItemId = (notes) => {
+      if (typeof notes !== 'string') return null;
+      const patterns = [
+        /(?:^|[|,\s])item_id\s*[:=]\s*(\d+)/i,
+        /(?:^|[|,\s])voucher_item_id\s*[:=]\s*(\d+)/i,
+        /(?:^|[|,\s])promo_item_id\s*[:=]\s*(\d+)/i,
+      ];
+      for (const re of patterns) {
+        const m = notes.match(re);
+        if (m) return Number(m[1]);
+      }
+      return null;
+    };
 
-    // Ambil sumber claimed (yang sudah direbut)
-    const claimed = isVoucher
-      ? (dataClaimedVoucher?.data || dataClaimedVoucher || [])
-      : (dataClaimedPromo?.data || dataClaimedPromo || []);
+    // === VALIDATIONS ===
+    const validationsRaw = isVoucher
+      ? toArray(dataVoucherValidations)
+      : toArray(dataPromoValidations);
 
-    // Kelompokkan data berdasarkan kode
-    const groupedByCode = new Map();
+    // Index validation berdasarkan item_id
+    const valByItemId = new Map();
+    const valByOwnerId = new Map();
 
-    // Proses claimed items
-    (claimed || []).forEach(c => {
-      const key = normCode(isVoucher ? (c?.item_code || c?.code) : c?.code);
-      if (!key) return;
+    (validationsRaw || []).forEach(v => {
+      const itemId = parseItemId(v?.notes || v?.note || '');
+      const ownerId = v?.owner?.id ?? v?.owner_id ?? null;
+      const validatedAt = v?.validated_at || v?.validation_at || null;
 
-      if (!groupedByCode.has(key)) {
-        groupedByCode.set(key, {
-          code: key,
-          users: new Set(),
-          validated_at: null,
-          validator_user: null,
-          claims: [],
-          validations: [],
-        });
+      if (itemId) {
+        const existing = valByItemId.get(itemId);
+        if (!existing || new Date(validatedAt || 0) > new Date(existing.validated_at || 0)) {
+          valByItemId.set(itemId, {
+            ...v,
+            validated_at: validatedAt,
+            validator_user: v?.user || v?.validator || null,
+          });
+        }
       }
 
-      const group = groupedByCode.get(key);
-      const ownerName =
-        c?.owner?.name ||
-        c?.owner_name ||
-        c?.user?.name ||
-        '-';
-      group.users.add(ownerName);
-      group.claims.push(c);
-    });
-
-    // Proses validations
-    (validations || []).forEach(v => {
-      const key = normCode(isVoucher ? (v?.item_code || v?.code) : v?.code);
-      if (!key) return;
-
-      if (!groupedByCode.has(key)) {
-        groupedByCode.set(key, {
-          code: key,
-          users: new Set(),
-          validated_at: null,
-          validator_user: null,
-          claims: [],
-          validations: [],
-        });
-      }
-
-      const group = groupedByCode.get(key);
-      const ownerName =
-        v?.owner?.name ||
-        v?.owner_name ||
-        v?.user_name ||
-        v?.user?.name ||
-        '-';
-      group.users.add(ownerName);
-      group.validations.push(v);
-
-      // Update validated_at dan validator_user dengan data terbaru
-      const validatedAt =
-        v?.validated_at ||
-        v?.validation_at ||
-        v?.latest_validation?.validated_at ||
-        v?.last_validation?.validated_at ||
-        null;
-      if (validatedAt && (!group.validated_at || new Date(validatedAt) > new Date(group.validated_at))) {
-        group.validated_at = validatedAt;
-        group.validator_user = v?.user || v?.validator || null;
+      if (ownerId) {
+        const existing = valByOwnerId.get(Number(ownerId));
+        if (!existing || new Date(validatedAt || 0) > new Date(existing.validated_at || 0)) {
+          valByOwnerId.set(Number(ownerId), {
+            ...v,
+            validated_at: validatedAt,
+            validator_user: v?.user || v?.validator || null,
+          });
+        }
       }
     });
 
-    // Konversi ke array untuk TableComponent
-    const unified = Array.from(groupedByCode.values()).map(group => ({
-      __raw_claims: group.claims,
-      __raw_validations: group.validations,
-      code: group.code || '-',
-      validated_at: group.validated_at,
-      validator_user: group.validator_user,
-      owner_name: Array.from(group.users).join(', ') || '-', // Gabungkan nama pengguna
-    }));
+    // === CLAIMED ITEMS ===
+    const claimedRaw = isVoucher
+      ? toArray(dataVoucherItems)
+      : toArray(dataPromoItems);
 
-    const loading =
-      (isVoucher
-        ? loadingVoucher || loadingClaimedVoucher
-        : loadingPromo || loadingClaimedPromo) || false;
+    const claimed = (claimedRaw || []).filter(c => {
+      if (isVoucher) {
+        return Number(c?.voucher_id) === Number(finalId);
+      } else {
+        return Number(c?.promo_id) === Number(finalId);
+      }
+    });
+
+    const userIds = Array.from(
+      new Set((claimed || []).map(c => c?.user_id).filter(Boolean))
+    );
+
+    if (isVoucher && claimed.length === 0 && validationsRaw.length > 0) {
+      const perValidationRows = validationsRaw.map(v => {
+        const validatedAt = v?.validated_at || v?.validation_at || null;
+        const displayName =
+          v?.owner?.name ||
+          v?.user?.name ||
+          v?.validator?.name ||
+          '-';
+
+        return {
+          __raw_validation: v,
+          ad_id: adId,
+          voucher_id: finalId,
+          voucher_code: finalCode || '',
+          claimer_id: v?.owner?.id ?? v?.user?.id ?? null,
+          user_id: displayName,
+          validation_at: validatedAt ? (
+            <div className="flex flex-col">
+              <DateFormatComponent date={validatedAt} />
+              {v?.validator?.name && (
+                <span className="text-xs text-slate-500">
+                  divalidasi oleh <b>{v?.validator?.name}</b>
+                </span>
+              )}
+            </div>
+          ) : (
+            <i className="font-normal text-red-700">Belum Validasi</i>
+          ),
+          code: finalCode || '-',
+        };
+      });
+
+      const validatedCount = perValidationRows.reduce((acc, r) =>
+        acc + (r?.validation_at && typeof r.validation_at !== 'string' ? 1 : 0), 0);
+
+      return {
+        data: perValidationRows,
+        total_row: perValidationRows.length,
+        loading: loadingVoucherValidations || false,
+        reset: () => { resetVoucherValidations?.(); },
+        source: 'voucher-validations-direct',
+        user_ids: perValidationRows.map(r => r.claimer_id).filter(Boolean),
+      };
+    }
+
+    const perClaimRows = claimed.map(c => {
+      const itemId = c?.id || c?.item_id || null;
+
+      let matchedValidation = itemId ? valByItemId.get(Number(itemId)) : null;
+
+      if (!matchedValidation) {
+        const ownerId = c?.user_id ?? c?.user?.id ?? null;
+        if (ownerId) {
+          matchedValidation = valByOwnerId.get(Number(ownerId)) || null;
+        }
+      }
+
+      const displayName =
+        c?.user?.name || c?.user_name || c?.owner?.name || c?.owner_name || '-';
+
+      return {
+        __item_id: itemId,
+        __raw_claim: c,
+        __raw_validation: matchedValidation,
+        code: (c?.code || '-'),
+        validated_at: matchedValidation?.validated_at || null,
+        validator_user: matchedValidation?.validator_user || null,
+        owner_name: displayName,
+        claimer_id: c?.user_id ?? c?.user?.id ?? null,
+        claimer_name: c?.user_name ?? c?.user?.name ?? null,
+      };
+    });
+
+    const loading = isVoucher
+      ? (loadingVoucherValidations || loadingVoucherItems)
+      : (loadingPromoValidations || loadingPromoItems);
 
     const reset = () => {
       if (isVoucher) {
-        resetVoucher?.();
-        resetClaimedVoucher?.();
+        resetVoucherValidations?.();
+        resetVoucherItems?.();
       } else {
-        resetPromo?.();
-        resetClaimedPromo?.();
+        resetPromoValidations?.();
+        resetPromoItems?.();
       }
     };
 
+    // eslint-disable-next-line no-console
+    console.log('[GrabList ROWS]', {
+      mode: isVoucher ? 'voucher' : 'promo',
+      finalId,
+      validationsCount: validationsRaw?.length || 0,
+      claimedCount: claimed?.length || 0,
+      finalRowsCount: perClaimRows?.length || 0,
+      shouldShowData,
+    });
+
     return {
-      data: unified,
-      total_row: unified.length,
-      loading,
+      data: perClaimRows,
+      total_row: perClaimRows.length,
+      loading: loading || false,
       reset,
-      source: isVoucher ? 'voucher-merged' : 'promo-merged',
+      source: isVoucher ? 'voucher-rows-by-id' : 'promo-rows-by-id',
+      user_ids: userIds,
     };
   }, [
+    shouldShowData,
     isVoucher,
-    dataPromo, loadingPromo, resetPromo,
-    dataVoucher, loadingVoucher, resetVoucher,
-    dataClaimedPromo, loadingClaimedPromo, resetClaimedPromo,
-    dataClaimedVoucher, loadingClaimedVoucher, resetClaimedVoucher,
+    dataVoucherValidations, loadingVoucherValidations, resetVoucherValidations,
+    dataPromoValidations, loadingPromoValidations, resetPromoValidations,
+    dataVoucherItems, loadingVoucherItems, resetVoucherItems,
+    dataPromoItems, loadingPromoItems, resetPromoItems,
+    finalId, finalCode, adId,
   ]);
 
-  // ===================== MAPPING UI =====================
+  // === Trigger fetch users (batch) ===
+  useEffect(() => {
+    if (Array.isArray(rows?.user_ids) && rows.user_ids.length > 0) {
+      setUserIdsParam(rows.user_ids.join(','));
+    } else {
+      setUserIdsParam('');
+    }
+  }, [rows?.user_ids]);
 
+  // ===================== MAPPING UI =====================
   useEffect(() => {
     const prepared = (rows.data || []).map((item) => {
-      // Ambil tanggal validasi dari unified row (hasil merge),
-      // fallback ke bentuk raw (kalau ada)
-      const validatedAt =
-        item?.validated_at ||
-        item?.validation_at ||
-        item?.__raw_valid?.validated_at ||
-        item?.__raw_valid?.validation_at ||
-        item?.__raw_valid?.latest_validation?.validated_at ||
-        item?.__raw_valid?.last_validation?.validated_at ||
-        null;
+      const nameFromMap = item?.claimer_id ? userMap.get(Number(item.claimer_id)) : null;
 
-      // Nama penampilkan: owner_name dari unified → fallback ke pola lama
       const displayName =
+        nameFromMap ||
+        item?.claimer_name ||
+        item?.__raw_claim?.user_name ||
+        item?.__raw_claim?.user?.name ||
+        (item?.claimer_id ? `User#${item.claimer_id}` : null) ||
+        item?.__raw_validation?.user?.name ||
+        item?.__raw_validation?.user_name ||
         item?.owner_name ||
-        item?.owner?.name ||
-        item?.owner_name ||
-        item?.user_name ||
-        item?.user?.name ||
+        item?.__raw_claim?.owner?.name ||
         '-';
 
-      // Kode unik:
-      // - voucher: utamakan item_code (kode item), fallback master code
-      // - promo: code saja
-      const codeVal = isVoucher
-        ? (item?.code || item?.item_code || item?.__raw_claim?.item_code || item?.__raw_claim?.code || '-')
-        : (item?.code || item?.__raw_claim?.code || '-');
+      const validatorName =
+        item?.validator_user?.name ||
+        item?.__raw_validation?.user?.name ||
+        item?.__raw_validation?.validator?.name ||
+        null;
 
       return {
+        ad_id: adId,
+        promo_id: !isVoucher ? finalId : null,
+        voucher_id: isVoucher ? finalId : null,
+        promo_code: !isVoucher ? finalCode : '',
+        voucher_code: isVoucher ? finalCode : '',
+        claimer_id: item?.claimer_id ?? null,
+
         user_id: displayName,
-        validation_at: validatedAt ? (
+        validation_at: item?.validated_at ? (
           <div className="flex flex-col">
-            <DateFormatComponent date={validatedAt} />
-            {(item?.validator_user?.name || item?.user?.name) && (
+            <DateFormatComponent date={item.validated_at} />
+            {validatorName && (
               <span className="text-xs text-slate-500">
-                divalidasi oleh <b>{item?.validator_user?.name || item?.user?.name}</b>
+                divalidasi oleh <b>{validatorName}</b>
               </span>
             )}
           </div>
         ) : (
           <i className="font-normal text-red-700">Belum Validasi</i>
         ),
-        code: codeVal,
+        code: (item?.code || '-'),
       };
     });
 
-    const validatedCount = (rows.data || []).reduce((acc, item) => {
-      const has =
-        item?.validated_at ||
-        item?.validation_at ||
-        item?.__raw_valid?.validated_at ||
-        item?.__raw_valid?.validation_at ||
-        item?.__raw_valid?.latest_validation?.validated_at ||
-        item?.__raw_valid?.last_validation?.validated_at;
-      return acc + (has ? 1 : 0);
-    }, 0);
+    const validatedCount = (rows.data || []).reduce(
+      (acc, item) => acc + (item?.validated_at ? 1 : 0),
+      0
+    );
 
     setGrabList(prepared);
     setGrabCount(validatedCount);
     setTotalRow(rows.total_row || 0);
-  }, [rows.data, rows.total_row, isVoucher]);
+  }, [rows.data, rows.total_row, userMap, adId, finalId, finalCode, isVoucher]);
 
   // Label dinamis header/kolom
   const headerLabel = isVoucher
     ? 'Voucher'
-    : (data?.ads?.at?.(0)?.is_daily_grab ? 'Promo Harian' : 'Promo');
+    : (currentAd?.is_daily_grab ? 'Promo Harian' : 'Promo');
 
   const listLabel = isVoucher ? 'List Voucher' : 'List Grab';
   const codeLabel = isVoucher ? 'Kode Voucher' : 'Kode Grab';
+
+  const showValidationWarning = useMemo(() => {
+    if (!currentAd || !finalId) return false;
+    return adValidationType !== finalValidationType;
+  }, [currentAd, finalId, adValidationType, finalValidationType]);
 
   return (
     <>
@@ -331,7 +500,7 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
           </div>
 
           <div id="iklan">
-            <b>{data?.ads?.at?.(0)?.title || '-'}</b>
+            <b>{currentAd?.title || '-'}</b>
           </div>
 
           <div className="cursor-pointer" id="lokasi" title={data?.address}>
@@ -371,11 +540,9 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
             )}
           </div>
 
-          {/* Hanya relevan untuk promo; aman dibiarkan untuk voucher (tidak dipakai) */}
           <div id="Promo">
-            {(data?.ads?.at?.(0)?.max_grab || 0) -
-              (data?.ads?.at?.(0)?.total_grab || 0)}
-            /{data?.ads?.at?.(0)?.max_grab || 0}
+            {(currentAd?.max_grab || 0) - (currentAd?.total_grab || 0)}
+            /{currentAd?.max_grab || 0}
           </div>
 
           <div className="text-transparent">-</div>
@@ -409,7 +576,7 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
                 setPage(newPage);
               },
             }}
-            filter={filter}
+            filter={normalizedFilter}
             loading={rows.loading}
             onChangeSearch={(e) => setSearch(e)}
             search={search}
