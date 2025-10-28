@@ -217,54 +217,33 @@ function KubusMain() {
       'ads[level_umkm]': ad?.level_umkm || '',
       'ads[max_production_per_day]': ad?.max_production_per_day || '',
       'ads[sell_per_day]': ad?.sell_per_day || '',
+    };
+
+    const stockSource = ad?.stock_source || (ad?.max_grab != null ? 'ad' : 'promo');
+    const maxGrabForForm = stockSource === 'promo'
+      ? (ad?.remaining_stock ?? '') // ambil stok dari promos
+      : (ad?.max_grab ?? '');
+
+    const mappedDataFinal = {
+      ...mappedData,
       'ads[is_daily_grab]': ad?.is_daily_grab ? 1 : 0,
       'ads[unlimited_grab]': ad?.unlimited_grab ? 1 : 0,
-      'ads[max_grab]': ad?.max_grab || '',
+      'ads[max_grab]': maxGrabForForm,
       'ads[jam_mulai]': ad?.jam_mulai ? String(ad.jam_mulai).substring(0, 5) : '',
       'ads[jam_berakhir]': ad?.jam_berakhir ? String(ad.jam_berakhir).substring(0, 5) : '',
       'ads[day_type]': ad?.day_type || 'custom',
-      // Tanggal validasi dalam format untuk input date (YYYY-MM-DD untuk form display)
       'ads[start_validate]': formatDateForInput(ad?.start_validate),
       'ads[finish_validate]': formatDateForInput(ad?.finish_validate),
-
-      // Debug log untuk format tanggal
-      ...((() => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('📅 DATE MAPPING DEBUG:', {
-            original_start: ad?.start_validate,
-            formatted_start: formatDateForInput(ad?.start_validate),
-            original_finish: ad?.finish_validate,
-            formatted_finish: formatDateForInput(ad?.finish_validate)
-          });
-        }
-        return {};
-      })()),
       'ads[validation_time_limit]': ad?.validation_time_limit || '',
       ...mapCustomDays(ad?.custom_days),
       ...(data?.world_id ? { world_id: data.world_id } : {}),
       ...(data?.user_id ? { owner_user_id: data.user_id } : {}),
       ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
-
-      // Promo fields using existing fields
-      // ads[description] sudah digunakan sebagai detail promo
-      // address sudah digunakan sebagai lokasi promo  
-      // owner_user_id sudah digunakan sebagai pemilik promo (manager tenant)
-      // ads[unlimited_grab] sudah digunakan sebagai promo tak terbatas
-      map_distance: 0, // Jarak maksimal untuk promo offline
+      map_distance: 0,
     };
 
-    // Debug logging untuk mapped data
-    console.log('[KUBUS EDIT] Mapped data:', {
-      description: mappedData['ads[description]'],
-      detail: mappedData['ads[detail]']
-    });
-
-    return mappedData;
-  };
-
-
-
-
+    return mappedDataFinal;
+  }; // ← TUTUP mapUpdateDefault DI SINI
 
   return (
     <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
@@ -334,19 +313,25 @@ function KubusMain() {
               ),
             },
             {
-              selector: 'max_grab',
+              selector: 'remaining_stock',
               label: 'Sisa Promo',
               sortable: true,
               width: '200px',
-              item: ({ ads }) =>
-                ads?.at(0)?.max_grab == null ? (
-                  <FontAwesomeIcon icon={faInfinity} />
-                ) : ads?.at(0)?.is_daily_grab ? (
-                  `${ads?.at(0)?.max_grab - (ads?.at(0)?.total_grab || 0) || 'Tidak ada'} Promo / Hari`
-                ) : (
-                  `${ads?.at(0)?.max_grab - (ads?.at(0)?.total_grab || 0) || 'Tidak ada'} Promo`
-                ),
+              item: ({ ads }) => {
+                const ad = ads?.[0] || {};
+                const sisa = ad?.remaining_stock;     // null = unlimited
+                const harian = !!ad?.is_daily_grab;
+
+                if (sisa === null || ad?.unlimited_grab) {
+                  return <FontAwesomeIcon icon={faInfinity} />;
+                }
+
+                return harian
+                  ? `${sisa} Promo / Hari`
+                  : `${sisa} Promo`;
+              },
             },
+
             {
               selector: 'world_id',
               label: 'Dunia',

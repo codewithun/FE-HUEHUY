@@ -68,54 +68,106 @@ export default function PromoDetailUnified() {
   const [promoData, setPromoData] = useState(null);
   const [communityData, setCommunityData] = useState(null);
 
-  // Tambah: status "belum mulai" dan "mulai besok"
-  const { isNotStarted, isStartTomorrow } = useMemo(() => {
-    if (!promoData) return { isNotStarted: false, isStartTomorrow: false };
+  console.log('🔥 promoData time fields', {
+    start_date: promoData?.start_date,
+    end_date: promoData?.end_date,
+    expires_at: promoData?.expires_at,
+    jam_mulai: promoData?.jam_mulai,
+    jam_berakhir: promoData?.jam_berakhir
+  });
 
-    const raw =
-      promoData.start_date ||
-      promoData.starts_at ||
-      promoData.start_at ||
-      promoData.valid_from ||
-      promoData.validFrom ||
-      promoData.start ||
-      null;
+  // ✅ Satu sumber kebenaran: status waktu & stok (Asia/Jakarta)
+  const timeFlags = useMemo(() => {
+    if (!promoData) {
+      return {
+        expiredByDate: false,
+        withinDailyTime: true,
+        startAt: null,
+        endAt: null,
+      };
+    }
 
-    if (!raw) return { isNotStarted: false, isStartTomorrow: false };
+    // ambil dari BE
+    let startDateOnly = promoData.start_date || promoData.created_at || null;
+    let endDateOnly = promoData.end_date || promoData.expires_at || promoData.finish_validate || null;
 
-    const start = new Date(raw);
-    if (Number.isNaN(start.getTime())) return { isNotStarted: false, isStartTomorrow: false };
+    // potong jadi "YYYY-MM-DD" kalau ada waktu di belakang
+    if (typeof startDateOnly === 'string' && startDateOnly.includes('T')) {
+      startDateOnly = startDateOnly.split('T')[0];
+    }
+    if (typeof endDateOnly === 'string' && endDateOnly.includes('T')) {
+      endDateOnly = endDateOnly.split('T')[0];
+    }
+
+    const norm = (t) => {
+      if (!t) return '00:00:00';
+      const s = String(t).trim();
+      if (/^\d{1,2}:\d{2}$/.test(s)) return s + ':00';
+      if (/^\d{1,2}:\d{2}:\d{2}$/.test(s)) return s;
+      return '00:00:00';
+    };
+    const startTime = norm(promoData.jam_mulai || '00:00:00');
+    const endTime = norm(promoData.jam_berakhir || '23:59:59');
 
     const now = new Date();
-    const isNotStarted = start.getTime() > now.getTime();
+    const startAt = startDateOnly ? new Date(`${startDateOnly}T${startTime}`) : null;
+    const endAt = endDateOnly ? new Date(`${endDateOnly}T${endTime}`) : null;
 
-    const startDateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrowDateOnly = new Date(todayDateOnly.getTime() + 24 * 60 * 60 * 1000);
+    const beforeStart = startAt && now < startAt;
+    const afterEnd = endAt && now > endAt;
+    const expiredByDate = !!afterEnd;
 
-    const isStartTomorrow = isNotStarted && startDateOnly.getTime() === tomorrowDateOnly.getTime();
+    let withinDailyTime = true;
+    if (!expiredByDate && !beforeStart) {
+      const todayStr = now.toISOString().split('T')[0];
+      const todayStart = new Date(`${todayStr}T${startTime}`);
+      const todayEnd = new Date(`${todayStr}T${endTime}`);
+      withinDailyTime = now >= todayStart && now <= todayEnd;
+    }
 
-    return { isNotStarted, isStartTomorrow };
+    console.log('🕒 FE time flags', {
+      now: now.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+      startAt,
+      endAt,
+      startTime,
+      endTime,
+      expiredByDate,
+      withinDailyTime,
+    });
+
+    return { expiredByDate, withinDailyTime, startAt, endAt };
   }, [promoData]);
 
-  // Apakah promo sudah kadaluwarsa?
-  const isExpired = useMemo(() => {
-    if (!promoData) return false;
-
-    // always_available? anggap tidak expired
-    if (promoData.always_available === true) return false;
-
-    // ambil expiry dari end_date dulu, lalu fallback ke expires_at
-    const raw = promoData.end_date || promoData.expires_at;
-    if (!raw) return false;
-
-    // Normalisasi ke timestamp. Jika parse gagal → anggap belum expired agar aman.
-    const ts = new Date(raw).getTime();
-    if (Number.isNaN(ts)) return false;
-
-    // bandingkan dengan "sekarang"
-    return ts < Date.now();
+  // Derivatif status “belum mulai” (ganti isNotStarted lama supaya konsisten TZ)
+  const isNotStarted = useMemo(() => {
+    if (!promoData?.start_date) return false;
+    const startAt = new Date(`${promoData.start_date}T${promoData.jam_mulai || '00:00:00'}`);
+    return new Date() < startAt;
   }, [promoData]);
+
+  const isStartTomorrow = useMemo(() => {
+    if (!promoData?.start_date) return false;
+    const startDate = new Date(promoData.start_date);
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    return (
+      startDate.getFullYear() === tomorrow.getFullYear() &&
+      startDate.getMonth() === tomorrow.getMonth() &&
+      startDate.getDate() === tomorrow.getDate()
+    );
+  }, [promoData]);
+
+  // (opsional) stok: pakai remaining_stock kalau ada, fallback ke total_remaining
+  const remaining = useMemo(() => {
+    const r = promoData?.remaining_stock ?? promoData?.total_remaining;
+    return Number.isFinite(Number(r)) ? Number(r) : null;
+  }, [promoData]);
+
+  const outOfStock = remaining !== null ? remaining <= 0 : false;
+
+  // ✅ Single source of truth untuk UI & tombol
+  const canClaim = !timeFlags.expiredByDate && timeFlags.withinDailyTime && !outOfStock;
 
   const [loading, setLoading] = useState(true);
 
@@ -530,7 +582,7 @@ export default function PromoDetailUnified() {
     try {
       setLoading(true);
 
-      // 1) Coba dari CubeController (pakai cube id)
+      // 1) Coba dari CubeController (pakai cube id)\
       let response = await get({ path: `admin/cubes/${effectivePromoId}` });
 
       if (response?.status === 200 && (response?.data?.data || response?.data)) {
@@ -591,6 +643,8 @@ export default function PromoDetailUnified() {
           always_available: false,
           expires_at: ad?.finish_validate || null,
           end_date: ad?.finish_validate || null,
+          jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
+          jam_berakhir: ad?.jam_berakhir ?? null,
           schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
@@ -608,7 +662,7 @@ export default function PromoDetailUnified() {
       }
 
       // 2) Fallback: coba endpoint ads langsung jika ada
-      response = await get({ path: `ads/${effectivePromoId}` });
+      response = await get({ path: `admin/ads/${effectivePromoId}` });
       if (response?.status === 200 && (response?.data?.data || response?.data)) {
         const ad = response.data?.data || response.data;
         // Collect all available images from ad
@@ -682,7 +736,7 @@ export default function PromoDetailUnified() {
           merchant: ad?.merchant || cubeInfo.sellerName || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
-          code: ad?.code || cube?.code || null,
+          code: ad?.code || null,
           distance: '3 KM',
           location: cubeInfo.address || cubeInfo.coordinates || ad?.location || '',
           coordinates: cubeInfo.coordinates || '',
@@ -697,6 +751,8 @@ export default function PromoDetailUnified() {
           always_available: false,
           expires_at: ad?.finish_validate || null,
           end_date: ad?.finish_validate || null,
+          jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
+          jam_berakhir: ad?.jam_berakhir ?? null,
           schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
@@ -736,7 +792,7 @@ export default function PromoDetailUnified() {
           merchant: data.owner_name || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
-          code: ad?.code || cube?.code || null,
+          code: data.code || null,
           distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
           location: data.location || '',
           coordinates: '',
@@ -1145,15 +1201,13 @@ export default function PromoDetailUnified() {
   // --- Claim promo manual ---
   const handleClaimPromo = async () => {
     if (!promoData || isClaimedLoading || isAlreadyClaimed) return;
-
-    // Blok klaim jika expired atau belum mulai
-    if (isExpired || isNotStarted) {
+    if (!canClaim || isNotStarted) {
       setErrorMessage(
-        isExpired
+        timeFlags.expiredByDate
           ? 'Promo sudah kadaluwarsa.'
-          : isStartTomorrow
-            ? 'Promo mulai besok.'
-            : 'Promo belum dimulai.'
+          : isNotStarted
+            ? (isStartTomorrow ? 'Promo mulai besok.' : 'Promo belum dimulai.')
+            : 'Di luar jam berlaku.'
       );
       setShowErrorModal(true);
       return;
@@ -1219,12 +1273,12 @@ export default function PromoDetailUnified() {
 
       // Try primary endpoint first, then fallback
       const endpoints = [
-        // unified claim endpoint (auto-handle promo/voucher)
-        `${apiUrl}/ads/${promoData.id}/claim`,
-        // promo item storeForPromo (tanpa /admin)
+        // 1) Promo-first (storeForPromo)
         `${apiUrl}/promos/${promoData.id}/items`,
-        // direct claim ke promo-items (butuh promo_id & claim=true)
-        `${apiUrl}/admin/promo-items`
+        // 2) Direct claim (payload promo_id/promo_code)
+        `${apiUrl}/admin/promo-items`,
+        // 3) Fallback Ad (hanya bila perlu)
+        `${apiUrl}/ads/${promoData.id}/claim`,
       ];
 
       const claimHeaders = {
@@ -1235,6 +1289,7 @@ export default function PromoDetailUnified() {
 
       const payload = {
         promo_id: promoData.id,
+        promo_code: promoData.code || null, // <-- penting!
         claim: true,
         expires_at: promoData.expires_at || null,
       };
@@ -1344,7 +1399,7 @@ export default function PromoDetailUnified() {
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
-      <div 
+      <div
         className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
         style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
       >
@@ -1516,28 +1571,27 @@ export default function PromoDetailUnified() {
         <div className="lg:max-w-sm lg:mx-auto">
           <button
             onClick={handleClaimPromo}
-            disabled={isExpired || isNotStarted || isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${isExpired || isNotStarted
+            disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
+            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
+              ? 'bg-gray-400 text-white cursor-not-allowed'
+              : isAlreadyClaimed
                 ? 'bg-gray-400 text-white cursor-not-allowed'
-                : isAlreadyClaimed
-                  ? 'bg-gray-400 text-white cursor-not-allowed'
-                  : isClaimedLoading
-                    ? 'bg-slate-400 text-white cursor-not-allowed'
-                    : 'text-white focus:ring-4 focus:ring-opacity-50'
+                : isClaimedLoading
+                  ? 'bg-slate-400 text-white cursor-not-allowed'
+                  : 'text-white focus:ring-4 focus:ring-opacity-50'
               }`}
             style={
-              !isExpired && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
-                ? {
-                    backgroundColor: getCommunityPrimaryColor(),
-                    '--tw-ring-color': `${getCommunityPrimaryColor()}50`
-                  }
+              !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
+                ? { backgroundColor: getCommunityPrimaryColor(), '--tw-ring-color': `${getCommunityPrimaryColor()}50` }
                 : {}
             }
           >
-            {isExpired ? (
+            {timeFlags.expiredByDate ? (
               'Promo sudah kadaluwarsa'
+            ) : !timeFlags.withinDailyTime ? (
+              'Di luar jam berlaku'
             ) : isNotStarted ? (
-              isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai'
+              (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai')
             ) : isAlreadyClaimed ? (
               <div className="flex items-center justify-center">
                 <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
@@ -1559,13 +1613,13 @@ export default function PromoDetailUnified() {
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
-            <div 
+            <div
               className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
               style={{ backgroundColor: `${getCommunityPrimaryColor()}20` }}
             >
-              <FontAwesomeIcon 
-                icon={faCheckCircle} 
-                className="text-3xl" 
+              <FontAwesomeIcon
+                icon={faCheckCircle}
+                className="text-3xl"
                 style={{ color: getCommunityPrimaryColor() }}
               />
             </div>
@@ -1636,15 +1690,15 @@ export default function PromoDetailUnified() {
                   }
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
-                  e.target.style.borderColor = `${getCommunityPrimaryColor()}50`;
+                  e.currentTarget.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
+                  e.currentTarget.style.borderColor = `${getCommunityPrimaryColor()}50`;
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '';
-                  e.target.style.borderColor = '';
+                  e.currentTarget.style.backgroundColor = '';
+                  e.currentTarget.style.borderColor = '';
                 }}
               >
-                <div 
+                <div
                   className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
                   style={{ backgroundColor: getCommunityPrimaryColor() }}
                 >
