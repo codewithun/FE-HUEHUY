@@ -225,6 +225,107 @@ const getCategoryLabel = (ad, cube = null) => {
   return rawCat;
 };
 
+// Professional SVG icons for categories
+const CategoryIcons = {
+  advertising: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z"/>
+    </svg>
+  ),
+  information: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z"/>
+    </svg>
+  ),
+  voucher: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M4,4A2,2 0 0,0 2,6V10C3.11,10 4,10.9 4,12A2,2 0 0,1 2,14V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V14C20.89,14 20,13.1 20,12A2,2 0 0,1 22,10V6A2,2 0 0,0 20,4H4M4,6H20V8.54C18.81,9.23 18,10.53 18,12C18,13.47 18.81,14.77 20,15.46V18H4V15.46C5.19,14.77 6,13.47 6,12C6,10.53 5.19,9.23 4,8.54V6Z"/>
+    </svg>
+  ),
+  promo: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z"/>
+    </svg>
+  ),
+  default: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z"/>
+    </svg>
+  )
+};
+
+// Helper function to get appropriate icon for each category type
+const getCategoryIcon = (category) => {
+  const categoryLower = String(category || '').toLowerCase();
+  
+  switch (categoryLower) {
+    case 'advertising':
+      return CategoryIcons.advertising;
+    case 'informasi':
+    case 'information':
+      return CategoryIcons.information;
+    case 'voucher':
+      return CategoryIcons.voucher;
+    case 'promo':
+      return CategoryIcons.promo;
+    default:
+      return CategoryIcons.default;
+  }
+};
+
+// Helper function to get additional informational data
+const getAdditionalInfo = (ad, cube, communityData) => {
+  const info = {};
+  
+  // Get creation date
+  const createdAt = ad?.created_at || cube?.created_at;
+  if (createdAt) {
+    const date = new Date(createdAt);
+    info.createdDate = date.toLocaleDateString('id-ID', { 
+      day: 'numeric', 
+      month: 'short' 
+    });
+  }
+  
+  // Get status information
+  if (ad) {
+    info.status = ad.status || 'active';
+    info.type = ad.type || 'general';
+    
+    // Get grab information for vouchers/promos
+    if (ad.max_grab) {
+      info.maxGrab = ad.unlimited_grab ? 'Unlimited' : `${ad.max_grab} tersisa`;
+    }
+    
+    // Get validation type
+    if (ad.validation_type) {
+      info.validationType = ad.validation_type === 'auto' ? 'Auto Validasi' : 'Manual Validasi';
+    }
+  }
+  
+  // Get community info
+  if (communityData) {
+    info.communityName = communityData.name;
+    info.memberCount = communityData.members || 0;
+  }
+  
+  return info;
+};
+
+// Helper function to get category with icon and additional info
+const getCategoryWithIcon = (ad, cube = null, communityData = null) => {
+  const label = getCategoryLabel(ad, cube);
+  const icon = getCategoryIcon(label);
+  const additionalInfo = getAdditionalInfo(ad, cube, communityData);
+  
+  return { 
+    label, 
+    icon, 
+    additionalInfo,
+    display: label // Remove emoji from display since we're using SVG
+  };
+};
+
 export default function CommunityDashboard({ communityId }) {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
@@ -336,13 +437,13 @@ export default function CommunityDashboard({ communityId }) {
               return (
                 <div
                   key={id}
-                  className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all"
+                  className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                   style={{ minWidth: 90 }}
                   onClick={() =>
                     router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
                   }
                 >
-                  <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-[#d8d8d8] bg-white shadow-sm mb-2">
+                  <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg mb-2">
                     <Image
                       src={normalizeImageSrc(imgSrc)}
                       alt={label}
@@ -350,7 +451,7 @@ export default function CommunityDashboard({ communityId }) {
                       className="object-cover"
                     />
                   </div>
-                  <p className="text-[12px] text-slate-700 font-medium text-center line-clamp-2">
+                  <p className="text-[12px] text-white font-medium text-center line-clamp-2 drop-shadow-sm">
                     {label}
                   </p>
                 </div>
@@ -387,7 +488,7 @@ export default function CommunityDashboard({ communityId }) {
               const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
               
               // Siapkan data untuk kartu dengan prioritas yang benar:
-              let imageUrl, title, merchant, address, category;
+              let imageUrl, title, merchant, address, categoryData, description;
               
               if (isInformationCube) {
                 // Untuk kubus informasi, prioritaskan data dari cube
@@ -395,24 +496,26 @@ export default function CommunityDashboard({ communityId }) {
                 title = cube.label || cube.name || ad?.title || 'Informasi';
                 merchant = cube.merchant || communityData?.name || ad?.merchant || 'Informasi';
                 address = cube.address || ad?.cube?.address || '';
-                category = 'Informasi';
+                categoryData = getCategoryWithIcon(ad, cube, communityData);
+                description = cube.description || ad?.description || '';
               } else {
                 // Untuk promo/iklan, prioritaskan data dari ad
                 imageUrl = ad ? getAdImage(ad) : (cube.image || '/default-avatar.png');
                 title = ad?.title || cube.label || 'Promo';
                 merchant = ad?.merchant || communityData?.name || 'Merchant';
                 address = ad?.cube?.address || cube.address || '';
-                category = ad ? getCategoryLabel(ad, cube) : (cube.category || 'Promo');
+                categoryData = ad ? getCategoryWithIcon(ad, cube, communityData) : getCategoryWithIcon(null, cube, communityData);
+                description = ad?.description || cube.description || '';
               }
               
 
-              // --- lalu bagian layout (XL-Ads/XL/L/S/M) tinggal pakai `category` untuk badge ---
+              // --- lalu bagian layout (XL-Ads/XL/L/S/M) dengan glassmorphism effect ---
               if (size === 'XL-Ads') {
                 return (
                   <div
                     key={cube?.id || index}
-                    className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
-                    style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', cursor: 'pointer' }}
+                    className="rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
+                    style={{ minWidth: 320, maxWidth: 350, cursor: 'pointer' }}
                     onClick={() => {
                       if (isInformationCube) {
                         // Untuk kubus informasi, prioritaskan code dari cube
@@ -445,17 +548,42 @@ export default function CommunityDashboard({ communityId }) {
                       }
                     }}
                   >
-                    <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
-                      <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain p-2" />
-                      <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
-                        {merchant}
+                    {/* Image Section */}
+                    <div className="relative w-full bg-white/20 backdrop-blur-sm overflow-hidden">
+                      <div className="w-full aspect-[4/3] relative">
+                        <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
+                      </div>
+                      <div className="absolute top-3 right-3 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                        <span>{categoryData.icon}</span>
+                        <span>{categoryData.label}</span>
                       </div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
-                      <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">{title}</h3>
-                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm">
-                        {category}
-                      </span>
+                    
+                    {/* Content Section */}
+                    <div className="p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
+                      <h3 className="text-base font-bold text-white line-clamp-2 mb-1 leading-tight drop-shadow-sm">{title}</h3>
+                      {description && (
+                        <p className="text-xs text-white/90 leading-relaxed mb-2 line-clamp-2 drop-shadow-sm">
+                          {description}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm">
+                            {merchant}
+                          </span>
+                          {categoryData.additionalInfo.createdDate && (
+                            <span className="text-[10px] text-white/80">
+                              {categoryData.additionalInfo.createdDate}
+                            </span>
+                          )}
+                        </div>
+                        {categoryData.additionalInfo.maxGrab && (
+                          <span className="text-[10px] text-white font-medium bg-white/20 px-2 py-1 rounded-md">
+                            {categoryData.additionalInfo.maxGrab}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -465,8 +593,8 @@ export default function CommunityDashboard({ communityId }) {
                 return (
                   <div
                     key={cube.id || index}
-                    className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#fffaf0] shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
-                    style={{ minWidth: 320, maxWidth: 360, cursor: 'pointer' }}
+                    className="rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
+                    style={{ minWidth: 320, maxWidth: 350, cursor: 'pointer' }}
                     onClick={() => {
                       if (isInformationCube) {
                         // Untuk kubus informasi, prioritaskan code dari cube
@@ -499,17 +627,29 @@ export default function CommunityDashboard({ communityId }) {
                       }
                     }}
                   >
-                    <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
-                      <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain p-2" />
-                      <div className="absolute top-3 left-3 bg-white/80 text-[#5a6e1d] text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm">
-                        {merchant}
+                    {/* Image Section */}
+                    <div className="relative w-full bg-white/20 backdrop-blur-sm overflow-hidden">
+                      <div className="w-full aspect-[4/3] relative">
+                        <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
+                      </div>
+                      <div className="absolute top-3 right-3 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                        <span>{categoryData.icon}</span>
+                        <span>{categoryData.label}</span>
                       </div>
                     </div>
-                    <div className="p-4 bg-white border-t border-[#e6e6e6]">
-                      <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">{title}</h3>
-                      {address && <p className="text-[13px] text-slate-700 line-clamp-2 mb-3">{address}</p>}
+                    
+                    {/* Content Section */}
+                    <div className="p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
+                      <h3 className="text-base font-bold text-white line-clamp-2 mb-1 leading-tight drop-shadow-sm">{title}</h3>
+                      {description && (
+                        <p className="text-xs text-white/90 leading-relaxed mb-2 line-clamp-2 drop-shadow-sm">
+                          {description}
+                        </p>
+                      )}
                       <div className="flex items-center justify-between">
-                        <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+                        <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm truncate flex-1">
+                          {merchant}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -520,8 +660,8 @@ export default function CommunityDashboard({ communityId }) {
                 return (
                   <div
                     key={cube.id || index}
-                    className="flex items-center rounded-[14px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
-                    style={{ minWidth: 280, maxWidth: 320, height: 130, cursor: 'pointer' }}
+                    className="flex rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
+                    style={{ minWidth: 320, maxWidth: 350, cursor: 'pointer' }}
                     onClick={() => {
                       if (isInformationCube) {
                         // Untuk kubus informasi, prioritaskan code dari cube
@@ -554,18 +694,109 @@ export default function CommunityDashboard({ communityId }) {
                       }
                     }}
                   >
-                    <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
-                      <div className="w-[90%] h-[90%] relative">
-                        <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain rounded-[10px]" />
+                    {/* Image Section */}
+                    <div className="w-2/5 relative bg-white/20 backdrop-blur-sm overflow-hidden">
+                      <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
+                      <div className="absolute top-2 right-2 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                        <span>{categoryData.icon}</span>
+                        <span>{categoryData.label}</span>
                       </div>
                     </div>
-                    <div className="flex-1 h-full p-3 flex flex-col justify-between bg-white border-l border-[#e6e6e6]">
-                      <div>
-                        <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">{title}</h3>
-                        {address && <p className="text-[13px] text-slate-700 line-clamp-2">{address}</p>}
+                    
+                    {/* Content Section */}
+                    <div className="w-3/5 p-3 bg-white/20 backdrop-blur-md border-l border-white/20 flex flex-col justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-[14px] font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm">{title}</h3>
+                        {description && (
+                          <p className="text-[12px] text-white/90 leading-relaxed line-clamp-2 mb-2 drop-shadow-sm">
+                            {description}
+                          </p>
+                        )}
+                        {address && <p className="text-[11px] text-white/80 line-clamp-1 drop-shadow-sm">{address}</p>}
                       </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+                      <div className="mt-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm">
+                            {merchant}
+                          </span>
+                          {categoryData.additionalInfo.createdDate && (
+                            <span className="text-[10px] text-white/80">
+                              {categoryData.additionalInfo.createdDate}
+                            </span>
+                          )}
+                        </div>
+                        {categoryData.additionalInfo.maxGrab && (
+                          <span className="text-[10px] text-blue-200 font-medium">
+                            {categoryData.additionalInfo.maxGrab}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (size === 'L') {
+                return (
+                  <div
+                    key={cube.id || index}
+                    className="flex rounded-[14px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
+                    style={{ minWidth: 300, maxWidth: 340, height: 150, cursor: 'pointer' }}
+                    onClick={() => {
+                      if (isInformationCube) {
+                        // Untuk kubus informasi, prioritaskan code dari cube
+                        const code = cube.code || ad?.cube?.code || ad?.code;
+                        if (code) {
+                          const targetUrl = communityId 
+                            ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                            : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                          router.push(targetUrl);
+                        } else {
+                          console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
+                        }
+                        return;
+                      }
+                      if (ad?.id) {
+                        // Cek apakah ini iklan/advertising
+                        if (getIsAdvertising(ad, cube)) {
+                          // Arahkan ke halaman iklan yang mendukung community background
+                          const targetUrl = communityId 
+                            ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                            : `/app/iklan/${ad.id}`;
+                          router.push(targetUrl);
+                        } else {
+                          // Arahkan ke halaman promo
+                          const targetUrl = communityId 
+                            ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                            : `/app/promo/detail_promo?promoId=${ad.id}`;
+                          router.push(targetUrl);
+                        }
+                      }
+                    }}
+                  >
+                    <div className="relative w-[35%] h-full bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden">
+                      <div className="w-[85%] h-[85%] relative">
+                        <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover rounded-[8px]" />
+                      </div>
+                      <div className="absolute top-2 left-2 bg-black/40 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                        <span>{categoryData.icon}</span>
+                        <span>{categoryData.label}</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 h-full p-3 flex flex-col justify-between bg-white/20 backdrop-blur-md border-l border-white/20">
+                      <div className="flex-1">
+                        <h3 className="text-[14px] font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm">{title}</h3>
+                        {description && (
+                          <p className="text-[12px] text-white/90 leading-relaxed line-clamp-2 mb-2 drop-shadow-sm">
+                            {description}
+                          </p>
+                        )}
+                        {address && <p className="text-[11px] text-white/80 line-clamp-1 drop-shadow-sm">{address}</p>}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm">
+                          {merchant}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -577,8 +808,13 @@ export default function CommunityDashboard({ communityId }) {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#e6e6e6] bg-white shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
-                  style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160, cursor: 'pointer' }}
+                  className="flex flex-col rounded-[12px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 hover:scale-[1.02] transition-all duration-300 bg-white/10 backdrop-blur-md"
+                  style={{ 
+                    minWidth: isM ? 200 : 160, 
+                    maxWidth: isM ? 220 : 180, 
+                    height: isM ? 280 : 240,
+                    cursor: 'pointer' 
+                  }}
                   onClick={() => {
                     if (isInformationCube) {
                       // Untuk kubus informasi, prioritaskan code dari cube
@@ -611,16 +847,60 @@ export default function CommunityDashboard({ communityId }) {
                     }
                   }}
                 >
-                  <div className="relative w-full bg-white flex items-center justify-center overflow-hidden" style={{ height: isM ? 150 : 120 }}>
-                    <div className="w-[90%] h-[90%] relative">
-                      <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-contain rounded-[8px]" />
+                  {/* Image Section */}
+                  <div className="relative w-full bg-white/20 backdrop-blur-sm overflow-hidden">
+                    <div className="w-full aspect-square relative">
+                      <Image 
+                        src={normalizeImageSrc(imageUrl)} 
+                        alt={title} 
+                        fill 
+                        className="object-cover" 
+                      />
                     </div>
+                    <div className="absolute top-2 right-2 bg-black/40 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                      <span>{categoryData.icon}</span>
+                      <span>{categoryData.label}</span>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent h-8"></div>
                   </div>
-                  <div className="p-2 bg-white border-t border-[#e6e6e6]">
-                    <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-slate-900 line-clamp-2 mb-0.5`}>{title}</h3>
-                    {address && <p className={`${isM ? 'text-[12px]' : 'text-[11px]'} text-slate-700 line-clamp-1`}>{address}</p>}
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">{category}</span>
+                  
+                  {/* Content Section */}
+                  <div className="flex-1 p-3 bg-white/20 backdrop-blur-md border-t border-white/20 flex flex-col justify-between">
+                    <div className="flex-1">
+                      <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm`}>
+                        {title}
+                      </h3>
+                      {description && (
+                        <p className={`${isM ? 'text-[11px]' : 'text-[10px]'} text-white/90 leading-relaxed line-clamp-${isM ? '3' : '2'} mb-2 drop-shadow-sm`}>
+                          {description}
+                        </p>
+                      )}
+                      {address && (
+                        <p className={`${isM ? 'text-[10px]' : 'text-[9px]'} text-white/80 line-clamp-1 drop-shadow-sm`}>
+                          {address}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Footer */}
+                    <div className="mt-2 pt-2 border-t border-white/20">
+                      <div className="flex flex-col gap-1">
+                        <span className="bg-white/30 border border-white/40 text-white text-[9px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm block text-center truncate">
+                          {merchant}
+                        </span>
+                        <div className="flex items-center justify-between">
+                          {categoryData.additionalInfo.createdDate && (
+                            <span className="text-[8px] text-white/70">
+                              {categoryData.additionalInfo.createdDate}
+                            </span>
+                          )}
+                          {categoryData.additionalInfo.maxGrab && (
+                            <span className="text-[8px] text-blue-200 font-medium">
+                              {categoryData.additionalInfo.maxGrab}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -782,12 +1062,10 @@ export default function CommunityDashboard({ communityId }) {
               {/* Community intro block (not a header) */}
               <div className="mb-6">
                 <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl p-4 text-white shadow-sm">
-                  <h2 className="text-lg font-semibold mb-3">{communityData.name}</h2>
-                  
-                  {/* Avatar dan deskripsi */}
-                  <div className="flex items-start gap-3">
-                    {/* Avatar komunitas */}
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/40 bg-white/10 flex-shrink-0 shadow-lg">
+                  {/* Avatar, title, dan deskripsi dalam satu baris */}
+                  <div className="flex items-start gap-4">
+                    {/* Avatar komunitas - Square shape */}
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-white/40 bg-white/10 flex-shrink-0 shadow-lg">
                       {!avatarError && communityData.avatar ? (
                         <Image
                           src={avatarSrc}
@@ -799,7 +1077,7 @@ export default function CommunityDashboard({ communityId }) {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/30 to-white/10">
-                          <span className="text-white/80 text-lg font-bold">
+                          <span className="text-white/80 text-xl font-bold">
                             {communityData.name?.charAt(0)?.toUpperCase() || 'C'}
                           </span>
                         </div>
@@ -807,10 +1085,14 @@ export default function CommunityDashboard({ communityId }) {
                       {/* Overlay untuk efek glass */}
                       <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
                     </div>
-                    {/* Deskripsi (jika ada) */}
-                    {communityData.description && (
-                      <p className="text-sm opacity-90 flex-1 leading-relaxed pt-1">{communityData.description}</p>
-                    )}
+                    
+                    {/* Title dan deskripsi di sebelah kanan */}
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-lg font-semibold mb-1 text-white">{communityData.name}</h2>
+                      {communityData.description && (
+                        <p className="text-sm opacity-90 leading-relaxed text-white/90 line-clamp-2">{communityData.description}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -861,13 +1143,13 @@ export default function CommunityDashboard({ communityId }) {
                                 return (
                                   <div
                                     key={id}
-                                    className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all"
+                                    className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                                     style={{ minWidth: 90 }}
                                     onClick={() =>
                                       router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
                                     }
                                   >
-                                    <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-[#d8d8d8] bg-white shadow-sm mb-2">
+                                    <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg mb-2">
                                       <Image
                                         src={normalizeImageSrc(imgSrc)}
                                         alt={label}
@@ -875,7 +1157,7 @@ export default function CommunityDashboard({ communityId }) {
                                         className="object-cover"
                                       />
                                     </div>
-                                    <p className="text-[12px] text-slate-700 font-medium text-center line-clamp-2">
+                                    <p className="text-[12px] text-white font-medium text-center line-clamp-2 drop-shadow-sm">
                                       {label}
                                     </p>
                                   </div>
