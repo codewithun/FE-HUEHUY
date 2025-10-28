@@ -92,6 +92,24 @@ const getIsInformation = (item) => {
   return itemInfo || cubeInfo || contentTypeInfo || typeInfo || cubeTypeInfo;
 };
 
+// Fungsi untuk mengidentifikasi iklan/advertising
+const getIsAdvertising = (ad, cube = null) => {
+  if (!ad && !cube) return false;
+  
+  // 1) Cek type
+  const typeStr = String(ad?.type || '').toLowerCase();
+  if (typeStr === 'iklan') return true;
+  
+  // 2) Cek kategori
+  const rawCat = (ad?.ad_category?.name || '').toLowerCase();
+  if (rawCat === 'advertising') return true;
+  
+  // 3) Cek flag advertising
+  if (ad?.is_advertising || ad?.advertising) return true;
+  
+  return false;
+};
+
 const getCategoryLabel = (ad, cube = null) => {
   // 1) Kalau informasi -> "Informasi" (cek ad dan cube)
   if (getIsInformation(ad) || getIsInformation(cube)) return 'Informasi';
@@ -316,10 +334,20 @@ export default function CommunityDashboard({ communityId }) {
                         return;
                       }
                       if (ad?.id) {
-                        const targetUrl = communityId 
-                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
-                          : `/app/promo/detail_promo?promoId=${ad.id}`;
-                        router.push(targetUrl);
+                        // Cek apakah ini iklan/advertising
+                        if (getIsAdvertising(ad, cube)) {
+                          // Arahkan ke halaman iklan yang mendukung community background
+                          const targetUrl = communityId 
+                            ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                            : `/app/iklan/${ad.id}`;
+                          router.push(targetUrl);
+                        } else {
+                          // Arahkan ke halaman promo
+                          const targetUrl = communityId 
+                            ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                            : `/app/promo/detail_promo?promoId=${ad.id}`;
+                          router.push(targetUrl);
+                        }
                       }
                     }}
                   >
@@ -360,10 +388,20 @@ export default function CommunityDashboard({ communityId }) {
                         return;
                       }
                       if (ad?.id) {
-                        const targetUrl = communityId 
-                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
-                          : `/app/promo/detail_promo?promoId=${ad.id}`;
-                        router.push(targetUrl);
+                        // Cek apakah ini iklan/advertising
+                        if (getIsAdvertising(ad, cube)) {
+                          // Arahkan ke halaman iklan yang mendukung community background
+                          const targetUrl = communityId 
+                            ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                            : `/app/iklan/${ad.id}`;
+                          router.push(targetUrl);
+                        } else {
+                          // Arahkan ke halaman promo
+                          const targetUrl = communityId 
+                            ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                            : `/app/promo/detail_promo?promoId=${ad.id}`;
+                          router.push(targetUrl);
+                        }
                       }
                     }}
                   >
@@ -405,10 +443,20 @@ export default function CommunityDashboard({ communityId }) {
                         return;
                       }
                       if (ad?.id) {
-                        const targetUrl = communityId 
-                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
-                          : `/app/promo/detail_promo?promoId=${ad.id}`;
-                        router.push(targetUrl);
+                        // Cek apakah ini iklan/advertising
+                        if (getIsAdvertising(ad, cube)) {
+                          // Arahkan ke halaman iklan yang mendukung community background
+                          const targetUrl = communityId 
+                            ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                            : `/app/iklan/${ad.id}`;
+                          router.push(targetUrl);
+                        } else {
+                          // Arahkan ke halaman promo
+                          const targetUrl = communityId 
+                            ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                            : `/app/promo/detail_promo?promoId=${ad.id}`;
+                          router.push(targetUrl);
+                        }
                       }
                     }}
                   >
@@ -452,10 +500,20 @@ export default function CommunityDashboard({ communityId }) {
                       return;
                     }
                     if (ad?.id) {
-                      const targetUrl = communityId 
-                        ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
-                        : `/app/promo/detail_promo?promoId=${ad.id}`;
-                      router.push(targetUrl);
+                      // Cek apakah ini iklan/advertising
+                      if (getIsAdvertising(ad, cube)) {
+                        // Arahkan ke halaman iklan yang mendukung community background
+                        const targetUrl = communityId 
+                          ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                          : `/app/iklan/${ad.id}`;
+                        router.push(targetUrl);
+                      } else {
+                        // Arahkan ke halaman promo
+                        const targetUrl = communityId 
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
+                      }
                     }
                   }}
                 >
