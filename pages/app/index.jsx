@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
 import 'swiper/css';
@@ -39,43 +38,43 @@ export default function Index() {
   const buildPromoLink = (ad) => {
     const id = ad?.id || ad?.ad_id;
     const normBool = (v) => {
-      if (v === true || v === 1) return true;
-      if (typeof v === 'string') {
-        const s = v.trim().toLowerCase();
-        return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
-      }
-      return !!v;
+        if (v === true || v === 1) return true;
+        if (typeof v === 'string') {
+            const s = v.trim().toLowerCase();
+            return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
+        }
+        return !!v;
     };
 
     const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
     const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
     const isInformation =
-      normBool(ad?.cube?.is_information) ||
-      normBool(ad?.is_information) ||
-      contentType === 'information' ||
-      contentType === 'kubus-informasi' ||
-      typeStr === 'information' ||
-      typeStr === 'informasi';
+        normBool(ad?.cube?.is_information) ||
+        normBool(ad?.is_information) ||
+        contentType === 'information' ||
+        contentType === 'kubus-informasi' ||
+        typeStr === 'information' ||
+        typeStr === 'informasi';
 
     // Arahkan khusus ke Kubus Informasi bila bertipe informasi
     if (isInformation) {
-      const code = ad?.cube?.code || ad?.code;
-      return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+        const code = ad?.cube?.code || ad?.code;
+        return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
     }
 
     // Arahkan ke iklan jika advertising
     if (id) {
-      const cat = String(ad?.ad_category?.name || '').toLowerCase();
-      if (
-        typeStr === 'iklan' ||
-        cat === 'advertising' ||
-        ad?.is_advertising === true ||
-        ad?.advertising === true
-      ) {
-        return `/app/iklan/${id}?source=home`;
-      }
-      // Default: promo
-      return `/app/komunitas/promo/${id}?source=home`;
+        const cat = String(ad?.ad_category?.name || '').toLowerCase();
+        if (
+            typeStr === 'iklan' ||
+            cat === 'advertising' ||
+            ad?.is_advertising === true ||
+            ad?.advertising === true
+        ) {
+            return `/app/iklan/${id}?source=home`;
+        }
+        // Default: promo
+        return `/app/komunitas/promo/${id}?source=home`;
     }
 
     // Fallback: bila tidak ada id tapi ada code kubus, pakai Kubus Informasi
@@ -332,61 +331,11 @@ export default function Index() {
     path: `notification`,
   }, !apiReady);
 
-  // Tambahkan useGet untuk chat / pesan
-  const [loadingChat, codeChat, dataChat] = useGet({
-    path: `chat-rooms`, // endpoint default daftar chat user
-  }, !apiReady);
-
-  // state sementara untuk trigger re-render
-  const [fakeUpdate, setFakeUpdate] = useState(null);
-
-  // 👇 Tambahkan setelah baris useGet chat-rooms
-  useEffect(() => {
-    const handleChatRead = (e) => {
-      const chatId = e.detail;
-      console.log("💬 Chat dibaca:", chatId);
-
-      // Kalau dataChat belum siap, skip
-      if (!dataChat?.data || !Array.isArray(dataChat.data)) return;
-
-      // Turunkan unread_count jadi 0
-      dataChat.data = dataChat.data.map(chat => {
-        if (chat.id === chatId) {
-          return { ...chat, unread_count: 0 };
-        }
-        return chat;
-      });
-
-      // Trigger re-render manual (karena useGet datanya statis)
-      // Jadi kita bikin salinan baru biar React sadar ada perubahan
-      const updated = { ...dataChat, data: [...dataChat.data] };
-      setFakeUpdate(updated);
-    };
-
-    window.addEventListener("chat-read", handleChatRead);
-    return () => window.removeEventListener("chat-read", handleChatRead);
-  }, [dataChat]);
-
-
   // Hitung jumlah notifikasi yang belum dibaca
   const unreadNotificationCount = useMemo(() => {
     if (!dataNotif?.data || !Array.isArray(dataNotif.data)) return 0;
     return dataNotif.data.filter(item => !item.read_at).length;
   }, [dataNotif]);
-
-  // Hitung jumlah pesan belum dibaca
-  const unreadChatCount = useMemo(() => {
-    if (!dataChat?.data || !Array.isArray(dataChat.data)) return 0;
-
-    // BE biasanya kasih unread_count di tiap chat
-    const totalUnread = dataChat.data.reduce((sum, chat) => {
-      const unread = Number(chat?.unread_count || 0);
-      return sum + (isNaN(unread) ? 0 : unread);
-    }, 0);
-
-    return totalUnread;
-  }, [dataChat]);
-
 
   // DEBUG: Log user data untuk debugging
   useEffect(() => {
@@ -495,17 +444,11 @@ export default function Index() {
 
                   {/* Button Pesan */}
                   <Link href="/app/pesan">
-                    <div className="px-4 py-4 flex justify-center items-center relative">
+                    <div className="px-4 py-4 flex justify-center items-center">
                       <FontAwesomeIcon
                         icon={faMessage}
                         className="text__primary text-lg"
                       />
-                      {/* Badge pesan dinamis */}
-                      {unreadChatCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                          {unreadChatCount > 99 ? '99+' : unreadChatCount}
-                        </span>
-                      )}
                     </div>
                   </Link>
                 </div>

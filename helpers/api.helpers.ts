@@ -8,7 +8,6 @@ import fileDownload from 'js-file-download';
 import { Decrypt } from './encryption.helpers';
 import { standIn } from './standIn.helpers';
 
-axios.defaults.withCredentials = true;
 // =========================>
 // ## Utils ss
 // =========================>

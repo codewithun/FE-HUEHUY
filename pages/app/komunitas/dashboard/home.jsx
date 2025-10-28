@@ -7,6 +7,33 @@ import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import CommunityBottomBar from './CommunityBottomBar';
 
+// Custom hook untuk handle image loading dengan fallback
+const useImageWithFallback = (src, fallback = '/default-avatar.png') => {
+  const [imageSrc, setImageSrc] = useState(src);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    setImageSrc(src);
+    setIsError(false);
+  }, [src]);
+
+  const handleError = () => {
+    if (!isError) {
+      console.warn('Image failed to load:', imageSrc);
+      setIsError(true);
+      setImageSrc(fallback);
+    }
+  };
+
+  const handleLoad = () => {
+    if (!isError) {
+      console.log('Image loaded successfully:', imageSrc);
+    }
+  };
+
+  return { imageSrc, handleError, handleLoad, isError };
+};
+
 // tambahkan helper normalisasi gambar
 const normalizeImageSrc = (raw) => {
   if (!raw) return '/default-avatar.png';
@@ -26,8 +53,8 @@ const normalizeImageSrc = (raw) => {
   // Remove leading slashes and api/storage prefix
   let path = s.replace(/^\/+/, '').replace(/^api\/storage\//i, 'storage/');
   
-  // Add storage prefix if needed for common directories
-  if (/^(ads|promos|uploads|images|files|banners)\//i.test(path)) {
+  // Add storage prefix if needed for common directories (including communities)
+  if (/^(ads|promos|uploads|images|files|banners|communities)\//i.test(path)) {
     path = `storage/${path}`;
   }
   
@@ -38,11 +65,74 @@ const normalizeImageSrc = (raw) => {
   
   // Build full URL for storage paths
   if (path.startsWith('storage/')) {
-    return `${apiBase}/${path}`.replace(/([^:]\/)\/+/g, '$1');
+    const fullUrl = `${apiBase}/${path}`.replace(/([^:]\/)\/+/g, '$1');
+    
+    // Debug logging untuk troubleshooting
+    console.log('normalizeImageSrc debug:', {
+      input: raw,
+      cleanPath: path,
+      fullUrl,
+      apiBase
+    });
+    
+    return fullUrl;
   }
   
   // For other paths, ensure leading slash
   return path.startsWith('/') ? path : `/${path}`;
+};
+
+// Helper khusus untuk logo komunitas (mirip dengan komunitas.jsx)
+const buildLogoUrl = (logo) => {
+  try {
+    if (!logo) return '/default-avatar.png';
+    if (/^https?:\/\//i.test(logo)) return logo; // already absolute
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiBase = baseUrl.replace(/\/api\/?$/, '');
+    
+    const cleanLogo = String(logo)
+      .replace(/^\/+/, "")
+      .replace(/^api\/storage\//, "storage/");
+
+    // Handle different path formats for community logos
+    let finalPath;
+    if (cleanLogo.startsWith("storage/")) {
+      finalPath = `/${cleanLogo}`;
+    } else if (cleanLogo.startsWith("communities/")) {
+      // Path sudah dalam format communities/, tambahkan storage/
+      finalPath = `/storage/${cleanLogo}`;
+    } else if (cleanLogo.includes("/")) {
+      // Path dengan folder, pastikan ada storage/
+      finalPath = `/storage/${cleanLogo}`;
+    } else {
+      // File name saja, asumsikan di folder communities
+      finalPath = `/storage/communities/${cleanLogo}`;
+    }
+
+    const fullUrl = `${apiBase}${finalPath}`.replace(/([^:]\/)\/+/g, '$1');
+    
+    // Debug logging untuk troubleshooting
+    console.log('buildLogoUrl debug:', {
+      input: logo,
+      cleanLogo,
+      finalPath,
+      fullUrl,
+      apiBase
+    });
+    
+    // Validasi URL sebelum return
+    try {
+      new URL(fullUrl);
+      return fullUrl;
+    } catch {
+      console.warn('Invalid URL generated for logo:', fullUrl);
+      return '/default-avatar.png';
+    }
+  } catch (error) {
+    console.warn('Error building logo URL:', error, 'for logo:', logo);
+    return '/default-avatar.png';
+  }
 };
 
 // === [ADD] helpers biar label konsisten seperti di app/index.jsx ===
@@ -145,6 +235,10 @@ export default function CommunityDashboard({ communityId }) {
   // ad_category: data options dan level (posisi) widget dimana kategori harus muncul
   const [adCategories, setAdCategories] = useState([]);
   const [adCategoryLevel, setAdCategoryLevel] = useState(null);
+  
+  // Use custom hook for avatar image handling
+  const avatarUrl = communityData?.avatar ? buildLogoUrl(communityData.avatar) : '/default-avatar.png';
+  const { imageSrc: avatarSrc, handleError: handleAvatarError, handleLoad: handleAvatarLoad, isError: avatarError } = useImageWithFallback(avatarUrl);
   // Fetch widget komunitas (type=information)
   useEffect(() => {
     const fetchWidgetData = async () => {
@@ -572,6 +666,13 @@ export default function CommunityDashboard({ communityId }) {
           const result = await response.json();
           const community = result.data || result;
 
+          // Debug logging untuk avatar/logo
+          console.log('Community API Response:', {
+            logo: community.logo,
+            avatar: community.avatar,
+            fullCommunity: community
+          });
+
           // Use API response directly, no dummy/default values
           setCommunityData({
             id: community.id,
@@ -681,10 +782,36 @@ export default function CommunityDashboard({ communityId }) {
               {/* Community intro block (not a header) */}
               <div className="mb-6">
                 <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl p-4 text-white shadow-sm">
-                  <h2 className="text-lg font-semibold">{communityData.name}</h2>
-                  {communityData.description && (
-                    <p className="text-sm opacity-90 mt-1">{communityData.description}</p>
-                  )}
+                  <h2 className="text-lg font-semibold mb-3">{communityData.name}</h2>
+                  
+                  {/* Avatar dan deskripsi */}
+                  <div className="flex items-start gap-3">
+                    {/* Avatar komunitas */}
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/40 bg-white/10 flex-shrink-0 shadow-lg">
+                      {!avatarError && communityData.avatar ? (
+                        <Image
+                          src={avatarSrc}
+                          alt={`Logo ${communityData.name}`}
+                          fill
+                          className="object-cover"
+                          onError={handleAvatarError}
+                          onLoad={handleAvatarLoad}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/30 to-white/10">
+                          <span className="text-white/80 text-lg font-bold">
+                            {communityData.name?.charAt(0)?.toUpperCase() || 'C'}
+                          </span>
+                        </div>
+                      )}
+                      {/* Overlay untuk efek glass */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
+                    </div>
+                    {/* Deskripsi (jika ada) */}
+                    {communityData.description && (
+                      <p className="text-sm opacity-90 flex-1 leading-relaxed pt-1">{communityData.description}</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
