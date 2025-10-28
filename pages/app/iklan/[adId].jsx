@@ -1,23 +1,27 @@
 /* eslint-disable no-console */
 import {
-    faArrowLeft,
-    faExclamationTriangle,
-    faMapMarkerAlt,
-    faPhone,
-    faShare,
-    faWifi,
-    faWifiSlash,
+  faArrowLeft,
+  faExclamationTriangle,
+  faExternalLinkAlt,
+  faMapMarkerAlt,
+  faPhone,
+  faShare,
+  faWifi,
+  faWifiSlash,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageCarousel } from '../../../components/base.components';
+import { token_cookie_name } from '../../../helpers';
 import { get } from '../../../helpers/api.helpers';
+import { Decrypt } from '../../../helpers/encryption.helpers';
 
 // Halaman detail Iklan (tanpa klaim promo, tanpa jam berlaku, tanpa jarak)
 export default function AdDetailUnified() {
   const router = useRouter();
-  const { adId } = router.query;
+  const { adId, communityId } = router.query;
 
   // =========================================================
   // util kecil, sebagian diambil dari kode promo kamu
@@ -96,6 +100,9 @@ export default function AdDetailUnified() {
   // Simpan data iklan
   const [adData, setAdData] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // State untuk community data (background colors)
+  const [communityData, setCommunityData] = useState(null);
 
   // Simpan lokasi user buat tombol "Rute"
   const userPosRef = useRef(null);
@@ -132,6 +139,31 @@ export default function AdDetailUnified() {
     },
     [buildImageUrl]
   );
+
+  // Function untuk mendapatkan gradient style berdasarkan community colors
+  const getCommunityGradient = useCallback((bgColor1, bgColor2) => {
+    // Jika ada bg_color_1 dan bg_color_2 dari community, gunakan itu
+    if (bgColor1 && bgColor2) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor2})`,
+      };
+    }
+    // Jika hanya ada bg_color_1, buat gradasi dengan versi transparan/gelapnya
+    if (bgColor1) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${bgColor1}, ${bgColor1}dd)`,
+      };
+    }
+    // Fallback default jika tidak ada warna dari community
+    return {
+      backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)',
+    };
+  }, []);
+
+  // Function untuk mendapatkan warna utama community
+  const getCommunityPrimaryColor = useCallback(() => {
+    return communityData?.bg_color_1 || '#16a34a'; // fallback ke green-600
+  }, [communityData?.bg_color_1]);
 
   // =========================================================
   // Helper untuk ambil info lokasi dari cube
@@ -208,7 +240,8 @@ export default function AdDetailUnified() {
           lat: loc.lat,
           lng: loc.lng,
           coordinates: loc.coordinates,
-          channel: adRaw?.channel || 'offline',
+          channel: adRaw?.promo_type === 'online' ? 'online' : 'offline',
+          promo_type: adRaw?.promo_type || 'offline',
           status: adRaw?.status || 'active',
           seller: {
             name: cube?.user?.name || cube?.corporate?.name || '',
@@ -216,8 +249,12 @@ export default function AdDetailUnified() {
           },
           expires_at: adRaw?.expires_at || null,
           end_date: adRaw?.end_date || null,
+          online_store_link: adRaw?.online_store_link || 
+                           cube?.link_information || 
+                           cube?.website || 
+                           cube?.online_link || 
+                           cube?.store_link,
         };
-
         setAdData(adData);
       } else {
         console.error('Failed to fetch iklan details');
@@ -236,6 +273,50 @@ export default function AdDetailUnified() {
     if (!router.isReady) return;
     fetchIklanDetails();
   }, [router.isReady, fetchIklanDetails]);
+
+  // Fetch community data berdasarkan communityId
+  useEffect(() => {
+    const fetchCommunityData = async () => {
+      if (!communityId || !router.isReady) return;
+
+      try {
+        const encryptedToken = Cookies.get(token_cookie_name);
+        const token = encryptedToken ? Decrypt(encryptedToken) : '';
+
+        // Handle API URL properly - remove /api if it exists, then add it back
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const apiUrl = baseUrl.replace(/\/api\/?$/, '');
+
+        const response = await fetch(`${apiUrl}/api/communities/${communityId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const community = result.data || result;
+
+          setCommunityData({
+            id: community.id,
+            name: community.name,
+            description: community.description ?? null,
+            bg_color_1: community.bg_color_1 ?? null,
+            bg_color_2: community.bg_color_2 ?? null,
+          });
+        } else {
+          setCommunityData(null);
+        }
+      } catch (error) {
+        console.error('Error fetching community data:', error);
+        setCommunityData(null);
+      }
+    };
+
+    fetchCommunityData();
+  }, [communityId, router.isReady]);
 
   // geolocation ringan buat rute (optional)
   useEffect(() => {
@@ -413,7 +494,10 @@ export default function AdDetailUnified() {
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
-      <div className="bg-primary w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl">
+      <div 
+        className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
+        style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+      >
         <div className="absolute inset-0">
           <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
           <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
@@ -471,24 +555,27 @@ export default function AdDetailUnified() {
 
           {/* Info card status type (online/offline) SISA SATU KARTU AJA */}
           <div className="mb-4">
-            <div className="bg-primary rounded-[20px] p-4 shadow-lg">
+            <div 
+              className="rounded-[20px] p-4 shadow-lg"
+              style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+            >
               <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <FontAwesomeIcon
                       icon={
-                        adData.channel === 'online'
+                        adData.promo_type === 'online'
                           ? faWifi
                           : faWifiSlash
                       }
                       className="mr-2 text-white text-sm"
                     />
                     <span className="text-sm font-semibold text-white">
-                      {adData.channel === 'online' ? 'Online' : 'Offline'}
+                      {adData.promo_type === 'online' ? 'Online' : 'Offline'}
                     </span>
                   </div>
                   <span className="text-xs text-white opacity-70">
-                    Tipe Iklan: {adData.channel === 'online' ? '🌐 Online' : '📍 Offline'}
+                    Tipe Iklan: {adData.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}
                   </span>
                 </div>
               </div>
@@ -521,27 +608,64 @@ export default function AdDetailUnified() {
             </div>
           </div>
 
-          {/* Lokasi */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                Lokasi Iklan
-              </h4>
-              <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                {adData.location || adData.coordinates || '-'}
-              </p>
-              <button
-                onClick={openRoute}
-                className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
-              >
-                <FontAwesomeIcon
-                  icon={faMapMarkerAlt}
-                  className="mr-2 text-sm"
-                />
-                Rute
-              </button>
+          {/* Lokasi - Only show for offline ads */}
+          {adData?.promo_type !== 'online' && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Lokasi Iklan
+                </h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                  {adData.location || adData.coordinates || '-'}
+                </p>
+                <button
+                  onClick={openRoute}
+                  className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+                >
+                  <FontAwesomeIcon
+                    icon={faMapMarkerAlt}
+                    className="mr-2 text-sm"
+                  />
+                  Rute
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Tautan Toko Online - Show when online store link exists */}
+          {adData?.online_store_link && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Tautan Toko Online
+                </h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                  {adData.online_store_link}
+                </p>
+                <button
+                  onClick={() => {
+                    const storeUrl = adData.online_store_link;
+                    if (storeUrl) {
+                      let url = storeUrl;
+                      // Pastikan URL memiliki protokol
+                      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        url = 'https://' + url;
+                      }
+                      window.open(url, '_blank');
+                    }
+                  }}
+                  className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+                >
+                  <FontAwesomeIcon
+                    icon={faExternalLinkAlt}
+                    className="mr-2 text-sm"
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Kontak pemilik */}
           <div className="mb-20 lg:mb-8">
@@ -558,7 +682,8 @@ export default function AdDetailUnified() {
                   {adData.seller?.phone || '-'}
                 </p>
                 <button
-                  className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                  className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
                   onClick={() => {
                     if (adData?.seller?.phone) {
                       const phone = String(
@@ -578,6 +703,42 @@ export default function AdDetailUnified() {
           </div>
         </div>
       </div>
+
+
+
+      {/* Bottom bar - Chat WhatsApp Button */}
+      {adData?.seller?.phone && (
+        <div className="fixed left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30 bottom-0">
+          <div className="lg:max-w-sm lg:mx-auto">
+            <button
+              onClick={() => {
+                if (adData?.seller?.phone) {
+                  const phone = String(adData.seller.phone).replace(/\s+/g, '');
+                  // Format nomor untuk WhatsApp (hapus karakter non-digit, tambah 62 jika dimulai dengan 0)
+                  let formattedPhone = phone.replace(/\D/g, '');
+                  if (formattedPhone.startsWith('0')) {
+                    formattedPhone = '62' + formattedPhone.substring(1);
+                  } else if (!formattedPhone.startsWith('62')) {
+                    formattedPhone = '62' + formattedPhone;
+                  }
+                  
+                  const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title}". Bisakah Anda memberikan informasi lebih lanjut?`);
+                  const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                  window.open(whatsappUrl, '_blank');
+                }
+              }}
+              className="w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white focus:ring-4 focus:ring-opacity-50 flex items-center justify-center"
+              style={{
+                backgroundColor: getCommunityPrimaryColor(),
+                '--tw-ring-color': `${getCommunityPrimaryColor()}50`
+              }}
+            >
+              <span className="mr-2">💬</span>
+              Chat
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Share Modal */}
       {showShareModal && (

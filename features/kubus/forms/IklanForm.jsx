@@ -50,20 +50,10 @@ const IklanForm = ({ formControl, values, setValues }) => {
       {values.find(i => i.name === 'ads[promo_type]')?.value === 'online' && (
         <InputComponent
           type="url"
-          name="cube_tags[0][link]"
-          label="Tautan/Link"
-          placeholder="Masukkan tautan/link promo online..."
-          onChange={(value) => {
-            const linkIndex = values.findIndex(v => v.name === 'cube_tags[0][link]');
-            const newValues = [...values];
-            if (linkIndex >= 0) {
-              newValues[linkIndex] = { name: 'cube_tags[0][link]', value: value || '' };
-            } else {
-              newValues.push({ name: 'cube_tags[0][link]', value: value || '' });
-            }
-            setValues(newValues);
-          }}
-          value={values.find(i => i.name === 'cube_tags[0][link]')?.value || ''}
+          name="ads[online_store_link]"
+          label="Link Toko Online"
+          placeholder="Masukkan link toko online..."
+          {...formControl('ads[online_store_link]')}
         />
       )}
     </div>
