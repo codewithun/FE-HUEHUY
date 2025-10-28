@@ -76,6 +76,24 @@ const CommunityPromoPage = () => {
     }
   };
 
+  // Fungsi untuk mengidentifikasi iklan/advertising
+  const getIsAdvertising = (ad, cube = null) => {
+    if (!ad && !cube) return false;
+    
+    // 1) Cek type
+    const typeStr = String(ad?.type || '').toLowerCase();
+    if (typeStr === 'iklan') return true;
+    
+    // 2) Cek kategori
+    const rawCat = (ad?.ad_category?.name || '').toLowerCase();
+    if (rawCat === 'advertising') return true;
+    
+    // 3) Cek flag advertising
+    if (ad?.is_advertising || ad?.advertising) return true;
+    
+    return false;
+  };
+
   const normalizePromos = (arr = []) => {
     let promos = (Array.isArray(arr) ? arr : []).map((p) => {
       // Ambil gambar dari ads[0] jika ada
@@ -100,6 +118,11 @@ const CommunityPromoPage = () => {
         image,
         created_at: p.created_at ?? ad?.created_at,
         updated_at: p.updated_at ?? ad?.updated_at,
+        // Tambahkan informasi untuk identifikasi iklan
+        type: ad?.type ?? p.type,
+        ad_category: ad?.ad_category ?? p.ad_category,
+        is_advertising: ad?.is_advertising ?? p.is_advertising,
+        advertising: ad?.advertising ?? p.advertising,
       };
     });
 
@@ -260,10 +283,17 @@ const CommunityPromoPage = () => {
     return { backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)' };
   };
 
-  const handlePromoClick = (promoId) => {
-    router.push(
-      `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
-    );
+  const handlePromoClick = (promoId, promo = null) => {
+    // Cek apakah ini iklan/advertising berdasarkan data promo
+    if (promo && getIsAdvertising(promo)) {
+      // Arahkan ke halaman iklan yang mendukung community background
+      router.push(`/app/iklan/${promoId}?communityId=${communityId}`);
+    } else {
+      // Arahkan ke halaman promo
+      router.push(
+        `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
+      );
+    }
   };
 
   // ======== UI TOKENS (BIAR KONSISTEN) ========
@@ -368,10 +398,18 @@ const CommunityPromoPage = () => {
                     cursor: 'pointer',
                   }}
                   onClick={() => {
-                    if (ad?.id)
-                      router.push(
-                        `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
-                      );
+                    if (ad?.id) {
+                      // Cek apakah ini iklan/advertising
+                      if (getIsAdvertising(ad, cube)) {
+                        // Arahkan ke halaman iklan yang mendukung community background
+                        router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                      } else {
+                        // Arahkan ke halaman promo
+                        router.push(
+                          `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                        );
+                      }
+                    }
                   }}
                 >
                   {/* Gambar */}
@@ -413,11 +451,20 @@ const CommunityPromoPage = () => {
                     maxWidth: 360,
                     cursor: 'pointer'
                   }}
-                  onClick={() =>
-                    router.push(
-                      `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
-                    )
-                  }
+                  onClick={() => {
+                    if (ad?.id) {
+                      // Cek apakah ini iklan/advertising
+                      if (getIsAdvertising(ad, cube)) {
+                        // Arahkan ke halaman iklan yang mendukung community background
+                        router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                      } else {
+                        // Arahkan ke halaman promo
+                        router.push(
+                          `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
+                        );
+                      }
+                    }
+                  }}
                 >
                   {/* Gambar di atas */}
                   <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
@@ -468,11 +515,20 @@ const CommunityPromoPage = () => {
                     height: 130,
                     cursor: 'pointer'
                   }}
-                  onClick={() =>
-                    router.push(
-                      `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
-                    )
-                  }
+                  onClick={() => {
+                    if (ad?.id) {
+                      // Cek apakah ini iklan/advertising
+                      if (getIsAdvertising(ad, cube)) {
+                        // Arahkan ke halaman iklan yang mendukung community background
+                        router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                      } else {
+                        // Arahkan ke halaman promo
+                        router.push(
+                          `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
+                        );
+                      }
+                    }
+                  }}
                 >
                   {/* Gambar kiri */}
                   <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
@@ -583,7 +639,7 @@ const CommunityPromoPage = () => {
   const PromoCard = ({ promo }) => (
     <div
       className="bg-white rounded-[16px] shadow-sm overflow-hidden mb-4 hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50"
-      onClick={() => handlePromoClick(promo.id)}
+      onClick={() => handlePromoClick(promo.id, promo)}
       style={{ minWidth: 220 }} // buat card bisa jadi item horizontal
     >
       <div className="flex p-4 items-center">

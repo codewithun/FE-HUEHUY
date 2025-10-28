@@ -628,7 +628,7 @@ export default function PromoDetailUnified() {
           merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
-          code: ad?.code || cube?.code || null,
+          code: data.code || null,
           distance: '3 KM',
           location: loc.address || (loc.coordinates ? loc.coordinates : ''),
           coordinates: loc.coordinates,
