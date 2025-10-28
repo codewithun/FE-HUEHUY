@@ -13,14 +13,36 @@ const normalizeImageSrc = (raw) => {
   if (typeof raw !== 'string') return '/default-avatar.png';
   const s = raw.trim();
   if (!s) return '/default-avatar.png';
+  
   // absolute URL -> return as is
   if (/^https?:\/\//i.test(s)) return s;
   // data URI -> return as is
   if (/^data:/i.test(s)) return s;
-  // already starts with slash -> ok
-  if (s.startsWith('/')) return s;
-  // otherwise ensure leading slash
-  return `/${s.replace(/^\/+/, '')}`;
+  
+  // Handle storage paths
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const apiBase = baseUrl.replace(/\/api\/?$/, '');
+  
+  // Remove leading slashes and api/storage prefix
+  let path = s.replace(/^\/+/, '').replace(/^api\/storage\//i, 'storage/');
+  
+  // Add storage prefix if needed for common directories
+  if (/^(ads|promos|uploads|images|files|banners)\//i.test(path)) {
+    path = `storage/${path}`;
+  }
+  
+  // If path doesn't start with storage and isn't absolute, add leading slash
+  if (!path.startsWith('storage/') && !path.startsWith('/')) {
+    path = `/${path}`;
+  }
+  
+  // Build full URL for storage paths
+  if (path.startsWith('storage/')) {
+    return `${apiBase}/${path}`.replace(/([^:]\/)\/+/g, '$1');
+  }
+  
+  // For other paths, ensure leading slash
+  return path.startsWith('/') ? path : `/${path}`;
 };
 
 // === [ADD] helpers biar label konsisten seperti di app/index.jsx ===
@@ -40,26 +62,55 @@ const normalizeBoolLike = (val) => {
   return !!val;
 };
 
-const getIsInformation = (ad) => {
-  const cubeInfo = normalizeBoolLike(ad?.cube?.is_information);
-  const adInfo = normalizeBoolLike(ad?.is_information);
-  const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
-  const contentTypeInfo = contentType === 'kubus-informasi';
-  const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
-  const looksInfoType = ['information', 'informasi'].includes(typeStr);
-  return cubeInfo || adInfo || contentTypeInfo || looksInfoType;
+const getIsInformation = (item) => {
+  if (!item) return false;
+  
+  // Prioritas pengecekan:
+  // 1. Field is_information di item atau cube
+  const itemInfo = normalizeBoolLike(item?.is_information);
+  const cubeInfo = normalizeBoolLike(item?.cube?.is_information);
+  
+  // 2. Content type yang spesifik untuk kubus informasi
+  const itemContentType = String(item?.content_type || '').toLowerCase();
+  const cubeContentType = String(item?.cube?.content_type || '').toLowerCase();
+  const contentTypeInfo = ['kubus-informasi', 'information', 'informasi'].includes(itemContentType) || 
+                         ['kubus-informasi', 'information', 'informasi'].includes(cubeContentType);
+  
+  // 3. Type field yang menunjukkan informasi
+  const itemType = String(item?.type || '').toLowerCase();
+  const cubeType = String(item?.cube?.type || '').toLowerCase();
+  const typeInfo = ['information', 'informasi', 'kubus-informasi'].includes(itemType) || 
+                   ['information', 'informasi', 'kubus-informasi'].includes(cubeType);
+  
+  // 4. Cube type name yang menunjukkan informasi
+  const cubeTypeName = String(item?.cube_type?.name || item?.cube?.cube_type?.name || '').toLowerCase();
+  const cubeTypeInfo = ['information', 'informasi', 'kubus informasi', 'kubus-informasi'].includes(cubeTypeName);
+  
+  // 5. Khusus untuk cube yang langsung diterima (bukan melalui ad)
+  const directCubeCheck = item?.ads !== undefined; // Jika ada property ads, kemungkinan ini cube langsung
+  
+  return itemInfo || cubeInfo || contentTypeInfo || typeInfo || cubeTypeInfo;
 };
 
-const getCategoryLabel = (ad) => {
-  // 1) Kalau informasi -> "Informasi"
-  if (getIsInformation(ad)) return 'Informasi';
+const getCategoryLabel = (ad, cube = null) => {
+  // 1) Kalau informasi -> "Informasi" (cek ad dan cube)
+  if (getIsInformation(ad) || getIsInformation(cube)) return 'Informasi';
 
   // 2) Mapping dari type
   const typeStr = String(ad?.type || '').toLowerCase();
   if (typeStr === 'iklan') return 'Advertising';
   if (typeStr === 'voucher') return 'Voucher';
+  if (typeStr === 'information' || typeStr === 'informasi') return 'Informasi';
 
-  // 3) Fallback: nama kategori dari BE
+  // 3) Cek cube type jika ada
+  const cubeTypeStr = String(cube?.type || ad?.cube?.type || '').toLowerCase();
+  if (cubeTypeStr === 'information' || cubeTypeStr === 'informasi') return 'Informasi';
+
+  // 4) Cek content type
+  const contentType = String(ad?.content_type || cube?.content_type || '').toLowerCase();
+  if (contentType === 'kubus-informasi' || contentType === 'information') return 'Informasi';
+
+  // 5) Fallback: nama kategori dari BE
   const rawCat = (ad?.ad_category?.name || '').trim();
   if (!rawCat) return 'Promo';
   if (rawCat.toLowerCase() === 'advertising') return 'Advertising';
@@ -219,13 +270,29 @@ export default function CommunityDashboard({ communityId }) {
 
               // Ambil 1 ad yang menempel ke cube (kalau ada)
               const ad = cube.ads?.[0] || null;
-
-              // Siapkan data untuk kartu:
-              const imageUrl = ad ? getAdImage(ad) : (cube.image || '/default-avatar.png');
-              const title = ad?.title || cube.label || 'Promo';
-              const merchant = ad?.merchant || communityData?.name || 'Merchant';
-              const address = ad?.cube?.address || cube.address || '';
-              const category = ad ? getCategoryLabel(ad) : (cube.category || 'Promo');
+              
+              // Cek apakah ini kubus informasi
+              const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
+              
+              // Siapkan data untuk kartu dengan prioritas yang benar:
+              let imageUrl, title, merchant, address, category;
+              
+              if (isInformationCube) {
+                // Untuk kubus informasi, prioritaskan data dari cube
+                imageUrl = cube.picture_source || cube.image || (ad ? getAdImage(ad) : '/default-avatar.png');
+                title = cube.label || cube.name || ad?.title || 'Informasi';
+                merchant = cube.merchant || communityData?.name || ad?.merchant || 'Informasi';
+                address = cube.address || ad?.cube?.address || '';
+                category = 'Informasi';
+              } else {
+                // Untuk promo/iklan, prioritaskan data dari ad
+                imageUrl = ad ? getAdImage(ad) : (cube.image || '/default-avatar.png');
+                title = ad?.title || cube.label || 'Promo';
+                merchant = ad?.merchant || communityData?.name || 'Merchant';
+                address = ad?.cube?.address || cube.address || '';
+                category = ad ? getCategoryLabel(ad, cube) : (cube.category || 'Promo');
+              }
+              
 
               // --- lalu bagian layout (XL-Ads/XL/L/S/M) tinggal pakai `category` untuk badge ---
               if (size === 'XL-Ads') {
@@ -235,12 +302,25 @@ export default function CommunityDashboard({ communityId }) {
                     className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
                     style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', cursor: 'pointer' }}
                     onClick={() => {
-                      if (getIsInformation(ad)) {
-                        const code = ad?.cube?.code || ad?.code;
-                        if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                      if (isInformationCube) {
+                        // Untuk kubus informasi, prioritaskan code dari cube
+                        const code = cube.code || ad?.cube?.code || ad?.code;
+                        if (code) {
+                          const targetUrl = communityId 
+                            ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                            : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                          router.push(targetUrl);
+                        } else {
+                          console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
+                        }
                         return;
                       }
-                      if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`);
+                      if (ad?.id) {
+                        const targetUrl = communityId 
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
+                      }
                     }}
                   >
                     <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
@@ -266,12 +346,25 @@ export default function CommunityDashboard({ communityId }) {
                     className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#fffaf0] shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
                     style={{ minWidth: 320, maxWidth: 360, cursor: 'pointer' }}
                     onClick={() => {
-                      if (getIsInformation(ad)) {
-                        const code = ad?.cube?.code || ad?.code;
-                        if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                      if (isInformationCube) {
+                        // Untuk kubus informasi, prioritaskan code dari cube
+                        const code = cube.code || ad?.cube?.code || ad?.code;
+                        if (code) {
+                          const targetUrl = communityId 
+                            ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                            : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                          router.push(targetUrl);
+                        } else {
+                          console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
+                        }
                         return;
                       }
-                      if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`);
+                      if (ad?.id) {
+                        const targetUrl = communityId 
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
+                      }
                     }}
                   >
                     <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
@@ -298,12 +391,25 @@ export default function CommunityDashboard({ communityId }) {
                     className="flex items-center rounded-[14px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
                     style={{ minWidth: 280, maxWidth: 320, height: 130, cursor: 'pointer' }}
                     onClick={() => {
-                      if (getIsInformation(ad)) {
-                        const code = ad?.cube?.code || ad?.code;
-                        if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                      if (isInformationCube) {
+                        // Untuk kubus informasi, prioritaskan code dari cube
+                        const code = cube.code || ad?.cube?.code || ad?.code;
+                        if (code) {
+                          const targetUrl = communityId 
+                            ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                            : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                          router.push(targetUrl);
+                        } else {
+                          console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
+                        }
                         return;
                       }
-                      if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`);
+                      if (ad?.id) {
+                        const targetUrl = communityId 
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
+                      }
                     }}
                   >
                     <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
@@ -332,12 +438,25 @@ export default function CommunityDashboard({ communityId }) {
                   className="flex flex-col rounded-[12px] overflow-hidden border border-[#e6e6e6] bg-white shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
                   style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160, cursor: 'pointer' }}
                   onClick={() => {
-                    if (getIsInformation(ad)) {
-                      const code = ad?.cube?.code || ad?.code;
-                      if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${code}`);
+                    if (isInformationCube) {
+                      // Untuk kubus informasi, prioritaskan code dari cube
+                      const code = cube.code || ad?.cube?.code || ad?.code;
+                      if (code) {
+                        const targetUrl = communityId 
+                          ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                          : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                        router.push(targetUrl);
+                      } else {
+                        console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
+                      }
                       return;
                     }
-                    if (ad?.id) router.push(`/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityData?.id}`);
+                    if (ad?.id) {
+                      const targetUrl = communityId 
+                        ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                        : `/app/promo/detail_promo?promoId=${ad.id}`;
+                      router.push(targetUrl);
+                    }
                   }}
                 >
                   <div className="relative w-full bg-white flex items-center justify-center overflow-hidden" style={{ height: isM ? 150 : 120 }}>
