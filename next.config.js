@@ -69,6 +69,9 @@ module.exports = withPWA({
 
       // map DB path 'ads/...'(public) ke 'storage/ads/...'
       { source: '/ads/:path*',          destination: `${FILE_BASE}/storage/ads/:path*` },
+      
+      // map DB path 'communities/...' ke 'storage/communities/...'
+      { source: '/communities/:path*',  destination: `${FILE_BASE}/storage/communities/:path*` },
 
       // Untuk endpoint promos/public gunakan API_BASE (termasuk /api jika ada)
       { source: '/promos/:path*',       destination: `${FILE_BASE}/promos/:path*` },
@@ -118,14 +121,20 @@ module.exports = withPWA({
       // izinkan jika backend kadang melayani /ads/** langsung
       { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/ads/**' },
       { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/ads/**' },
+      // izinkan jika backend kadang melayani /communities/** langsung
+      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/communities/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/communities/**' },
 
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/storage/**' },
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/ads/**' },
+      { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/communities/**' },
 
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/storage/**' },
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/storage/**' },
       { protocol: 'https', hostname: '159.223.48.146', pathname: '/ads/**' },
       { protocol: 'http',  hostname: '159.223.48.146', pathname: '/ads/**' },
+      { protocol: 'https', hostname: '159.223.48.146', pathname: '/communities/**' },
+      { protocol: 'http',  hostname: '159.223.48.146', pathname: '/communities/**' },
 
       // Allow Google profile images
       { protocol: 'https', hostname: 'lh3.googleusercontent.com', pathname: '/**' },
