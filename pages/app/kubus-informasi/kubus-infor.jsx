@@ -10,20 +10,42 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Cookies from 'js-cookie';
 import { ImageCarousel } from '../../../components/base.components';
 import { get } from '../../../helpers/api.helpers';
+import { token_cookie_name } from '../../../helpers';
+import { Decrypt } from '../../../helpers/encryption.helpers';
 
 export default function KubusInformasiPage() {
   const router = useRouter();
-  const { code, cubeCode, cube_code } = router.query;
+  const { code, cubeCode, cube_code, communityId } = router.query;
 
   const [cube, setCube] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [communityData, setCommunityData] = useState(null);
   const [expandedSections, setExpandedSections] = useState({
     schedule: false,
     description: false,
     location: false
   });
+
+  // Function to get community gradient style
+  const getCommunityGradient = (bgColor1, bgColor2) => {
+    if (bgColor1 && bgColor2) {
+      return {
+        background: `linear-gradient(135deg, ${bgColor1} 0%, ${bgColor2} 100%)`
+      };
+    } else if (bgColor1) {
+      return {
+        backgroundColor: bgColor1
+      };
+    } else if (bgColor2) {
+      return {
+        backgroundColor: bgColor2
+      };
+    }
+    return null;
+  };
 
   // Build URL gambar seperti di iklan
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -63,26 +85,39 @@ export default function KubusInformasiPage() {
 
       const imgs = [];
 
-      // Ambil gambar dari cube
+      // Prioritas 1: Gambar dari cube (untuk kubus informasi)
       if (cubeData.picture_source) {
         imgs.push(buildImageUrl(cubeData.picture_source));
       }
+      if (cubeData.image) {
+        imgs.push(buildImageUrl(cubeData.image));
+      }
 
-      // Ambil gambar dari ads yang aktif
+      // Prioritas 2: Gambar dari ads yang aktif
       const ads = Array.isArray(cubeData?.ads) ? cubeData.ads : [];
       const activeAds = ads.filter(a => String(a?.status).toLowerCase() === 'active');
       
       activeAds.forEach(ad => {
-        [ad.picture_source, ad.image_1, ad.image_2, ad.image_3, ad.image].forEach((raw) => {
-          if (raw) imgs.push(buildImageUrl(raw));
+        // Untuk kubus informasi, prioritaskan picture_source dari ad
+        const imageFields = [ad.picture_source, ad.image_1, ad.image_2, ad.image_3, ad.image];
+        imageFields.forEach((raw) => {
+          if (raw && raw.trim()) {
+            const imageUrl = buildImageUrl(raw);
+            // Hindari duplikasi gambar
+            if (!imgs.includes(imageUrl)) {
+              imgs.push(imageUrl);
+            }
+          }
         });
       });
 
+      // Fallback jika tidak ada gambar
       if (imgs.length === 0) {
         imgs.push('/default-avatar.png');
       }
 
-      return imgs;
+      // Hapus duplikasi dan batasi maksimal 5 gambar
+      return [...new Set(imgs)].slice(0, 5);
     },
     [buildImageUrl]
   );
@@ -146,16 +181,74 @@ export default function KubusInformasiPage() {
   }, [fmtDayLabel]);
 
   const buildDescription = useCallback((cubeData) => {
-    // ambil deskripsi dari iklan aktif jika ada
+    if (!cubeData) return 'Tidak ada deskripsi.';
+
+    // Prioritas 1: Deskripsi dari cube (untuk kubus informasi)
+    if (cubeData.description && String(cubeData.description).trim()) {
+      return String(cubeData.description).trim();
+    }
+
+    // Prioritas 2: Detail dari cube
+    if (cubeData.detail && String(cubeData.detail).trim()) {
+      return String(cubeData.detail).trim();
+    }
+
+    // Prioritas 3: Deskripsi dari iklan aktif
     const ads = Array.isArray(cubeData?.ads) ? cubeData.ads : [];
     const activeAd = ads.find(a => String(a?.status).toLowerCase() === 'active') || ads[0];
 
-    const desc = activeAd?.description || activeAd?.detail;
-    if (desc && String(desc).trim()) return String(desc).trim();
+    if (activeAd) {
+      const adDesc = activeAd?.description || activeAd?.detail;
+      if (adDesc && String(adDesc).trim()) {
+        return String(adDesc).trim();
+      }
+    }
 
-    // fallback minimal
-    return 'Tidak ada deskripsi.';
+    // Prioritas 4: Label atau nama cube
+    if (cubeData.label && String(cubeData.label).trim()) {
+      return `Informasi tentang ${String(cubeData.label).trim()}`;
+    }
+
+    // Fallback minimal
+    return 'Tidak ada deskripsi tersedia.';
   }, []);
+
+  // Fetch community data
+  const fetchCommunityData = useCallback(async () => {
+    if (!communityId) return;
+    
+    try {
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : '';
+      
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = baseUrl.replace(/\/api\/?$/, '');
+      
+      const response = await fetch(`${apiUrl}/api/communities/${communityId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        const community = result.data || result;
+        setCommunityData({
+          id: community.id,
+          name: community.name,
+          description: community.description ?? null,
+          bg_color_1: community.bg_color_1 ?? null,
+          bg_color_2: community.bg_color_2 ?? null,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching community data:', error);
+    }
+  }, [communityId]);
+
+
 
 
 
@@ -185,6 +278,12 @@ export default function KubusInformasiPage() {
     fetchCubeInfo();
   }, [fetchCubeInfo]);
 
+  useEffect(() => {
+    if (router.isReady && communityId) {
+      fetchCommunityData();
+    }
+  }, [router.isReady, communityId, fetchCommunityData]);
+
   const handleBack = () => {
     try {
       const { from } = router.query;
@@ -202,6 +301,15 @@ export default function KubusInformasiPage() {
   const todayHours = buildTodayHours(cube?.opening_hours);
   const fullSchedule = buildFullSchedule(cube?.opening_hours);
   const description = buildDescription(cube);
+
+  // Get community background style
+  const communityBgStyle = getCommunityGradient(
+    communityData?.bg_color_1,
+    communityData?.bg_color_2
+  );
+
+  // Determine header background - use community colors if available, otherwise use primary
+  const headerBgStyle = communityBgStyle;
 
   if (loading) {
     return (
@@ -231,7 +339,7 @@ export default function KubusInformasiPage() {
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
-      <div className="bg-primary w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl">
+      <div className={`w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl ${!headerBgStyle ? 'bg-primary' : ''}`} style={headerBgStyle || {}}>
         <div className="absolute inset-0">
           <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
           <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
@@ -249,8 +357,13 @@ export default function KubusInformasiPage() {
           </button>
           <div className="flex-1 text-center">
             <h1 className="text-white font-bold text-sm">
-              Kubus Informasi
+              {communityData ? `${communityData.name} - Kubus Informasi` : 'Kubus Informasi'}
             </h1>
+            {communityData && (
+              <p className="text-white text-xs opacity-80 mt-0.5">
+                Informasi dari komunitas
+              </p>
+            )}
           </div>
           <div className="w-8"></div> {/* Spacer for centering */}
         </div>
@@ -270,7 +383,7 @@ export default function KubusInformasiPage() {
 
           {/* Status Card - Selalu Tersedia */}
           <div className="mb-4">
-            <div className="bg-primary rounded-[20px] p-4 shadow-lg">
+            <div className={`rounded-[20px] p-4 shadow-lg ${!headerBgStyle ? 'bg-primary' : ''}`} style={headerBgStyle || {}}>
               <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -299,6 +412,18 @@ export default function KubusInformasiPage() {
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">
                 Hanya berupa informasi bukan promo atau voucher
               </p>
+              {communityData && (
+                <div className="bg-slate-50 rounded-lg p-3 mb-2">
+                  <p className="text-slate-700 text-sm">
+                    <span className="font-medium">Dari komunitas:</span> {communityData.name}
+                  </p>
+                  {communityData.description && (
+                    <p className="text-slate-600 text-xs mt-1">
+                      {communityData.description}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
