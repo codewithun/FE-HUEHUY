@@ -6,18 +6,33 @@ import React from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
 import { useGet } from '../../../helpers';
 import moment from 'moment';
+import { useRouter } from 'next/router';
 
 export default function Pesan() {
-  // ambil semua chat room dari backend universal endpoint
+  const { query } = useRouter();
+  const partnerId = query.partner_id;
+  const communityId = query.community_id;
+  const corporateId = query.corporate_id;
+
+  // build query string untuk filter backend
+  const qs = new URLSearchParams();
+  if (partnerId) qs.set('partner_id', partnerId);
+  if (communityId) qs.set('community_id', communityId);
+  if (corporateId) qs.set('corporate_id', corporateId);
+
+  // ambil chat room (terfilter jika query ada)
   const [loading, code, dataChats] = useGet({
-    path: `chat-rooms`, // endpoint Laravel: ChatController::chatRooms
+    path: `chat-rooms${qs.toString() ? `?${qs.toString()}` : ''}`, // endpoint Laravel: ChatController::chatRooms
   });
 
-  // helper waktu
-  const formatTime = (t) => {
-    if (!t) return '';
-    return moment(t).fromNow(); // ex: "2 jam lalu"
-  };
+  // fallback filter di FE jika backend belum update (optional)
+  const list = Array.isArray(dataChats?.data)
+    ? dataChats.data.filter((item) =>
+      partnerId ? String(item?.partner?.id) === String(partnerId) : true
+    )
+    : [];
+
+  const formatTime = (t) => (t ? moment(t).fromNow() : '');
 
   return (
     <div className="lg:mx-auto lg:relative lg:max-w-md">
@@ -34,11 +49,17 @@ export default function Pesan() {
           <div className="flex flex-col gap-3">
             {loading ? (
               <div className="text-center text-slate-500 py-10">Memuat pesan...</div>
-            ) : dataChats?.data?.length ? (
-              dataChats.data.map((item, key) => {
+            ) : list.length ? (
+              list.map((item, key) => {
                 const partner = item.partner || {};
                 const last = item.last_message || '(belum ada pesan)';
                 const time = item.created_at ? formatTime(item.created_at) : '';
+
+                // unread_count dikirim dari backend (>=0)
+                const unreadCount = Number(item.unread_count || 0);
+                // Chat dianggap "read" jika tidak ada pesan belum dibaca
+                // Tampilkan sebagai buram/grayscale hanya jika sudah dibaca
+                const isRead = unreadCount === 0;
 
                 return (
                   <Link
@@ -46,9 +67,21 @@ export default function Pesan() {
                     key={key}
                     className="block"
                   >
-                    <div className="grid grid-cols-6 gap-3 p-3 shadow-sm rounded-[15px] bg-white hover:scale-[1.02] transition-all">
+                    <div
+                      className={
+                        `relative grid grid-cols-6 gap-3 p-3 shadow-sm rounded-[15px] bg-white hover:scale-[1.02] transition-all ` +
+                        (isRead ? 'opacity-60 filter grayscale' : '')
+                      }
+                    >
+                      {/* unread badge */}
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-2 -right-2 z-50 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
+
                       {/* Avatar */}
-                      <div className="w-full aspect-square overflow-hidden rounded-full bg-slate-200 flex justify-center items-center">
+                      <div className={"w-full aspect-square overflow-hidden rounded-full bg-slate-200 flex justify-center items-center " + (isRead ? 'filter grayscale' : '')}>
                         {partner.picture ? (
                           <img
                             src={partner.picture}
@@ -63,7 +96,7 @@ export default function Pesan() {
                       {/* Info */}
                       <div className="col-span-5 flex flex-col justify-center">
                         <div className="flex justify-between items-center">
-                          <p className="font-semibold text-slate-800 truncate">
+                          <p className={`font-semibold truncate ${isRead ? 'text-slate-500' : 'text-slate-800'}`}>
                             {partner.name || 'Pengguna'}
                           </p>
                           {time && (
@@ -72,7 +105,7 @@ export default function Pesan() {
                             </p>
                           )}
                         </div>
-                        <p className="text-sm text-slate-600 truncate mt-1">
+                        <p className={`text-sm truncate mt-1 ${isRead ? 'text-slate-500' : 'text-slate-600'}`}>
                           {last}
                         </p>
                       </div>

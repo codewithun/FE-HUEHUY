@@ -38,43 +38,43 @@ export default function Index() {
   const buildPromoLink = (ad) => {
     const id = ad?.id || ad?.ad_id;
     const normBool = (v) => {
-        if (v === true || v === 1) return true;
-        if (typeof v === 'string') {
-            const s = v.trim().toLowerCase();
-            return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
-        }
-        return !!v;
+      if (v === true || v === 1) return true;
+      if (typeof v === 'string') {
+        const s = v.trim().toLowerCase();
+        return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
+      }
+      return !!v;
     };
 
     const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
     const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
     const isInformation =
-        normBool(ad?.cube?.is_information) ||
-        normBool(ad?.is_information) ||
-        contentType === 'information' ||
-        contentType === 'kubus-informasi' ||
-        typeStr === 'information' ||
-        typeStr === 'informasi';
+      normBool(ad?.cube?.is_information) ||
+      normBool(ad?.is_information) ||
+      contentType === 'information' ||
+      contentType === 'kubus-informasi' ||
+      typeStr === 'information' ||
+      typeStr === 'informasi';
 
     // Arahkan khusus ke Kubus Informasi bila bertipe informasi
     if (isInformation) {
-        const code = ad?.cube?.code || ad?.code;
-        return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+      const code = ad?.cube?.code || ad?.code;
+      return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
     }
 
     // Arahkan ke iklan jika advertising
     if (id) {
-        const cat = String(ad?.ad_category?.name || '').toLowerCase();
-        if (
-            typeStr === 'iklan' ||
-            cat === 'advertising' ||
-            ad?.is_advertising === true ||
-            ad?.advertising === true
-        ) {
-            return `/app/iklan/${id}?source=home`;
-        }
-        // Default: promo
-        return `/app/komunitas/promo/${id}?source=home`;
+      const cat = String(ad?.ad_category?.name || '').toLowerCase();
+      if (
+        typeStr === 'iklan' ||
+        cat === 'advertising' ||
+        ad?.is_advertising === true ||
+        ad?.advertising === true
+      ) {
+        return `/app/iklan/${id}?source=home`;
+      }
+      // Default: promo
+      return `/app/komunitas/promo/${id}?source=home`;
     }
 
     // Fallback: bila tidak ada id tapi ada code kubus, pakai Kubus Informasi
@@ -331,11 +331,21 @@ export default function Index() {
     path: `notification`,
   }, !apiReady);
 
+  const [loadingMessage, codeMessage, dataMessage] = useGet({
+    path: `chat-rooms`, // pastikan endpoint kamu benar, bisa juga "messages/unread" kalau BE kamu beda
+  }, !apiReady);
+
   // Hitung jumlah notifikasi yang belum dibaca
   const unreadNotificationCount = useMemo(() => {
     if (!dataNotif?.data || !Array.isArray(dataNotif.data)) return 0;
     return dataNotif.data.filter(item => !item.read_at).length;
   }, [dataNotif]);
+
+  // Hitung jumlah pesan belum dibaca (pakai unread_count dari backend)
+  const unreadMessageCount = useMemo(() => {
+    if (!dataMessage?.data || !Array.isArray(dataMessage.data)) return 0;
+    return dataMessage.data.reduce((acc, chat) => acc + (chat.unread_count || 0), 0);
+  }, [dataMessage]);
 
   // DEBUG: Log user data untuk debugging
   useEffect(() => {
@@ -408,7 +418,7 @@ export default function Index() {
             <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
               <div className="relative -top-5 px-4">
                 {/* Gabungkan search, notifikasi, dan pesan dalam satu container */}
-                <div className="bg-white border border__primary rounded-[20px] flex items-center overflow-hidden">
+                <div className="bg-white border border__primary rounded-[20px] flex items-center overflow-visible">
                   {/* Search Section */}
                   <Link href="/app/cari" className="flex-1">
                     <div className="px-6 py-4 flex justify-between items-center">
@@ -432,7 +442,7 @@ export default function Index() {
                       />
                       {/* Badge notifikasi dinamis */}
                       {unreadNotificationCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        <span className="absolute -top-2 -right-2 z-50 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                           {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
                         </span>
                       )}
@@ -444,11 +454,17 @@ export default function Index() {
 
                   {/* Button Pesan */}
                   <Link href="/app/pesan">
-                    <div className="px-4 py-4 flex justify-center items-center">
+                    <div className="px-4 py-4 flex justify-center items-center relative">
                       <FontAwesomeIcon
                         icon={faMessage}
                         className="text__primary text-lg"
                       />
+                      {/* Badge pesan dinamis */}
+                      {unreadMessageCount > 0 && (
+                        <span className="absolute -top-0 -right-0 z-50 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                        </span>
+                      )}
                     </div>
                   </Link>
                 </div>
