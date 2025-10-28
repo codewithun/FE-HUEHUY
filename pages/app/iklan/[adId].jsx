@@ -633,8 +633,8 @@ export default function AdDetailUnified() {
             </div>
           )}
 
-          {/* Tautan Toko Online - Show when online store link exists */}
-          {adData?.online_store_link && (
+          {/* Tautan Toko Online - hanya saat Online dan link tersedia */}
+          {adData?.promo_type === 'online' && adData?.online_store_link && (
             <div className="mb-4">
               <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
                 <h4 className="font-semibold text-slate-900 mb-3 text-sm">
@@ -648,7 +648,6 @@ export default function AdDetailUnified() {
                     const storeUrl = adData.online_store_link;
                     if (storeUrl) {
                       let url = storeUrl;
-                      // Pastikan URL memiliki protokol
                       if (!url.startsWith('http://') && !url.startsWith('https://')) {
                         url = 'https://' + url;
                       }
@@ -659,13 +658,11 @@ export default function AdDetailUnified() {
                   style={{ backgroundColor: getCommunityPrimaryColor() }}
                 >
                   <FontAwesomeIcon
-                    icon={faExternalLinkAlt}
-                    className="mr-2 text-sm"
-                  />
-                </button>
+                    icon={faExternalLinkAlt} className="mr-2 text-sm" />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Kontak pemilik */}
           <div className="mb-20 lg:mb-8">

@@ -5,7 +5,7 @@ import {
   SelectComponent 
 } from '../../../components/base.components';
 
-const IklanForm = ({ formControl, values, setValues }) => {
+function IklanForm({ formControl, values, setValues }) {
   return (
     <div className="mt-6 space-y-4">
       <div className="font-semibold text-lg text-slate-700 border-b pb-2">Iklan</div>
@@ -50,10 +50,10 @@ const IklanForm = ({ formControl, values, setValues }) => {
       {values.find(i => i.name === 'ads[promo_type]')?.value === 'online' && (
         <InputComponent
           type="url"
-          name="ads[online_store_link]"
+          name="link_information"
           label="Link Toko Online"
           placeholder="Masukkan link toko online..."
-          {...formControl('ads[online_store_link]')}
+          {...formControl('link_information')}
         />
       )}
     </div>
