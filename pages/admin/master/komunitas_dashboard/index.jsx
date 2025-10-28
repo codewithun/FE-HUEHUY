@@ -67,6 +67,12 @@ export default function KomunitasDashboard() {
   const [memberHistoryLoading, setMemberHistoryLoading] = useState(false);
   const [memberHistoryError, setMemberHistoryError] = useState("");
 
+  /** ADD MEMBER modal state */
+  const [modalAddMember, setModalAddMember] = useState(false);
+  const [newMemberId, setNewMemberId] = useState("");
+  const [addMemberLoading, setAddMemberLoading] = useState(false);
+
+
   // const router = useRouter();
 
   // Debug logs removed - member modal now working with manual table
@@ -734,7 +740,7 @@ export default function KomunitasDashboard() {
                     icon={faPlus}
                     size="sm"
                     paint="primary"
-                    onClick={() => {/* Implementasi tambah anggota baru */ }}
+                    onClick={() => setModalAddMember(true)}
                   />
                   <div className="flex items-center gap-3">
                     <ButtonComponent
@@ -841,6 +847,76 @@ export default function KomunitasDashboard() {
           )}
         </div>
       </FloatingPageComponent>
+
+      {/* ADD MEMBER MODAL */}
+      <FloatingPageComponent
+        show={modalAddMember}
+        onClose={() => {
+          setModalAddMember(false);
+          setNewMemberId("");
+        }}
+        title={`Tambah Anggota ke: ${activeCommunity?.name || "-"}`}
+      >
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="text"
+              className="w-full border border-gray-300 rounded p-2 text-sm focus:ring focus:ring-blue-200 focus:outline-none"
+              placeholder="Masukkan Email User Terdaftar"
+              value={newMemberId}
+              onChange={(e) => setNewMemberId(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <ButtonComponent
+              label={addMemberLoading ? "Menambahkan..." : "Tambahkan"}
+              paint="primary"
+              icon={faCheck}
+              disabled={addMemberLoading || !newMemberId.trim()}
+              onClick={async () => {
+                if (!activeCommunity?.id) {
+                  alert("Pilih komunitas terlebih dahulu!");
+                  return;
+                }
+                try {
+                  setAddMemberLoading(true);
+                  const res = await fetch(apiJoin(`admin/communities/${activeCommunity.id}/members`), {
+                    method: "POST",
+                    headers: authHeaders("POST"),
+                    body: JSON.stringify({ user_identifier: newMemberId }),
+                  });
+
+                  if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${errText}`);
+                  }
+
+                  const json = await res.json().catch(() => ({}));
+                  console.log("Member added:", json);
+
+                  alert("✅ Anggota berhasil ditambahkan!");
+                  setModalAddMember(false);
+                  setNewMemberId("");
+
+                  // Refresh daftar anggota & riwayat
+                  openMemberModal(activeCommunity);
+                  refreshMemberHistory();
+                } catch (err) {
+                  console.error("Gagal menambahkan anggota:", err);
+                  alert("Gagal menambahkan anggota ke komunitas.");
+                } finally {
+                  setAddMemberLoading(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      </FloatingPageComponent>
+
 
       {/* MEMBER REQUESTS MODAL */}
       <FloatingPageComponent
