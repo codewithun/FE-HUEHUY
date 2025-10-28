@@ -25,6 +25,29 @@ export default function Cari() {
   const router = useRouter();
   const { cari, berdasarkan } = router.query;
 
+  // === Helpers gambar (samakan dengan Home) ===
+  const toAbs = (url) => {
+    if (!url) return null;
+    if (/^https?:\/\//i.test(url)) return url; // sudah absolut
+    return `http://localhost:8000/${url.replace(/^\/+/, '')}`; // storage/... -> absolut
+  };
+  const getAdImage = (ad) => {
+    const candidates = [
+      ad?.image_1,
+      ad?.image_2,
+      ad?.image_3,
+      ad?.picture_source,
+      ad?.picture_url,
+      ad?.thumbnail,
+      ad?.image_url,
+      ad?.images?.[0]?.url,
+      ad?.pictures?.[0]?.source,
+      ad?.cube?.ads?.[0]?.picture_source,
+    ];
+    const raw = candidates.find(Boolean);
+    return toAbs(raw);
+  };
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
@@ -73,7 +96,7 @@ export default function Cari() {
       try {
         const j = JSON.parse(val);
         return normalizeBoolLike(j);
-      } catch {}
+      } catch { }
     }
     return !!val;
   };
@@ -160,16 +183,34 @@ export default function Cari() {
                 dataAds?.data
                   ?.filter(isPromoOnly)
                   ?.map((item, key) => {
+                    // Untuk konsistensi, gunakan routing promo langsung
+                    const promoUrl = `/app/komunitas/promo/${item?.id}?source=search`;
+                    const thumb = getAdImage(item);
+
                     return (
-                      <Link href={`/app/${item?.cube?.code}`} key={key}>
+                      <Link href={promoUrl} key={key}>
                         <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
-                          <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
-                            <img
-                              src={item?.picture_source}
-                              height={700}
-                              width={700}
-                              alt=""
-                            />
+                          <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-200 flex justify-center items-center">
+                            {thumb ? (
+                              <img
+                                src={thumb}
+                                height={700}
+                                width={700}
+                                alt={item?.title || "Promo"}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="w-full h-full flex items-center justify-center text-slate-400 text-xs"
+                              style={{ display: thumb ? 'none' : 'flex' }}
+                            >
+                              No Image
+                            </div>
                           </div>
                           <div className="col-span-3">
                             <p className="font-semibold limit__line__1">
