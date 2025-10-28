@@ -1,20 +1,20 @@
 /* eslint-disable no-console */
 import {
-    faArrowLeft,
-    faExclamationTriangle,
-    faMapMarkerAlt,
-    faPhone,
-    faShare,
-    faWifi,
-    faWifiSlash,
+  faArrowLeft,
+  faExclamationTriangle,
+  faMapMarkerAlt,
+  faPhone,
+  faShare,
+  faWifi,
+  faWifiSlash,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageCarousel } from '../../../components/base.components';
-import { get } from '../../../helpers/api.helpers';
 import { token_cookie_name } from '../../../helpers';
+import { get } from '../../../helpers/api.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 
 // Halaman detail Iklan (tanpa klaim promo, tanpa jam berlaku, tanpa jarak)
@@ -661,6 +661,40 @@ export default function AdDetailUnified() {
           </div>
         </div>
       </div>
+
+      {/* Bottom bar - Chat WhatsApp Button */}
+      {adData?.seller?.phone && (
+        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+          <div className="lg:max-w-sm lg:mx-auto">
+            <button
+              onClick={() => {
+                if (adData?.seller?.phone) {
+                  const phone = String(adData.seller.phone).replace(/\s+/g, '');
+                  // Format nomor untuk WhatsApp (hapus karakter non-digit, tambah 62 jika dimulai dengan 0)
+                  let formattedPhone = phone.replace(/\D/g, '');
+                  if (formattedPhone.startsWith('0')) {
+                    formattedPhone = '62' + formattedPhone.substring(1);
+                  } else if (!formattedPhone.startsWith('62')) {
+                    formattedPhone = '62' + formattedPhone;
+                  }
+                  
+                  const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title}". Bisakah Anda memberikan informasi lebih lanjut?`);
+                  const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                  window.open(whatsappUrl, '_blank');
+                }
+              }}
+              className="w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white focus:ring-4 focus:ring-opacity-50 flex items-center justify-center"
+              style={{
+                backgroundColor: getCommunityPrimaryColor(),
+                '--tw-ring-color': `${getCommunityPrimaryColor()}50`
+              }}
+            >
+              <span className="mr-2">💬</span>
+              Chat
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Share Modal */}
       {showShareModal && (
