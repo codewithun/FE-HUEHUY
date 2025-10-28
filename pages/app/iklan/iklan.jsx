@@ -7,21 +7,22 @@
  * The component expects adId from router.query, which requires dynamic routing.
  */
 import {
-    faArrowLeft,
-    faExclamationTriangle,
-    faMapMarkerAlt,
-    faPhone,
-    faShare,
-    faWifi,
-    faWifiSlash,
+  faArrowLeft,
+  faExclamationTriangle,
+  faExternalLinkAlt,
+  faMapMarkerAlt,
+  faPhone,
+  faShare,
+  faWifi,
+  faWifiSlash,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageCarousel } from '../../../components/base.components';
-import { get } from '../../../helpers/api.helpers';
 import { token_cookie_name } from '../../../helpers';
+import { get } from '../../../helpers/api.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 
 // Halaman detail Iklan (tanpa klaim promo, tanpa jam berlaku, tanpa jarak)
@@ -266,8 +267,15 @@ export default function AdDetailUnified() {
           // tanggal berakhir (opsional)
           expires_at: adRaw?.finish_validate || adRaw?.end_date || adRaw?.expires_at || null,
           end_date: adRaw?.finish_validate || adRaw?.end_date || null,
+          
+          // promo type dan online store link
+          promo_type: adRaw?.promo_type || 'offline',
+          online_store_link: adRaw?.online_store_link || 
+                           cube?.link_information || 
+                           cube?.website || 
+                           cube?.online_link || 
+                           cube?.store_link,
         };
-
         setAdData(transformed); // masih pakai nama state adData
         return transformed;
       }
@@ -621,7 +629,8 @@ export default function AdDetailUnified() {
             </div>
           </div>
 
-          {/* Lokasi */}
+          {/* Lokasi - Only show for offline ads */}
+          {adData?.promo_type !== 'online' && (
           <div className="mb-4">
             <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
               <h4 className="font-semibold text-slate-900 mb-3 text-sm">
@@ -643,6 +652,41 @@ export default function AdDetailUnified() {
               </button>
             </div>
           </div>
+          )}
+
+          {/* Tautan Toko Online - Show when online store link exists */}
+          {adData?.online_store_link && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Tautan Toko Online
+                </h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                  {adData.online_store_link}
+                </p>
+                <button
+                  onClick={() => {
+                    const storeUrl = adData.online_store_link;
+                    if (storeUrl) {
+                      let url = storeUrl;
+                      // Pastikan URL memiliki protokol
+                      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        url = 'https://' + url;
+                      }
+                      window.open(url, '_blank');
+                    }
+                  }}
+                  className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+                >
+                  <FontAwesomeIcon
+                    icon={faExternalLinkAlt}
+                    className="mr-2 text-sm"
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Kontak pemilik */}
           <div className="mb-20 lg:mb-8">

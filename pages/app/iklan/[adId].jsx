@@ -2,6 +2,7 @@
 import {
   faArrowLeft,
   faExclamationTriangle,
+  faExternalLinkAlt,
   faMapMarkerAlt,
   faPhone,
   faShare,
@@ -239,7 +240,8 @@ export default function AdDetailUnified() {
           lat: loc.lat,
           lng: loc.lng,
           coordinates: loc.coordinates,
-          channel: adRaw?.channel || 'offline',
+          channel: adRaw?.promo_type === 'online' ? 'online' : 'offline',
+          promo_type: adRaw?.promo_type || 'offline',
           status: adRaw?.status || 'active',
           seller: {
             name: cube?.user?.name || cube?.corporate?.name || '',
@@ -247,8 +249,12 @@ export default function AdDetailUnified() {
           },
           expires_at: adRaw?.expires_at || null,
           end_date: adRaw?.end_date || null,
+          online_store_link: adRaw?.online_store_link || 
+                           cube?.link_information || 
+                           cube?.website || 
+                           cube?.online_link || 
+                           cube?.store_link,
         };
-
         setAdData(adData);
       } else {
         console.error('Failed to fetch iklan details');
@@ -558,18 +564,18 @@ export default function AdDetailUnified() {
                   <div className="flex items-center">
                     <FontAwesomeIcon
                       icon={
-                        adData.channel === 'online'
+                        adData.promo_type === 'online'
                           ? faWifi
                           : faWifiSlash
                       }
                       className="mr-2 text-white text-sm"
                     />
                     <span className="text-sm font-semibold text-white">
-                      {adData.channel === 'online' ? 'Online' : 'Offline'}
+                      {adData.promo_type === 'online' ? 'Online' : 'Offline'}
                     </span>
                   </div>
                   <span className="text-xs text-white opacity-70">
-                    Tipe Iklan: {adData.channel === 'online' ? '🌐 Online' : '📍 Offline'}
+                    Tipe Iklan: {adData.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}
                   </span>
                 </div>
               </div>
@@ -602,28 +608,64 @@ export default function AdDetailUnified() {
             </div>
           </div>
 
-          {/* Lokasi */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                Lokasi Iklan
-              </h4>
-              <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                {adData.location || adData.coordinates || '-'}
-              </p>
-              <button
-                onClick={openRoute}
-                className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
-                style={{ backgroundColor: getCommunityPrimaryColor() }}
-              >
-                <FontAwesomeIcon
-                  icon={faMapMarkerAlt}
-                  className="mr-2 text-sm"
-                />
-                Rute
-              </button>
+          {/* Lokasi - Only show for offline ads */}
+          {adData?.promo_type !== 'online' && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Lokasi Iklan
+                </h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                  {adData.location || adData.coordinates || '-'}
+                </p>
+                <button
+                  onClick={openRoute}
+                  className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+                >
+                  <FontAwesomeIcon
+                    icon={faMapMarkerAlt}
+                    className="mr-2 text-sm"
+                  />
+                  Rute
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Tautan Toko Online - Show when online store link exists */}
+          {adData?.online_store_link && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Tautan Toko Online
+                </h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                  {adData.online_store_link}
+                </p>
+                <button
+                  onClick={() => {
+                    const storeUrl = adData.online_store_link;
+                    if (storeUrl) {
+                      let url = storeUrl;
+                      // Pastikan URL memiliki protokol
+                      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        url = 'https://' + url;
+                      }
+                      window.open(url, '_blank');
+                    }
+                  }}
+                  className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+                >
+                  <FontAwesomeIcon
+                    icon={faExternalLinkAlt}
+                    className="mr-2 text-sm"
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Kontak pemilik */}
           <div className="mb-20 lg:mb-8">
@@ -662,9 +704,11 @@ export default function AdDetailUnified() {
         </div>
       </div>
 
+
+
       {/* Bottom bar - Chat WhatsApp Button */}
       {adData?.seller?.phone && (
-        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+        <div className="fixed left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30 bottom-0">
           <div className="lg:max-w-sm lg:mx-auto">
             <button
               onClick={() => {
