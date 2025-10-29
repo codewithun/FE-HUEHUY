@@ -10,22 +10,26 @@ import { AdminLayout } from '../../../components/construct.components/layout/Adm
 import GiveCubeModal from '../../../components/construct.components/modal/GiveCube.modal';
 import UserDetailComponent from '../../../components/construct.components/partial-page/UserDetail.component';
 import { useUserContext } from '../../../context/user.context';
-import { token_cookie_name } from '../../../helpers';
+import { admin_token_cookie_name } from '../../../helpers/api.helpers';
 import { resolveUserImageUrl } from '../../../helpers/image.helpers';
 
 export default function ManageUser() {
   const [selected, setSelected] = useState(null);
   const [modalGive, setModalGive] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey] = useState(0);
   const { profile: Profile } = useUserContext();
 
   // Use shared resolver to support Google URLs and storage paths
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
+    const adminToken = Cookies.get(admin_token_cookie_name) || (typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null);
+    if (adminToken && Profile) {
       if (Profile?.role_id != 1) {
-        Cookies.remove(token_cookie_name);
-        window.location.href = '/admin';
+        Cookies.remove(admin_token_cookie_name);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(admin_token_cookie_name);
+          window.location.href = '/admin';
+        }
       }
     }
   }, [Profile]);

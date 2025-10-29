@@ -873,6 +873,11 @@ const CommunityPromoPage = () => {
       return <ShuffleCubeWidget widget={widget} />;
     }
 
+    // Handle shuffle_cube widget
+    if (source_type === 'shuffle_cube') {
+      return <ShuffleCubeWidget widget={widget} />;
+    }
+
     // 🟢 Kotak Kategori Biasa dari dynamic_content_cubes (versi lama)
     if (content_type === 'category' && dynamic_content_cubes?.length) {
       return (

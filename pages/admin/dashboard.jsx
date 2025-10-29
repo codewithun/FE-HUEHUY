@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
-    faCrosshairs,
-    faCubes,
-    faGlobe,
-    faHandshake,
-    faNewspaper,
-    faUsers,
+  faCrosshairs,
+  faCubes,
+  faGlobe,
+  faHandshake,
+  faNewspaper,
+  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
@@ -14,7 +14,8 @@ import { useEffect, useState } from 'react';
 import DashboardCard from '../../components/construct.components/card/Dashboard.card';
 import { AdminLayout } from '../../components/construct.components/layout/Admin.layout';
 import { useUserContext } from '../../context/user.context';
-import { token_cookie_name, useGet } from '../../helpers';
+import { useGet } from '../../helpers';
+import { admin_token_cookie_name } from '../../helpers/api.helpers';
 
 const mapContainerStyle = {
   width: '100%',
@@ -69,13 +70,20 @@ export default function Index() {
   const { profile: Profile } = useUserContext();
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
-      if (Profile?.role_id != 1) {
-        Cookies.remove(token_cookie_name);
-        window.location.href = '/admin';
+    // Gunakan cookie admin khusus (dengan fallback localStorage untuk Safari)
+    const adminToken = Cookies.get(admin_token_cookie_name) || (typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null);
+    if (adminToken && Profile) {
+      if (Profile?.role_id !== 1) {
+        // Hapus token admin dan arahkan ke halaman login admin
+        Cookies.remove(admin_token_cookie_name);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(admin_token_cookie_name);
+          window.location.href = '/admin';
+        }
       }
     }
   }, [Profile]);
+
 
   const [loading, code, data, reset] = useGet({
     path: 'admin/dashboard/counter-data',
@@ -90,7 +98,7 @@ export default function Index() {
             lng: pos.coords.longitude,
           });
         },
-        () => {},
+        () => { },
         { enableHighAccuracy: true }
       );
     }
@@ -135,12 +143,31 @@ export default function Index() {
           linkPath="/admin/master/mitra"
         />
         <DashboardCard
-          label="Dunia"
-          // loading={dashboardLoading}
-          value={data?.data?.worlds}
+          label="Komunitas"
+          value={(() => {
+            const d = data?.data;
+            if (!d) return 0;
+
+            // urutan prioritas berdasarkan struktur umum dashboard
+            if (typeof d.worlds_count === "number") return d.worlds_count;
+            if (typeof d.world_count === "number") return d.world_count;
+            if (typeof d.communities_count === "number") return d.communities_count;
+
+            // kalau isinya array, hitung panjangnya
+            if (Array.isArray(d.worlds)) return d.worlds.length;
+            if (Array.isArray(d.communities)) return d.communities.length;
+
+            // fallback terakhir (misal ada field worlds tapi bukan array)
+            if (typeof d.worlds === "number") return d.worlds;
+            if (typeof d.communities === "number") return d.communities;
+
+            // default aman
+            return 0;
+          })()}
           icon={faGlobe}
-          linkPath="/admin/master/dunia"
+          linkPath="/admin/master/komunitas_dashboard"
         />
+
         {/* Event card removed as the feature is no longer used */}
         <DashboardCard
           label="Iklan"

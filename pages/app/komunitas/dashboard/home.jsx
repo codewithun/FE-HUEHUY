@@ -413,6 +413,185 @@ export default function CommunityDashboard({ communityId }) {
     textDark: '#2B3A55',
   };
 
+  // ======== SHUFFLE CUBE WIDGET ========
+  const ShuffleCubeWidget = ({ widget }) => {
+    const { size, name } = widget;
+    const [shuffleData, setShuffleData] = useState([]);
+    const [shuffleLoading, setShuffleLoading] = useState(true);
+
+    useEffect(() => {
+      const fetchShuffleData = async () => {
+        try {
+          setShuffleLoading(true);
+          const encryptedToken = Cookies.get(token_cookie_name);
+          const token = encryptedToken ? Decrypt(encryptedToken) : '';
+          const headers = {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          };
+
+          // NORMALISASI: selalu panggil /api/shuffle-ads
+          const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+          const apiBase = rawApi.replace(/\/api\/?$/, '');
+          const response = await fetch(
+            `${apiBase}/api/shuffle-ads?community_id=${communityId}`,
+            { headers }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Shuffle ads response:', data);
+            setShuffleData(
+              Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+            );
+          } else {
+            console.error('Failed to fetch shuffle ads:', response.status, await response.text());
+          }
+        } catch (error) {
+          console.error('Error fetching shuffle ads:', error);
+        } finally {
+          setShuffleLoading(false);
+        }
+      };
+
+      if (communityId) {
+        fetchShuffleData();
+      }
+    }, [communityId]);
+
+    if (shuffleLoading) {
+      return (
+        <div className="mb-6">
+          <div className="mb-2">
+            <h2 className="text-lg font-bold text-white">{name}</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="rounded-[16px] bg-white/10 animate-pulse flex-shrink-0 backdrop-blur-md"
+                style={{ minWidth: 320, height: 200 }}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (!shuffleData?.length) return null;
+
+    return (
+      <div className="mb-6">
+        <div className="mb-2">
+          <h2 className="text-lg font-bold text-white">{name}</h2>
+          {widget.description && (
+            <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
+          )}
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {shuffleData.map((item, index) => {
+            const cube = item?.cube;
+            const ad = item;
+            if (!cube && !ad) return null;
+
+            const imageUrl = normalizeImageSrc(
+              ad?.image_1 ||
+              ad?.image ||
+              ad?.picture_source ||
+              cube?.image ||
+              '/default-avatar.png'
+            );
+            const title = ad?.title || cube?.label || 'Promo';
+            const merchant = ad?.merchant || communityData?.name || 'Merchant';
+            const categoryData = getCategoryWithIcon(ad, cube, communityData);
+
+            // Use glassmorphism styling consistent with home dashboard
+            if (size === 'XL-Ads') {
+              return (
+                <div
+                  key={ad?.id || cube?.id || index}
+                  className="relative rounded-[18px] overflow-hidden border border-white/20 bg-white/10 backdrop-blur-md shadow-lg flex-shrink-0 hover:scale-[1.02] hover:bg-white/15 transition-all duration-300"
+                  style={{
+                    minWidth: 320,
+                    maxWidth: 360,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    if (ad?.id) {
+                      router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                    }
+                  }}
+                >
+                  <div className="relative w-full h-[290px] bg-white/5 flex items-center justify-center">
+                    <Image
+                      src={imageUrl}
+                      alt={title}
+                      fill
+                      className="object-contain p-2"
+                    />
+                    <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
+                      {merchant}
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
+                    <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
+                      {title}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm flex items-center gap-1">
+                        {categoryData.icon}
+                        {categoryData.label}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Default size handling with glassmorphism
+            return (
+              <div
+                key={ad?.id || cube?.id || index}
+                className="rounded-[16px] overflow-hidden border border-white/20 bg-white/10 backdrop-blur-md shadow-lg flex-shrink-0 hover:scale-[1.02] hover:bg-white/15 transition-all duration-300"
+                style={{
+                  minWidth: 320,
+                  maxWidth: 360,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  if (ad?.id) {
+                    router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                  }
+                }}
+              >
+                <div className="relative w-full h-[200px] bg-white/5 flex items-center justify-center">
+                  <Image
+                    src={imageUrl}
+                    alt={title}
+                    fill
+                    className="object-contain p-2"
+                  />
+                </div>
+                <div className="p-4">
+                  <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-2 drop-shadow-sm">
+                    {title}
+                  </h3>
+                  <p className="text-[12px] text-white/80 mb-2 drop-shadow-sm">{merchant}</p>
+                  <span className="bg-white/20 text-white text-[11px] font-semibold px-2 py-1 rounded border border-white/30 backdrop-blur-sm flex items-center gap-1 w-fit">
+                    {categoryData.icon}
+                    {categoryData.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   // Komponen renderer widget sederhana (bisa diupgrade sesuai kebutuhan)
   function WidgetRenderer({ widget }) {
     const { source_type, size, dynamic_content_cubes, name, content_type, description } = widget;

@@ -3,10 +3,12 @@ import Link from 'next/link';
 import React from 'react';
 import { useGet } from '../../../helpers';
 
-export default function MenuCubePage({ menu }) {
+export default function MenuCubePage({ menu, communityId = null }) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingCubes, codeCubes, dataCubes] = useGet({
-    path: menu.source_type == 'cube' ? `menu-cube/${menu.id}` : 'shuffle-ads',
+    path: menu.source_type == 'cube' 
+      ? `menu-cube/${menu.id}` 
+      : `shuffle-ads${communityId ? `?community_id=${communityId}` : ''}`,
   });
 
   return (

@@ -33,7 +33,7 @@ export default function ChatUniversal() {
     const enc = Cookies.get(token_cookie_name);
     return enc ? Decrypt(enc) : '';
   }, []);
-  
+
   // ======= START CHANGED: ambil current user & isMine =======
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -78,6 +78,25 @@ export default function ChatUniversal() {
       setLoading(false);
     }
   };
+
+  /** ===============================
+ *  Tandai pesan sudah dibaca
+ *  =============================== */
+  const markMessagesAsRead = async (chatIdToMark) => {
+    try {
+      const res = await fetch(apiJoin(`chat/${chatIdToMark}/read`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error('Failed to mark as read');
+      console.log(`✅ Marked chat ${chatIdToMark} as read`);
+    } catch (err) {
+      console.error('Gagal mark as read:', err);
+    }
+  };
+
 
   /** ===============================
    *  Resolve / buat chat room baru
@@ -146,7 +165,8 @@ export default function ChatUniversal() {
    *  =============================== */
   useEffect(() => {
     if (!chatId) return;
-    fetchMessages(chatId);
+    // fetch messages then mark as read
+    fetchMessages(chatId).then(() => markMessagesAsRead(chatId));
     const itv = setInterval(() => fetchMessages(chatId, true), 5000);
     return () => clearInterval(itv);
   }, [chatId, token]);
@@ -237,11 +257,10 @@ export default function ChatUniversal() {
                 className={`mb-3 flex ${mine ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xs px-4 py-2 rounded-2xl ${
-                    mine
-                      ? 'bg-green-500 text-white rounded-br-none'
-                      : 'bg-gray-200 text-gray-900 rounded-bl-none'
-                  }`}
+                  className={`max-w-xs px-4 py-2 rounded-2xl ${mine
+                    ? 'bg-green-500 text-white rounded-br-none'
+                    : 'bg-gray-200 text-gray-900 rounded-bl-none'
+                    }`}
                 >
                   <div className="whitespace-pre-wrap break-words">{m.message}</div>
                   <div
