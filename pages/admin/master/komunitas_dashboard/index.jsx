@@ -68,6 +68,13 @@ export default function KomunitasDashboard() {
   const [memberHistoryLoading, setMemberHistoryLoading] = useState(false);
   const [memberHistoryError, setMemberHistoryError] = useState("");
 
+  // CUBES modal state
+  const [modalCubes, setModalCubes] = useState(false);
+  const [cubeList, setCubeList] = useState([]);
+  const [cubeLoading, setCubeLoading] = useState(false);
+  const [cubeError, setCubeError] = useState("");
+
+
   // const router = useRouter();
 
   // Debug logs removed - member modal now working with manual table
@@ -125,6 +132,33 @@ export default function KomunitasDashboard() {
   };
 
   // Kategori modal dan prefetch promo dihapus; tidak dibutuhkan lagi.
+
+  /** ============ KUBUS MODAL ACTIONS ============ */
+
+  const openCubesModal = async (communityRow) => {
+    setActiveCommunity(communityRow);
+    setModalCubes(true);
+    setCubeLoading(true);
+    setCubeError("");
+    setCubeList([]);
+
+    try {
+      const res = await fetch(apiJoin(`admin/communities/${communityRow.id}/cubes`), {
+        method: "GET",
+        headers: authHeaders("GET"),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json().catch(() => ({}));
+      const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      setCubeList(rows);
+    } catch (err) {
+      console.error("Gagal memuat kubus:", err);
+      setCubeError("Tidak bisa memuat daftar kubus.");
+    } finally {
+      setCubeLoading(false);
+    }
+  };
+
 
   /** ============ MEMBERS MODAL ACTIONS ============ */
   const tryFetch = async (url, signal) =>

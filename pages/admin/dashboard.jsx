@@ -14,7 +14,8 @@ import { useEffect, useState } from 'react';
 import DashboardCard from '../../components/construct.components/card/Dashboard.card';
 import { AdminLayout } from '../../components/construct.components/layout/Admin.layout';
 import { useUserContext } from '../../context/user.context';
-import { token_cookie_name, useGet } from '../../helpers';
+import { useGet } from '../../helpers';
+import { admin_token_cookie_name } from '../../helpers/api.helpers';
 
 const mapContainerStyle = {
   width: '100%',
@@ -69,13 +70,16 @@ export default function Index() {
   const { profile: Profile } = useUserContext();
 
   useEffect(() => {
-    // Gunakan cookie admin khusus
-    const adminToken = Cookies.get(`${token_cookie_name}_admin`);
+    // Gunakan cookie admin khusus (dengan fallback localStorage untuk Safari)
+    const adminToken = Cookies.get(admin_token_cookie_name) || (typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null);
     if (adminToken && Profile) {
       if (Profile?.role_id !== 1) {
-        // Hapus cookie admin dan arahkan ke halaman login admin
-        Cookies.remove(`${token_cookie_name}_admin`);
-        window.location.href = '/admin';
+        // Hapus token admin dan arahkan ke halaman login admin
+        Cookies.remove(admin_token_cookie_name);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(admin_token_cookie_name);
+          window.location.href = '/admin';
+        }
       }
     }
   }, [Profile]);

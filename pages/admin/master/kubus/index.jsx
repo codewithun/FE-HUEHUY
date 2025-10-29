@@ -25,7 +25,8 @@ import GrabListComponent from '../../../../components/construct.components/parti
 import UpdateCubeStatusModal from '../../../../components/construct.components/modal/UpdateCubeStatus.modal';
 import VoucherModal from '../../../../components/construct.components/modal/Voucher.modal';
 import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../../../helpers';
+// token_cookie_name intentionally not used here; admin pages use admin_token_cookie_name
+import { admin_token_cookie_name } from '../../../../helpers/api.helpers';
 
 import { useUserContext } from '../../../../context/user.context';
 
@@ -41,8 +42,7 @@ import IklanForm from '../../../../features/kubus/forms/IklanForm';
 import { getCT, isInfo } from '../../../../features/kubus/utils/helpers';
 import {
   prepareKubusVoucherData,
-  validateVoucherData,
-  transformKubusVoucherToManagement
+  validateVoucherData
 } from '../../../../helpers/voucher.helpers';
 // Note: Real modals are imported above
 function KubusMain() {
@@ -105,12 +105,14 @@ function KubusMain() {
     }
   }, [previewUrl, previewOwnerKey, resetCropState]);
 
-  // Admin guard: ensure only role_id 1 can access
+  // Admin guard: ensure only role_id 1 can access (use admin token cookie/localStorage)
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
+    const adminToken = Cookies.get(admin_token_cookie_name) || (typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null);
+    if (adminToken && Profile) {
       if (Profile?.role_id != 1) {
-        Cookies.remove(token_cookie_name);
+        Cookies.remove(admin_token_cookie_name);
         if (typeof window !== 'undefined') {
+          localStorage.removeItem(admin_token_cookie_name);
           window.location.href = '/admin';
         }
       }

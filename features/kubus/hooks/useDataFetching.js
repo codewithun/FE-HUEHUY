@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Cookies from 'js-cookie';
 import { token_cookie_name, Decrypt } from '../../../helpers';
+import { admin_token_cookie_name } from '../../../helpers/api.helpers';
 import { getApiBase, isManagerTenant, getDisplayName, isUserRole } from '../utils/helpers';
 
 export const useManagersData = () => {
@@ -9,12 +10,16 @@ export const useManagersData = () => {
 	const [managersError, setManagersError] = useState(null);
 
 	const authHeader = useCallback(() => {
-		const enc = Cookies.get(token_cookie_name);
-		const token = enc ? Decrypt(enc) : "";
+			const encCookie = Cookies.get(admin_token_cookie_name);
+			const encLs = typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null;
+			const encUser = Cookies.get(token_cookie_name);
+			const enc = encCookie || encLs || encUser || null;
+			const token = enc ? Decrypt(enc) : "";
 		return { Authorization: `Bearer ${token}` };
 	}, []);
 
 	const apiBase = getApiBase();
+	// Note: routes in routes/api.php are auto-prefixed with /api
 	const MANAGERS_ENDPOINT = `${apiBase}/api/admin/users?roles[]=manager_tenant&roles[]=manager%20tenant&paginate=all`;
 
 	useEffect(() => {
@@ -70,8 +75,11 @@ export const useUsersData = () => {
 	const [users, setUsers] = useState([]);
 
 	const authHeader = useCallback(() => {
-		const enc = Cookies.get(token_cookie_name);
-		const token = enc ? Decrypt(enc) : "";
+			const encCookie = Cookies.get(admin_token_cookie_name);
+			const encLs = typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null;
+			const encUser = Cookies.get(token_cookie_name);
+			const enc = encCookie || encLs || encUser || null;
+			const token = enc ? Decrypt(enc) : "";
 		return { Authorization: `Bearer ${token}` };
 	}, []);
 
@@ -80,7 +88,7 @@ export const useUsersData = () => {
 	useEffect(() => {
 		const fetchUsers = async () => {
 			try {
-				const response = await fetch(`${apiBase}/api/admin/users?paginate=all`, {
+						const response = await fetch(`${apiBase}/api/admin/users?paginate=all`, {
 					method: 'GET',
 					headers: {
 						'Content-Type': 'application/json',
