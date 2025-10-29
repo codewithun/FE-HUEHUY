@@ -348,6 +348,23 @@ export default function CommunityDashboard({ communityId }) {
         const json = await res.json();
         let widgets = Array.isArray(json?.data) ? json.data.filter((w) => w.is_active) : [];
 
+        // === NEW: fetch promo widgets and pick shuffle_cube entries so "Promo/Iklan Acak" can show in community dashboard
+        try {
+          const promoRes = await fetch(`${apiBase}/api/admin/dynamic-content?type=promo&community_id=${communityId}`, { headers });
+          const promoJson = await promoRes.json();
+          const promoWidgets = Array.isArray(promoJson?.data) ? promoJson.data : [];
+          // keep only active shuffle_cube widgets
+          const shuffleWidgets = promoWidgets.filter(w => w?.is_active && String(w.source_type || '').toLowerCase() === 'shuffle_cube');
+          if (shuffleWidgets.length) {
+            // merge with information widgets, dedupe by id
+            const map = new Map();
+            widgets.concat(shuffleWidgets).forEach(w => { if (w?.id != null) map.set(w.id, w); });
+            widgets = Array.from(map.values());
+          }
+        } catch (e) {
+          console.warn('Failed to fetch promo widgets for shuffle_cube merge:', e);
+        }
+
         // 🔹 Cari widget ad_category: ambil kategorinya dan hapus widget agar tidak dirender dua kali
         const adCategoryWidget = widgets.find((w) => w.source_type === 'ad_category');
         if (adCategoryWidget) {
@@ -399,6 +416,11 @@ export default function CommunityDashboard({ communityId }) {
   // Komponen renderer widget sederhana (bisa diupgrade sesuai kebutuhan)
   function WidgetRenderer({ widget }) {
     const { source_type, size, dynamic_content_cubes, name, content_type, description } = widget;
+
+    // Handle shuffle_cube widgets (add this)
+    if (source_type === 'shuffle_cube') {
+      return <ShuffleCubeWidget widget={widget} communityId={communityId} communityData={communityData} />;
+    }
 
     // ===== Kotak Kategori (mirip di promo.jsx) =====
     if (content_type === 'category' && Array.isArray(dynamic_content_cubes) && dynamic_content_cubes.length > 0) {
@@ -482,18 +504,18 @@ export default function CommunityDashboard({ communityId }) {
             if (!mounted) return;
 
             const list = Array.isArray(json?.data) ? json.data : [];
-            const normalized = list.map((row) => {
-              const ad = row?.ad || row?.ads?.[0] || row;
-              const cube = row?.cube || ad?.cube || row?.ad?.cube || {};
-              return { cube: { ...cube, ads: ad ? [ad] : [] } };
-            });
+            // normalisasi dan filter: hanya tampilkan item yang diklasifikasikan sebagai 'promo'
+            const normalized = list
+              .map((row) => {
+                const ad = row?.ad || row?.ads?.[0] || row;
+                const cube = row?.cube || ad?.cube || row?.ad?.cube || {};
+                return { cube: { ...cube, ads: ad ? [ad] : [] }, ad };
+              })
+              .filter(item => getNormalizedType(item.ad, item.cube) === 'promo');
+
 
             setItems(normalized);
-          } catch {
-            setItems([]);
-          } finally {
-            setLoading(false);
-          }
+          } finally { if (mounted) setLoading(false); }
         })();
         return () => { mounted = false; };
       }, [communityId]);
@@ -760,7 +782,7 @@ export default function CommunityDashboard({ communityId }) {
 
                     {/* Content Section */}
                     <div className="p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
-                      <h3 className="text-base font-bold text-white line-clamp-2 mb-1 leading-tight drop-shadow-sm">{title}</h3>
+                      <h3 className="text-base font-bold text-white line-clamp-2 mb-1 drop-shadow-sm">{title}</h3>
                       {description && (
                         <p className="text-xs text-white/90 leading-relaxed mb-2 line-clamp-2 drop-shadow-sm">
                           {description}
@@ -839,7 +861,7 @@ export default function CommunityDashboard({ communityId }) {
 
                     {/* Content Section */}
                     <div className="p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
-                      <h3 className="text-base font-bold text-white line-clamp-2 mb-1 leading-tight drop-shadow-sm">{title}</h3>
+                      <h3 className="text-base font-bold text-white line-clamp-2 mb-1 drop-shadow-sm">{title}</h3>
                       {description && (
                         <p className="text-xs text-white/90 leading-relaxed mb-2 line-clamp-2 drop-shadow-sm">
                           {description}
@@ -1319,3 +1341,149 @@ export default function CommunityDashboard({ communityId }) {
     </>
   );
 }
+
+// ======= Add: ShuffleCubeWidget (mirip promo.jsx) =======
+const ShuffleCubeWidget = ({ widget, communityId, communityData }) => {
+  const { name, size } = widget;
+  const [shuffleData, setShuffleData] = useState([]);
+  const [loadingShuffle, setLoadingShuffle] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchShuffleData = async () => {
+      const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiBase = rawApi.replace(/\/api\/?$/, '');
+      // candidate endpoints (try in order)
+      const candidates = [
+        { name: 'public promo recommendation', url: `${apiBase}/api/ads/promo-recommendation` },
+        { name: 'public promo nearest (no-loc)', url: `${apiBase}/api/ads/promo-nearest/0/0` }, // placeholder if BE ignores coords
+        { name: 'protected shuffle ads', url: `${apiBase}/api/shuffle-ads` }, // needs auth
+        { name: 'admin promo dynamic-content (shuffle widgets)', url: `${apiBase}/api/admin/dynamic-content?type=promo&community_id=${communityId}&paginate=all` }
+      ];
+
+      console.log('[ShuffleCubeWidget] fetch start, communityId=', communityId, 'apiBase=', apiBase);
+
+      let got = [];
+      for (const c of candidates) {
+        try {
+          console.log('[ShuffleCubeWidget] trying:', c.name, c.url);
+          const headers = { 'Content-Type': 'application/json' };
+          // If candidate is admin/protected, attempt with credentials (browser will send cookie if present)
+          const opts = { headers, credentials: 'include' };
+
+          const res = await fetch(c.url, opts);
+          console.log('[ShuffleCubeWidget] response', c.name, res.status, res.statusText);
+          let json;
+          try { json = await res.json(); } catch (e) { json = null; console.warn('[ShuffleCubeWidget] invalid json for', c.name, e); }
+
+          console.log('[ShuffleCubeWidget] payload', c.name, json);
+
+          // normalize possible shapes: { data: [...] } or [...]
+          const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : (Array.isArray(json?.ads) ? json.ads : []));
+          if (Array.isArray(list) && list.length > 0) {
+            console.log('[ShuffleCubeWidget] found data from', c.name, 'count=', list.length);
+            got = list;
+            break;
+          }
+        } catch (err) {
+          console.error('[ShuffleCubeWidget] fetch error for', c.name, err);
+        }
+      }
+
+      if (!mounted) return;
+      if (got.length) {
+        setShuffleData(got);
+        console.log('[ShuffleCubeWidget] setShuffleData count=', got.length);
+      } else {
+        console.warn('[ShuffleCubeWidget] no data found from any candidate endpoints');
+        setShuffleData([]);
+      }
+      if (mounted) setLoadingShuffle(false);
+    };
+
+    if (communityId) {
+      fetchShuffleData().catch(e => {
+        console.error('[ShuffleCubeWidget] unexpected error', e);
+        if (mounted) { setShuffleData([]); setLoadingShuffle(false); }
+      });
+    } else {
+      console.log('[ShuffleCubeWidget] communityId missing, skipping fetch');
+      setLoadingShuffle(false);
+    }
+
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId]);
+
+  if (loadingShuffle) {
+    return (
+      <div className="mb-6">
+        <div className="mb-2">
+          <h2 className="text-lg font-bold text-white">{name}</h2>
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {[1, 2, 3].map(i => <div key={i} className="rounded-[16px] bg-gray-200 animate-pulse flex-shrink-0" style={{ minWidth: 320, height: 200 }} />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (!shuffleData?.length) return null;
+
+  return (
+    <div className="mb-6">
+      <div className="mb-2">
+        <h2 className="text-lg font-bold text-white">{name}</h2>
+      </div>
+      <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+        {shuffleData.map((item, idx) => {
+          const cube = item?.cube;
+          const ad = item;
+          // use normalized helpers to decide category (prioritize ad data)
+          const imageUrl = normalizeImageSrc(ad?.image_1 || ad?.image || ad?.picture_source || cube?.image || '/default-avatar.png');
+          const title = ad?.title || cube?.label || 'Promo';
+          const merchant = ad?.merchant || communityData?.name || 'Merchant';
+          const categoryData = getCategoryWithIcon(ad, cube, communityData);
+          const category = categoryData?.label || getCategoryLabel(ad, cube) || 'Promo';
+
+          return (
+            <div
+              key={ad?.id || cube?.id || idx}
+              className="rounded-[16px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+              style={{ minWidth: 320, maxWidth: 360, cursor: 'pointer' }}
+              onClick={() => {
+                // prefer ad (promo) navigation, fallback to cube (info)
+                const promoId = ad?.id;
+                if (promoId) {
+                  const targetUrl = communityId
+                    ? `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
+                    : `/app/promo/detail_promo?promoId=${promoId}`;
+                  router.push(targetUrl);
+                  return;
+                }
+                const code = cube?.code;
+                if (code) {
+                  const targetUrl = communityId
+                    ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}&communityId=${communityId}`
+                    : `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}`;
+                  router.push(targetUrl);
+                }
+              }}
+            >
+              <div className="relative w-full h-[200px] bg-white flex items-center justify-center">
+                <Image src={imageUrl} alt={title} fill className="object-contain p-2" />
+              </div>
+              <div className="p-4">
+                <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-2 line-clamp-2">{title}</h3>
+                <p className="text-[12px] text-slate-600 mb-2">{merchant}</p>
+                <span className="bg-slate-100 text-slate-700 text-[11px] font-semibold px-2 py-1 rounded">{category}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};

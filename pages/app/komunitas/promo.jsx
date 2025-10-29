@@ -428,7 +428,7 @@ const CommunityPromoPage = () => {
         }
       };
 
-      // 1) PRIORITAS: admin API (pasti lewat CORS api)
+      // --- ONLY fetch types relevant to promo page: promo + hunting
       const adminPromo = await tryJson(
         `${apiUrl}/admin/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
         { headers: authHeaders }
@@ -438,7 +438,7 @@ const CommunityPromoPage = () => {
         { headers: authHeaders }
       );
 
-      // 2) FALLBACK: public web route (bisa CORS). Kirim credentials kalau server set cookie/CORS allow.
+      // public fallback (only if adminPromo not provided)
       const publicPromo = adminPromo?.length ? null : await tryJson(
         `${base}/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
         { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
@@ -448,7 +448,7 @@ const CommunityPromoPage = () => {
         { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
       );
 
-      // 3) ALIAS (jika kamu punya /api/dynamic-content dialias ke web route)
+      // alias fallback (if neither admin nor public returned)
       const aliasPromo = (adminPromo?.length || publicPromo?.length) ? null : await tryJson(
         `${apiUrl}/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
         { headers: { 'Content-Type': 'application/json' } }
@@ -549,8 +549,10 @@ const CommunityPromoPage = () => {
           const normalized = list.map(row => {
             const ad = row?.ad || row?.ads?.[0] || row;
             const cube = row?.cube || ad?.cube || {};
-            return { cube: { ...cube, ads: ad ? [ad] : [] } };
-          });
+            return { cube: { ...cube, ads: ad ? [ad] : [] }, ad };
+          })
+            // hanya tampilkan yang diklasifikasikan sebagai 'promo'
+            .filter(item => getNormalizedType(item.ad, item.cube) === 'promo');
           if (mounted) setItems(normalized);
         } finally { if (mounted) setLoadingNearby(false); }
       })();
@@ -683,12 +685,193 @@ const CommunityPromoPage = () => {
     );
   };
 
+  // ======== SHUFFLE CUBE WIDGET (Promo Acak) ========
+  const ShuffleCubeWidget = ({ widget }) => {
+    const { size, name } = widget;
+    const [shuffleData, setShuffleData] = useState([]);
+    const [shuffleLoading, setShuffleLoading] = useState(true);
+
+    useEffect(() => {
+      const fetchShuffleData = async () => {
+        try {
+          setShuffleLoading(true);
+          const token = Cookies.get(token_cookie_name);
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) {
+            const decryptedToken = Decrypt(token);
+            headers.Authorization = `Bearer ${decryptedToken}`;
+          }
+
+          // GUNAKAN baseUrl + /api agar konsisten di semua environment
+          const response = await fetch(
+            `${baseUrl}/api/shuffle-ads?community_id=${communityId}`,
+            { headers }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            setShuffleData(
+              Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+            );
+          } else {
+            console.error('Failed to fetch shuffle ads:', response.status);
+          }
+        } catch (error) {
+          console.error('Error fetching shuffle ads:', error);
+        } finally {
+          setShuffleLoading(false);
+        }
+      };
+
+      if (communityId) {
+        fetchShuffleData();
+      }
+    }, [communityId]);
+
+    if (shuffleLoading) {
+      return (
+        <div className="mb-6">
+          <div className="mb-2">
+            <h2 className="text-lg font-bold text-white">{name}</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="rounded-[16px] bg-gray-200 animate-pulse flex-shrink-0"
+                style={{ minWidth: 320, height: 200 }}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (!shuffleData?.length) return null;
+
+    return (
+      <div className="mb-6">
+        <div className="mb-2">
+          <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+          {widget.description && (
+            <p className="text-sm text-slate-600 mt-[1px]">{widget.description}</p>
+          )}
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          {shuffleData.map((item, index) => {
+            const cube = item?.cube;
+            const ad = item;
+            if (!cube && !ad) return null;
+
+            const imageUrl = buildImageUrl(
+              ad?.image_1 ||
+              ad?.image ||
+              ad?.picture_source ||
+              cube?.image ||
+              FALLBACK_IMAGE
+            );
+            const title = ad?.title || cube?.label || 'Promo';
+            const merchant = ad?.merchant || communityData?.name || 'Merchant';
+            const categoryData = getCategoryWithIcon(ad, cube, communityData);
+            const category = categoryData?.label || getCategoryLabel(ad, cube) || 'Promo';
+
+            // Use same styling as regular cube widgets
+            if (size === 'XL-Ads') {
+              return (
+                <div
+                  key={ad?.id || cube?.id || index}
+                  className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
+                  style={{
+                    minWidth: 320,
+                    maxWidth: 360,
+                    borderColor: '#d8d8d8',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    if (ad?.id) {
+                      router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                    }
+                  }}
+                >
+                  <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
+                    <Image
+                      src={imageUrl}
+                      alt={title}
+                      fill
+                      className="object-contain p-2"
+                    />
+                    <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
+                      {merchant}
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
+                    <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
+                      {title}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm">
+                        {category}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Default size handling
+            return (
+              <div
+                key={ad?.id || cube?.id || index}
+                className="rounded-[16px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+                style={{
+                  minWidth: 320,
+                  maxWidth: 360,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  if (ad?.id) {
+                    router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                  }
+                }}
+              >
+                <div className="relative w-full h-[200px] bg-white flex items-center justify-center">
+                  <Image
+                    src={imageUrl}
+                    alt={title}
+                    fill
+                    className="object-contain p-2"
+                  />
+                </div>
+                <div className="p-4">
+                  <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-2 line-clamp-2">
+                    {title}
+                  </h3>
+                  <p className="text-[12px] text-slate-600 mb-2">{merchant}</p>
+                  <span className="bg-slate-100 text-slate-700 text-[11px] font-semibold px-2 py-1 rounded">
+                    {category}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   // ======== WIDGET RENDERER (S, M, L, XL, XL-Ads) ========
   const WidgetRenderer = ({ widget }) => {
     const { source_type, size, dynamic_content_cubes, name, content_type } = widget;
 
     // jika widget adalah ad_category kita hide UI di sini (data sudah diambil di parent)
     if (source_type === 'ad_category') return null;
+
+    // Handle shuffle_cube widget
+    if (source_type === 'shuffle_cube') {
+      return <ShuffleCubeWidget widget={widget} />;
+    }
 
     // 🟢 Kotak Kategori Biasa dari dynamic_content_cubes (versi lama)
     if (content_type === 'category' && dynamic_content_cubes?.length) {
