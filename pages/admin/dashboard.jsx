@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
-    faCrosshairs,
-    faCubes,
-    faGlobe,
-    faHandshake,
-    faNewspaper,
-    faUsers,
+  faCrosshairs,
+  faCubes,
+  faGlobe,
+  faHandshake,
+  faNewspaper,
+  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
@@ -69,13 +69,17 @@ export default function Index() {
   const { profile: Profile } = useUserContext();
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
-      if (Profile?.role_id != 1) {
-        Cookies.remove(token_cookie_name);
+    // Gunakan cookie admin khusus
+    const adminToken = Cookies.get(`${token_cookie_name}_admin`);
+    if (adminToken && Profile) {
+      if (Profile?.role_id !== 1) {
+        // Hapus cookie admin dan arahkan ke halaman login admin
+        Cookies.remove(`${token_cookie_name}_admin`);
         window.location.href = '/admin';
       }
     }
   }, [Profile]);
+
 
   const [loading, code, data, reset] = useGet({
     path: 'admin/dashboard/counter-data',
@@ -90,7 +94,7 @@ export default function Index() {
             lng: pos.coords.longitude,
           });
         },
-        () => {},
+        () => { },
         { enableHighAccuracy: true }
       );
     }
