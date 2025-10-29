@@ -4,6 +4,7 @@ import {
   faArrowLeft,
   faCheckCircle,
   faExclamationTriangle,
+  faInfoCircle,
   faMapMarkerAlt,
   faPhone,
   faShare,
@@ -18,6 +19,68 @@ import { ImageCarousel } from '../../../../components/base.components';
 import { token_cookie_name } from '../../../../helpers';
 import { get } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
+
+// === Helper functions untuk label (sama seperti di home.jsx) ===
+const normalizeBoolLike = (val) => {
+  if (val === true || val === 1) return true;
+  if (typeof val === 'number') return val === 1;
+  if (Array.isArray(val)) return val.length > 0 && (val.includes(1) || val.includes('1') || val.includes(true));
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s)) return true;
+    if (['0', 'false', 'n', 'no', 'off', ''].includes(s)) return false;
+    try { return normalizeBoolLike(JSON.parse(val)); } catch { }
+  }
+  return !!val;
+};
+
+const getNormalizedType = (ad, cube = null) => {
+  const t1 = String(ad?.type || '').toLowerCase();
+  const t2 = String(cube?.type || ad?.cube?.type || '').toLowerCase();
+  const ct = String(cube?.content_type || ad?.content_type || '').toLowerCase();
+
+  // Informasi menang duluan
+  if (normalizeBoolLike(ad?.is_information) || normalizeBoolLike(ad?.cube?.is_information) || normalizeBoolLike(cube?.is_information)) return 'information';
+  if (t1 === 'information' || t2 === 'information' || ['kubus-informasi', 'information', 'informasi'].includes(ct)) return 'information';
+
+  // Voucher
+  if (t1 === 'voucher' || normalizeBoolLike(ad?.is_voucher) || normalizeBoolLike(ad?.voucher)) return 'voucher';
+
+  // Iklan (HANYA dari type/flag, BUKAN kategori)
+  if (t1 === 'iklan' || t2 === 'iklan' || normalizeBoolLike(ad?.is_advertising) || normalizeBoolLike(ad?.advertising)) return 'iklan';
+
+  // Default aman
+  return 'promo';
+};
+
+const getCategoryLabel = (ad, cube = null) => {
+  const t = getNormalizedType(ad, cube);
+  if (t === 'information') return 'Informasi';
+  if (t === 'voucher') return 'Voucher';
+  if (t === 'iklan') return 'Advertising';
+  return 'Promo';
+};
+
+// Helper functions untuk YouTube video
+const getYouTubeVideoId = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+};
+
+const isYouTubeLink = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  return /(?:youtube\.com|youtu\.be)/i.test(url);
+};
 
 export default function PromoDetailUnified() {
   const router = useRouter();
@@ -628,7 +691,7 @@ export default function PromoDetailUnified() {
           merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
-          code: data.code || null,
+          code: ad?.code || cube?.code || null,
           distance: '3 KM',
           location: loc.address || (loc.coordinates ? loc.coordinates : ''),
           coordinates: loc.coordinates,
@@ -655,6 +718,13 @@ export default function PromoDetailUnified() {
             phone: cube?.user?.phone || cube?.corporate?.phone || '',
           },
           terms: 'TERM & CONDITIONS APPLY',
+          // Tambahkan informasi kategori
+          categoryLabel: getCategoryLabel(ad, cube),
+          // Tambahkan link informasi (untuk video YouTube)
+          link_information: cube?.link_information || cube?.tags?.[0]?.link || null,
+          // Simpan raw data untuk keperluan lain
+          rawAd: ad,
+          rawCube: cube,
         };
 
         setPromoData(transformed);
@@ -763,6 +833,13 @@ export default function PromoDetailUnified() {
             phone: cubeInfo.sellerPhone || ad?.owner_contact || '',
           },
           terms: 'TERM & CONDITIONS APPLY',
+          // Tambahkan informasi kategori
+          categoryLabel: getCategoryLabel(ad, ad?.cube),
+          // Tambahkan link informasi (untuk video YouTube)
+          link_information: ad?.cube?.link_information || ad?.link_information || ad?.cube?.tags?.[0]?.link || null,
+          // Simpan raw data untuk keperluan lain
+          rawAd: ad,
+          rawCube: ad?.cube,
         };
         setPromoData(transformed);
         return transformed;
@@ -817,6 +894,12 @@ export default function PromoDetailUnified() {
           },
           seller: { name: data.owner_name || 'Admin', phone: data.owner_contact || '' },
           terms: 'TERM & CONDITIONS APPLY',
+          // Tambahkan informasi kategori (untuk legacy endpoint, gunakan data langsung)
+          categoryLabel: getCategoryLabel(data, null),
+          // Tambahkan link informasi (untuk video YouTube)
+          link_information: data?.link_information || data?.tags?.[0]?.link || null,
+          // Simpan raw data
+          rawAd: data,
         };
         setPromoData(transformedData);
         return transformedData;
@@ -1416,7 +1499,7 @@ export default function PromoDetailUnified() {
             <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
           </button>
           <div className="flex-1 text-center">
-            <h1 className="text-white font-bold text-sm">Iklan</h1>
+            <h1 className="text-white font-bold text-sm">{promoData?.categoryLabel || 'Promo'}</h1>
           </div>
           <div className="flex space-x-1.5">
             <button
@@ -1562,52 +1645,126 @@ export default function PromoDetailUnified() {
                 </button>
               </div>
             </div>
+
+            {/* Video/Link Section - hanya untuk tipe Informasi */}
+            {promoData?.link_information && promoData?.categoryLabel === 'Informasi' && (
+              <div className="mb-4">
+                <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
+                  <div className="p-4">
+                    <div className="flex items-center mb-3">
+                      <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
+                      <span className="font-semibold text-slate-900 text-sm">
+                        {isYouTubeLink(promoData.link_information) ? 'Video Informasi' : 'Link Informasi'}
+                      </span>
+                    </div>
+
+                    {isYouTubeLink(promoData.link_information) && getYouTubeVideoId(promoData.link_information) ? (
+                      <div className="space-y-3">
+                        {/* YouTube Embed */}
+                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                          <iframe
+                            className="absolute top-0 left-0 w-full h-full rounded-lg"
+                            src={`https://www.youtube.com/embed/${getYouTubeVideoId(promoData.link_information)}`}
+                            title="Video Informasi"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                        {/* Link to YouTube */}
+                        <a
+                          href={promoData.link_information}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                          </svg>
+                          Tonton di YouTube
+                        </a>
+                      </div>
+                    ) : (
+                      /* Regular Link */
+                      <a
+                        href={promoData.link_information}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg transition-colors text-sm group"
+                      >
+                        <span className="truncate flex-1">{promoData.link_information}</span>
+                        <svg className="w-5 h-5 flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
-        <div className="lg:max-w-sm lg:mx-auto">
-          <button
-            onClick={handleClaimPromo}
-            disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
-            className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : isAlreadyClaimed
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : isClaimedLoading
-                  ? 'bg-slate-400 text-white cursor-not-allowed'
-                  : 'text-white focus:ring-4 focus:ring-opacity-50'
-              }`}
-            style={
-              !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
-                ? { backgroundColor: getCommunityPrimaryColor(), '--tw-ring-color': `${getCommunityPrimaryColor()}50` }
-                : {}
-            }
-          >
-            {timeFlags.expiredByDate ? (
-              'Promo sudah kadaluwarsa'
-            ) : !timeFlags.withinDailyTime ? (
-              'Di luar jam berlaku'
-            ) : isNotStarted ? (
-              (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai')
-            ) : isAlreadyClaimed ? (
-              <div className="flex items-center justify-center">
-                <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                Sudah Direbut
-              </div>
-            ) : isClaimedLoading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Merebut Promo...
-              </div>
+      {/* Bottom bar - Conditional based on category */}
+      {promoData?.categoryLabel !== 'Informasi' && (
+        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+          <div className="lg:max-w-sm lg:mx-auto">
+            {/* Jika Advertising/Iklan - Tampilkan tombol Chat */}
+            {promoData?.categoryLabel === 'Advertising' ? (
+              <a
+                href={`https://wa.me/${promoData?.seller?.phone?.replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white flex items-center justify-center"
+                style={{ backgroundColor: getCommunityPrimaryColor() }}
+              >
+                <FontAwesomeIcon icon={faPhone} className="mr-2" />
+                Hubungi Penjual
+              </a>
             ) : (
-              'Rebut Promo Sekarang'
+              /* Jika Promo/Voucher - Tampilkan tombol Rebut */
+              <button
+                onClick={handleClaimPromo}
+                disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
+                className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : isAlreadyClaimed
+                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                    : isClaimedLoading
+                      ? 'bg-slate-400 text-white cursor-not-allowed'
+                      : 'text-white focus:ring-4 focus:ring-opacity-50'
+                  }`}
+                style={
+                  !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
+                    ? { backgroundColor: getCommunityPrimaryColor(), '--tw-ring-color': `${getCommunityPrimaryColor()}50` }
+                    : {}
+                }
+              >
+                {timeFlags.expiredByDate ? (
+                  'Promo sudah kadaluwarsa'
+                ) : !timeFlags.withinDailyTime ? (
+                  'Di luar jam berlaku'
+                ) : isNotStarted ? (
+                  (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai')
+                ) : isAlreadyClaimed ? (
+                  <div className="flex items-center justify-center">
+                    <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                    Sudah Direbut
+                  </div>
+                ) : isClaimedLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Merebut Promo...
+                  </div>
+                ) : (
+                  'Rebut Promo Sekarang'
+                )}
+              </button>
             )}
-          </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && (
