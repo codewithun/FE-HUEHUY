@@ -6,6 +6,10 @@ import { useEffect, useState } from 'react';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import CommunityBottomBar from './CommunityBottomBar';
+import Link from 'next/link';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLocationDot, faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { distanceConvert } from '../../../../helpers/distanceConvert.helpers';
 
 // Custom hook untuk handle image loading dengan fallback
 const useImageWithFallback = (src, fallback = '/default-avatar.png') => {
@@ -429,20 +433,229 @@ export default function CommunityDashboard({ communityId }) {
                     router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
                   }
                 >
-                  <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg mb-2">
+                  <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
                     <Image
                       src={normalizeImageSrc(imgSrc)}
                       alt={label}
                       fill
-                      className="object-cover"
+                      className="object-cover brightness-90"
                     />
+                    <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
+                      <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
+                    </div>
                   </div>
-                  <p className="text-[12px] text-white font-medium text-center line-clamp-2 drop-shadow-sm">
-                    {label}
-                  </p>
                 </div>
               );
             })}
+          </div>
+        </div>
+      );
+    }
+
+    if (widget.content_type === 'nearby') {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const [items, setItems] = useState([]);
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const [loading, setLoading] = useState(true);
+
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      useEffect(() => {
+        let mounted = true;
+        (async () => {
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const apiBase = baseUrl.replace(/\/api\/?$/, '');
+            const headers = { 'Content-Type': 'application/json' };
+
+            let lat = null, lng = null;
+            if (typeof navigator !== 'undefined' && navigator.geolocation) {
+              await new Promise((resolve) => navigator.geolocation.getCurrentPosition(
+                (pos) => { lat = pos.coords.latitude; lng = pos.coords.longitude; resolve(); },
+                () => resolve(),
+                { enableHighAccuracy: true, timeout: 5000 }
+              ));
+            }
+            if (lat == null || lng == null) { setItems([]); setLoading(false); return; }
+
+            const res = await fetch(`${apiBase}/api/ads/promo-nearest/${lat}/${lng}`, { headers });
+            const json = await res.json();
+            if (!mounted) return;
+
+            const list = Array.isArray(json?.data) ? json.data : [];
+            const normalized = list.map((row) => {
+              const ad = row?.ad || row?.ads?.[0] || row;
+              const cube = row?.cube || ad?.cube || row?.ad?.cube || {};
+              return { cube: { ...cube, ads: ad ? [ad] : [] } };
+            });
+
+            setItems(normalized);
+          } catch {
+            setItems([]);
+          } finally {
+            setLoading(false);
+          }
+        })();
+        return () => { mounted = false; };
+      }, [communityId]);
+
+      if (loading) return <div className="text-white/80 text-sm mb-4">Memuat {widget.name || 'terdekat'}…</div>;
+      if (!items.length) return null;
+
+      return (
+        <div className="mb-6">
+          {(widget.name || widget.description) && (
+            <div className="mb-2 px-1">
+              {widget.name && <h2 className="text-lg font-bold text-white">{widget.name}</h2>}
+              {widget.description && <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>}
+            </div>
+          )}
+          {/* LIST VERTIKAL – biarkan seperti ini */}
+          <div className="flex flex-col gap-3 mt-4">
+            {items.map((cubeData, key) => {
+              const cube = cubeData?.cube;
+              if (!cube) return null;
+              const ad = cube?.ads?.[0] || null;
+
+              const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
+              const imageUrl = ad ? getAdImage(ad) : (cube.image || cube.picture_source || '/default-avatar.png');
+              const title = ad?.title || cube.label || cube.name || 'Promo';
+              const address = ad?.cube?.address || cube.address || '';
+              const distanceRaw = ad?.distance ?? cube?.distance ?? null;
+              const worldName = ad?.cube?.world?.name || cube?.world?.name || 'General';
+
+              let href = '#';
+              if (isInformationCube) {
+                const code = cube.code || ad?.cube?.code || ad?.code;
+                if (code) href = `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}${communityId ? `&communityId=${communityId}` : ''}`;
+              } else if (ad?.id) {
+                href = getIsAdvertising(ad, cube)
+                  ? `/app/iklan/${ad.id}${communityId ? `?communityId=${communityId}` : ''}`
+                  : `/app/komunitas/promo/detail_promo?promoId=${ad.id}${communityId ? `&communityId=${communityId}` : ''}`;
+              }
+
+              return (
+                <Link href={href} key={key}>
+                  <div className="grid grid-cols-4 gap-3 p-3 rounded-[15px] bg-white/40 backdrop-blur-sm border border-white/30 hover:scale-[1.01] transition-transform">
+                    <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-300">
+                      <Image src={normalizeImageSrc(imageUrl)} alt={title} width={700} height={700} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="col-span-3">
+                      <p className="font-semibold text-white drop-shadow-sm limit__line__1">{title}</p>
+                      {!!address && <p className="text-white/90 text-xs my-1 limit__line__2 drop-shadow-sm">{address}</p>}
+                      <div className="flex flex-wrap gap-2 mt-2 items-center text-white/90">
+                        {distanceRaw != null && (
+                          <>
+                            <span className="text-xs"><FontAwesomeIcon icon={faLocationDot} /> {distanceConvert(distanceRaw)}</span>
+                            <span className="text-xs"> | </span>
+                          </>
+                        )}
+                        <span className="text-xs font-semibold"><FontAwesomeIcon icon={faGlobe} /> {worldName}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (widget.content_type === 'recommendation') {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const [items, setItems] = useState([]);
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const [loading, setLoading] = useState(true);
+
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      useEffect(() => {
+        let mounted = true;
+        (async () => {
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const apiBase = baseUrl.replace(/\/api\/?$/, '');
+            const headers = { 'Content-Type': 'application/json' };
+            const res = await fetch(`${apiBase}/api/ads/promo-recommendation`, { headers });
+            const json = await res.json();
+            if (!mounted) return;
+
+            const list = Array.isArray(json?.data) ? json.data : [];
+            const normalized = list.map((row) => {
+              const ad = row?.ad || row?.ads?.[0] || row;
+              const cube = row?.cube || ad?.cube || row?.ad?.cube || {};
+              return { cube: { ...cube, ads: ad ? [ad] : [] } };
+            });
+
+            setItems(normalized);
+          } catch {
+            setItems([]);
+          } finally {
+            setLoading(false);
+          }
+        })();
+        return () => { mounted = false; };
+      }, [communityId]);
+
+      if (loading) return <div className="text-white/80 text-sm mb-4">Memuat {widget.name || 'rekomendasi'}…</div>;
+      if (!items.length) return null;
+
+      return (
+        <div className="mb-6">
+          {(widget.name || widget.description) && (
+            <div className="mb-2 px-1">
+              {widget.name && <h2 className="text-lg font-bold text-white">{widget.name}</h2>}
+              {widget.description && <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>}
+            </div>
+          )}
+
+          {/* LIST HORIZONTAL + sembunyikan scrollbar */}
+          <div className="w-full overflow-x-auto no-scrollbar">
+            <div className="flex flex-nowrap gap-4 w-max">
+              {items.map((cubeData, index) => {
+                const cube = cubeData?.cube;
+                if (!cube) return null;
+                const ad = cube?.ads?.[0] || null;
+
+                const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
+                const imageUrl = ad ? getAdImage(ad) : (cube.image || '/default-avatar.png');
+                const title = ad?.title || cube.label || 'Promo';
+                const description = ad?.description || cube.description || '';
+                const address = ad?.cube?.address || cube.address || '';
+
+                let href = '#';
+                if (isInformationCube) {
+                  const code = cube.code || ad?.cube?.code || ad?.code;
+                  if (code) href = `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}${communityId ? `&communityId=${communityId}` : ''}`;
+                } else if (ad?.id) {
+                  href = getIsAdvertising(ad, cube)
+                    ? `/app/iklan/${ad.id}${communityId ? `?communityId=${communityId}` : ''}`
+                    : `/app/komunitas/promo/detail_promo?promoId=${ad.id}${communityId ? `&communityId=${communityId}` : ''}`;
+                }
+
+                // Kartu ukuran M (ringkas, horizontal-friendly)
+                return (
+                  <Link href={href} key={index}>
+                    <div
+                      className="flex flex-col rounded-[12px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 hover:scale-[1.02] transition-all duration-300 bg-white/10 backdrop-blur-md"
+                      style={{ minWidth: 200, maxWidth: 220, height: 280 }}
+                    >
+                      <div className="relative w-full overflow-hidden">
+                        <div className="w-full aspect-square relative">
+                          <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent h-8" />
+                      </div>
+
+                      <div className="flex-1 p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
+                        <h3 className="text-[14px] font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm">{title}</h3>
+                        {description && <p className="text-[11px] text-white/90 leading-relaxed line-clamp-2 mb-2 drop-shadow-sm">{description}</p>}
+                        {address && <p className="text-[10px] text-white/80 line-clamp-1 drop-shadow-sm">{address}</p>}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </div>
       );
@@ -716,73 +929,6 @@ export default function CommunityDashboard({ communityId }) {
                             {categoryData.additionalInfo.maxGrab}
                           </span>
                         )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-
-              if (size === 'L') {
-                return (
-                  <div
-                    key={cube.id || index}
-                    className="flex rounded-[14px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
-                    style={{ minWidth: 300, maxWidth: 340, height: 150, cursor: 'pointer' }}
-                    onClick={() => {
-                      if (isInformationCube) {
-                        // Untuk kubus informasi, prioritaskan code dari cube
-                        const code = cube.code || ad?.cube?.code || ad?.code;
-                        if (code) {
-                          const targetUrl = communityId
-                            ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
-                            : `/app/kubus-informasi/kubus-infor?code=${code}`;
-                          router.push(targetUrl);
-                        } else {
-                          console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
-                        }
-                        return;
-                      }
-                      if (ad?.id) {
-                        // Cek apakah ini iklan/advertising
-                        if (getIsAdvertising(ad, cube)) {
-                          // Arahkan ke halaman iklan yang mendukung community background
-                          const targetUrl = communityId
-                            ? `/app/iklan/${ad.id}?communityId=${communityId}`
-                            : `/app/iklan/${ad.id}`;
-                          router.push(targetUrl);
-                        } else {
-                          // Arahkan ke halaman promo
-                          const targetUrl = communityId
-                            ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
-                            : `/app/promo/detail_promo?promoId=${ad.id}`;
-                          router.push(targetUrl);
-                        }
-                      }
-                    }}
-                  >
-                    <div className="relative w-[35%] h-full bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden">
-                      <div className="w-[85%] h-[85%] relative">
-                        <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover rounded-[8px]" />
-                      </div>
-                      <div className="absolute top-2 left-2 bg-black/40 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
-                        <span>{categoryData.icon}</span>
-                        <span>{categoryData.label}</span>
-                      </div>
-                    </div>
-                    <div className="flex-1 h-full p-3 flex flex-col justify-between bg-white/20 backdrop-blur-md border-l border-white/20">
-                      <div className="flex-1">
-                        <h3 className="text-[14px] font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm">{title}</h3>
-                        {description && (
-                          <p className="text-[12px] text-white/90 leading-relaxed line-clamp-2 mb-2 drop-shadow-sm">
-                            {description}
-                          </p>
-                        )}
-                        {address && <p className="text-[11px] text-white/80 line-clamp-1 drop-shadow-sm">{address}</p>}
-                      </div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm">
-                          {merchant}
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -1135,17 +1281,17 @@ export default function CommunityDashboard({ communityId }) {
                                       router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
                                     }
                                   >
-                                    <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg mb-2">
+                                    <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
                                       <Image
                                         src={normalizeImageSrc(imgSrc)}
                                         alt={label}
                                         fill
-                                        className="object-cover"
+                                        className="object-cover brightness-90"
                                       />
+                                      <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
+                                        <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
+                                      </div>
                                     </div>
-                                    <p className="text-[12px] text-white font-medium text-center line-clamp-2 drop-shadow-sm">
-                                      {label}
-                                    </p>
                                   </div>
                                 );
                               })}

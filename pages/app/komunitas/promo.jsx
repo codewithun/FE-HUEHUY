@@ -53,7 +53,7 @@ const CommunityPromoPage = () => {
     path = path.replace(/^api\/storage\//i, 'storage/');
 
     // map folder publik ke storage/*
-    if (/^(ads|promos|uploads|images|files|banners)\//i.test(path)) {
+    if (/^(ads|promos|uploads|images|files|banners|communities)\//i.test(path)) {
       path = `storage/${path}`;
     }
 
@@ -144,6 +144,20 @@ const CommunityPromoPage = () => {
     return 'Promo';
   };
 
+  // Helper function to get category with icon and additional info
+  const getCategoryWithIcon = (ad, cube = null, communityData = null) => {
+    const label = getCategoryLabel(ad, cube);
+    const icon = getCategoryIcon(label);
+    const additionalInfo = getAdditionalInfo(ad, cube, communityData);
+
+    return {
+      label,
+      icon,
+      additionalInfo,
+      display: label // Remove emoji from display since we're using SVG
+    };
+  };
+
   // Professional SVG icons for categories
   const CategoryIcons = {
     advertising: (
@@ -192,6 +206,45 @@ const CommunityPromoPage = () => {
     }
   };
 
+  // Helper function to get additional informational data
+  const getAdditionalInfo = (ad, cube, communityData) => {
+    const info = {};
+
+    // Get creation date
+    const createdAt = ad?.created_at || cube?.created_at;
+    if (createdAt) {
+      const date = new Date(createdAt);
+      info.createdDate = date.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short'
+      });
+    }
+
+    // Get status information
+    if (ad) {
+      info.status = ad.status || 'active';
+      info.type = ad.type || 'general';
+
+      // Get grab information for vouchers/promos
+      if (ad.max_grab) {
+        info.maxGrab = ad.unlimited_grab ? 'Unlimited' : `${ad.max_grab} tersisa`;
+      }
+
+      // Get validation type
+      if (ad.validation_type) {
+        info.validationType = ad.validation_type === 'auto' ? 'Auto Validasi' : 'Manual Validasi';
+      }
+    }
+
+    // Get community info
+    if (communityData) {
+      info.communityName = communityData.name;
+      info.memberCount = communityData.members || 0;
+    }
+
+    return info;
+  };
+
   // Fungsi untuk mengidentifikasi iklan/advertising
   const getIsAdvertising = (ad, cube = null) => {
     return getNormalizedType(ad, cube) === 'iklan';
@@ -226,6 +279,13 @@ const CommunityPromoPage = () => {
         ad_category: ad?.ad_category ?? p.ad_category,
         is_advertising: ad?.is_advertising ?? p.is_advertising,
         advertising: ad?.advertising ?? p.advertising,
+        // Field tambahan untuk routing detection seperti di home.jsx
+        code: p.code ?? ad?.code,
+        is_information: p.is_information ?? ad?.is_information,
+        content_type: p.content_type ?? ad?.content_type,
+        is_voucher: p.is_voucher ?? ad?.is_voucher,
+        rawCube: p, // simpan raw cube untuk akses penuh
+        cube: ad?.cube || null,
       };
     });
 
@@ -240,6 +300,51 @@ const CommunityPromoPage = () => {
     });
 
     return promos;
+  };
+
+  // Fungsi handle klik promo - PERSIS seperti di home.jsx
+  const handlePromoClick = (promo) => {
+    const promoId = promo?.id;
+    if (!promoId) {
+      console.warn('Promo ID tidak tersedia:', promo);
+      return;
+    }
+
+    // Extract ad and cube data
+    const ad = promo?.rawCube?.ads?.[0] || promo;
+    const cube = promo?.rawCube || promo?.cube;
+
+    // Cek apakah ini kubus informasi (prioritas tertinggi)
+    const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
+
+    if (isInformationCube) {
+      // Untuk kubus informasi, prioritaskan code dari cube
+      const code = cube?.code || ad?.cube?.code || ad?.code;
+      if (code) {
+        const targetUrl = communityId
+          ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+          : `/app/kubus-informasi/kubus-infor?code=${code}`;
+        router.push(targetUrl);
+      } else {
+        console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
+      }
+      return;
+    }
+
+    // Cek apakah ini iklan/advertising
+    if (getIsAdvertising(ad, cube)) {
+      const targetUrl = communityId
+        ? `/app/iklan/${promoId}?communityId=${communityId}`
+        : `/app/iklan/${promoId}`;
+      router.push(targetUrl);
+      return;
+    }
+
+    // Default: promo/voucher
+    const targetUrl = communityId
+      ? `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
+      : `/app/promo/detail_promo?promoId=${promoId}`;
+    router.push(targetUrl);
   };
 
   // We intentionally call top-level async helpers when communityId changes.
@@ -308,71 +413,101 @@ const CommunityPromoPage = () => {
   // fetch widget data (type=hunting, content_type=promo, active)
   const fetchWidgetData = async () => {
     try {
-      // tambahkan paginate=all biar backend ngasih semua data
-      const widgetRes = await fetch(
+      const authHeaders = getAuthHeaders();
+      const base = apiUrl.replace(/\/api\/?$/, '');
+
+      // helper fetch aman
+      const tryJson = async (url, init) => {
+        try {
+          const r = await fetch(url, init);
+          if (!r.ok) return null;
+          const j = await r.json();
+          return Array.isArray(j?.data) ? j.data : (Array.isArray(j) ? j : []);
+        } catch {
+          return null;
+        }
+      };
+
+      // 1) PRIORITAS: admin API (pasti lewat CORS api)
+      const adminPromo = await tryJson(
+        `${apiUrl}/admin/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
+        { headers: authHeaders }
+      );
+      const adminHunting = await tryJson(
         `${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
-        { headers: getAuthHeaders() }
+        { headers: authHeaders }
       );
 
-      if (widgetRes.ok) {
-        const widgetJson = await widgetRes.json();
+      // 2) FALLBACK: public web route (bisa CORS). Kirim credentials kalau server set cookie/CORS allow.
+      const publicPromo = adminPromo?.length ? null : await tryJson(
+        `${base}/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
+      );
+      const publicHunting = adminPromo?.length ? null : await tryJson(
+        `${base}/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
+      );
 
-        // fallback kalau backend ngirim data langsung tanpa wrapper .data
-        let widgets = Array.isArray(widgetJson?.data)
-          ? widgetJson.data
-          : Array.isArray(widgetJson)
-            ? widgetJson
-            : [];
+      // 3) ALIAS (jika kamu punya /api/dynamic-content dialias ke web route)
+      const aliasPromo = (adminPromo?.length || publicPromo?.length) ? null : await tryJson(
+        `${apiUrl}/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      const aliasHunting = (adminPromo?.length || publicPromo?.length) ? null : await tryJson(
+        `${apiUrl}/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
-        // filter hanya widget hunting aktif
-        widgets = widgets
-          .filter((w) => w.is_active && w.type === 'hunting')
-          .sort((a, b) => (a.level || 0) - (b.level || 0));
+      const merged = [
+        ...(adminPromo || []),
+        ...(adminHunting || []),
+        ...(publicPromo || []),
+        ...(publicHunting || []),
+        ...(aliasPromo || []),
+        ...(aliasHunting || []),
+      ].filter(Boolean);
 
-        // 🔹 Cari widget ad_category: ambil kategorinya dan hapus widget agar tidak dirender dua kali
-        const adCategoryWidget = widgets.find((w) => w.source_type === 'ad_category');
-        if (adCategoryWidget) {
-          try {
-            const catRes = await fetch(
-              `${apiUrl}/admin/options/ad-category?community_id=${communityId}`,
-              { headers: getAuthHeaders() }
-            );
-            const catResult = await catRes.json();
-            if (catResult?.message === 'success' && Array.isArray(catResult.data)) {
-              setAdCategories(catResult.data);
-              setAdCategoryLevel(adCategoryWidget.level ?? null);
-            } else if (Array.isArray(catResult)) {
-              setAdCategories(catResult);
-              setAdCategoryLevel(adCategoryWidget.level ?? null);
-            } else {
-              setAdCategories([]);
-              setAdCategoryLevel(null);
-            }
-          } catch (e) {
-            console.error('Gagal ambil ad_category saat fetch widget:', e);
-            setAdCategories([]);
-            setAdCategoryLevel(null);
-          }
-
-          // remove the ad_category widget so it won't render via WidgetRenderer
-          widgets = widgets.filter((w) => w.id !== adCategoryWidget.id);
-        } else {
-          setAdCategories([]);
-          setAdCategoryLevel(null);
-        }
-
-        setWidgetData(widgets);
-      } else {
-        console.error('Failed to fetch widgets:', widgetRes.status);
+      if (!merged.length) {
+        console.warn('Widget kosong: kemungkinan CORS/route tidak tersedia di local.');
+        setWidgetData([]); setAdCategories([]); setAdCategoryLevel(null);
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching widget data:', error);
-      setAdCategories([]);
-      setAdCategoryLevel(null);
+
+      // dedupe + sort + tarik kategori
+      const mapById = new Map();
+      merged.forEach(w => { if (w?.id != null) mapById.set(w.id, w); });
+      let widgets = [...mapById.values()]
+        .filter(w => w?.is_active)
+        .sort((a, b) => (a.level || 0) - (b.level || 0));
+
+      const adCategoryWidget = widgets.find(w => w.source_type === 'ad_category' || w.content_type === 'category');
+      if (adCategoryWidget) {
+        try {
+          const catRes = await fetch(`${apiUrl}/admin/options/ad-category?community_id=${communityId}`, { headers: authHeaders });
+          const catResult = await catRes.json();
+          if (catResult?.message === 'success' && Array.isArray(catResult.data)) {
+            setAdCategories(catResult.data);
+            setAdCategoryLevel(adCategoryWidget.level ?? 0);
+          } else if (Array.isArray(catResult)) {
+            setAdCategories(catResult);
+            setAdCategoryLevel(adCategoryWidget.level ?? 0);
+          } else {
+            setAdCategories([]); setAdCategoryLevel(null);
+          }
+        } catch {
+          setAdCategories([]); setAdCategoryLevel(null);
+        }
+        widgets = widgets.filter(w => w.id !== adCategoryWidget.id);
+      } else {
+        setAdCategories([]); setAdCategoryLevel(null);
+      }
+
+      setWidgetData(widgets);
+    } catch (e) {
+      console.error('Error fetching widget data:', e);
+      setWidgetData([]); setAdCategories([]); setAdCategoryLevel(null);
     }
   };
-
-
 
   // ======== HELPER FUNCTIONS ========
   // Function gradient murni dari warna BE (tanpa dummy mapping kategori)
@@ -386,21 +521,167 @@ const CommunityPromoPage = () => {
     return { backgroundImage: 'linear-gradient(135deg, #16a34a, #059669)' };
   };
 
-  const handlePromoClick = (promoId, promo = null) => {
-    // Cek apakah ini iklan/advertising berdasarkan data promo
-    if (promo && getIsAdvertising(promo)) {
-      // Arahkan ke halaman iklan yang mendukung community background
-      router.push(`/app/iklan/${promoId}?communityId=${communityId}`);
-    } else {
-      // Arahkan ke halaman promo
-      router.push(
-        `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
-      );
-    }
-  };
-
   // ======== UI TOKENS (BIAR KONSISTEN) ========
   // (Removed unused COLORS to satisfy lint)
+
+  // ======== SUB-COMPONENTS FOR WIDGET TYPES (Hooks at top-level) ========
+  const NearbyWidget = ({ widget, communityId, buildImageUrl, getIsInformation, getIsAdvertising }) => {
+    const [items, setItems] = useState([]);
+    const [loadingNearby, setLoadingNearby] = useState(true);
+
+    useEffect(() => {
+      let mounted = true;
+      (async () => {
+        try {
+          const base = apiUrl.replace(/\/api\/?$/, '');
+          let lat = null, lng = null;
+          if (navigator?.geolocation) {
+            await new Promise(r => navigator.geolocation.getCurrentPosition(
+              p => { lat = p.coords.latitude; lng = p.coords.longitude; r(); },
+              () => r(),
+              { enableHighAccuracy: true, timeout: 5000 }
+            ));
+          }
+          if (lat == null || lng == null) { setItems([]); return; }
+          const r = await fetch(`${base}/api/ads/promo-nearest/${lat}/${lng}`);
+          const j = await r.json();
+          const list = Array.isArray(j?.data) ? j.data : [];
+          const normalized = list.map(row => {
+            const ad = row?.ad || row?.ads?.[0] || row;
+            const cube = row?.cube || ad?.cube || {};
+            return { cube: { ...cube, ads: ad ? [ad] : [] } };
+          });
+          if (mounted) setItems(normalized);
+        } finally { if (mounted) setLoadingNearby(false); }
+      })();
+      return () => { mounted = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    if (loadingNearby) return <div className="text-white/80 text-sm mb-4">Memuat {widget.name || 'terdekat'}…</div>;
+    if (!items.length) return null;
+
+    return (
+      <div className="mb-6">
+        {widget.name && <h2 className="text-lg font-bold text-white mb-2">{widget.name}</h2>}
+        <div className="flex flex-col gap-3">
+          {items.map((row, i) => {
+            const cube = row?.cube; const ad = cube?.ads?.[0];
+            const img = buildImageUrl(ad?.image_1 || ad?.image || ad?.picture_source || cube?.image);
+            const title = ad?.title || cube?.label || 'Promo';
+            const address = ad?.cube?.address || cube?.address || '';
+            const isInfo = getIsInformation(cube) || getIsInformation(ad);
+
+            const handleClick = () => {
+              if (isInfo) {
+                const code = cube?.code || ad?.cube?.code || ad?.code;
+                if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}${communityId ? `&communityId=${communityId}` : ''}`);
+              } else if (ad?.id) {
+                const targetUrl = getIsAdvertising(ad, cube)
+                  ? `/app/iklan/${ad.id}${communityId ? `?communityId=${communityId}` : ''}`
+                  : `/app/komunitas/promo/detail_promo?promoId=${ad.id}${communityId ? `&communityId=${communityId}` : ''}`;
+                router.push(targetUrl);
+              }
+            };
+
+            return (
+              <div
+                key={i}
+                className="grid grid-cols-4 gap-3 p-3 rounded-[15px] bg-white/40 backdrop-blur-sm border border-white/30 cursor-pointer hover:bg-white/50 transition-all"
+                onClick={handleClick}
+              >
+                <div className="w-full aspect-square rounded-lg overflow-hidden bg-slate-300 relative">
+                  <Image src={img} alt={title} fill className="object-cover" />
+                </div>
+                <div className="col-span-3">
+                  <p className="font-semibold text-white drop-shadow-sm">{title}</p>
+                  {!!address && <p className="text-white/90 text-xs my-1 drop-shadow-sm">{address}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const RecommendationWidget = ({ widget, communityId, buildImageUrl, getIsInformation, getIsAdvertising }) => {
+    const [items, setItems] = useState([]);
+    const [loadingRec, setLoadingRec] = useState(true);
+
+    useEffect(() => {
+      let mounted = true;
+      (async () => {
+        try {
+          const base = apiUrl.replace(/\/api\/?$/, '');
+          const r = await fetch(`${base}/api/ads/promo-recommendation`);
+          const j = await r.json();
+          const list = Array.isArray(j?.data) ? j.data : [];
+          const normalized = list.map(row => {
+            const ad = row?.ad || row?.ads?.[0] || row;
+            const cube = row?.cube || ad?.cube || {};
+            return { cube: { ...cube, ads: ad ? [ad] : [] } };
+          });
+          if (mounted) setItems(normalized);
+        } finally { if (mounted) setLoadingRec(false); }
+      })();
+      return () => { mounted = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    if (loadingRec) return <div className="text-white/80 text-sm mb-4">Memuat {widget.name || 'rekomendasi'}…</div>;
+    if (!items.length) return null;
+
+    return (
+      <div className="mb-6">
+        {widget.name && <h2 className="text-lg font-bold text-white mb-2">{widget.name}</h2>}
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          {items.map((row, i) => {
+            const cube = row?.cube; const ad = cube?.ads?.[0];
+            const img = buildImageUrl(ad?.image_1 || ad?.image || ad?.picture_source || cube?.image);
+            const title = ad?.title || cube?.label || 'Promo';
+            const description = ad?.description || cube?.description || '';
+            const address = ad?.cube?.address || cube?.address || '';
+            const isInfo = getIsInformation(cube) || getIsInformation(ad);
+
+            const handleClick = () => {
+              if (isInfo) {
+                const code = cube?.code || ad?.cube?.code || ad?.code;
+                if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}${communityId ? `&communityId=${communityId}` : ''}`);
+              } else if (ad?.id) {
+                const targetUrl = getIsAdvertising(ad, cube)
+                  ? `/app/iklan/${ad.id}${communityId ? `?communityId=${communityId}` : ''}`
+                  : `/app/komunitas/promo/detail_promo?promoId=${ad.id}${communityId ? `&communityId=${communityId}` : ''}`;
+                router.push(targetUrl);
+              }
+            };
+
+            return (
+              <div
+                key={i}
+                className="flex flex-col rounded-[12px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 bg-white/10 backdrop-blur-md cursor-pointer hover:bg-white/20 transition-all"
+                style={{ minWidth: 200, maxWidth: 220, height: 280 }}
+                onClick={handleClick}
+              >
+                <div className="relative w-full overflow-hidden">
+                  <div className="w-full aspect-square relative">
+                    <Image src={img} alt={title} fill className="object-cover" />
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent h-8" />
+                </div>
+
+                <div className="flex-1 p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
+                  <h3 className="text-[14px] font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm">{title}</h3>
+                  {description && <p className="text-[11px] text-white/90 leading-relaxed line-clamp-2 mb-2 drop-shadow-sm">{description}</p>}
+                  {address && <p className="text-[10px] text-white/80 line-clamp-1 drop-shadow-sm">{address}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   // ======== WIDGET RENDERER (S, M, L, XL, XL-Ads) ========
   const WidgetRenderer = ({ widget }) => {
@@ -414,13 +695,13 @@ const CommunityPromoPage = () => {
       return (
         <div className="mb-6">
           <div className="mb-2">
-            <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+            <h2 className="text-lg font-bold text-white">{name}</h2>
             {widget.description && (
-              <p className="text-sm text-slate-600 mt-[1px]">{widget.description}</p>
+              <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
             )}
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             {dynamic_content_cubes.map((catData, index) => {
               const cube = catData?.cube;
               if (!cube) return null;
@@ -428,7 +709,7 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all"
+                  className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                   style={{ minWidth: 90 }}
                   onClick={() => {
                     router.push(
@@ -436,22 +717,48 @@ const CommunityPromoPage = () => {
                     );
                   }}
                 >
-                  <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-[#d8d8d8] bg-white shadow-sm mb-2">
+                  <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
                     <Image
                       src={buildImageUrl(cube.image)}
                       alt={cube.category}
                       fill
-                      className="object-cover"
+                      className="object-cover brightness-90"
                     />
+                    <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
+                      <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{cube.category}</p>
+                    </div>
                   </div>
-                  <p className="text-[12px] text-slate-700 font-medium text-center line-clamp-2">
-                    {cube.category}
-                  </p>
                 </div>
               );
             })}
           </div>
         </div>
+      );
+    }
+
+    // Handle nearby widget type
+    if (widget.content_type === 'nearby') {
+      return (
+        <NearbyWidget
+          widget={widget}
+          communityId={communityId}
+          buildImageUrl={buildImageUrl}
+          getIsInformation={getIsInformation}
+          getIsAdvertising={getIsAdvertising}
+        />
+      );
+    }
+
+    // Handle recommendation widget type
+    if (widget.content_type === 'recommendation') {
+      return (
+        <RecommendationWidget
+          widget={widget}
+          communityId={communityId}
+          buildImageUrl={buildImageUrl}
+          getIsInformation={getIsInformation}
+          getIsAdvertising={getIsAdvertising}
+        />
       );
     }
 
@@ -461,85 +768,115 @@ const CommunityPromoPage = () => {
       <div className="mb-6">
         {/* Header Widget */}
         <div className="mb-2">
-          <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+          <h2 className="text-lg font-bold text-white">{name}</h2>
           {widget.description && (
-            <p className="text-sm text-slate-600 mt-[1px]">
+            <p className="text-sm text-white/80 mt-[1px]">
               {widget.description}
             </p>
           )}
         </div>
 
         {/* Scrollable horizontal container */}
-        <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
           {dynamic_content_cubes.map((cubeData, index) => {
             const cube = cubeData?.cube;
             if (!cube) return null;
 
-            const ad = cube?.ads?.[0];
-            const imageUrl = buildImageUrl(
-              ad?.image_1 ||
-              ad?.image ||
-              ad?.picture_source ||
-              cube?.image ||
-              FALLBACK_IMAGE
-            );
-            const title = ad?.title || cube?.label || 'Promo';
-            const merchant = ad?.merchant || communityData?.name || 'Merchant';
-            const description = ad?.description || '';
-            // Gunakan fungsi getCategoryLabel untuk mendapatkan label yang benar
-            const categoryLabel = getCategoryLabel(ad, cube);
-            const categoryIcon = getCategoryIcon(categoryLabel);
+            // Ambil 1 ad yang menempel ke cube (kalau ada)
+            const ad = cube.ads?.[0] || null;
+
+            // Cek apakah ini kubus informasi
+            const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
+
+            // Siapkan data untuk kartu dengan prioritas yang benar:
+            let imageUrl, title, merchant, address, categoryData, description;
+
+            if (isInformationCube) {
+              // Untuk kubus informasi, prioritaskan data dari cube
+              imageUrl = cube.picture_source || cube.image || (ad ? (ad.image_1 || ad.image_2 || ad.image_3 || ad.picture_source) : '/default-avatar.png');
+              title = cube.label || cube.name || ad?.title || 'Informasi';
+              merchant = cube.merchant || communityData?.name || ad?.merchant || 'Informasi';
+              address = cube.address || ad?.cube?.address || '';
+              categoryData = getCategoryWithIcon(ad, cube, communityData);
+              description = cube.description || ad?.description || '';
+            } else {
+              // Untuk promo/iklan, prioritaskan data dari ad
+              imageUrl = ad ? (ad.image_1 || ad.image_2 || ad.image_3 || ad.picture_source) : (cube.image || '/default-avatar.png');
+              title = ad?.title || cube.label || 'Promo';
+              merchant = ad?.merchant || communityData?.name || 'Merchant';
+              address = ad?.cube?.address || cube.address || '';
+              categoryData = getCategoryWithIcon(ad, cube, communityData);
+              description = ad?.description || cube.description || '';
+            }
 
             // ===== XL-ADS
             if (size === 'XL-Ads') {
               return (
                 <div
                   key={cube?.id || index}
-                  className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
-                  style={{
-                    minWidth: 320,
-                    maxWidth: 360,
-                    borderColor: '#d8d8d8',
-                    cursor: 'pointer',
-                  }}
+                  className="rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
+                  style={{ minWidth: 320, maxWidth: 350, cursor: 'pointer' }}
                   onClick={() => {
+                    if (isInformationCube) {
+                      const code = cube.code || ad?.cube?.code || ad?.code;
+                      if (code) {
+                        const targetUrl = communityId
+                          ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                          : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                        router.push(targetUrl);
+                      }
+                      return;
+                    }
                     if (ad?.id) {
-                      // Cek apakah ini iklan/advertising
                       if (getIsAdvertising(ad, cube)) {
-                        // Arahkan ke halaman iklan yang mendukung community background
-                        router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                        const targetUrl = communityId
+                          ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                          : `/app/iklan/${ad.id}`;
+                        router.push(targetUrl);
                       } else {
-                        // Arahkan ke halaman promo
-                        router.push(
-                          `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
-                        );
+                        const targetUrl = communityId
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
                       }
                     }
                   }}
                 >
-                  {/* Gambar */}
-                  <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
-                    <Image
-                      src={imageUrl}
-                      alt={title}
-                      fill
-                      className="object-contain p-2"
-                    />
-                    <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
-                      {merchant}
+                  {/* Image Section */}
+                  <div className="relative w-full bg-white/20 backdrop-blur-sm overflow-hidden">
+                    <div className="w-full aspect-[4/3] relative">
+                      <Image src={buildImageUrl(imageUrl)} alt={title} fill className="object-cover" />
+                    </div>
+                    <div className="absolute top-3 right-3 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                      <span>{categoryData.icon}</span>
+                      <span>{categoryData.label}</span>
                     </div>
                   </div>
 
-                  {/* Bottom gradient glass overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
-                    <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
-                      {title}
-                    </h3>
+                  {/* Content Section */}
+                  <div className="p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
+                    <h3 className="text-base font-bold text-white line-clamp-2 mb-1 leading-tight drop-shadow-sm">{title}</h3>
+                    {description && (
+                      <p className="text-xs text-white/90 leading-relaxed mb-2 line-clamp-2 drop-shadow-sm">
+                        {description}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between">
-                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm flex items-center gap-1">
-                        {categoryIcon}
-                        {categoryLabel}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm">
+                          {merchant}
+                        </span>
+                        {categoryData.additionalInfo.createdDate && (
+                          <span className="text-[10px] text-white/80">
+                            {categoryData.additionalInfo.createdDate}
+                          </span>
+                        )}
+                      </div>
+                      {categoryData.additionalInfo.maxGrab && (
+                        <span className="text-[10px] text-white font-medium bg-white/20 px-2 py-1 rounded-md">
+                          {categoryData.additionalInfo.maxGrab}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -551,59 +888,57 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube.id || index}
-                  className="rounded-[16px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
-                  style={{
-                    minWidth: 320,
-                    maxWidth: 360,
-                    cursor: 'pointer'
-                  }}
+                  className="rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
+                  style={{ minWidth: 320, maxWidth: 350, cursor: 'pointer' }}
                   onClick={() => {
+                    if (isInformationCube) {
+                      const code = cube.code || ad?.cube?.code || ad?.code;
+                      if (code) {
+                        const targetUrl = communityId
+                          ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                          : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                        router.push(targetUrl);
+                      }
+                      return;
+                    }
                     if (ad?.id) {
-                      // Cek apakah ini iklan/advertising
                       if (getIsAdvertising(ad, cube)) {
-                        // Arahkan ke halaman iklan yang mendukung community background
-                        router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                        const targetUrl = communityId
+                          ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                          : `/app/iklan/${ad.id}`;
+                        router.push(targetUrl);
                       } else {
-                        // Arahkan ke halaman promo
-                        router.push(
-                          `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
-                        );
+                        const targetUrl = communityId
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
                       }
                     }
                   }}
                 >
-                  {/* Gambar di atas */}
-                  <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
-                    <Image
-                      src={imageUrl}
-                      alt={title}
-                      fill
-                      className="object-contain p-2"
-                    />
-                    {/* Merchant Badge */}
-                    <div className="absolute top-3 left-3 bg-white/80 text-[#5a6e1d] text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm">
-                      {merchant}
+                  {/* Image Section */}
+                  <div className="relative w-full bg-white/20 backdrop-blur-sm overflow-hidden">
+                    <div className="w-full aspect-[4/3] relative">
+                      <Image src={buildImageUrl(imageUrl)} alt={title} fill className="object-cover" />
+                    </div>
+                    <div className="absolute top-3 right-3 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                      <span>{categoryData.icon}</span>
+                      <span>{categoryData.label}</span>
                     </div>
                   </div>
 
-                  {/* Konten bawah */}
-                  <div className="p-4 bg-white border-t border-[#e6e6e6]">
-                    <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">
-                      {title}
-                    </h3>
-                    <p className="text-[13px] text-slate-700 line-clamp-2 mb-3">
-                      {description || 'Temukan berbagai keseruan menarik di komunitas ini!'}
-                    </p>
-
+                  {/* Content Section */}
+                  <div className="p-3 bg-white/20 backdrop-blur-md border-t border-white/20">
+                    <h3 className="text-base font-bold text-white line-clamp-2 mb-1 leading-tight drop-shadow-sm">{title}</h3>
+                    {description && (
+                      <p className="text-xs text-white/90 leading-relaxed mb-2 line-clamp-2 drop-shadow-sm">
+                        {description}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between">
-                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md flex items-center gap-1">
-                        {categoryIcon}
-                        {categoryLabel}
+                      <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm truncate flex-1">
+                        {merchant}
                       </span>
-                      <FontAwesomeIcon
-                        icon={faGift}
-                        className="text-[#3f4820] text-[14px] opacity-80"
-                      />
                     </div>
                   </div>
                 </div>
@@ -615,60 +950,70 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex items-center rounded-[14px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
-                  style={{
-                    minWidth: 280,
-                    maxWidth: 320,
-                    height: 130,
-                    cursor: 'pointer'
-                  }}
+                  className="flex rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md"
+                  style={{ minWidth: 320, maxWidth: 350, cursor: 'pointer' }}
                   onClick={() => {
+                    if (isInformationCube) {
+                      const code = cube.code || ad?.cube?.code || ad?.code;
+                      if (code) {
+                        const targetUrl = communityId
+                          ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                          : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                        router.push(targetUrl);
+                      }
+                      return;
+                    }
                     if (ad?.id) {
-                      // Cek apakah ini iklan/advertising
                       if (getIsAdvertising(ad, cube)) {
-                        // Arahkan ke halaman iklan yang mendukung community background
-                        router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                        const targetUrl = communityId
+                          ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                          : `/app/iklan/${ad.id}`;
+                        router.push(targetUrl);
                       } else {
-                        // Arahkan ke halaman promo
-                        router.push(
-                          `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
-                        );
+                        const targetUrl = communityId
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
                       }
                     }
                   }}
                 >
-                  {/* Gambar kiri */}
-                  <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
-                    <div className="w-[90%] h-[90%] relative">
-                      <Image
-                        src={imageUrl}
-                        alt={title}
-                        fill
-                        className="object-contain rounded-[10px]"
-                      />
+                  {/* Image Section */}
+                  <div className="w-2/5 relative bg-white/20 backdrop-blur-sm overflow-hidden">
+                    <Image src={buildImageUrl(imageUrl)} alt={title} fill className="object-cover" />
+                    <div className="absolute top-2 right-2 bg-black/50 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                      <span>{categoryData.icon}</span>
+                      <span>{categoryData.label}</span>
                     </div>
                   </div>
 
-                  {/* Konten kanan */}
-                  <div className="flex-1 h-full p-3 flex flex-col justify-between bg-white border-l border-[#e6e6e6]">
-                    <div>
-                      <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">
-                        {title}
-                      </h3>
-                      <p className="text-[13px] text-slate-700 line-clamp-2">
-                        {description || 'Welcome to Huehuy!'}
-                      </p>
+                  {/* Content Section */}
+                  <div className="w-3/5 p-3 bg-white/20 backdrop-blur-md border-l border-white/20 flex flex-col justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-[14px] font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm">{title}</h3>
+                      {description && (
+                        <p className="text-[12px] text-white/90 leading-relaxed line-clamp-2 mb-2 drop-shadow-sm">
+                          {description}
+                        </p>
+                      )}
+                      {address && <p className="text-[11px] text-white/80 line-clamp-1 drop-shadow-sm">{address}</p>}
                     </div>
-
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md flex items-center gap-1">
-                        {categoryIcon}
-                        {categoryLabel}
-                      </span>
-                      <FontAwesomeIcon
-                        icon={faGift}
-                        className="text-[#3f4820] text-[13px] opacity-80"
-                      />
+                    <div className="mt-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-white/30 border border-white/40 text-white text-[10px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm">
+                          {merchant}
+                        </span>
+                        {categoryData.additionalInfo.createdDate && (
+                          <span className="text-[10px] text-white/80">
+                            {categoryData.additionalInfo.createdDate}
+                          </span>
+                        )}
+                      </div>
+                      {categoryData.additionalInfo.maxGrab && (
+                        <span className="text-[10px] text-blue-200 font-medium">
+                          {categoryData.additionalInfo.maxGrab}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -681,57 +1026,93 @@ const CommunityPromoPage = () => {
               return (
                 <div
                   key={cube.id || index}
-                  className="flex flex-col rounded-[12px] overflow-hidden border border-[#e6e6e6] bg-white shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
+                  className="flex flex-col rounded-[12px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 hover:scale-[1.02] transition-all duration-300 bg-white/10 backdrop-blur-md"
                   style={{
-                    minWidth: isM ? 180 : 140,
-                    maxWidth: isM ? 200 : 160,
+                    minWidth: isM ? 200 : 160,
+                    maxWidth: isM ? 220 : 180,
+                    height: isM ? 280 : 240,
                     cursor: 'pointer'
                   }}
-                  onClick={() =>
-                    router.push(
-                      `/app/komunitas/promo/detail_promo?promoId=${ad?.id}&communityId=${communityData?.id}`
-                    )
-                  }
+                  onClick={() => {
+                    if (isInformationCube) {
+                      const code = cube.code || ad?.cube?.code || ad?.code;
+                      if (code) {
+                        const targetUrl = communityId
+                          ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+                          : `/app/kubus-informasi/kubus-infor?code=${code}`;
+                        router.push(targetUrl);
+                      }
+                      return;
+                    }
+                    if (ad?.id) {
+                      if (getIsAdvertising(ad, cube)) {
+                        const targetUrl = communityId
+                          ? `/app/iklan/${ad.id}?communityId=${communityId}`
+                          : `/app/iklan/${ad.id}`;
+                        router.push(targetUrl);
+                      } else {
+                        const targetUrl = communityId
+                          ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+                          : `/app/promo/detail_promo?promoId=${ad.id}`;
+                        router.push(targetUrl);
+                      }
+                    }
+                  }}
                 >
-                  {/* Gambar */}
-                  <div
-                    className="relative w-full bg-white flex items-center justify-center overflow-hidden"
-                    style={{ height: isM ? 150 : 120 }}
-                  >
-                    <div className="w-[90%] h-[90%] relative">
+                  {/* Image Section */}
+                  <div className="relative w-full bg-white/20 backdrop-blur-sm overflow-hidden">
+                    <div className="w-full aspect-square relative">
                       <Image
-                        src={imageUrl}
+                        src={buildImageUrl(imageUrl)}
                         alt={title}
                         fill
-                        className="object-contain rounded-[8px]"
+                        className="object-cover"
                       />
                     </div>
+                    <div className="absolute top-2 right-2 bg-black/40 text-white text-[9px] font-semibold px-2 py-1 rounded-full shadow-lg border border-white/30 backdrop-blur-md flex items-center gap-1">
+                      <span>{categoryData.icon}</span>
+                      <span>{categoryData.label}</span>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent h-8"></div>
                   </div>
 
-                  {/* Konten bawah */}
-                  <div className="p-2 bg-white border-t border-[#e6e6e6]">
-                    <h3
-                      className={`${isM ? 'text-[14px]' : 'text-[13px]'
-                        } font-bold text-slate-900 line-clamp-2 mb-0.5`}
-                    >
-                      {title}
-                    </h3>
-                    <p
-                      className={`${isM ? 'text-[12px]' : 'text-[11px]'
-                        } text-slate-700 line-clamp-1`}
-                    >
-                      {description || 'Welcome to Huehuy!'}
-                    </p>
+                  {/* Content Section */}
+                  <div className="flex-1 p-3 bg-white/20 backdrop-blur-md border-t border-white/20 flex flex-col justify-between">
+                    <div className="flex-1">
+                      <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-white line-clamp-2 leading-tight mb-1 drop-shadow-sm`}>
+                        {title}
+                      </h3>
+                      {description && (
+                        <p className={`${isM ? 'text-[11px]' : 'text-[10px]'} text-white/90 leading-relaxed line-clamp-${isM ? '3' : '2'} mb-2 drop-shadow-sm`}>
+                          {description}
+                        </p>
+                      )}
+                      {address && (
+                        <p className={`${isM ? 'text-[10px]' : 'text-[9px]'} text-white/80 line-clamp-1 drop-shadow-sm`}>
+                          {address}
+                        </p>
+                      )}
+                    </div>
 
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md flex items-center gap-1">
-                        {categoryIcon}
-                        {categoryLabel}
-                      </span>
-                      <FontAwesomeIcon
-                        icon={faGift}
-                        className="text-[#3f4820] text-[11px] opacity-80"
-                      />
+                    {/* Footer */}
+                    <div className="mt-2 pt-2 border-t border-white/20">
+                      <div className="flex flex-col gap-1">
+                        <span className="bg-white/30 border border-white/40 text-white text-[9px] font-semibold px-2 py-1 rounded-md backdrop-blur-sm block text-center truncate">
+                          {merchant}
+                        </span>
+                        <div className="flex items-center justify-between">
+                          {categoryData.additionalInfo.createdDate && (
+                            <span className="text-[8px] text-white/70">
+                              {categoryData.additionalInfo.createdDate}
+                            </span>
+                          )}
+                          {categoryData.additionalInfo.maxGrab && (
+                            <span className="text-[8px] text-blue-200 font-medium">
+                              {categoryData.additionalInfo.maxGrab}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -741,18 +1122,18 @@ const CommunityPromoPage = () => {
             return null;
           })}
         </div>
-      </div>
+      </div >
     );
   };
 
   const PromoCard = ({ promo }) => (
     <div
-      className="bg-white rounded-[16px] shadow-sm overflow-hidden mb-4 hover:shadow-md transition-all duration-300 cursor-pointer border border-gray-50"
-      onClick={() => handlePromoClick(promo.id, promo)}
+      className="bg-white/20 backdrop-blur-md rounded-[16px] shadow-lg overflow-hidden mb-4 hover:shadow-xl transition-all duration-300 cursor-pointer border border-white/30"
+      onClick={() => handlePromoClick(promo)}
       style={{ minWidth: 220 }} // buat card bisa jadi item horizontal
     >
       <div className="flex p-4 items-center">
-        <div className="w-28 h-28 rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100">
+        <div className="w-28 h-28 rounded-[12px] overflow-hidden flex-shrink-0 bg-white/10">
           {/* ukuran diperbesar */}
           <Image
             src={promo.image}
@@ -765,10 +1146,10 @@ const CommunityPromoPage = () => {
           />
         </div>
         <div className="flex-1 ml-4 min-w-0 flex flex-col justify-center">
-          <h3 className="font-semibold text-gray-900 text-base leading-tight line-clamp-2 mb-1">
+          <h3 className="font-semibold text-white text-base leading-tight line-clamp-2 mb-1 drop-shadow-sm">
             {promo.title}
           </h3>
-          <p className="text-sm text-gray-500 line-clamp-1">{promo.merchant}</p>
+          <p className="text-sm text-white/90 line-clamp-1 drop-shadow-sm">{promo.merchant}</p>
         </div>
       </div>
     </div>
@@ -852,7 +1233,7 @@ const CommunityPromoPage = () => {
                       <div key="categories" className="mb-6">
                         <div className="mb-2">
                         </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+                        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                           {item.data.map((cat) => {
                             const imgSrc = cat.image || buildImageUrl(cat.picture_source) || '/default-avatar.png';
                             const label = cat.label || cat.name || 'Kategori';
@@ -861,23 +1242,23 @@ const CommunityPromoPage = () => {
                             return (
                               <div
                                 key={id}
-                                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all"
+                                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                                 style={{ minWidth: 90 }}
                                 onClick={() =>
                                   router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
                                 }
                               >
-                                <div className="relative w-[70px] h-[70px] rounded-full overflow-hidden border border-[#d8d8d8] bg-white shadow-sm mb-2">
+                                <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
                                   <Image
                                     src={imgSrc}
                                     alt={label}
                                     fill
-                                    className="object-cover"
+                                    className="object-cover brightness-90"
                                   />
+                                  <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
+                                    <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
+                                  </div>
                                 </div>
-                                <p className="text-[12px] text-slate-700 font-medium text-center line-clamp-2">
-                                  {label}
-                                </p>
                               </div>
                             );
                           })}
@@ -897,7 +1278,7 @@ const CommunityPromoPage = () => {
               <div className="mb-2">
                 <h2 className="text-lg font-bold text-white">Promo Terbaru</h2>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-3 hide-scrollbar">
+              <div className="flex gap-3 overflow-x-auto pb-3 no-scrollbar">
                 {promoData.map((p) => (
                   <div key={p.id} className="flex-shrink-0">
                     <PromoCard promo={p} />
