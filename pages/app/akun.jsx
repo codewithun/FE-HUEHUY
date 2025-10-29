@@ -25,6 +25,24 @@ export default function Akun() {
     path: `account`,
   });
 
+  // Helper function untuk generate vCard
+  const generateVCard = (profile) => {
+    if (!profile) return 'huehuy-user';
+    
+    const vCard = `BEGIN:VCARD
+VERSION:3.0
+FN:${profile.name || 'User HUEHUY'}
+N:${profile.name || 'User HUEHUY'};;;
+EMAIL:${profile.email || ''}
+TEL:${profile.phone || ''}
+ORG:HUEHUY
+NOTE:Kode User: ${profile.code || ''} - Platform HUEHUY
+URL:https://huehuy.app
+END:VCARD`;
+    
+    return vCard;
+  };
+
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
@@ -132,18 +150,21 @@ export default function Akun() {
 
         {/* QR Popup */}
         {showQR && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-            <div className="bg-white rounded-2xl shadow-neuro-in p-6 flex flex-col items-center relative">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+            <div className="bg-white rounded-2xl shadow-neuro-in p-6 flex flex-col items-center relative max-w-sm w-full">
               <button
-                className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"
+                className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-xl font-bold w-8 h-8 flex items-center justify-center"
                 onClick={() => setShowQR(false)}
                 aria-label="Close QR"
               >
-                &times;
+                ×
               </button>
-              <p className="text-sm font-semibold mb-2">Barcode Akun Anda</p>
+              <p className="text-lg font-semibold mb-1 text-center">Barcode Akun Anda</p>
+              <p className="text-xs text-slate-500 mb-4 text-center px-2">
+                Scan dengan kamera HP atau Google Lens untuk melihat info kontak
+              </p>
               <QRCode
-                value={data?.data?.profile?.code || 'huehuy-user'}
+                value={generateVCard(data?.data?.profile)}
                 size={160}
                 bgColor="#f8fafc"
                 fgColor="#0f172a"
@@ -151,9 +172,31 @@ export default function Akun() {
                 includeMargin={true}
                 className="rounded-lg"
               />
-              <p className="text-xs text-slate-400 mt-2">
-                {data?.data?.profile?.code}
+              <p className="text-xs text-slate-400 mt-3 text-center">
+                Scan dengan kamera untuk melihat info kontak
               </p>
+              <p className="text-xs text-slate-500 mt-1 text-center">
+                Kode: {data?.data?.profile?.code}
+              </p>
+              
+              {/* Preview Data */}
+              <div className="mt-4 p-3 bg-slate-50 rounded-lg w-full">
+                <p className="text-xs font-medium text-slate-600 mb-2">Data yang akan ditampilkan:</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-700">
+                    <span className="font-medium">Nama:</span> {data?.data?.profile?.name || '-'}
+                  </p>
+                  <p className="text-xs text-slate-700">
+                    <span className="font-medium">Email:</span> {data?.data?.profile?.email || '-'}
+                  </p>
+                  <p className="text-xs text-slate-700">
+                    <span className="font-medium">No. HP:</span> {data?.data?.profile?.phone || '-'}
+                  </p>
+                  <p className="text-xs text-slate-700">
+                    <span className="font-medium">Platform:</span> HUEHUY
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
