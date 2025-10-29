@@ -1,11 +1,11 @@
 /* eslint-disable no-console */
 import {
-    faArrowLeft,
-    faChevronDown,
-    faChevronUp,
-    faClock,
-    faInfoCircle,
-    faMapMarkerAlt
+  faArrowLeft,
+  faChevronDown,
+  faChevronUp,
+  faClock,
+  faInfoCircle,
+  faMapMarkerAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
@@ -96,7 +96,7 @@ export default function KubusInformasiPage() {
       // Prioritas 2: Gambar dari ads yang aktif
       const ads = Array.isArray(cubeData?.ads) ? cubeData.ads : [];
       const activeAds = ads.filter(a => String(a?.status).toLowerCase() === 'active');
-      
+
       activeAds.forEach(ad => {
         // Untuk kubus informasi, prioritaskan picture_source dari ad
         const imageFields = [ad.picture_source, ad.image_1, ad.image_2, ad.image_3, ad.image];
@@ -122,11 +122,6 @@ export default function KubusInformasiPage() {
     [buildImageUrl]
   );
 
-  // Map index day → nama hari Indonesia
-  const DAY_MAP = useMemo(() => ([
-    'minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'
-  ]), []);
-
   const fmtDayLabel = useCallback((d) => {
     const low = String(d || '').toLowerCase();
     const mapping = {
@@ -142,16 +137,6 @@ export default function KubusInformasiPage() {
       [section]: !prev[section]
     }));
   };
-
-  const buildTodayHours = useCallback((openingHours) => {
-    // Untuk kubus informasi, selalu tersedia
-    return { 
-      day: 'Informasi', 
-      time: 'Selalu Tersedia', 
-      details: 'Tersedia',
-      fullSchedule: openingHours || []
-    };
-  }, []);
 
   const buildFullSchedule = useCallback((openingHours) => {
     if (!Array.isArray(openingHours) || openingHours.length === 0) {
@@ -213,17 +198,43 @@ export default function KubusInformasiPage() {
     return 'Tidak ada deskripsi tersedia.';
   }, []);
 
+  // Helper function untuk extract YouTube video ID dari URL
+  const getYouTubeVideoId = useCallback((url) => {
+    if (!url || typeof url !== 'string') return null;
+
+    const patterns = [
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
+      /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})/,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
+  }, []);
+
+  // Helper function untuk check apakah URL adalah YouTube
+  const isYouTubeLink = useCallback((url) => {
+    if (!url || typeof url !== 'string') return false;
+    return /(?:youtube\.com|youtu\.be)/i.test(url);
+  }, []);
+
   // Fetch community data
   const fetchCommunityData = useCallback(async () => {
     if (!communityId) return;
-    
+
     try {
       const encryptedToken = Cookies.get(token_cookie_name);
       const token = encryptedToken ? Decrypt(encryptedToken) : '';
-      
+
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const apiUrl = baseUrl.replace(/\/api\/?$/, '');
-      
+
       const response = await fetch(`${apiUrl}/api/communities/${communityId}`, {
         method: 'GET',
         headers: {
@@ -231,7 +242,7 @@ export default function KubusInformasiPage() {
           'Authorization': token ? `Bearer ${token}` : '',
         },
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         const community = result.data || result;
@@ -298,9 +309,13 @@ export default function KubusInformasiPage() {
   };
 
   const images = useMemo(() => buildImagesArray(cube), [cube, buildImagesArray]);
-  const todayHours = buildTodayHours(cube?.opening_hours);
   const fullSchedule = buildFullSchedule(cube?.opening_hours);
   const description = buildDescription(cube);
+
+  // Extract link information
+  const linkInformation = cube?.link_information || cube?.tags?.[0]?.link;
+  const youtubeVideoId = getYouTubeVideoId(linkInformation);
+  const hasYouTubeLink = isYouTubeLink(linkInformation);
 
   // Get community background style
   const communityBgStyle = getCommunityGradient(
@@ -430,7 +445,7 @@ export default function KubusInformasiPage() {
           {/* Jadwal Ketersediaan */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
-              <button 
+              <button
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
                 onClick={() => toggleSection('schedule')}
               >
@@ -438,8 +453,8 @@ export default function KubusInformasiPage() {
                   <FontAwesomeIcon icon={faClock} className="mr-3 text-slate-600 text-sm" />
                   <span className="font-semibold text-slate-900 text-sm">Jadwal Ketersediaan</span>
                 </div>
-                <FontAwesomeIcon 
-                  icon={expandedSections.schedule ? faChevronUp : faChevronDown} 
+                <FontAwesomeIcon
+                  icon={expandedSections.schedule ? faChevronUp : faChevronDown}
                   className="text-slate-400 text-sm"
                 />
               </button>
@@ -449,11 +464,10 @@ export default function KubusInformasiPage() {
                     <div key={index} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-b-0">
                       <span className="font-medium text-slate-900 text-xs flex-1">{schedule.day}</span>
                       <span className="text-slate-600 text-xs flex-1 text-center">{schedule.time}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium min-w-[80px] text-center ${
-                        schedule.status.toLowerCase() === 'tersedia' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium min-w-[80px] text-center ${schedule.status.toLowerCase() === 'tersedia'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                        }`}>
                         {schedule.status}
                       </span>
                     </div>
@@ -466,7 +480,7 @@ export default function KubusInformasiPage() {
           {/* Detail Informasi */}
           <div className="mb-4">
             <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
-              <button 
+              <button
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
                 onClick={() => toggleSection('description')}
               >
@@ -474,8 +488,8 @@ export default function KubusInformasiPage() {
                   <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
                   <span className="font-semibold text-slate-900 text-sm">Detail Informasi</span>
                 </div>
-                <FontAwesomeIcon 
-                  icon={expandedSections.description ? faChevronUp : faChevronDown} 
+                <FontAwesomeIcon
+                  icon={expandedSections.description ? faChevronUp : faChevronDown}
                   className="text-slate-400 text-sm"
                 />
               </button>
@@ -489,11 +503,68 @@ export default function KubusInformasiPage() {
             </div>
           </div>
 
+          {/* Video/Link Section */}
+          {linkInformation && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center mb-3">
+                    <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
+                    <span className="font-semibold text-slate-900 text-sm">
+                      {hasYouTubeLink ? 'Video Informasi' : 'Link Informasi'}
+                    </span>
+                  </div>
+
+                  {hasYouTubeLink && youtubeVideoId ? (
+                    <div className="space-y-3">
+                      {/* YouTube Embed */}
+                      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                        <iframe
+                          className="absolute top-0 left-0 w-full h-full rounded-lg"
+                          src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+                          title="Video Informasi"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                      {/* Link to YouTube */}
+                      <a
+                        href={linkInformation}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                        </svg>
+                        Tonton di YouTube
+                      </a>
+                    </div>
+                  ) : (
+                    /* Regular Link */
+                    <a
+                      href={linkInformation}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg transition-colors text-sm group"
+                    >
+                      <span className="truncate flex-1">{linkInformation}</span>
+                      <svg className="w-5 h-5 flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Lokasi (jika ada data lokasi) */}
           {cube?.location && (
             <div className="mb-20 lg:mb-8">
               <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
-                <button 
+                <button
                   className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
                   onClick={() => toggleSection('location')}
                 >
@@ -501,8 +572,8 @@ export default function KubusInformasiPage() {
                     <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-3 text-slate-600 text-sm" />
                     <span className="font-semibold text-slate-900 text-sm">Lokasi</span>
                   </div>
-                  <FontAwesomeIcon 
-                    icon={expandedSections.location ? faChevronUp : faChevronDown} 
+                  <FontAwesomeIcon
+                    icon={expandedSections.location ? faChevronUp : faChevronDown}
                     className="text-slate-400 text-sm"
                   />
                 </button>

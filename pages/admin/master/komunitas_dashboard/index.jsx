@@ -12,6 +12,7 @@ import {
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
 import InputHexColor from "../../../../components/construct.components/input/InputHexColor";
 import { token_cookie_name } from "../../../../helpers";
+import { admin_token_cookie_name } from "../../../../helpers/api.helpers";
 import { Decrypt } from "../../../../helpers/encryption.helpers";
 
 /** =============================
@@ -76,7 +77,10 @@ export default function KomunitasDashboard() {
   // Fetch Mitra (Corporates) untuk dropdown "Mitra"
   useEffect(() => {
     const fetchCorporates = async () => {
-      const encryptedToken = Cookies.get(token_cookie_name);
+      // Ambil token admin (cookie atau localStorage) agar kompatibel Safari
+      const encFromCookie = Cookies.get(admin_token_cookie_name);
+      const encFromLs = typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null;
+      const encryptedToken = encFromCookie || encFromLs || Cookies.get(token_cookie_name) || null;
       const token = encryptedToken ? Decrypt(encryptedToken) : "";
       try {
         setCorporateLoading(true);
@@ -99,7 +103,10 @@ export default function KomunitasDashboard() {
   /** ============ HELPERS ============ */
   // Ganti helper headers agar GET tidak kirim Content-Type
   const authHeaders = (method = "GET") => {
-    const encryptedToken = Cookies.get(token_cookie_name);
+    // Prioritaskan token admin; fallback ke user bila ada
+    const encFromCookie = Cookies.get(admin_token_cookie_name);
+    const encFromLs = typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null;
+    const encryptedToken = encFromCookie || encFromLs || Cookies.get(token_cookie_name) || null;
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     const base = { Authorization: `Bearer ${token}`, Accept: "application/json" };
     // Hanya kirim Content-Type untuk method yang punya body JSON
@@ -110,7 +117,9 @@ export default function KomunitasDashboard() {
   };
 
   const authHeadersMultipart = () => {
-    const encryptedToken = Cookies.get(token_cookie_name);
+    const encFromCookie = Cookies.get(admin_token_cookie_name);
+    const encFromLs = typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null;
+    const encryptedToken = encFromCookie || encFromLs || Cookies.get(token_cookie_name) || null;
     const token = encryptedToken ? Decrypt(encryptedToken) : "";
     return { Authorization: `Bearer ${token}` };
   };

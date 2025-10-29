@@ -139,12 +139,31 @@ export default function Index() {
           linkPath="/admin/master/mitra"
         />
         <DashboardCard
-          label="Dunia"
-          // loading={dashboardLoading}
-          value={data?.data?.worlds}
+          label="Komunitas"
+          value={(() => {
+            const d = data?.data;
+            if (!d) return 0;
+
+            // urutan prioritas berdasarkan struktur umum dashboard
+            if (typeof d.worlds_count === "number") return d.worlds_count;
+            if (typeof d.world_count === "number") return d.world_count;
+            if (typeof d.communities_count === "number") return d.communities_count;
+
+            // kalau isinya array, hitung panjangnya
+            if (Array.isArray(d.worlds)) return d.worlds.length;
+            if (Array.isArray(d.communities)) return d.communities.length;
+
+            // fallback terakhir (misal ada field worlds tapi bukan array)
+            if (typeof d.worlds === "number") return d.worlds;
+            if (typeof d.communities === "number") return d.communities;
+
+            // default aman
+            return 0;
+          })()}
           icon={faGlobe}
-          linkPath="/admin/master/dunia"
+          linkPath="/admin/master/komunitas_dashboard"
         />
+
         {/* Event card removed as the feature is no longer used */}
         <DashboardCard
           label="Iklan"

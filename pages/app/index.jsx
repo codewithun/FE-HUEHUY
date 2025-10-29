@@ -30,6 +30,26 @@ import { useGet } from '../../helpers';
 import { distanceConvert } from '../../helpers/distanceConvert.helpers';
 
 export default function Index() {
+
+  const getNormalizedType = (ad) => {
+    const t1 = String(ad?.type || '').toLowerCase();
+    const t2 = String(ad?.cube?.type || '').toLowerCase();
+    const ct = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+
+    // Informasi menang duluan
+    if (normalizeBoolLike(ad?.is_information) || normalizeBoolLike(ad?.cube?.is_information)) return 'information';
+    if (t1 === 'information' || t2 === 'information' || ct === 'kubus-informasi') return 'information';
+
+    // Voucher jelas
+    if (t1 === 'voucher' || normalizeBoolLike(ad?.is_voucher) || normalizeBoolLike(ad?.voucher)) return 'voucher';
+
+    // Iklan jelas (HANYA dari type/flag, BUKAN kategori)
+    if (t1 === 'iklan' || t2 === 'iklan' || normalizeBoolLike(ad?.is_advertising) || normalizeBoolLike(ad?.advertising)) return 'iklan';
+
+    // Default aman
+    return 'promo';
+  };
+
   const [map, setMap] = useState(null);
   const [apiReady, setApiReady] = useState(false);
 
@@ -139,22 +159,11 @@ export default function Index() {
   };
 
   const getCategoryLabel = (ad) => {
-    // 1) Utamakan flag Informasi
-    if (getIsInformation(ad)) return 'Informasi';
-
-    // 2) Mapping berdasarkan type dari BE
-    const typeStr = String(ad?.type || '').toLowerCase();
-    if (typeStr === 'iklan') return 'Advertising';
-    if (typeStr === 'voucher') return 'Voucher';
-
-    // 3) Fallback ke kategori dari BE
-    const rawCat = (ad?.ad_category?.name || '').trim();
-    if (!rawCat) return 'Promo';
-
-    // kalau kategori BE memang "Advertising", tampilkan apa adanya
-    if (rawCat.toLowerCase() === 'advertising') return 'Advertising';
-
-    return rawCat;
+    const t = getNormalizedType(ad);
+    if (t === 'information') return 'Informasi';
+    if (t === 'voucher') return 'Voucher';
+    if (t === 'iklan') return 'Advertising';
+    return 'Promo'; // <- default wajib Promo
   };
 
   const isPromoOnly = (ad) => {

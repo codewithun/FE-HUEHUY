@@ -46,11 +46,11 @@ export function AdminLayout({ children }) {
           icon: faHandshake,
           path: 'master/mitra',
         },
-        {
-          label: 'Dunia',
-          icon: faGlobe,
-          path: 'master/dunia',
-        },
+        // {
+        //   label: 'Dunia',
+        //   icon: faGlobe,
+        //   path: 'master/dunia',
+        // },
         {
           label: 'Kategori Iklan',
           icon: faTags,
@@ -90,16 +90,16 @@ export function AdminLayout({ children }) {
             { label: 'Kontak Admin', path: 'master/kontak' },
           ],
         },
-        {
-          label: 'Manajemen Voucher',
-          icon: faTags,
-          path: 'master/voucher',
-        },
-        {
-          label: 'Manajemen Promo', // Tambahkan menu promo
-          icon: faBullhorn,
-          path: 'master/promo_dashborad',
-        },
+        // {
+        //   label: 'Manajemen Voucher',
+        //   icon: faTags,
+        //   path: 'master/voucher',
+        // },
+        // {
+        //   label: 'Manajemen Promo', // Tambahkan menu promo
+        //   icon: faBullhorn,
+        //   path: 'master/promo_dashborad',
+        // },
         {
           label: 'Manajemen Komunitas',
           icon: faUsers, // Tambahkan icon komunitas, import dulu di atas

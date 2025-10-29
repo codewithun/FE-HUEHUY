@@ -76,22 +76,125 @@ const CommunityPromoPage = () => {
     }
   };
 
+  // === Helper functions untuk label (sama seperti di home.jsx) ===
+  const normalizeBoolLike = (val) => {
+    if (val === true || val === 1) return true;
+    if (typeof val === 'number') return val === 1;
+    if (Array.isArray(val)) return val.length > 0 && (val.includes(1) || val.includes('1') || val.includes(true));
+    if (typeof val === 'string') {
+      const s = val.trim().toLowerCase();
+      if (['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s)) return true;
+      if (['0', 'false', 'n', 'no', 'off', ''].includes(s)) return false;
+      try { return normalizeBoolLike(JSON.parse(val)); } catch { }
+    }
+    return !!val;
+  };
+
+  const getIsInformation = (item) => {
+    if (!item) return false;
+
+    // Prioritas pengecekan:
+    // 1. Field is_information di item atau cube
+    const itemInfo = normalizeBoolLike(item?.is_information);
+    const cubeInfo = normalizeBoolLike(item?.cube?.is_information);
+
+    // 2. Content type yang spesifik untuk kubus informasi
+    const itemContentType = String(item?.content_type || '').toLowerCase();
+    const cubeContentType = String(item?.cube?.content_type || '').toLowerCase();
+    const contentTypeInfo = ['kubus-informasi', 'information', 'informasi'].includes(itemContentType) ||
+      ['kubus-informasi', 'information', 'informasi'].includes(cubeContentType);
+
+    // 3. Type field yang menunjukkan informasi
+    const itemType = String(item?.type || '').toLowerCase();
+    const cubeType = String(item?.cube?.type || '').toLowerCase();
+    const typeInfo = ['information', 'informasi', 'kubus-informasi'].includes(itemType) ||
+      ['information', 'informasi', 'kubus-informasi'].includes(cubeType);
+
+    // 4. Cube type name yang menunjukkan informasi
+    const cubeTypeName = String(item?.cube_type?.name || item?.cube?.cube_type?.name || '').toLowerCase();
+    const cubeTypeInfo = ['information', 'informasi', 'kubus informasi', 'kubus-informasi'].includes(cubeTypeName);
+
+    return itemInfo || cubeInfo || contentTypeInfo || typeInfo || cubeTypeInfo;
+  };
+
+  const getNormalizedType = (ad, cube = null) => {
+    const t1 = String(ad?.type || '').toLowerCase();
+    const t2 = String(cube?.type || ad?.cube?.type || '').toLowerCase();
+    const ct = String(cube?.content_type || ad?.content_type || '').toLowerCase();
+
+    // Informasi menang duluan
+    if (normalizeBoolLike(ad?.is_information) || normalizeBoolLike(ad?.cube?.is_information) || normalizeBoolLike(cube?.is_information)) return 'information';
+    if (t1 === 'information' || t2 === 'information' || ['kubus-informasi', 'information', 'informasi'].includes(ct)) return 'information';
+
+    // Voucher
+    if (t1 === 'voucher' || normalizeBoolLike(ad?.is_voucher) || normalizeBoolLike(ad?.voucher)) return 'voucher';
+
+    // Iklan (HANYA dari type/flag, BUKAN kategori)
+    if (t1 === 'iklan' || t2 === 'iklan' || normalizeBoolLike(ad?.is_advertising) || normalizeBoolLike(ad?.advertising)) return 'iklan';
+
+    // Default aman
+    return 'promo';
+  };
+
+  const getCategoryLabel = (ad, cube = null) => {
+    const t = getNormalizedType(ad, cube);
+    if (t === 'information') return 'Informasi';
+    if (t === 'voucher') return 'Voucher';
+    if (t === 'iklan') return 'Advertising';
+    return 'Promo';
+  };
+
+  // Professional SVG icons for categories
+  const CategoryIcons = {
+    advertising: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z" />
+      </svg>
+    ),
+    information: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+      </svg>
+    ),
+    voucher: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M4,4A2,2 0 0,0 2,6V10C3.11,10 4,10.9 4,12A2,2 0 0,1 2,14V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V14C20.89,14 20,13.1 20,12A2,2 0 0,1 22,10V6A2,2 0 0,0 20,4H4M4,6H20V8.54C18.81,9.23 18,10.53 18,12C18,13.47 18.81,14.77 20,15.46V18H4V15.46C5.19,14.77 6,13.47 6,12C6,10.53 5.19,9.23 4,8.54V6Z" />
+      </svg>
+    ),
+    promo: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+      </svg>
+    ),
+    default: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+      </svg>
+    )
+  };
+
+  // Helper function to get appropriate icon for each category type
+  const getCategoryIcon = (category) => {
+    const categoryLower = String(category || '').toLowerCase();
+
+    switch (categoryLower) {
+      case 'advertising':
+        return CategoryIcons.advertising;
+      case 'informasi':
+      case 'information':
+        return CategoryIcons.information;
+      case 'voucher':
+        return CategoryIcons.voucher;
+      case 'promo':
+        return CategoryIcons.promo;
+      default:
+        return CategoryIcons.default;
+    }
+  };
+
   // Fungsi untuk mengidentifikasi iklan/advertising
   const getIsAdvertising = (ad, cube = null) => {
-    if (!ad && !cube) return false;
-    
-    // 1) Cek type
-    const typeStr = String(ad?.type || '').toLowerCase();
-    if (typeStr === 'iklan') return true;
-    
-    // 2) Cek kategori
-    const rawCat = (ad?.ad_category?.name || '').toLowerCase();
-    if (rawCat === 'advertising') return true;
-    
-    // 3) Cek flag advertising
-    if (ad?.is_advertising || ad?.advertising) return true;
-    
-    return false;
+    return getNormalizedType(ad, cube) === 'iklan';
   };
 
   const normalizePromos = (arr = []) => {
@@ -383,7 +486,9 @@ const CommunityPromoPage = () => {
             const title = ad?.title || cube?.label || 'Promo';
             const merchant = ad?.merchant || communityData?.name || 'Merchant';
             const description = ad?.description || '';
-            const category = cube?.category || 'Informasi';
+            // Gunakan fungsi getCategoryLabel untuk mendapatkan label yang benar
+            const categoryLabel = getCategoryLabel(ad, cube);
+            const categoryIcon = getCategoryIcon(categoryLabel);
 
             // ===== XL-ADS
             if (size === 'XL-Ads') {
@@ -431,8 +536,9 @@ const CommunityPromoPage = () => {
                       {title}
                     </h3>
                     <div className="flex items-center justify-between">
-                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm">
-                        {category}
+                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm flex items-center gap-1">
+                        {categoryIcon}
+                        {categoryLabel}
                       </span>
                     </div>
                   </div>
@@ -490,8 +596,9 @@ const CommunityPromoPage = () => {
                     </p>
 
                     <div className="flex items-center justify-between">
-                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
-                        {cube.category || 'Informasi'}
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md flex items-center gap-1">
+                        {categoryIcon}
+                        {categoryLabel}
                       </span>
                       <FontAwesomeIcon
                         icon={faGift}
@@ -554,8 +661,9 @@ const CommunityPromoPage = () => {
                     </div>
 
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
-                        {cube.category || 'Advertising'}
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md flex items-center gap-1">
+                        {categoryIcon}
+                        {categoryLabel}
                       </span>
                       <FontAwesomeIcon
                         icon={faGift}
@@ -616,8 +724,9 @@ const CommunityPromoPage = () => {
                     </p>
 
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">
-                        {cube.category || 'Advertising'}
+                      <span className="bg-transparent border border-[#cdd0b3] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md flex items-center gap-1">
+                        {categoryIcon}
+                        {categoryLabel}
                       </span>
                       <FontAwesomeIcon
                         icon={faGift}
@@ -643,7 +752,7 @@ const CommunityPromoPage = () => {
       style={{ minWidth: 220 }} // buat card bisa jadi item horizontal
     >
       <div className="flex p-4 items-center">
-        <div className="w-28 h-28 rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100"> 
+        <div className="w-28 h-28 rounded-[12px] overflow-hidden flex-shrink-0 bg-gray-100">
           {/* ukuran diperbesar */}
           <Image
             src={promo.image}
@@ -712,7 +821,7 @@ const CommunityPromoPage = () => {
               {(() => {
                 // Create combined items with widgets and categories at correct level
                 const items = [];
-                
+
                 // Add all widgets
                 widgetData.forEach(widget => {
                   items.push({
@@ -721,7 +830,7 @@ const CommunityPromoPage = () => {
                     data: widget
                   });
                 });
-                
+
                 // Add category block if available
                 if (adCategories.length > 0 && adCategoryLevel !== null) {
                   items.push({
@@ -730,10 +839,10 @@ const CommunityPromoPage = () => {
                     data: adCategories
                   });
                 }
-                
+
                 // Sort by level
                 items.sort((a, b) => a.level - b.level);
-                
+
                 // Render items
                 return items.map((item) => {
                   if (item.type === 'widget') {
