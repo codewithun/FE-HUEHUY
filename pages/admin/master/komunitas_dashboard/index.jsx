@@ -14,6 +14,7 @@ import InputHexColor from "../../../../components/construct.components/input/Inp
 import { token_cookie_name } from "../../../../helpers";
 import { admin_token_cookie_name } from "../../../../helpers/api.helpers";
 import { Decrypt } from "../../../../helpers/encryption.helpers";
+import { faCubes } from "@fortawesome/free-solid-svg-icons";
 
 /** =============================
  *  Helpers
@@ -143,21 +144,32 @@ export default function KomunitasDashboard() {
     setCubeList([]);
 
     try {
-      const res = await fetch(apiJoin(`admin/communities/${communityRow.id}/cubes`), {
-        method: "GET",
-        headers: authHeaders("GET"),
-      });
+      // ambil dari endpoint baru yang terhubung ke widget
+      const url = apiJoin(`admin/communities/${communityRow.id}/cubes`);
+      const res = await fetch(url, { headers: authHeaders("GET") });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const json = await res.json().catch(() => ({}));
-      const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      const d = json?.data ?? json;
+      const rows = Array.isArray(d)
+        ? d
+        : Array.isArray(d?.data)
+          ? d.data
+          : Array.isArray(json)
+            ? json
+            : [];
+      console.log("CUBE RESPONSE:", rows);
       setCubeList(rows);
+
     } catch (err) {
       console.error("Gagal memuat kubus:", err);
-      setCubeError("Tidak bisa memuat daftar kubus.");
+      setCubeError("Tidak bisa memuat daftar kubus komunitas ini.");
     } finally {
       setCubeLoading(false);
     }
   };
+
+
 
 
   /** ============ MEMBERS MODAL ACTIONS ============ */
@@ -443,7 +455,6 @@ export default function KomunitasDashboard() {
           except: ["detail"],
           include: (row) => (
             <div className="flex items-center gap-2">
-              {/* Hapus tombol Kategori */}
               <ButtonComponent
                 label="Anggota"
                 icon={faUsers}
@@ -451,13 +462,23 @@ export default function KomunitasDashboard() {
                 paint="secondary"
                 variant="solid"
                 rounded
-                disabled={memberLoading}                 // cegah spam click
+                disabled={memberLoading}
                 onClick={() => {
-                  if (!memberLoading) openMemberModal(row); // guard race
+                  if (!memberLoading) openMemberModal(row);
                 }}
               />
+              <ButtonComponent
+                label="Lihat Kubus"
+                icon={faCubes}
+                size="xs"
+                paint="info"
+                variant="outline"
+                rounded
+                onClick={() => openCubesModal(row)}
+              />
             </div>
-          ),
+          )
+
         }}
         formControl={{
           contentType: "multipart/form-data",
@@ -1135,6 +1156,91 @@ export default function KomunitasDashboard() {
                 except: ["edit", "delete", "detail"],
               }}
             />
+          )}
+        </div>
+      </FloatingPageComponent>
+
+      {/* CUBES MODAL */}
+      <FloatingPageComponent
+        show={modalCubes}
+        onClose={() => {
+          setModalCubes(false);
+          setCubeList([]);
+          setCubeError("");
+        }}
+        title={`Daftar Kubus: ${activeCommunity?.name || "-"}`}
+        size="lg"
+      >
+        <div className="p-6">
+          {cubeLoading ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Memuat kubus…</div>
+          ) : cubeError ? (
+            <div className="py-10 text-center text-red-600 font-semibold">{cubeError}</div>
+          ) : cubeList.length === 0 ? (
+            <div className="py-10 text-center text-gray-500 font-medium">Tidak ada kubus dalam komunitas ini.</div>
+          ) : (
+            // ⬇️ DI SINI kamu tempelkan TableSupervisionComponent barumu
+            <TableSupervisionComponent
+              key={`cube-table-${activeCommunity?.id}-${cubeList.length}`}
+              title={`Daftar Kubus (${cubeList.length})`}
+              data={cubeList}
+              customTopBar={<div />}
+              noControlBar={true}
+              unUrlPage={true}
+              searchable
+              columnControl={{
+                custom: [
+                  {
+                    selector: "name",
+                    label: "Nama Kubus",
+                    item: (cube) => cube.name ?? "-",
+                  },
+                  {
+                    selector: "widget_name",
+                    label: "Widget Asal",
+                    item: (cube) => (
+                      <div>
+                        <span className="font-medium text-gray-800">{cube.widget_name ?? "-"}</span>
+                        <div className="text-xs text-gray-500 italic">
+                          ({cube.widget_type ?? "unknown"})
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    selector: "type",
+                    label: "Status",
+                    item: (cube) => (
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-xs ${cube.type === "active"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-600"
+                          }`}
+                      >
+                        {cube.type === "active" ? "Aktif" : "Nonaktif"}
+                      </span>
+                    ),
+                  },
+                  {
+                    selector: "created_at",
+                    label: "Dibuat Pada",
+                    item: (cube) =>
+                      cube.created_at
+                        ? new Date(cube.created_at).toLocaleDateString("id-ID", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })
+                        : "-",
+                  },
+                ],
+              }}
+              actionControl={{
+                // Hilangkan tombol Ubah (edit) dan Hapus (delete)
+                except: ["edit", "delete"],
+              }}
+            />
+            // ⬆️ tempelkan di sini
           )}
         </div>
       </FloatingPageComponent>
