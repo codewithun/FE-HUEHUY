@@ -15,6 +15,8 @@ import {
 import { get, token_cookie_name, useForm } from '../../helpers';
 import { Encrypt } from '../../helpers/encryption.helpers';
 
+const admin_token_cookie_name = `${token_cookie_name}_admin`;
+
 export default function Login() {
   const router = useRouter();
   const [loadingScreen, setLoadingScreen] = useState(true);
@@ -27,31 +29,38 @@ export default function Login() {
     console.log('Full data:', data);
     // eslint-disable-next-line no-console
     console.log('Status Code:', data?.status);
-    
+
     // REKOMENDASI: Simpan token dari field data.token
     const token = data?.data?.token;
-    
+
     if (token) {
       // eslint-disable-next-line no-console
       console.log('Admin token found, saving...');
-      
+
+      // GUNAKAN COOKIE KHUSUS ADMIN
       Cookies.set(
-        token_cookie_name,
+        admin_token_cookie_name,
         Encrypt(token),
-        { expires: 365, secure: true }
+        { expires: 365, secure: process.env.NODE_ENV === 'production' }
       );
+      // Safari fallback: simpan juga ke localStorage agar helper bisa mengambilnya
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(admin_token_cookie_name, Encrypt(token));
+        }
+      } catch { }
 
       // PERBAIKAN: Cek role dan redirect sesuai role
       const role = data?.data?.role || data?.role;
       const user = data?.data?.user || data?.user;
-      
+
       // eslint-disable-next-line no-console
       console.log('Admin role:', role, 'User:', user);
-      
+
       // Admin role check - berbagai kemungkinan struktur role
-      const isAdmin = role?.id === 1 || role?.name === 'admin' || role === 'admin' || 
-                     user?.role === 'admin' || user?.role_id === 1;
-      
+      const isAdmin = role?.id === 1 || role?.name === 'admin' || role === 'admin' ||
+        user?.role === 'admin' || user?.role_id === 1;
+
       if (isAdmin) {
         // eslint-disable-next-line no-console
         console.log('Admin access confirmed, redirecting to dashboard...');
@@ -89,13 +98,16 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name)) {
-      router.push('/corporate/dashboard');
+    const adminToken = Cookies.get(admin_token_cookie_name) || (typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null);
+
+    if (adminToken) {
+      router.push('/admin/dashboard'); // ✅ bukan corporate!
     } else {
       setLoadingScreen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   if (!loadingScreen) {
     return (

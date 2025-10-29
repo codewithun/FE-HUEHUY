@@ -90,7 +90,7 @@ const joinCommunityAPI = async (communityId) => {
     // sematkan properti tambahan supaya caller bisa memutuskan fallback
     error.code = res.status;
     if (errBody && typeof errBody === 'object') {
-      try { Object.assign(error, errBody); } catch {}
+      try { Object.assign(error, errBody); } catch { }
     }
     throw error;
   }
@@ -151,12 +151,12 @@ const normalizeCommunities = (raw) => {
   // backend kita sekarang balikin { data: [...] }, tapi handle array langsung
   const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
   return list.map((c) => {
-  // Normalisasi privacy dari beberapa kemungkinan field
-  const privacyRaw = c.privacy ?? c.world_type ?? c.type ?? 'public';
-  const privacyStr = String(privacyRaw || '').toLowerCase();
+    // Normalisasi privacy dari beberapa kemungkinan field
+    const privacyRaw = c.privacy ?? c.world_type ?? c.type ?? 'public';
+    const privacyStr = String(privacyRaw || '').toLowerCase();
 
-  // Selaraskan dengan backend: treat 'pribadi' as private
-  let privacy = privacyStr === 'pribadi' ? 'private' : (privacyStr || 'public');
+    // Selaraskan dengan backend: treat 'pribadi' as private
+    let privacy = privacyStr === 'pribadi' ? 'private' : (privacyStr || 'public');
 
     // Tetap hormati flag boolean is_private/private bila ada.
     const isPrivateFlag = (c.is_private ?? c.private);
@@ -232,6 +232,19 @@ const fetchCommunitiesWithMembership = async () => {
     // bentuk standar
     const normalized = normalizeCommunities(data);
 
+    // 🔄 Hitung semua promo milik komunitas (tanpa filter aktif)
+    await Promise.all(
+      normalized.map(async (c, i) => {
+        try {
+          const count = await fetchAllPromoCount(c.id);
+          normalized[i].activePromos = count;
+        } catch {
+          normalized[i].activePromos = 0;
+        }
+      })
+    );
+
+
     // kalau ini endpoint utama (with-membership), biasanya sudah ada isJoined
     if (url.endsWith('/with-membership')) {
       return normalized;
@@ -251,12 +264,33 @@ const fetchCommunitiesWithMembership = async () => {
             isJoined: userIds.has(c.id),
           }));
         }
-      } catch {}
+      } catch { }
       return normalized;
     }
   }
 
   return [];
+};
+
+/* ----- MOVED TO TOP-LEVEL: Hitung semua promo (apapun statusnya) milik komunitas ----- */
+const fetchAllPromoCount = async (communityId) => {
+  const apiUrl = getApiBase();
+  const headers = getAuthHeaders();
+
+  try {
+    // tanpa filter is_active
+    const res = await fetch(`${apiUrl}/api/admin/promos?community_id=${communityId}`, { headers });
+    if (!res.ok) return 0;
+    const data = await res.json().catch(() => ({}));
+
+    // handle berbagai bentuk respons
+    if (Array.isArray(data?.data)) return data.data.length; // format Laravel paginated
+    if (Array.isArray(data)) return data.length;            // format array langsung
+    if (typeof data?.total === "number") return data.total; // format { total: n }
+    return 0;
+  } catch {
+    return 0;
+  }
 };
 
 /** =========================
@@ -269,7 +303,7 @@ export default function Komunitas() {
   const [isClient, setIsClient] = useState(false);
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Notification states
   const [notification, setNotification] = useState({
     show: false,
@@ -340,7 +374,7 @@ export default function Komunitas() {
             };
           })
         );
-      } catch {}
+      } catch { }
     };
 
     // Saat user balik ke tab ini → refetch biar pasti akurat
@@ -441,31 +475,28 @@ export default function Komunitas() {
               <div className="px-4">
                 <div className="flex space-x-8">
                   <button
-                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
-                      activeTab === 'semua'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'semua'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                      }`}
                     onClick={() => setActiveTab('semua')}
                   >
                     Semua Komunitas
                   </button>
                   <button
-                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
-                      activeTab === 'komunitasku'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'komunitasku'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                      }`}
                     onClick={() => setActiveTab('komunitasku')}
                   >
                     Komunitas Saya
                   </button>
                   <button
-                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${
-                      activeTab === 'belum-gabung'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
+                    className={`py-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'belum-gabung'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                      }`}
                     onClick={() => setActiveTab('belum-gabung')}
                   >
                     Tersedia
@@ -569,7 +600,7 @@ export default function Komunitas() {
                                   'community:membership',
                                   JSON.stringify({ id: c.id, action: 'join', delta: +1, at: Date.now() })
                                 );
-                              } catch {}
+                              } catch { }
                               fetchCommunities();
                             }
                           } catch (error) {
@@ -620,12 +651,12 @@ function CommunityCard({
   onShowJoinPopup,
 }) {
   const [isJoined, setIsJoined] = useState(Boolean(community.isJoined));
-  
+
   // Gunakan privacy yang sudah dinormalisasi; map 'pribadi' -> 'private'
   const rawPrivacy = String(community?.privacy || '').toLowerCase();
   const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
   const isPrivate = privacy === 'private';
-  
+
   const [justJoined, setJustJoined] = useState(false);
 
   // Gradient murni dari warna BE (tanpa dummy kategori)
@@ -698,11 +729,11 @@ function CommunityCard({
       }
     >
       {/* Community Color Banner */}
-      <div 
+      <div
         className="h-3 w-full rounded-t-xl"
         style={getCommunityGradient(community.bg_color_1, community.bg_color_2)}
       />
-      
+
       <div className="p-5">
         <div className="flex gap-4">
           {/* Community Logo */}
@@ -717,7 +748,7 @@ function CommunityCard({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div 
+                <div
                   className="w-full h-full rounded-xl flex items-center justify-center"
                   style={getCommunityGradient(community.bg_color_1, community.bg_color_2)}
                 >

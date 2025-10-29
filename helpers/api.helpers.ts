@@ -8,6 +8,9 @@ import fileDownload from 'js-file-download';
 import { Decrypt } from './encryption.helpers';
 import { standIn } from './standIn.helpers';
 
+// Gunakan cookie terpisah untuk admin agar tidak tabrakan dengan user biasa
+export const admin_token_cookie_name = `${token_cookie_name}_admin`;
+
 // =========================>
 // ## Utils ss
 // =========================>
@@ -19,30 +22,59 @@ const buildBaseUrl = (base?: string, path?: string) => {
 
 const getAuthHeader = () => {
   try {
-    const enc = Cookies.get(token_cookie_name);
+    const isBrowser = typeof window !== 'undefined';
+    const isAdminScope = isBrowser && typeof window.location?.pathname === 'string'
+      ? window.location.pathname.startsWith('/admin')
+      : false;
+
+    // Prioritaskan token sesuai scope (admin atau user), tapi tetap fallback ke yang lain
+    const names = isAdminScope
+      ? [admin_token_cookie_name, token_cookie_name]
+      : [token_cookie_name, admin_token_cookie_name];
+
+    let enc: string | undefined = undefined;
+    for (const name of names) {
+      enc = Cookies.get(name);
+      if (!enc && isBrowser) {
+        const ls = localStorage.getItem(name);
+        enc = ls === null ? undefined : ls;
+      }
+      if (enc) break;
+    }
+
     if (!enc) {
       // eslint-disable-next-line no-console
-      console.debug('No encrypted token found in cookies');
+      console.debug('No encrypted token found (cookies/localStorage) for user/admin');
       return {};
     }
 
     const token = Decrypt(enc);
     if (!token || token.trim() === '') {
       // eslint-disable-next-line no-console
-      console.warn('Token decryption failed or empty token, clearing cookie');
-      // Clear corrupted cookie
-      Cookies.remove(token_cookie_name);
+      console.warn('Token decryption failed or empty; clearing storages');
+      try {
+        Cookies.remove(token_cookie_name);
+        Cookies.remove(admin_token_cookie_name);
+        if (isBrowser) {
+          localStorage.removeItem(token_cookie_name);
+          localStorage.removeItem(admin_token_cookie_name);
+        }
+      } catch {}
       return {};
     }
 
-    // eslint-disable-next-line no-console
-    console.debug('Token found and decrypted successfully, length:', token.length);
     return { Authorization: `Bearer ${token}` };
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('Failed to decrypt token from cookie:', error);
-    // Clear corrupted cookie
-    Cookies.remove(token_cookie_name);
+    console.error('Failed to resolve token from storages:', error);
+    try {
+      Cookies.remove(token_cookie_name);
+      Cookies.remove(admin_token_cookie_name);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(token_cookie_name);
+        localStorage.removeItem(admin_token_cookie_name);
+      }
+    } catch {}
     return {};
   }
 };
@@ -166,7 +198,14 @@ export const get = async ({
 
       // Berikan delay kecil sebelum redirect untuk menghindari race condition
       setTimeout(() => {
-        Cookies.remove(token_cookie_name);
+        try {
+          Cookies.remove(token_cookie_name);
+          Cookies.remove(admin_token_cookie_name);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(token_cookie_name);
+            localStorage.removeItem(admin_token_cookie_name);
+          }
+        } catch {}
         Router.push(loginPath);
       }, delayTime);
     }

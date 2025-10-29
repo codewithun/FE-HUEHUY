@@ -1,3 +1,4 @@
+import { admin_token_cookie_name } from "../../../../helpers/api.helpers";
 /* eslint-disable no-console */
 import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
@@ -38,18 +39,22 @@ export default function QRCodeCrud() {
   const storageBase = apiBase.replace(/\/api\/?$/, '');
 
   const authHeader = useCallback(() => {
-    const enc = Cookies.get(token_cookie_name);
+    // Prioritaskan token admin dengan fallback ke localStorage (Safari) dan terakhir user token
+    const encCookie = Cookies.get(admin_token_cookie_name);
+    const encLs = typeof window !== 'undefined' ? localStorage.getItem(admin_token_cookie_name) : null;
+    const encUser = Cookies.get(token_cookie_name);
+    const enc = encCookie || encLs || encUser || null;
     const token = enc ? Decrypt(enc) : '';
     return { Authorization: `Bearer ${token}` };
   }, []);
 
   // Helper membentuk URL image storage yang aman
-  const toStorageUrl = (path) => {
+  const toStorageUrl = useCallback((path) => {
     if (!path) return '';
     // kalau backend sudah kirim absolute URL, langsung pakai
     if (/^https?:\/\//i.test(path)) return path;
     return `${storageBase}/storage/${path}`.replace(/([^:]\/)\/+/g, '$1');
-  };
+  }, [storageBase]);
 
   // Helper format tanggal (lokal Indonesia)
   const formatDate = (value) => {
@@ -175,7 +180,7 @@ export default function QRCodeCrud() {
       sortable: true,
       item: ({ created_at }) => formatDate(created_at),
     },
-  ], [getVoucherLabel, getPromoLabel]);
+  ], [getVoucherLabel, getPromoLabel, toStorageUrl]);
 
   const handleDelete = async () => {
     if (!selectedItem) return;
@@ -203,7 +208,7 @@ export default function QRCodeCrud() {
   };
 
   // helper to build target URL (untuk nilai QR yang dipreview)
-  const buildTargetUrl = (item) => {
+  const buildTargetUrl = useCallback((item) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     if (!item) return '';
 
@@ -222,7 +227,7 @@ export default function QRCodeCrud() {
       }
     }
     return '';
-  };
+  }, [promoList, voucherList]);
 
   // setiap selectedItem berubah, stabilkan qrUrl di state
   useEffect(() => {
@@ -230,7 +235,7 @@ export default function QRCodeCrud() {
     setQrUrl(buildTargetUrl(selectedItem));
     // reset ref biar clean
     qrCanvasRef.current = null;
-  }, [selectedItem, promoList, voucherList]);
+  }, [selectedItem, buildTargetUrl]);
 
   // === Download: pilih otomatis server-PNG atau FE konversi SVG -> PNG ===
   const smartDownload = async () => {

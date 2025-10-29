@@ -18,6 +18,8 @@ interface FetchControl {
 interface TableSupervisionProps {
   title?: string | React.ReactNode;
   fetchControl: FetchControl;
+  // Optional static data mode: when no fetchControl.path/url provided, use this data instead
+  data?: any[];
   customTopBar?: React.ReactNode;
   customTopBarWithForm?: (args: { setModalForm: (b: boolean) => void }) => React.ReactNode;
   headBar?: React.ReactNode;
@@ -46,6 +48,7 @@ interface TableSupervisionProps {
 export function TableSupervisionComponent({
   title,
   fetchControl,
+  data,
   customTopBar,
   headBar,
   columnControl,
@@ -177,7 +180,10 @@ export function TableSupervisionComponent({
     [storageBase]
   );
 
-  const [loading, code, data, reset] = useGet(
+  const shouldFetch = Boolean(fetchControl?.path || fetchControl?.url);
+  const isStatic = !shouldFetch;
+
+  const [apiLoading, apiCode, apiData, reset] = useGet(
     {
       ...fetchControl,
       params: {
@@ -189,20 +195,21 @@ export function TableSupervisionComponent({
         filter: mutatefilter.length ? mutatefilter : undefined,
       },
     },
-    setToLoading || (includeFilters && mutatefilter.length < (includeFilters?.length || 0))
+    setToLoading || (includeFilters && mutatefilter.length < (includeFilters?.length || 0)) || isStatic
   );
 
   const hasPermissions = useMemo<number[]>(() => {
     if (!permissionCode) return [];
-    return (data?.allowed_privileges || [])
+    return (apiData?.allowed_privileges || [])
       .filter((p: string) => Number(p.split('.')[0]) === permissionCode)
       .map((p: string) => Number(p.split('.')[1]))
       .filter((n: number) => !isNaN(n));
-  }, [data, permissionCode]);
+  }, [apiData, permissionCode]);
 
   // Refresh ketika trigger eksternal
   useEffect(() => {
-    !loading && reset();
+    if (isStatic) return; // no auto-reset in static mode
+    !apiLoading && reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setToRefresh]);
 
@@ -244,30 +251,31 @@ export function TableSupervisionComponent({
     setMutateFilter(includeFilters ? [...base, ...includeFilters] : base);
   }, [filter, includeFilters]);
 
-  // Proses data API
+  // Proses data API mode
   useEffect(() => {
-    if (loading) return;
+    if (isStatic) return; // handled by separate effect
+    if (apiLoading) return;
 
-    if (code === 200 || code === 204) {
+    if (apiCode === 200 || apiCode === 204) {
       // Normalisasi payload agar tahan segala bentuk (array langsung, laravel paginator, dsb)
       let originalData: any[] = [];
-      const payload = (data && typeof data === 'object') ? (data.data ?? data) : data;
+      const payload = (apiData && typeof apiData === 'object') ? (apiData.data ?? apiData) : apiData;
 
       if (Array.isArray(payload)) originalData = payload;
       else if (Array.isArray(payload?.data)) originalData = payload.data;        // { data: [...] }
       else if (Array.isArray(payload?.items)) originalData = payload.items;      // { items: [...] }
-      else if (Array.isArray(data?.data?.data)) originalData = data.data.data;   // { data: { data: [...] } }
+      else if (Array.isArray(apiData?.data?.data)) originalData = apiData.data.data;   // { data: { data: [...] } }
 
       const newColumns: any[] = [];
       const newData: any[] = [];
 
       // Total row: coba beberapa jalur umum
       const apiTotal =
-        data?.totalRow ??
-        data?.total_row ??
-        data?.total ??
-        data?.meta?.total ??
-        data?.data?.total ??
+        apiData?.totalRow ??
+        apiData?.total_row ??
+        apiData?.total ??
+        apiData?.meta?.total ??
+        apiData?.data?.total ??
         payload?.total ??
         originalData.length;
 
@@ -437,8 +445,8 @@ export function TableSupervisionComponent({
         setDataTable([]);
         setDataOriginal([]);
         setTotalRow(0);
-        if (data?.columns?.length) {
-          const newForms = data.columns.map((c: string) => ({
+        if (apiData?.columns?.length) {
+          const newForms = apiData.columns.map((c: string) => ({
             construction: {
               label: c.charAt(0).toUpperCase() + c.slice(1),
               name: c,
@@ -452,7 +460,164 @@ export function TableSupervisionComponent({
     } else {
       setIsError(true);
     }
-  }, [loading, code, data, columnControl, formControl, actionControl, hasPermissions, downloadQrAsPng, permissionCode]);
+  }, [isStatic, apiLoading, apiCode, apiData, columnControl, formControl, actionControl, hasPermissions, downloadQrAsPng, permissionCode]);
+
+  // Proses data Static mode (no fetch)
+  useEffect(() => {
+    if (!isStatic) return;
+    const originalData: any[] = Array.isArray(data) ? data : [];
+    const newColumns: any[] = [];
+    const newData: any[] = [];
+
+    setTotalRow(originalData.length);
+
+    if (originalData.length) {
+      if (!columnControl?.custom) {
+        Object.keys(originalData[0] || {}).forEach((keyName) => {
+          if (!columnControl?.except || !columnControl.except.includes(keyName)) {
+            newColumns.push({
+              label: keyName.charAt(0).toUpperCase() + keyName.slice(1),
+              selector: keyName,
+              width: '200px',
+              sortable: !columnControl?.exceptSorts || !columnControl.exceptSorts.includes(keyName),
+            });
+          }
+        });
+      }
+
+      if (!formControl?.custom) {
+        let newForms: any[] = [];
+        Object.keys(originalData[0] || {}).forEach((keyName) => {
+          if (!formControl?.except || !formControl.except.includes(keyName)) {
+            const custom = (formControl?.change && formControl.change[keyName]) || {};
+            newForms.push({
+              type: custom.type || 'default',
+              construction: {
+                label: custom.construction?.label || keyName.charAt(0).toUpperCase() + keyName.slice(1),
+                name: keyName,
+                placeholder: custom.construction?.placeholder || 'Please enter ' + keyName + '...',
+                options: custom.construction?.options || [],
+                validations: custom.construction?.validations || {},
+              },
+            });
+          }
+        });
+        if (formControl?.include?.length) newForms = [...newForms, ...formControl.include];
+        setForms(newForms);
+      }
+
+      if (!columnControl?.custom) {
+        setColumns(newColumns);
+      }
+
+      originalData.forEach((row, idx) => {
+        let items: Record<string, any> = row;
+
+        if (columnControl?.custom) {
+          const mapped: Record<string, any> = {};
+          columnControl.custom.forEach((col: any) => {
+            mapped[col.selector] = col.item(row);
+          });
+          items = mapped;
+        }
+
+        Object.keys(items).forEach((k) => {
+          const includeBefore = columnControl?.include?.filter((c: any) => c.before && c.before === k) || [];
+          includeBefore.forEach((inc: any) => {
+            if (inc.selector) {
+              items[inc.selector] = inc.item ? inc.item(row) : null;
+            }
+          });
+
+          if (columnControl?.change && columnControl.change[k]) {
+            items[k] = columnControl.change[k].custom(row);
+            const originalVal = row[k];
+            if (
+              originalVal &&
+              !(columnControl.include || []).some((c: any) => c.selector === k) &&
+              (typeof originalVal === 'object' || Array.isArray(originalVal))
+            ) {
+              items[k] = JSON.stringify(items[k]);
+            }
+          }
+        });
+
+        const canEdit = !permissionCode || hasPermissions.includes(3);
+        const canDelete = !permissionCode || hasPermissions.includes(4);
+
+        newData.push({
+          ...items,
+          action: actionControl?.custom
+            ? actionControl.custom(
+                row,
+                {
+                  setModalView: (e: boolean) => setModalView(e),
+                  setDataSelected: () => setDataSelected(idx),
+                  setModalForm: (e: boolean) => setModalForm(e),
+                  setModalDelete: (e: boolean) => setModalDelete(e),
+                },
+                hasPermissions,
+                originalData.length
+              )
+            : (
+                <>
+                  {actionControl?.include &&
+                    actionControl.include(
+                      row,
+                      {
+                        setModalView: (e: boolean) => setModalView(e),
+                        setDataSelected: () => setDataSelected(idx),
+                        setModalForm: (e: boolean) => setModalForm(e),
+                        setModalDelete: (e: boolean) => setModalDelete(e),
+                      },
+                      hasPermissions
+                    )}
+
+                  {canEdit &&
+                    (!actionControl?.except || !actionControl.except.includes('edit')) && (
+                      <ButtonComponent
+                        icon={faEdit}
+                        label="Ubah"
+                        variant="outline"
+                        paint="warning"
+                        size="xs"
+                        rounded
+                        onClick={() => {
+                          setModalForm(true);
+                          setDataSelected(idx);
+                        }}
+                      />
+                    )}
+
+                  {canDelete &&
+                    (!actionControl?.except || !actionControl.except.includes('delete')) && (
+                      <ButtonComponent
+                        icon={faTrash}
+                        label="Hapus"
+                        variant="outline"
+                        paint="danger"
+                        size="xs"
+                        rounded
+                        onClick={() => {
+                          setModalDelete(true);
+                          setDataSelected(idx);
+                        }}
+                      />
+                    )}
+                </>
+              ),
+        });
+      });
+
+      setDataTable(newData);
+      setDataOriginal(originalData);
+    } else {
+      setDataTable([]);
+      setDataOriginal([]);
+      setTotalRow(0);
+    }
+    setIsError(false);
+  }, [isStatic, data, columnControl, formControl, actionControl, hasPermissions, permissionCode]);
 
   const canCreate = !permissionCode || hasPermissions.includes(2);
 
@@ -480,7 +645,7 @@ export function TableSupervisionComponent({
                 ? columns
                 : columnControl.custom
                     .filter(
-                      (col: any) => !col.permissionCode || data?.allowed_privileges?.includes(col.permissionCode)
+                      (col: any) => !col.permissionCode || apiData?.allowed_privileges?.includes(col.permissionCode)
                     )
                     .map((col: any) => ({
                       label: col.label || '',
@@ -507,7 +672,7 @@ export function TableSupervisionComponent({
           searchColumn={searchColumn}
           onChangeFilter={(e: any) => setFilter(e)}
           filter={filter}
-          loading={loading}
+          loading={isStatic ? false : apiLoading}
           onChangeSearch={(e: string) => setSearch(e)}
           search={search}
           onRefresh={reset}
