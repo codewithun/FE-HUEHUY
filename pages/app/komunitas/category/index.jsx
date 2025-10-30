@@ -232,6 +232,38 @@ export default function CategoryPage() {
   const avatarUrl = communityData?.avatar ? buildLogoUrl(communityData.avatar) : '/default-avatar.png';
   const { imageSrc: avatarSrc, handleError: handleAvatarError, handleLoad: handleAvatarLoad, isError: avatarError } = useImageWithFallback(avatarUrl);
 
+  // Function untuk menentukan background berdasarkan data komunitas (sama seperti dashboard)
+  const getCommunityBackground = (communityData) => {
+    // Prioritas 1: Background image jika ada
+    if (communityData?.background_image) {
+      return {
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${buildLogoUrl(communityData.background_image)})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      };
+    }
+    
+    // Prioritas 2: Gradient dari bg_color_1 dan bg_color_2
+    if (communityData?.bg_color_1 && communityData?.bg_color_2) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${communityData.bg_color_1}, ${communityData.bg_color_2})`,
+      };
+    }
+    
+    // Prioritas 3: Single color dengan transparansi
+    if (communityData?.bg_color_1) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${communityData.bg_color_1}, ${communityData.bg_color_1}dd)`,
+      };
+    }
+    
+    // Fallback default
+    return {
+      backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+    };
+  };
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -262,19 +294,8 @@ export default function CategoryPage() {
         const communityRes = await fetch(`${apiBase}/api/communities/${communityId}`, { headers });
         const communityJson = await communityRes.json();
         
-        console.log('Community API Response:', {
-          status: communityRes.status,
-          ok: communityRes.ok,
-          data: communityJson
-        });
-        
         if (communityRes.ok && (communityJson?.data || communityJson?.id)) {
           setCommunityData(communityJson.data || communityJson);
-        } else {
-          console.error('Failed to fetch community data:', {
-            status: communityRes.status,
-            response: communityJson
-          });
         }
 
         // Fetch category data
@@ -331,22 +352,16 @@ export default function CategoryPage() {
     );
   }
 
-  // Create dynamic background style
-  const backgroundStyle = communityData?.background_image
-    ? {
-        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${buildLogoUrl(communityData.background_image)})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }
-    : {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-      };
+  // Get community background style (sama seperti dashboard)
+  const backgroundStyle = getCommunityBackground(communityData);
 
   return (
     <>
-      <div className="min-h-screen" style={backgroundStyle}>
-        <div className="min-h-screen bg-black/20 backdrop-blur-sm">
+      <div className="relative lg:mx-auto lg:max-w-md min-h-screen" style={backgroundStyle}>
+        {/* Dimmer overlay to ensure content stays readable over strong backgrounds */}
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] z-0 pointer-events-none" />
+        
+        <div className="relative z-10 min-h-screen">
           {/* Header */}
           <div className="sticky top-0 z-30 bg-white/20 backdrop-blur-md border-b border-white/30">
             <div className="flex items-center justify-between p-4">
@@ -476,12 +491,12 @@ export default function CategoryPage() {
               </div>
             )}
           </div>
+          
+          <CommunityBottomBar
+            active={'category'}
+            communityId={communityData.id}
+          />
         </div>
-
-        <CommunityBottomBar
-          active={'category'}
-          communityId={communityData.id}
-        />
       </div>
     </>
   );
