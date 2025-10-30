@@ -31,7 +31,7 @@ export default function JoinCommunity() {
       const apiBase = baseUrl.replace(/\/api\/?$/, '');
 
       try {
-        // 1. Ambil detail komunitas dulu
+        // 1) Ambil detail komunitas dengan auth agar dapat isJoined/hasRequested
         const communityRes = await fetch(`${apiBase}/api/communities/${communityId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -41,13 +41,33 @@ export default function JoinCommunity() {
         const communityJson = await communityRes.json();
         const community = communityJson.data || communityJson;
 
-        // 2. Cek jenis privacy (normalisasi agar tahan variasi nilai)
+        setCommunityName(community?.name || '');
+
+        const isJoined = Boolean(community?.isJoined ?? community?.is_joined);
+        const hasRequested = Boolean(community?.hasRequested ?? community?.has_requested);
+
+        // 1a) Sudah member → langsung ke profile
+        if (isJoined) {
+          router.replace(`/app/komunitas/profile/${communityId}`);
+          return;
+        }
+
+        // 1b) Sudah request (pending) → tampilkan info menunggu
+        if (hasRequested) {
+          setMessage('Permintaan bergabung telah dikirim. Menunggu persetujuan admin.');
+          setShowPopup(true);
+          setDone(true);
+          return;
+        }
+
+        // 2) Tentukan privacy
         const rawPrivacy = String(
           community?.privacy ?? community?.world_type ?? community?.type ?? ''
         ).toLowerCase();
-        const isPrivate = rawPrivacy === 'private' || rawPrivacy === 'pribadi' ||
-          community?.is_private === true || community?.private === true;
+        const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
+        const isPrivate = privacy === 'private';
 
+        // 3) Private → kirim join-request
         if (isPrivate) {
           const res = await fetch(`${apiBase}/api/communities/${communityId}/join-request`, {
             method: 'POST',
@@ -58,26 +78,112 @@ export default function JoinCommunity() {
           });
 
           let data = {};
-          try { data = await res.json(); } catch {}
+          try { data = await res.json(); } catch { }
           console.log('Join request result:', data);
 
-          setCommunityName(community.name);
-          setShowPopup(true);
           setMessage('Permintaan bergabung telah dikirim. Menunggu persetujuan admin.');
+          setShowPopup(true);
           setDone(true);
-        } else {
-          // langsung join
-          await fetch(`${apiBase}/api/communities/${communityId}/join`, {
+          return;
+        }
+
+        // 4) Public → coba join
+        const joinRes = await fetch(`${apiBase}/api/communities/${communityId}/join`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (joinRes.ok) {
+          // Broadcast agar daftar komunitas sinkron
+          try {
+            localStorage.setItem(
+              'community:membership',
+              JSON.stringify({
+                id: Number(communityId),
+                action: 'join',
+                delta: +1,
+                at: Date.now()
+              })
+            );
+          } catch { }
+
+          router.replace(`/app/komunitas/profile/${communityId}`);
+          return;
+        }
+
+        // 4a) Tangani fallback error join
+        let body = {};
+        try { body = await joinRes.json(); } catch { }
+        if (joinRes.status === 422 && (body?.already_joined || body?.message?.includes('sudah'))) {
+          router.replace(`/app/komunitas/profile/${communityId}`);
+          return;
+        }
+        if (joinRes.status === 403 && body?.need_request) {
+          // Server minta request join
+          const reqRes = await fetch(`${apiBase}/api/communities/${communityId}/join-request`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
           });
-          router.replace(`/app/komunitas/profile/${communityId}`);
+          // Abaikan hasil; tampilkan popup menunggu
+          setMessage('Permintaan bergabung telah dikirim. Menunggu persetujuan admin.');
+          setShowPopup(true);
+          setDone(true);
+          return;
         }
+
+        setMessage(body?.message || 'Gagal bergabung ke komunitas.');
+        setDone(true);
       } catch (err) {
         console.error(err);
+        // Fallback terakhir: coba join langsung (tanpa info privacy)
+        try {
+          const res = await fetch(`${apiBase}/api/communities/${communityId}/join`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (res.ok) {
+            try {
+              localStorage.setItem(
+                'community:membership',
+                JSON.stringify({
+                  id: Number(communityId),
+                  action: 'join',
+                  delta: +1,
+                  at: Date.now()
+                })
+              );
+            } catch { }
+            router.replace(`/app/komunitas/profile/${communityId}`);
+            return;
+          }
+
+          let body = {};
+          try { body = await res.json(); } catch { }
+          if (res.status === 403 && body?.need_request) {
+            await fetch(`${apiBase}/api/communities/${communityId}/join-request`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            setMessage('Permintaan bergabung telah dikirim. Menunggu persetujuan admin.');
+            setShowPopup(true);
+            setDone(true);
+            return;
+          }
+        } catch { }
+
         setMessage('Terjadi kesalahan, coba lagi nanti.');
         setDone(true);
       }
