@@ -631,7 +631,7 @@ export default function CommunityDashboard({ communityId }) {
                   className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                   style={{ minWidth: 90 }}
                   onClick={() =>
-                    router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
+                    router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
                   }
                 >
                   <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
@@ -1337,18 +1337,16 @@ export default function CommunityDashboard({ communityId }) {
     };
   };
 
-  // Admin-style loading state
+  // Loading state
   if (!isClient || loading) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="container mx-auto relative z-10 pb-28">
-          <div className="bg-slate-50 p-6 border-b border-slate-200">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-3 text-sm text-slate-600">
-                  Loading komunitas...
-                </p>
+          <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-pulse">
+                <div className="w-12 h-12 bg-primary rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-500">Memuat...</p>
               </div>
             </div>
           </div>
@@ -1357,7 +1355,7 @@ export default function CommunityDashboard({ communityId }) {
     );
   }
 
-  // Admin-style error state
+  // Error state
   if (!communityData) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
@@ -1479,7 +1477,7 @@ export default function CommunityDashboard({ communityId }) {
                                     className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                                     style={{ minWidth: 90 }}
                                     onClick={() =>
-                                      router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
+                                      router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
                                     }
                                   >
                                     <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
@@ -1573,8 +1571,29 @@ const ShuffleCubeWidget = ({ widget, communityId, communityData }) => {
 
       if (!mounted) return;
       if (got.length) {
-        setShuffleData(got);
-        console.log('[ShuffleCubeWidget] setShuffleData count=', got.length);
+        // Filter out voucher cubes from shuffle ads
+        const filteredData = got.filter(item => {
+          const ad = item;
+          const cube = item?.cube;
+          
+          // Check if this is a voucher cube/ad
+          const isVoucher = 
+            // Check ad type
+            String(ad?.type || '').toLowerCase() === 'voucher' ||
+            // Check cube content_type
+            String(cube?.content_type || '').toLowerCase() === 'voucher' ||
+            // Check voucher flags
+            normalizeBoolLike(ad?.is_voucher) ||
+            normalizeBoolLike(ad?.voucher) ||
+            // Check normalized type helper
+            getNormalizedType(ad, cube) === 'voucher';
+          
+          // Return true to keep (exclude vouchers)
+          return !isVoucher;
+        });
+        
+        setShuffleData(filteredData);
+        console.log('[ShuffleCubeWidget] setShuffleData count=', filteredData.length, '(filtered from', got.length, 'total, excluded vouchers)');
       } else {
         console.warn('[ShuffleCubeWidget] no data found from any candidate endpoints');
         setShuffleData([]);
