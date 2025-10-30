@@ -710,9 +710,30 @@ const CommunityPromoPage = () => {
 
           if (response.ok) {
             const data = await response.json();
-            setShuffleData(
-              Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
-            );
+            const rawData = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            
+            // Filter out voucher cubes from shuffle ads
+            const filteredData = rawData.filter(item => {
+              const ad = item;
+              const cube = item?.cube;
+              
+              // Check if this is a voucher cube/ad
+              const isVoucher = 
+                // Check ad type
+                String(ad?.type || '').toLowerCase() === 'voucher' ||
+                // Check cube content_type
+                String(cube?.content_type || '').toLowerCase() === 'voucher' ||
+                // Check voucher flags
+                normalizeBoolLike(ad?.is_voucher) ||
+                normalizeBoolLike(ad?.voucher) ||
+                // Check normalized type helper
+                getNormalizedType(ad, cube) === 'voucher';
+              
+              // Return true to keep (exclude vouchers)
+              return !isVoucher;
+            });
+            
+            setShuffleData(filteredData);
           } else {
             console.error('Failed to fetch shuffle ads:', response.status);
           }
@@ -1351,10 +1372,14 @@ const CommunityPromoPage = () => {
 
   if (!communityData) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen flex items-center justify-center px-4 py-4">
-        <div className="text-center bg-white rounded-2xl shadow-sm p-8 border border-slate-200">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-slate-600">Memuat data komunitas...</p>
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-pulse">
+              <div className="w-12 h-12 bg-primary rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-500">Memuat...</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -1433,7 +1458,7 @@ const CommunityPromoPage = () => {
                                 className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                                 style={{ minWidth: 90 }}
                                 onClick={() =>
-                                  router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
+                                  router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
                                 }
                               >
                                 <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
