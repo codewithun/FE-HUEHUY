@@ -232,18 +232,6 @@ const fetchCommunitiesWithMembership = async () => {
     // bentuk standar
     const normalized = normalizeCommunities(data);
 
-    // 🔄 Hitung semua promo milik komunitas (tanpa filter aktif)
-    await Promise.all(
-      normalized.map(async (c, i) => {
-        try {
-          const count = await fetchAllPromoCount(c.id);
-          normalized[i].activePromos = count;
-        } catch {
-          normalized[i].activePromos = 0;
-        }
-      })
-    );
-
 
     // kalau ini endpoint utama (with-membership), biasanya sudah ada isJoined
     if (url.endsWith('/with-membership')) {
@@ -270,27 +258,6 @@ const fetchCommunitiesWithMembership = async () => {
   }
 
   return [];
-};
-
-/* ----- MOVED TO TOP-LEVEL: Hitung semua promo (apapun statusnya) milik komunitas ----- */
-const fetchAllPromoCount = async (communityId) => {
-  const apiUrl = getApiBase();
-  const headers = getAuthHeaders();
-
-  try {
-    // tanpa filter is_active
-    const res = await fetch(`${apiUrl}/api/admin/promos?community_id=${communityId}`, { headers });
-    if (!res.ok) return 0;
-    const data = await res.json().catch(() => ({}));
-
-    // handle berbagai bentuk respons
-    if (Array.isArray(data?.data)) return data.data.length; // format Laravel paginated
-    if (Array.isArray(data)) return data.length;            // format array langsung
-    if (typeof data?.total === "number") return data.total; // format { total: n }
-    return 0;
-  } catch {
-    return 0;
-  }
 };
 
 /** =========================
