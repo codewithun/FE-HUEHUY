@@ -19,10 +19,21 @@ export default function Pesan() {
   if (partnerId) qs.set('partner_id', partnerId);
   if (communityId) qs.set('community_id', communityId);
   if (corporateId) qs.set('corporate_id', corporateId);
+  // Tampilkan juga chat yang belum dibalas lawan bicara
+  qs.set('replied_only', '0');
 
   // ambil chat room (terfilter jika query ada)
-  const [loading, code, dataChats] = useGet({
+  const [loading, , dataChats] = useGet({
     path: `chat-rooms${qs.toString() ? `?${qs.toString()}` : ''}`, // endpoint Laravel: ChatController::chatRooms
+  });
+
+  // Debug: lihat response dari API untuk diagnosis
+  // eslint-disable-next-line no-console
+  console.log('DEBUG Chat List:', {
+    loading,
+    rawResponse: dataChats,
+    queryString: qs.toString(),
+    finalUrl: `chat-rooms${qs.toString() ? `?${qs.toString()}` : ''}`
   });
 
   // fallback filter di FE jika backend belum update (optional)

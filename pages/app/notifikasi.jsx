@@ -3,7 +3,7 @@
 import { faCheckCircle, faExclamationTriangle, faTimesCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { DateFormatComponent } from '../../components/base.components';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import { token_cookie_name } from '../../helpers';
@@ -36,6 +36,9 @@ export default function NotificationPage() {
   const [showVoucherExpiredModal, setShowVoucherExpiredModal] = useState(false);
   // NEW: disable button while verifying/claiming
   const [claimingId, setClaimingId] = useState(null);
+  // Guard concurrent loads and apply cooldown to avoid 429
+  const inFlightRef = useRef(false);
+  const cooldownRef = useRef(0);
 
   const authHeader = () => {
     const enc = Cookies.get(token_cookie_name);
@@ -46,13 +49,30 @@ export default function NotificationPage() {
   // helper tanggal kadaluwarsa (ambil dari berbagai kemungkinan field)
   const parseExpiry = (raw) => {
     if (!raw) return null;
+    if (raw instanceof Date && Number.isFinite(raw.getTime())) return raw;
     const s = String(raw).trim();
-    // Jika format hanya YYYY-MM-DD, anggap akhir hari lokal
+
+    // Case 1: YYYY-MM-DD (treat as end of local day)
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       const [y, m, d] = s.split('-').map(Number);
       return new Date(y, m - 1, d, 23, 59, 59, 999);
     }
-    const t = new Date(s);
+
+    // Case 2: UNIX timestamp (seconds or ms)
+    if (/^\d{10,13}$/.test(s)) {
+      const n = Number(s);
+      return new Date(s.length === 13 ? n : n * 1000);
+    }
+
+    // Case 3: "YYYY-MM-DD HH:mm:ss" (Safari can't parse this reliably)
+    const m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+    if (m1) {
+      const [, y, mo, d, hh, mm, ss] = m1.map(Number);
+      return new Date(y, mo - 1, d, hh, mm, ss, 0); // interpret as local time
+    }
+
+    // Case 4: ISO-like string is generally parseable
+    const t = new Date(s.replace(' ', 'T'));
     return Number.isFinite(t.getTime()) ? t : null;
   };
 
@@ -115,6 +135,28 @@ export default function NotificationPage() {
     return !isVoucherExpired(n);
   };
 
+  // Helpers to mark notification handled on server and notify UI for badge refresh
+  async function markNotificationHandled(notificationId) {
+    if (!notificationId) return;
+    // Prefer a single DELETE to reduce extra calls and avoid throttle
+    try {
+      await fetch(`${apiBase}/api/notification/${notificationId}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', ...authHeader() },
+      });
+    } catch { }
+  }
+
+  function emitNotificationChanged(type, id) {
+    try {
+      window.dispatchEvent(new CustomEvent('notifications:changed', { detail: { type, id, delta: -1 } }));
+    } catch { }
+    try {
+      // Optional cross-tab signal
+      localStorage.setItem('notifications:lastChange', JSON.stringify({ t: Date.now(), type, id, delta: -1 }));
+    } catch { }
+  }
+
   // Reset data saat ganti tab
   const resetData = useCallback(() => {
     console.log('🔄 Resetting data for tab:', type);
@@ -127,12 +169,15 @@ export default function NotificationPage() {
 
   // Load notifications dengan cursor-based pagination
   const loadNotifications = useCallback(async (reset = false) => {
-    if (loading || (!hasMore && !reset)) {
+    const now = Date.now();
+    if (now < cooldownRef.current) return;
+    if (inFlightRef.current || loading || (!hasMore && !reset)) {
       console.log('⏸️ Skip loading:', { loading, hasMore, reset });
       return;
     }
 
     console.log('📥 Loading notifications:', { type, cursor, reset });
+    inFlightRef.current = true;
     setLoading(true);
 
     try {
@@ -153,12 +198,18 @@ export default function NotificationPage() {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json',
           ...authHeader(),
         },
       });
 
       if (!res.ok) {
+        if (res.status === 429) {
+          const ra = Number(res.headers.get('Retry-After'));
+          const delaySec = Number.isFinite(ra) && ra > 0 ? ra : 2;
+          console.warn(`⏳ Throttled, retrying in ${delaySec}s`);
+          cooldownRef.current = Date.now() + delaySec * 1000;
+          return; // gracefully exit; finally will unset loading and inflight
+        }
         throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       }
 
@@ -189,13 +240,16 @@ export default function NotificationPage() {
       }
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
+      // apply a tiny cooldown to prevent burst
+      cooldownRef.current = Date.now() + 500;
     }
   }, [type, cursor, hasMore, loading, version]);
 
   // Initial load & reload saat ganti tab
   useEffect(() => {
     loadNotifications(true);
-  }, [type]);
+  }, [type, loadNotifications]);
 
   // Infinite scroll handler
   const handleScroll = useCallback(() => {
@@ -241,7 +295,6 @@ export default function NotificationPage() {
         method: 'GET',
         headers: {
           Accept: 'application/json',
-          'Content-Type': 'application/json',
           ...authHeader(),
         },
       });
@@ -268,6 +321,8 @@ export default function NotificationPage() {
       const notif = localItems.find((n) => n.id === notificationId);
       if (notif && isVoucherExpired(notif)) {
         setShowVoucherExpiredModal(true);
+        // Mark handled on server so it won't come back on refresh
+        markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
         setTimeout(() => {
           setShowVoucherExpiredModal(false);
           setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
@@ -286,6 +341,7 @@ export default function NotificationPage() {
           String(live?.status || '').toLowerCase() === 'expired';
         if (expiredLive) {
           setShowVoucherExpiredModal(true);
+          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
           setTimeout(() => {
             setShowVoucherExpiredModal(false);
             setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
@@ -298,6 +354,7 @@ export default function NotificationPage() {
         const stockLeft = Number(live?.stock ?? live?.remaining ?? live?.quota_remaining ?? NaN);
         if (Number.isFinite(stockLeft) && stockLeft <= 0) {
           setShowVoucherOutOfStockModal(true);
+          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
           setTimeout(() => {
             setShowVoucherOutOfStockModal(false);
             setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
@@ -335,6 +392,7 @@ export default function NotificationPage() {
           msg.includes('kadaluarsa')
         ) {
           setShowVoucherExpiredModal(true);
+          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
           setTimeout(() => {
             setShowVoucherExpiredModal(false);
             setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
@@ -350,6 +408,7 @@ export default function NotificationPage() {
           res.status === 410
         ) {
           setShowVoucherOutOfStockModal(true);
+          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
           setTimeout(() => {
             setShowVoucherOutOfStockModal(false);
             setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
@@ -363,6 +422,9 @@ export default function NotificationPage() {
         return;
       }
 
+      // Success: mark as handled on server so it won't reappear and update badge
+      await markNotificationHandled(notificationId);
+      emitNotificationChanged(type, notificationId);
       setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
       setVersion((v) => v + 1);
       setModalMessage('Voucher berhasil diklaim! Cek di Saku.');
