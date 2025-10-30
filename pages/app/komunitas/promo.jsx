@@ -1351,10 +1351,14 @@ const CommunityPromoPage = () => {
 
   if (!communityData) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen flex items-center justify-center px-4 py-4">
-        <div className="text-center bg-white rounded-2xl shadow-sm p-8 border border-slate-200">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-slate-600">Memuat data komunitas...</p>
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-pulse">
+              <div className="w-12 h-12 bg-primary rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-500">Memuat...</p>
+            </div>
+          </div>
         </div>
       </div>
     );

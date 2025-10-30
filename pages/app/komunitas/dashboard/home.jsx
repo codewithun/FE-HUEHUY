@@ -1337,18 +1337,16 @@ export default function CommunityDashboard({ communityId }) {
     };
   };
 
-  // Admin-style loading state
+  // Loading state
   if (!isClient || loading) {
     return (
-      <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
         <div className="container mx-auto relative z-10 pb-28">
-          <div className="bg-slate-50 p-6 border-b border-slate-200">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-3 text-sm text-slate-600">
-                  Loading komunitas...
-                </p>
+          <div className="bg-background min-h-screen w-full relative z-20 bg-gradient-to-br from-cyan-50 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-pulse">
+                <div className="w-12 h-12 bg-primary rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-500">Memuat...</p>
               </div>
             </div>
           </div>
@@ -1357,7 +1355,7 @@ export default function CommunityDashboard({ communityId }) {
     );
   }
 
-  // Admin-style error state
+  // Error state
   if (!communityData) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-slate-50 min-h-screen">
