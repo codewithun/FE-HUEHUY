@@ -1571,8 +1571,29 @@ const ShuffleCubeWidget = ({ widget, communityId, communityData }) => {
 
       if (!mounted) return;
       if (got.length) {
-        setShuffleData(got);
-        console.log('[ShuffleCubeWidget] setShuffleData count=', got.length);
+        // Filter out voucher cubes from shuffle ads
+        const filteredData = got.filter(item => {
+          const ad = item;
+          const cube = item?.cube;
+          
+          // Check if this is a voucher cube/ad
+          const isVoucher = 
+            // Check ad type
+            String(ad?.type || '').toLowerCase() === 'voucher' ||
+            // Check cube content_type
+            String(cube?.content_type || '').toLowerCase() === 'voucher' ||
+            // Check voucher flags
+            normalizeBoolLike(ad?.is_voucher) ||
+            normalizeBoolLike(ad?.voucher) ||
+            // Check normalized type helper
+            getNormalizedType(ad, cube) === 'voucher';
+          
+          // Return true to keep (exclude vouchers)
+          return !isVoucher;
+        });
+        
+        setShuffleData(filteredData);
+        console.log('[ShuffleCubeWidget] setShuffleData count=', filteredData.length, '(filtered from', got.length, 'total, excluded vouchers)');
       } else {
         console.warn('[ShuffleCubeWidget] no data found from any candidate endpoints');
         setShuffleData([]);

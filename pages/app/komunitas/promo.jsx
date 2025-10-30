@@ -710,9 +710,30 @@ const CommunityPromoPage = () => {
 
           if (response.ok) {
             const data = await response.json();
-            setShuffleData(
-              Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
-            );
+            const rawData = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            
+            // Filter out voucher cubes from shuffle ads
+            const filteredData = rawData.filter(item => {
+              const ad = item;
+              const cube = item?.cube;
+              
+              // Check if this is a voucher cube/ad
+              const isVoucher = 
+                // Check ad type
+                String(ad?.type || '').toLowerCase() === 'voucher' ||
+                // Check cube content_type
+                String(cube?.content_type || '').toLowerCase() === 'voucher' ||
+                // Check voucher flags
+                normalizeBoolLike(ad?.is_voucher) ||
+                normalizeBoolLike(ad?.voucher) ||
+                // Check normalized type helper
+                getNormalizedType(ad, cube) === 'voucher';
+              
+              // Return true to keep (exclude vouchers)
+              return !isVoucher;
+            });
+            
+            setShuffleData(filteredData);
           } else {
             console.error('Failed to fetch shuffle ads:', response.status);
           }
