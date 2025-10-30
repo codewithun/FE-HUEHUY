@@ -1433,7 +1433,7 @@ const CommunityPromoPage = () => {
                                 className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                                 style={{ minWidth: 90 }}
                                 onClick={() =>
-                                  router.push(`/app/komunitas/promo?categoryId=${id}&communityId=${communityId}`)
+                                  router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
                                 }
                               >
                                 <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
