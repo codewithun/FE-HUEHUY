@@ -992,8 +992,10 @@ export default function Save() {
               {/* Perbaiki urutan sumber id untuk detail */}
               <Link
                 href={
+                  // Jika item voucher -> arahkan ke komunitas/promo dengan source=home (per request)
                   selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher
-                    ? `/app/voucher/${selected?.voucher_item?.voucher_id || selected?.voucher?.id || selected?.ad?.id}`
+                    ? // Per user request: arahkan tombol Detail voucher ke URL fixed (localhost test)
+                    `/app/komunitas/promo/17?source=home`
                     : (() => {
                       const ad = selected?.ad;
                       const normBool = (v) => {
@@ -1024,8 +1026,7 @@ export default function Save() {
                         from: 'saku',
                       }).toString()}`;
                     })()
-                }
-              >
+                }>
                 <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors">
                   Detail
                   <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
