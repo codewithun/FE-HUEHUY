@@ -327,6 +327,7 @@ export default function CommunityDashboard({ communityId }) {
   const [adCategories, setAdCategories] = useState([]);
   const [adCategoryLevel, setAdCategoryLevel] = useState(null);
   const [adCategoryWidget, setAdCategoryWidget] = useState(null);
+  const [categoryBoxWidget, setCategoryBoxWidget] = useState(null);
   const [authHeaders, setAuthHeaders] = useState({});
 
   // Use custom hook for avatar image handling
@@ -372,32 +373,63 @@ export default function CommunityDashboard({ communityId }) {
 
         // 🔹 Cari widget ad_category: ambil kategorinya dan simpan widget untuk rendering khusus
         const adCategoryWidget = widgets.find((w) => w.source_type === 'ad_category');
-        if (adCategoryWidget) {
+        
+        // 🔹 Cari widget category_box/kotak_kategori: untuk navigasi ke page-category
+        const categoryBoxWidget = widgets.find((w) => 
+          w.source_type === 'category_box' || 
+          w.content_type === 'category_box' ||
+          w.source_type === 'kotak_kategori' ||
+          (w.name && w.name.toLowerCase().includes('kotak kategori'))
+        );
+        
+        if (adCategoryWidget || categoryBoxWidget) {
           try {
             const catRes = await fetch(`${apiBase}/api/admin/options/ad-category?community_id=${communityId}`, { headers });
             const catJson = await catRes.json();
             if (catJson?.message === 'success' && Array.isArray(catJson.data)) {
               setAdCategories(catJson.data);
-              setAdCategoryLevel(adCategoryWidget.level ?? null);
-              setAdCategoryWidget(adCategoryWidget); // Simpan widget untuk rendering khusus
+              
+              if (adCategoryWidget) {
+                setAdCategoryLevel(adCategoryWidget.level ?? null);
+                setAdCategoryWidget(adCategoryWidget);
+              } else {
+                setAdCategoryLevel(null);
+                setAdCategoryWidget(null);
+              }
+              
+              if (categoryBoxWidget) {
+                setCategoryBoxWidget(categoryBoxWidget);
+              } else {
+                setCategoryBoxWidget(null);
+              }
             } else {
               setAdCategories([]);
               setAdCategoryLevel(null);
               setAdCategoryWidget(null);
+              setCategoryBoxWidget(null);
             }
           } catch (e) {
             console.error('Gagal ambil ad_category saat fetch widget:', e);
             setAdCategories([]);
             setAdCategoryLevel(null);
             setAdCategoryWidget(null);
+            setCategoryBoxWidget(null);
           }
 
           // remove the ad_category widget so it won't render via WidgetRenderer
-          widgets = widgets.filter((w) => w.id !== adCategoryWidget.id);
+          if (adCategoryWidget) {
+            widgets = widgets.filter((w) => w.id !== adCategoryWidget.id);
+          }
+          
+          // remove the category_box widget so it won't render via WidgetRenderer
+          if (categoryBoxWidget) {
+            widgets = widgets.filter((w) => w.id !== categoryBoxWidget.id);
+          }
         } else {
           setAdCategories([]);
           setAdCategoryLevel(null);
           setAdCategoryWidget(null);
+          setCategoryBoxWidget(null);
         }
 
         // 🔹 Urutkan widget berdasarkan level naik
@@ -420,6 +452,51 @@ export default function CommunityDashboard({ communityId }) {
     oliveSoft: 'rgba(90,110,29,0.1)',
     oliveBorder: '#cdd0b3',
     textDark: '#2B3A55',
+  };
+
+  // ======== CATEGORY BOX WIDGET COMPONENT ========
+  const CategoryBoxWidget = ({ widget }) => {
+    return (
+      <div className="mb-6">
+        <div className="mb-2">
+          <h2 className="text-lg font-bold text-white">{widget.name || 'Kotak Kategori'}</h2>
+          {widget.description && (
+            <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
+          )}
+        </div>
+        
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {adCategories.map((category) => {
+            const imgSrc = category.image || category.picture_source || '/default-avatar.png';
+            const label = category.label || category.name || 'Kategori';
+            const id = category.id || category.value;
+
+            return (
+              <div
+                key={id}
+                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
+                style={{ minWidth: 90 }}
+                onClick={() =>
+                  router.push(`/app/komunitas/page-category?categoryId=${id}&communityId=${communityId}`)
+                }
+              >
+                <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
+                  <Image
+                    src={normalizeImageSrc(imgSrc)}
+                    alt={label}
+                    fill
+                    className="object-cover brightness-90"
+                  />
+                  <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
+                    <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   // ======== AD CATEGORY WIDGET COMPONENT ========
@@ -1733,7 +1810,7 @@ export default function CommunityDashboard({ communityId }) {
               </div>
 
               {/* Widget Komunitas Section (type=information) */}
-              {(widgetData.length > 0 || adCategories.length > 0 || adCategoryWidget) && (
+              {(widgetData.length > 0 || adCategories.length > 0 || adCategoryWidget || categoryBoxWidget) && (
                 <div className="mb-6">
                   {(() => {
                     // Create combined items with widgets and categories at correct level
@@ -1748,8 +1825,16 @@ export default function CommunityDashboard({ communityId }) {
                       });
                     });
 
-                    // Add AdCategoryWidget if available
-                    if (adCategoryWidget && adCategories.length > 0) {
+                    // Add CategoryBoxWidget if available (prioritas tertinggi untuk kotak kategori)
+                    if (categoryBoxWidget && adCategories.length > 0) {
+                      items.push({
+                        type: 'category_box_widget',
+                        level: categoryBoxWidget.level || 0,
+                        data: categoryBoxWidget
+                      });
+                    }
+                    // Add AdCategoryWidget if available (untuk promo/iklan dengan kategori)
+                    else if (adCategoryWidget && adCategories.length > 0) {
                       items.push({
                         type: 'ad_category_widget',
                         level: adCategoryLevel || 0,
@@ -1772,6 +1857,8 @@ export default function CommunityDashboard({ communityId }) {
                     return items.map((item) => {
                       if (item.type === 'widget') {
                         return <WidgetRenderer key={item.data.id} widget={item.data} />;
+                      } else if (item.type === 'category_box_widget') {
+                        return <CategoryBoxWidget key="category_box_widget" widget={item.data} />;
                       } else if (item.type === 'ad_category_widget') {
                         return <AdCategoryWidget key="ad_category_widget" widget={item.data} authHeaders={authHeaders} />;
                       } else if (item.type === 'categories') {
