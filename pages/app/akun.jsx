@@ -25,22 +25,19 @@ export default function Akun() {
     path: `account`,
   });
 
-  // Helper function untuk generate vCard
-  const generateVCard = (profile) => {
-    if (!profile) return 'huehuy-user';
+  // Helper function untuk generate user data
+  const generateUserData = (profile) => {
+    if (!profile) return 'HUEHUY User';
     
-    const vCard = `BEGIN:VCARD
-VERSION:3.0
-FN:${profile.name || 'User HUEHUY'}
-N:${profile.name || 'User HUEHUY'};;;
-EMAIL:${profile.email || ''}
-TEL:${profile.phone || ''}
-ORG:HUEHUY
-NOTE:Kode User: ${profile.code || ''} - Platform HUEHUY
-URL:https://huehuy.app
-END:VCARD`;
+    const userData = `HUEHUY User Profile
+Nama: ${profile.name || 'User HUEHUY'}
+Email: ${profile.email || '-'}
+No. HP: ${profile.phone || '-'}
+Kode User: ${profile.code || '-'}
+Platform: HUEHUY
+Website: https://huehuy.app`;
     
-    return vCard;
+    return userData;
   };
 
   return (
@@ -161,10 +158,10 @@ END:VCARD`;
               </button>
               <p className="text-lg font-semibold mb-1 text-center">Barcode Akun Anda</p>
               <p className="text-xs text-slate-500 mb-4 text-center px-2">
-                Scan dengan kamera HP atau Google Lens untuk melihat info kontak
+                Scan dengan kamera HP atau Google Lens untuk melihat data pengguna
               </p>
               <QRCode
-                value={generateVCard(data?.data?.profile)}
+                value={generateUserData(data?.data?.profile)}
                 size={160}
                 bgColor="#f8fafc"
                 fgColor="#0f172a"
@@ -173,8 +170,8 @@ END:VCARD`;
                 className="rounded-lg"
               />
               <p className="text-xs text-slate-400 mt-3 text-center">
-                Scan dengan kamera untuk melihat info kontak
-              </p>
+                Scan dengan kamera untuk melihat data pengguna
+              &gt;</p>
               <p className="text-xs text-slate-500 mt-1 text-center">
                 Kode: {data?.data?.profile?.code}
               </p>
