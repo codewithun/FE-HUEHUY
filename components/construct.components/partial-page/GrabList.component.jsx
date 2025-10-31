@@ -478,6 +478,24 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
     return adValidationType !== finalValidationType;
   }, [currentAd, finalId, adValidationType, finalValidationType]);
 
+  // helper for remaining/total display (promo vs voucher)
+  const claimed = Number(grabList?.length ?? 0);
+  const baseMax = Number(currentAd?.max_grab ?? 0);
+
+  let remainingDisplay, totalDisplay;
+  if (isVoucher) {
+    // Voucher: BE kirim SISA → tampilkan sisa apa adanya
+    // total = sisa + klaim (total derived)
+    remainingDisplay = Math.max(baseMax, 0);
+    totalDisplay = (baseMax > 0 || claimed > 0) ? (baseMax + claimed) : null;
+  } else {
+    // Promo: BE kirim TOTAL → proyeksikan sisa = total - klaim
+    const projectedRemaining = Math.max(baseMax - claimed, 0);
+    remainingDisplay = projectedRemaining;
+    // If baseMax > 0 assume BE provided TOTAL; otherwise fallback to projected sum
+    totalDisplay = (baseMax > 0) ? baseMax : (projectedRemaining + claimed);
+  }
+
   return (
     <>
       <div className="full px-6 pt-10 grid grid-cols-12 gap-4">
@@ -541,8 +559,11 @@ const GrabListComponent = ({ data, filter, mode = 'promo', voucherCode: voucherC
           </div>
 
           <div id="Promo">
-            {(currentAd?.max_grab || 0) - (currentAd?.total_grab || 0)}
-            /{currentAd?.max_grab || 0}
+            {totalDisplay === null ? (
+              <><FontAwesomeIcon icon={faInfinity} />/∞</>
+            ) : (
+              `${remainingDisplay}/${totalDisplay}`
+            )}
           </div>
 
           <div className="text-transparent">-</div>

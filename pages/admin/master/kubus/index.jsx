@@ -292,27 +292,39 @@ function KubusMain() {
               label: 'Status',
               sortable: true,
               width: '130px',
-              item: ({ status, inactive_at }) => (
-                <div>
-                  {status === 'active' ? (
-                    <span className="uppercase font-medium text-green-600 py-1 px-2.5 rounded-md text-sm bg-green-100">
-                      Aktif
-                    </span>
-                  ) : (
-                    <span className="uppercase font-medium text-red-600 py-1 px-2.5 rounded-md text-sm bg-red-100">
-                      Tidak Aktif
-                    </span>
-                  )}
-                  <p className="text-xs mt-2">
-                    Aktif Sampai:{' '}
-                    {inactive_at ? (
-                      <DateFormatComponent date={inactive_at} />
+              item: ({ status, inactive_at, ads }) => {
+                const ad = ads?.[0] || {};
+                // FE fallback jika inactive_at kosong
+                const endDate =
+                  inactive_at ||
+                  ad?.finish_validate ||
+                  ad?.expires_at ||
+                  null;
+
+                const isExpired = endDate ? moment().isAfter(moment(endDate)) : false;
+
+                return (
+                  <div>
+                    {status === 'active' && !isExpired ? (
+                      <span className="uppercase font-medium text-green-600 py-1 px-2.5 rounded-md text-sm bg-green-100">
+                        Aktif
+                      </span>
                     ) : (
-                      <FontAwesomeIcon icon={faInfinity} />
+                      <span className="uppercase font-medium text-red-600 py-1 px-2.5 rounded-md text-sm bg-red-100">
+                        {isExpired ? 'Kedaluwarsa' : 'Tidak Aktif'}
+                      </span>
                     )}
-                  </p>
-                </div>
-              ),
+                    <p className="text-xs mt-2">
+                      Aktif Sampai:{' '}
+                      {endDate ? (
+                        <DateFormatComponent date={endDate} />
+                      ) : (
+                        <FontAwesomeIcon icon={faInfinity} />
+                      )}
+                    </p>
+                  </div>
+                );
+              },
             },
             {
               selector: 'remaining_stock',
