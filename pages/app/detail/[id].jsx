@@ -34,7 +34,7 @@ export default function UnifiedDetailPage() {
   // Build image URL helper
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
   const baseUrl = (apiUrl || '').replace(/\/api\/?$/, '').replace(/\/+$/, '');
-  
+
   const buildImageUrl = useCallback((raw) => {
     const isAbs = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
     const fallback = '/default-avatar.png';
@@ -62,7 +62,7 @@ export default function UnifiedDetailPage() {
     if (dataCube?.data && !loadingCube) {
       const cube = dataCube.data;
       const ad = cube.ads?.[0] || {};
-      
+
       // Build images array
       const images = [];
       if (ad.picture_source) {
@@ -164,7 +164,7 @@ export default function UnifiedDetailPage() {
   const handleShareComplete = (platform) => {
     const url = window.location.href;
     const text = `Check out this ${contentData?.contentType}: ${contentData?.title}`;
-    
+
     switch (platform) {
       case 'whatsapp':
         window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`);
@@ -196,9 +196,9 @@ export default function UnifiedDetailPage() {
   // Claim promo (only for actual promos)
   const handleClaimPromo = async () => {
     if (!contentData?.showClaimButton) return;
-    
+
     setIsClaimedLoading(true);
-    
+
     try {
       const response = await post({
         path: 'grabs',
@@ -358,7 +358,7 @@ export default function UnifiedDetailPage() {
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{contentData.description}</p>
 
               <div className="text-left">
-                <button 
+                <button
                   onClick={() => setShowDetailExpanded(!showDetailExpanded)}
                   className="bg-primary text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:bg-opacity-90 transition-all flex items-center"
                 >
@@ -368,11 +368,10 @@ export default function UnifiedDetailPage() {
                   </span>
                 </button>
               </div>
-              
+
               {/* Expanded Detail */}
-              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
-              }`}>
+              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
+                }`}>
                 <div className="border-t border-slate-200 pt-4">
                   {contentData?.detail && (
                     <div className="mb-4">
@@ -408,16 +407,31 @@ export default function UnifiedDetailPage() {
               <div className="space-y-2">
                 <p className="font-semibold text-slate-900 text-xs">Nama: {contentData.seller?.name}</p>
                 <p className="text-xs text-slate-500">No Hp/WA: {contentData.seller?.phone || '-'}</p>
-                <button
-                  className="w-full bg-primary text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
-                  onClick={() => {
-                    if (contentData.seller?.phone) {
-                      window.open(`https://wa.me/${contentData.seller.phone}`, '_blank');
-                    }
-                  }}
-                >
-                  <FontAwesomeIcon icon={faPhone} className="text-sm" />
-                </button>
+                {contentData?.seller?.phone && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => {
+                        const phone = String(contentData.seller.phone).replace(/\s+/g, '');
+                        let formattedPhone = phone.replace(/\D/g, '');
+                        if (formattedPhone.startsWith('0')) {
+                          formattedPhone = '62' + formattedPhone.substring(1);
+                        } else if (!formattedPhone.startsWith('62')) {
+                          formattedPhone = '62' + formattedPhone;
+                        }
+                        const message = encodeURIComponent(`Halo, saya tertarik dengan informasi ini. Bisa bantu info lebih lanjut?`);
+                        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                        window.open(whatsappUrl, '_blank');
+                      }}
+                      className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                      style={{ backgroundColor: getCommunityPrimaryColor() }}
+                    >
+                      <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                        <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {/* removed duplicate bottom WA button to keep single green SVG button above */}
               </div>
             </div>
           </div>
@@ -431,15 +445,14 @@ export default function UnifiedDetailPage() {
             <button
               onClick={handleClaimPromo}
               disabled={contentData.isExpired || contentData.isNotStarted || isClaimedLoading || isAlreadyClaimed}
-              className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
-                contentData.isExpired || contentData.isNotStarted
-                  ? 'bg-gray-400 text-white cursor-not-allowed'
-                  : isAlreadyClaimed
+              className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${contentData.isExpired || contentData.isNotStarted
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : isAlreadyClaimed
                   ? 'bg-gray-400 text-white cursor-not-allowed'
                   : isClaimedLoading
-                  ? 'bg-slate-400 text-white cursor-not-allowed'
-                  : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
-              }`}
+                    ? 'bg-slate-400 text-white cursor-not-allowed'
+                    : 'bg-green-700 text-white hover:bg-green-800 lg:hover:bg-green-600 focus:ring-4 focus:ring-green-300 lg:focus:ring-green-200'
+                }`}
             >
               {contentData.isExpired ? (
                 'Promo sudah kadaluwarsa'

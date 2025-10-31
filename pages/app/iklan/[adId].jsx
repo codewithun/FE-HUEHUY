@@ -100,7 +100,7 @@ export default function AdDetailUnified() {
   // Simpan data iklan
   const [adData, setAdData] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   // State untuk community data (background colors)
   const [communityData, setCommunityData] = useState(null);
 
@@ -180,7 +180,7 @@ export default function AdDetailUnified() {
     const lat = primaryTag?.map_lat ?? cube?.map_lat ?? null;
     const lng = primaryTag?.map_lng ?? cube?.map_lng ?? null;
 
-    const coordinates = lat != null && lng != null 
+    const coordinates = lat != null && lng != null
       ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
       : '';
 
@@ -206,7 +206,7 @@ export default function AdDetailUnified() {
 
       // Ambil data iklan dari public endpoint
       const response = await get({ path: `ads/${adId}` });
-      
+
       if (response?.status === 200 && (response?.data?.data || response?.data)) {
         const adRaw = response.data?.data || response.data;
         const cube = adRaw?.cube || null;
@@ -249,11 +249,11 @@ export default function AdDetailUnified() {
           },
           expires_at: adRaw?.expires_at || null,
           end_date: adRaw?.end_date || null,
-          online_store_link: adRaw?.online_store_link || 
-                           cube?.link_information || 
-                           cube?.website || 
-                           cube?.online_link || 
-                           cube?.store_link,
+          online_store_link: adRaw?.online_store_link ||
+            cube?.link_information ||
+            cube?.website ||
+            cube?.online_link ||
+            cube?.store_link,
         };
         setAdData(adData);
       } else {
@@ -338,7 +338,7 @@ export default function AdDetailUnified() {
           lng: Number(longitude),
         };
       },
-      () => {},
+      () => { },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }, [adData]);
@@ -494,7 +494,7 @@ export default function AdDetailUnified() {
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
-      <div 
+      <div
         className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
         style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
       >
@@ -555,7 +555,7 @@ export default function AdDetailUnified() {
 
           {/* Info card status type (online/offline) SISA SATU KARTU AJA */}
           <div className="mb-4">
-            <div 
+            <div
               className="rounded-[20px] p-4 shadow-lg"
               style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
             >
@@ -618,51 +618,42 @@ export default function AdDetailUnified() {
                 <p className="text-slate-600 text-xs leading-relaxed mb-3">
                   {adData.location || adData.coordinates || '-'}
                 </p>
-                <button
-                  onClick={openRoute}
-                  className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
-                  style={{ backgroundColor: getCommunityPrimaryColor() }}
-                >
-                  <FontAwesomeIcon
-                    icon={faMapMarkerAlt}
-                    className="mr-2 text-sm"
-                  />
-                  Rute
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={openRoute}
+                    className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
+                    style={{ backgroundColor: getCommunityPrimaryColor() }}
+                  >
+                    <FontAwesomeIcon
+                      icon={faMapMarkerAlt}
+                      className="mr-2 text-sm"
+                    />
+                    Rute
+                  </button>
+
+                  {adData?.online_store_link && (
+                    <button
+                      onClick={() => {
+                        const storeUrl = adData.online_store_link;
+                        if (storeUrl) {
+                          let url = storeUrl;
+                          if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                            url = 'https://' + url;
+                          }
+                          window.open(url, '_blank');
+                        }
+                      }}
+                      className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
+                      style={{ backgroundColor: getCommunityPrimaryColor() }}
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2 text-sm" />
+                      Kunjungi Toko
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
-
-          {/* Tautan Toko Online - hanya saat Online dan link tersedia */}
-          {adData?.promo_type === 'online' && adData?.online_store_link && (
-            <div className="mb-4">
-              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                  Tautan Toko Online
-                </h4>
-                <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                  {adData.online_store_link}
-                </p>
-                <button
-                  onClick={() => {
-                    const storeUrl = adData.online_store_link;
-                    if (storeUrl) {
-                      let url = storeUrl;
-                      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                        url = 'https://' + url;
-                      }
-                      window.open(url, '_blank');
-                    }
-                  }}
-                  className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
-                  style={{ backgroundColor: getCommunityPrimaryColor() }}
-                >
-                  <FontAwesomeIcon
-                    icon={faExternalLinkAlt} className="mr-2 text-sm" />
-                  </button>
-                </div>
-              </div>
-            )}
 
           {/* Kontak pemilik */}
           <div className="mb-20 lg:mb-8">
@@ -675,26 +666,33 @@ export default function AdDetailUnified() {
                   Nama: {adData.seller?.name || '-'}
                 </p>
                 <p className="text-xs text-slate-500">
-                  No Hp/WA:{' '}
-                  {adData.seller?.phone || '-'}
+                  No Hp/WA:{' '}   {adData.seller?.phone || '-'}
+                  {adData?.seller?.phone && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => {
+                          const phone = String(adData.seller.phone).replace(/\s+/g, '');
+                          let formattedPhone = phone.replace(/\D/g, '');
+                          if (formattedPhone.startsWith('0')) {
+                            formattedPhone = '62' + formattedPhone.substring(1);
+                          } else if (!formattedPhone.startsWith('62')) {
+                            formattedPhone = '62' + formattedPhone;
+                          }
+                          const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title || ''}". Bisa bantu info lebih lanjut?`);
+                          const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                          window.open(whatsappUrl, '_blank');
+                        }}
+                        className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                        style={{ backgroundColor: getCommunityPrimaryColor() }}
+                      >
+                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                          <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </p>
-                <button
-                  className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
-                  style={{ backgroundColor: getCommunityPrimaryColor() }}
-                  onClick={() => {
-                    if (adData?.seller?.phone) {
-                      const phone = String(
-                        adData.seller.phone
-                      ).replace(/\s+/g, '');
-                      window.location.href = `tel:${phone}`;
-                    }
-                  }}
-                >
-                  <FontAwesomeIcon
-                    icon={faPhone}
-                    className="text-sm"
-                  />
-                </button>
+                {/* removed duplicate tel button to keep single WA button above */}
               </div>
             </div>
           </div>
@@ -718,7 +716,7 @@ export default function AdDetailUnified() {
                   } else if (!formattedPhone.startsWith('62')) {
                     formattedPhone = '62' + formattedPhone;
                   }
-                  
+
                   const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title}". Bisakah Anda memberikan informasi lebih lanjut?`);
                   const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
                   window.open(whatsappUrl, '_blank');

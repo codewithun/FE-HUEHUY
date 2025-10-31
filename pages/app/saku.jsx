@@ -30,6 +30,60 @@ const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
   .replace(/\/$/, '')
   .replace(/\/api$/, '');
 
+// === Helper: parse validation_time_limit (m/h/s atau angka menit) ===
+const parseTimeLimitMs = (raw) => {
+  if (raw == null) return 0;
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return 0;
+  // format HH:mm:ss atau HH:mm
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
+    const parts = s.split(':').map((v) => Number(v));
+    const h = parts[0] || 0;
+    const m = parts[1] || 0;
+    const sec = parts[2] || 0;
+    const hours = Number.isFinite(h) ? h : 0;
+    const minutes = Number.isFinite(m) ? m : 0;
+    const seconds = Number.isFinite(sec) ? sec : 0;
+    return (hours * 3600 + minutes * 60 + seconds) * 1000;
+  }
+
+  // format berakhiran huruf: 90m, 2h, 3600s
+  const m = s.match(/^(\d+(?:\.\d+)?)([smh])$/);
+  if (m) {
+    const val = parseFloat(m[1]);
+    const unit = m[2];
+    if (unit === 's') return val * 1000;
+    if (unit === 'm') return val * 60 * 1000;
+    if (unit === 'h') return val * 60 * 60 * 1000;
+  }
+  // angka polos → asumsikan MENIT
+  const num = Number(s);
+  if (!Number.isNaN(num) && num > 0) return num * 60 * 1000;
+  return 0;
+};
+
+// === Helper: tentukan expired_at promo berbasis time limit sejak claimedAt ===
+const resolvePromoExpiry = (ad, claimedAtIso, fallbackExpiredIso) => {
+  const limitMs = parseTimeLimitMs(ad?.validation_time_limit);
+  if (limitMs > 0 && claimedAtIso) {
+    const t = new Date(claimedAtIso).getTime();
+    if (!Number.isNaN(t)) {
+      return new Date(t + limitMs).toISOString();
+    }
+  }
+  return fallbackExpiredIso || null;
+};
+
+// Resolve the correct ad id from a promo/voucher item
+// Prioritize raw numeric columns from the payload (ad_id/ad.id).
+const resolveAdId = (row) => {
+  if (!row) return null;
+  const pick = (v) => (v === 0 || v ? Number(v) : null);
+  // Only resolve using ad_id or ad.id. Do NOT fallback to promo_id (that caused wrong fetch).
+  const cand = [pick(row.ad_id), pick(row?.ad?.id)].filter((v) => Number.isFinite(v) && v > 0);
+  return cand[0] ?? null;
+};
+
 // +++ Tambah helper normalisasi URL media +++
 const toAbsMediaUrl = (raw) => {
   if (!raw || typeof raw !== 'string') return null;
@@ -124,40 +178,40 @@ export default function Save() {
           (it) => !currentUserId || String(it.user_id) === String(currentUserId)
         );
 
-        // Di dalam fetchData() mapping PROMO ITEMS, ganti blok mapping 'mapped' → isi gambar & kontak
-        const mapped = userFilteredRows.map((it) => {
+        // === PROMO ITEMS mapping (async karena bisa fetch meta)
+        const mapped = await Promise.all(userFilteredRows.map(async (it) => {
           const ad = it.promo || it.ad || {};
           const claimedAt = it.created_at || it.reserved_at || null;
-          const expiredAt = it.expires_at || ad.end_date || null;
-          const redeemedAt = it.redeemed_at || null;
-          const isRedeemed = !!(redeemedAt || it.status === 'redeemed');
 
-          const validation_type = ad.validation_type || it.validation_type || 'auto';
+          // ✅ ambil limit dari field yang benar (prioritas: it.ad_limit, it.promo?.validation_time_limit, ad.validation_time_limit)
+          const limitStr =
+            it.ad_limit ??
+            it?.promo?.validation_time_limit ??
+            ad?.validation_time_limit ??
+            null;
 
-          // Pilih kandidat gambar terbaik
-          const imgCandidates = [
-            ad.picture_source,
-            ad.image_1,
-            ad.image_2,
-            ad.image_3,
-            ad.image,
-          ];
-          const picture =
-            toAbsMediaUrl(imgCandidates.find((u) => u && String(u).trim() !== '')) ||
-            '/default-avatar.png';
+          // minimal meta object only contains validation_time_limit when available
+          const meta = limitStr ? { validation_time_limit: limitStr } : {};
 
-          // Owner/contact (ambil dari ad.owner_* atau cube.user/corporate jika ada)
-          const ownerName =
-            ad.owner_name ||
-            ad?.cube?.user?.name ||
-            ad?.cube?.corporate?.name ||
-            'Merchant';
+          // ⛔️ jangan fetch /api/ads using promo_id — expired_at must be derived from claimedAt + validation_time_limit
+          const expiredAt = resolvePromoExpiry(meta, claimedAt, it.expires_at || null);
 
-          const ownerPhone =
-            ad.owner_contact ||
-            ad?.cube?.user?.phone ||
-            ad?.cube?.corporate?.phone ||
-            '';
+          // Resolve ad id for debugging (uses only ad_id/ad.id per resolveAdId)
+          const adIdResolved = resolveAdId(it);
+          // DEBUG: tunjukkan sumber limit dan hasilnya (sertakan resolver info)
+          // eslint-disable-next-line no-console
+          console.log('🧪Saku limit check', {
+            ad_id: adIdResolved,
+            raw: {
+              promo_item_id: it?.id,
+              promo_id_col: it?.promo_id,
+              ad_id_col: it?.ad_id,
+              ad_id_in_object: ad?.id,
+            },
+            claimedAt,
+            limit: meta?.validation_time_limit,
+            expiredAt,
+          });
 
           return {
             id: it.id,
@@ -165,49 +219,42 @@ export default function Save() {
             code: it.code,
             claimed_at: claimedAt,
             expired_at: expiredAt,
-            validated_at: redeemedAt,
-            validation_type,
+            validated_at: it.redeemed_at || null,
+            validation_type: ad.validation_type || it.validation_type || 'auto',
             user_id: it.user_id,
             promo_item: {
-              id: it.id,
-              code: it.code,
-              user_id: it.user_id,
+              id: it.id, code: it.code, user_id: it.user_id,
               promo_id: it.promo_id || ad.id,
-              status: it.status || (isRedeemed ? 'redeemed' : 'available'),
-              redeemed_at: redeemedAt,
-              reserved_at: it.reserved_at,
+              status: it.status || 'available',
+              redeemed_at: it.redeemed_at, reserved_at: it.reserved_at,
             },
             voucher_item: null,
             voucher: null,
             ad: {
               id: ad.id,
               title: ad.title || ad.name || 'Promo',
-              picture_source: picture,
+              picture_source:
+                toAbsMediaUrl([ad.picture_source, ad.image_1, ad.image_2, ad.image_3, ad.image]
+                  .find(u => u && String(u).trim() !== '')) || '/default-avatar.png',
               status: ad.status || 'active',
               description: ad.description,
-              validation_type,
-              // simpan juga owner_* agar modal bisa akses langsung
-              owner_name: ownerName,
-              owner_contact: ownerPhone,
+              validation_type: ad.validation_type || it.validation_type || 'auto',
+              owner_name: ad.owner_name || ad?.cube?.user?.name || ad?.cube?.corporate?.name || 'Merchant',
+              owner_contact: ad.owner_contact || ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || '',
               cube: {
                 community_id: ad.community_id || ad?.cube?.community_id || 1,
-                user: {
-                  name: ownerName,
-                  phone: ownerPhone,
-                },
+                user: { name: ad?.cube?.user?.name || 'Merchant', phone: ad?.cube?.user?.phone || '' },
                 corporate: ad?.cube?.corporate || null,
-                tags: [
-                  {
-                    address: ad.location || ad?.cube?.tags?.[0]?.address || '',
-                    link: ad?.cube?.tags?.[0]?.link || null,
-                    map_lat: ad?.cube?.tags?.[0]?.map_lat || null,
-                    map_lng: ad?.cube?.tags?.[0]?.map_lng || null,
-                  },
-                ],
+                tags: [{
+                  address: ad.location || ad?.cube?.tags?.[0]?.address || '',
+                  link: ad?.cube?.tags?.[0]?.link || null,
+                  map_lat: ad?.cube?.tags?.[0]?.map_lat || null,
+                  map_lng: ad?.cube?.tags?.[0]?.map_lng || null,
+                }],
               },
             },
           };
-        });
+        }));
 
         allItems = allItems.concat(mapped);
       }
@@ -222,20 +269,22 @@ export default function Save() {
           (it) => !currentUserId || String(it.user_id) === String(currentUserId)
         );
 
-        // Di mapping VOUCHER ITEMS, normalisasi gambar juga
+        // VOUCHER ITEMS: pakai ad_limit dari BE untuk expired_at (fallback ke valid_until)
         const mapped = userFilteredRows.map((it) => {
           const voucher = it.voucher || {};
           const validation_type = voucher.validation_type || it.validation_type || 'auto';
 
-          const imgCandidates = [
-            voucher.image,
-            voucher.image_1,
-            voucher.image_2,
-            voucher.image_3,
-          ];
+          // Hitung expired_at: claimed_at + ad_limit; fallback ke voucher.valid_until
+          const expiredAt = resolvePromoExpiry(
+            { validation_time_limit: it.ad_limit },          // <- dari BE (HH:mm:ss / 90m / 2h / angka=menit)
+            it.created_at,                                   // claimed_at
+            voucher.valid_until || null                      // fallback jika tidak ada limit
+          );
+
+          // Gambar
+          const imgCandidates = [voucher.image, voucher.image_1, voucher.image_2, voucher.image_3];
           const picture =
-            toAbsMediaUrl(imgCandidates.find((u) => u && String(u).trim() !== '')) ||
-            '/default-avatar.png';
+            toAbsMediaUrl(imgCandidates.find((u) => u && String(u).trim() !== '')) || '/default-avatar.png';
 
           const usedAt = it.used_at || null;
 
@@ -244,7 +293,7 @@ export default function Save() {
             type: 'voucher',
             code: it.code,
             claimed_at: it.created_at,
-            expired_at: voucher.valid_until || null,
+            expired_at: expiredAt,                            // <- now uses ad_limit
             validated_at: usedAt,
             validation_type,
             user_id: it.user_id,
@@ -256,8 +305,9 @@ export default function Save() {
               used_at: usedAt,
             },
             voucher,
+            // sisipkan info ad minimal (optional)
             ad: {
-              id: voucher.id,
+              id: it.ad_id || voucher.id,                    // ad_id dari BE bila ada
               title: voucher.name || voucher.title || 'Voucher',
               picture_source: picture,
               status: 'active',
@@ -384,7 +434,12 @@ export default function Save() {
 
     if (isValidated) return false;
 
-    const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
+    let expiredAt = null;
+    if (item?.type === 'voucher' || item?.voucher) {
+      expiredAt = item?.voucher?.valid_until || item?.expired_at || null;
+    } else {
+      expiredAt = item?.expired_at || null; // promo: sumber tunggal
+    }
     const isExpired = expiredAt && new Date(expiredAt) < new Date();
     if (isExpired) return false;
 
@@ -423,31 +478,37 @@ export default function Save() {
 
   const getTimeRemaining = (expiredAt) => {
     if (!expiredAt) return null;
+
     const now = moment();
-    const expired = moment(expiredAt);
-    const duration = moment.duration(expired.diff(now));
+    const end = moment(expiredAt);
+    let ms = end.diff(now);
 
-    if (duration.asMilliseconds() <= 0) return 'Sudah kedaluwarsa';
+    if (ms <= 0) return 'Sudah kedaluwarsa';
 
-    const days = Math.floor(duration.asDays());
-    const hours = Math.floor(duration.asHours()) % 24;
+    const dur = moment.duration(ms);
 
-    if (days > 0) {
-      if (days === 1) return '1 hari lagi';
-      if (days < 7) return `${days} hari lagi`;
+    // Hari & minggu
+    const days = Math.floor(dur.asDays());
+    if (days >= 7) {
       const weeks = Math.floor(days / 7);
-      if (weeks === 1) return '1 minggu lagi';
-      if (weeks < 4) return `${weeks} minggu lagi`;
-      const months = Math.floor(days / 30);
-      return `${months} bulan lagi`;
+      return weeks === 1 ? '1 minggu lagi' : `${weeks} minggu lagi`;
+    }
+    if (days >= 1) {
+      const remHours = Math.floor(dur.asHours()) % 24;
+      return remHours ? `${days} hari ${remHours} jam lagi` : `${days} hari lagi`;
     }
 
-    if (hours > 0) return `${hours} jam lagi`;
+    // < 24 jam → tampilkan jam + menit
+    const hours = Math.floor(dur.asHours());
+    const minutes = Math.floor(dur.asMinutes()) % 60;
+    if (hours > 0) return `${hours} jam ${minutes} menit lagi`;
 
-    const minutes = Math.floor(duration.asMinutes());
-    if (minutes > 0) return `${minutes} menit lagi`;
+    // < 1 jam → menit + detik
+    const mins = Math.floor(dur.asMinutes());
+    const secs = Math.floor(dur.asSeconds()) % 60;
+    if (mins > 0) return `${mins} menit ${secs} detik lagi`;
 
-    return 'Segera berakhir';
+    return `${secs} detik lagi`;
   };
 
   const isRecentlyClaimed = (claimedAt) => {
@@ -480,7 +541,9 @@ export default function Save() {
       );
     }
 
-    const expiredAt = item?.expired_at || item?.ad?.valid_until || item?.voucher?.valid_until;
+    const expiredAt = (item?.type === 'voucher' || item?.voucher)
+      ? (item?.voucher?.valid_until || item?.expired_at || null)
+      : (item?.expired_at || null);
     const isExpired = expiredAt && new Date(expiredAt) < new Date();
 
     if (isExpired) {
@@ -932,35 +995,35 @@ export default function Save() {
                   selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher
                     ? `/app/voucher/${selected?.voucher_item?.voucher_id || selected?.voucher?.id || selected?.ad?.id}`
                     : (() => {
-                        const ad = selected?.ad;
-                        const normBool = (v) => {
-                          if (v === true || v === 1) return true;
-                          if (typeof v === 'string') {
-                            const s = v.trim().toLowerCase();
-                            return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
-                          }
-                          return !!v;
-                        };
-                        const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
-                        const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
-                        const isInformation =
-                          normBool(ad?.cube?.is_information) ||
-                          normBool(ad?.is_information) ||
-                          contentType === 'information' ||
-                          contentType === 'kubus-informasi' ||
-                          typeStr === 'information' ||
-                          typeStr === 'informasi';
-
-                        if (isInformation) {
-                          const code = ad?.cube?.code || ad?.code;
-                          return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+                      const ad = selected?.ad;
+                      const normBool = (v) => {
+                        if (v === true || v === 1) return true;
+                        if (typeof v === 'string') {
+                          const s = v.trim().toLowerCase();
+                          return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
                         }
+                        return !!v;
+                      };
+                      const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+                      const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+                      const isInformation =
+                        normBool(ad?.cube?.is_information) ||
+                        normBool(ad?.is_information) ||
+                        contentType === 'information' ||
+                        contentType === 'kubus-informasi' ||
+                        typeStr === 'information' ||
+                        typeStr === 'informasi';
 
-                        return `/app/komunitas/promo/${ad?.id}?${new URLSearchParams({
-                          communityId: String(ad?.cube?.community_id || 1),
-                          from: 'saku',
-                        }).toString()}`;
-                      })()
+                      if (isInformation) {
+                        const code = ad?.cube?.code || ad?.code;
+                        return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+                      }
+
+                      return `/app/komunitas/promo/${ad?.id}?${new URLSearchParams({
+                        communityId: String(ad?.cube?.community_id || 1),
+                        from: 'saku',
+                      }).toString()}`;
+                    })()
                 }
               >
                 <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors">
