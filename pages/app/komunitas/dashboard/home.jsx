@@ -354,21 +354,26 @@ export default function CommunityDashboard({ communityId }) {
         const json = await res.json();
         let widgets = Array.isArray(json?.data) ? json.data.filter((w) => w.is_active) : [];
 
-        // === NEW: fetch promo widgets and pick shuffle_cube entries so "Promo/Iklan Acak" can show in community dashboard
+        // === NEW: fetch promo widgets and pick shuffle_cube + ad_category entries so they can show in community dashboard
         try {
           const promoRes = await fetch(`${apiBase}/api/admin/dynamic-content?type=promo&community_id=${communityId}`, { headers });
           const promoJson = await promoRes.json();
           const promoWidgets = Array.isArray(promoJson?.data) ? promoJson.data : [];
-          // keep only active shuffle_cube widgets
-          const shuffleWidgets = promoWidgets.filter(w => w?.is_active && String(w.source_type || '').toLowerCase() === 'shuffle_cube');
-          if (shuffleWidgets.length) {
+          // keep only active shuffle_cube and ad_category widgets
+          const relevantPromoWidgets = promoWidgets.filter(w => 
+            w?.is_active && (
+              String(w.source_type || '').toLowerCase() === 'shuffle_cube' ||
+              String(w.source_type || '').toLowerCase() === 'ad_category'
+            )
+          );
+          if (relevantPromoWidgets.length) {
             // merge with information widgets, dedupe by id
             const map = new Map();
-            widgets.concat(shuffleWidgets).forEach(w => { if (w?.id != null) map.set(w.id, w); });
+            widgets.concat(relevantPromoWidgets).forEach(w => { if (w?.id != null) map.set(w.id, w); });
             widgets = Array.from(map.values());
           }
         } catch (e) {
-          console.warn('Failed to fetch promo widgets for shuffle_cube merge:', e);
+          console.warn('Failed to fetch promo widgets for shuffle_cube and ad_category merge:', e);
         }
 
         // 🔹 Cari widget ad_category: ambil kategorinya dan simpan widget untuk rendering khusus
@@ -1833,16 +1838,18 @@ export default function CommunityDashboard({ communityId }) {
                         data: categoryBoxWidget
                       });
                     }
+                    
                     // Add AdCategoryWidget if available (untuk promo/iklan dengan kategori)
-                    else if (adCategoryWidget && adCategories.length > 0) {
+                    if (adCategoryWidget && adCategories.length > 0) {
                       items.push({
                         type: 'ad_category_widget',
                         level: adCategoryLevel || 0,
                         data: adCategoryWidget
                       });
                     }
+                    
                     // Add category block if available (fallback for old category display)
-                    else if (adCategories.length > 0 && adCategoryLevel !== null) {
+                    if (adCategories.length > 0 && adCategoryLevel !== null && !categoryBoxWidget && !adCategoryWidget) {
                       items.push({
                         type: 'categories',
                         level: adCategoryLevel,
