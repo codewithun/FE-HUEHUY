@@ -17,6 +17,8 @@ const CommunityPromoPage = () => {
   const [widgetData, setWidgetData] = useState([]); // widgets "hunting"
   const [adCategories, setAdCategories] = useState([]); // ambil ad_category di parent
   const [adCategoryLevel, setAdCategoryLevel] = useState(null); // level untuk posisi kategori
+  const [adCategoryWidget, setAdCategoryWidget] = useState(null); // ad_category widget
+  const [categoryBoxWidget, setCategoryBoxWidget] = useState(null); // category_box widget
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -428,13 +430,18 @@ const CommunityPromoPage = () => {
         }
       };
 
-      // --- ONLY fetch types relevant to promo page: promo + hunting
+      // --- Fetch types relevant to promo page: promo + hunting + information (for ad_category widgets)
       const adminPromo = await tryJson(
         `${apiUrl}/admin/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
         { headers: authHeaders }
       );
       const adminHunting = await tryJson(
         `${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
+        { headers: authHeaders }
+      );
+      // Fetch information type to get ad_category and category_box widgets
+      const adminInformation = await tryJson(
+        `${apiUrl}/admin/dynamic-content?type=information&community_id=${communityId}&paginate=all`,
         { headers: authHeaders }
       );
 
@@ -447,6 +454,10 @@ const CommunityPromoPage = () => {
         `${base}/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
         { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
       );
+      const publicInformation = adminPromo?.length ? null : await tryJson(
+        `${base}/dynamic-content?type=information&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
+      );
 
       // alias fallback (if neither admin nor public returned)
       const aliasPromo = (adminPromo?.length || publicPromo?.length) ? null : await tryJson(
@@ -457,14 +468,21 @@ const CommunityPromoPage = () => {
         `${apiUrl}/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
         { headers: { 'Content-Type': 'application/json' } }
       );
+      const aliasInformation = (adminPromo?.length || publicPromo?.length) ? null : await tryJson(
+        `${apiUrl}/dynamic-content?type=information&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
       const merged = [
         ...(adminPromo || []),
         ...(adminHunting || []),
+        ...(adminInformation || []),
         ...(publicPromo || []),
         ...(publicHunting || []),
+        ...(publicInformation || []),
         ...(aliasPromo || []),
         ...(aliasHunting || []),
+        ...(aliasInformation || []),
       ].filter(Boolean);
 
       if (!merged.length) {
@@ -480,32 +498,65 @@ const CommunityPromoPage = () => {
         .filter(w => w?.is_active)
         .sort((a, b) => (a.level || 0) - (b.level || 0));
 
+      // Identify both ad_category and category_box widgets
       const adCategoryWidget = widgets.find(w => w.source_type === 'ad_category' || w.content_type === 'category');
-      if (adCategoryWidget) {
+      const categoryBoxWidget = widgets.find(w => 
+        w.source_type === 'category_box' || 
+        w.content_type === 'category_box' || 
+        (w.name && w.name.toLowerCase().includes('kotak kategori'))
+      );
+
+      // Handle both ad_category and category_box widgets
+      if (adCategoryWidget || categoryBoxWidget) {
         try {
-          const catRes = await fetch(`${apiUrl}/admin/options/ad-category?community_id=${communityId}`, { headers: authHeaders });
+          const catRes = await fetch(`${apiUrl}/admin/options/ad-category?community_id=${communityId}`, { headers: getAuthHeaders() });
           const catResult = await catRes.json();
           if (catResult?.message === 'success' && Array.isArray(catResult.data)) {
             setAdCategories(catResult.data);
-            setAdCategoryLevel(adCategoryWidget.level ?? 0);
+            // Set level based on ad_category widget specifically
+            setAdCategoryLevel(adCategoryWidget?.level ?? 0);
           } else if (Array.isArray(catResult)) {
             setAdCategories(catResult);
-            setAdCategoryLevel(adCategoryWidget.level ?? 0);
+            // Set level based on ad_category widget specifically
+            setAdCategoryLevel(adCategoryWidget?.level ?? 0);
           } else {
             setAdCategories([]); setAdCategoryLevel(null);
           }
         } catch {
           setAdCategories([]); setAdCategoryLevel(null);
         }
-        widgets = widgets.filter(w => w.id !== adCategoryWidget.id);
       } else {
         setAdCategories([]); setAdCategoryLevel(null);
+      }
+
+      // Set adCategoryWidget state
+      if (adCategoryWidget) {
+        setAdCategoryWidget(adCategoryWidget);
+      } else {
+        setAdCategoryWidget(null);
+      }
+
+      // Set categoryBoxWidget state
+      if (categoryBoxWidget) {
+        setCategoryBoxWidget(categoryBoxWidget);
+      } else {
+        setCategoryBoxWidget(null);
+      }
+
+      // Remove both ad_category and category_box widgets from main widgets array
+      // (they will be handled separately in the rendering logic)
+      if (adCategoryWidget) {
+        widgets = widgets.filter(w => w.id !== adCategoryWidget.id);
+      }
+      if (categoryBoxWidget) {
+        widgets = widgets.filter(w => w.id !== categoryBoxWidget.id);
       }
 
       setWidgetData(widgets);
     } catch (e) {
       console.error('Error fetching widget data:', e);
       setWidgetData([]); setAdCategories([]); setAdCategoryLevel(null);
+      setAdCategoryWidget(null); setCategoryBoxWidget(null);
     }
   };
 
@@ -525,6 +576,286 @@ const CommunityPromoPage = () => {
   // (Removed unused COLORS to satisfy lint)
 
   // ======== SUB-COMPONENTS FOR WIDGET TYPES (Hooks at top-level) ========
+  
+  // ======== AD CATEGORY WIDGET COMPONENT ========
+  const AdCategoryWidget = ({ widget }) => {
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [categoryData, setCategoryData] = useState([]);
+    const [loadingCategory, setLoadingCategory] = useState(false);
+
+    // Fetch cubes by category
+    const fetchCubesByCategory = async (categoryId) => {
+      try {
+        setLoadingCategory(true);
+        const response = await fetch(`${apiUrl}/cubes-by-category?ad_category_id=${categoryId}&community_id=${communityId}`, {
+          headers: getAuthHeaders()
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const data = Array.isArray(result?.data) ? result.data : [];
+          setCategoryData(data);
+        } else {
+          console.error('Failed to fetch category data:', response.status);
+          setCategoryData([]);
+        }
+      } catch (error) {
+        console.error('Error fetching category data:', error);
+        setCategoryData([]);
+      } finally {
+        setLoadingCategory(false);
+      }
+    };
+
+    // Auto-select first category if available
+    useEffect(() => {
+      if (adCategories.length > 0 && !selectedCategory) {
+        const firstCategory = adCategories[0];
+        setSelectedCategory(firstCategory);
+        fetchCubesByCategory(firstCategory.id);
+      }
+    }, [adCategories]);
+
+    const handleCategorySelect = (category) => {
+      setSelectedCategory(category);
+      fetchCubesByCategory(category.id);
+    };
+
+    const renderCubeCard = (item, index) => {
+      const ad = item?.ad || item;
+      const cube = item?.cube || ad?.cube;
+      
+      if (!ad && !cube) return null;
+
+      const imageUrl = getAdImage(ad) || cube?.picture_source || '/default-avatar.png';
+      const title = ad?.title || cube?.label || cube?.name || 'Promo';
+      const merchant = cube?.name || ad?.merchant || 'Merchant';
+      const description = ad?.description || cube?.description || '';
+      const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
+      const categoryData = getCategoryWithIcon(ad, cube, communityData);
+
+      const handleClick = () => {
+        if (isInformationCube) {
+          const code = cube?.code || ad?.cube?.code || ad?.code;
+          if (code) {
+            const targetUrl = communityId
+              ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
+              : `/app/kubus-informasi/kubus-infor?code=${code}`;
+            router.push(targetUrl);
+          }
+          return;
+        }
+        if (ad?.id) {
+          if (getIsAdvertising(ad, cube)) {
+            const targetUrl = communityId
+              ? `/app/iklan/${ad.id}?communityId=${communityId}`
+              : `/app/iklan/${ad.id}`;
+            router.push(targetUrl);
+          } else {
+            const targetUrl = communityId
+              ? `/app/komunitas/promo/detail_promo?promoId=${ad.id}&communityId=${communityId}`
+              : `/app/promo/detail_promo?promoId=${ad.id}`;
+            router.push(targetUrl);
+          }
+        }
+      };
+
+      const size = widget.size || 'M';
+
+      // Size S - Compact card
+      if (size === 'S') {
+        return (
+          <div
+            key={ad?.id || cube?.id || index}
+            className="flex rounded-[12px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 hover:scale-[1.02] hover:shadow-xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
+            style={{ minWidth: 240, maxWidth: 280 }}
+            onClick={handleClick}
+          >
+            <div className="relative w-16 h-16 bg-white/20 backdrop-blur-sm overflow-hidden">
+              <Image src={buildImageUrl(imageUrl)} alt={title} fill className="object-cover" />
+            </div>
+            <div className="flex-1 p-2 flex flex-col justify-between">
+              <div>
+                <h3 className="font-semibold text-white text-xs line-clamp-1 mb-1">{title}</h3>
+                <p className="text-xs text-white/70 line-clamp-1">{merchant}</p>
+              </div>
+              <div className="flex items-center gap-1 mt-1">
+                {categoryData?.icon}
+                <span className="text-xs text-white/80">{categoryData?.label}</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Size M - Medium card
+      if (size === 'M') {
+        return (
+          <div
+            key={ad?.id || cube?.id || index}
+            className="flex rounded-[14px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 hover:scale-[1.02] hover:shadow-xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
+            style={{ minWidth: 280, maxWidth: 320 }}
+            onClick={handleClick}
+          >
+            <div className="relative w-20 h-20 bg-white/20 backdrop-blur-sm overflow-hidden">
+              <Image src={buildImageUrl(imageUrl)} alt={title} fill className="object-cover" />
+            </div>
+            <div className="flex-1 p-3 flex flex-col justify-between">
+              <div>
+                <h3 className="font-semibold text-white text-sm line-clamp-2 mb-1">{title}</h3>
+                <p className="text-xs text-white/70 line-clamp-1">{merchant}</p>
+              </div>
+              <div className="flex items-center gap-1 mt-2">
+                {categoryData?.icon}
+                <span className="text-xs text-white/80">{categoryData?.label}</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Size L - Large card
+      if (size === 'L') {
+        return (
+          <div
+            key={ad?.id || cube?.id || index}
+            className="flex rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
+            style={{ minWidth: 320, maxWidth: 350 }}
+            onClick={handleClick}
+          >
+            <div className="relative w-24 h-full bg-white/20 backdrop-blur-sm overflow-hidden">
+              <Image src={buildImageUrl(imageUrl)} alt={title} fill className="object-cover" />
+            </div>
+            <div className="flex-1 p-4 flex flex-col justify-between">
+              <div>
+                <h3 className="font-semibold text-white text-base line-clamp-2 mb-2">{title}</h3>
+                <p className="text-sm text-white/70 line-clamp-1 mb-1">{merchant}</p>
+                <p className="text-xs text-white/60 line-clamp-2">{description}</p>
+              </div>
+              <div className="flex items-center gap-2 mt-3">
+                {categoryData?.icon}
+                <span className="text-sm text-white/80">{categoryData?.label}</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Size XL - Extra large card
+      if (size === 'XL') {
+        return (
+          <div
+            key={ad?.id || cube?.id || index}
+            className="rounded-[18px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
+            style={{ minWidth: 280, maxWidth: 320 }}
+            onClick={handleClick}
+          >
+            <div className="relative w-full h-40 bg-white/20 backdrop-blur-sm overflow-hidden">
+              <Image src={buildImageUrl(imageUrl)} alt={title} fill className="object-cover" />
+            </div>
+            <div className="p-4">
+              <h3 className="font-semibold text-white text-base line-clamp-2 mb-2">{title}</h3>
+              <p className="text-sm text-white/70 line-clamp-1 mb-2">{merchant}</p>
+              <p className="text-xs text-white/60 line-clamp-3 mb-3">{description}</p>
+              <div className="flex items-center gap-2">
+                {categoryData?.icon}
+                <span className="text-sm text-white/80">{categoryData?.label}</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Size XL-Ads - Extra large ads format
+      if (size === 'XL-Ads') {
+        return (
+          <div
+            key={ad?.id || cube?.id || index}
+            className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white cursor-pointer"
+            style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8' }}
+            onClick={handleClick}
+          >
+            <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
+              <Image
+                src={buildImageUrl(imageUrl)}
+                alt={title}
+                fill
+                className="object-contain p-2"
+              />
+            </div>
+            <div className="p-4 bg-white">
+              <h3 className="font-bold text-gray-900 text-lg line-clamp-2 mb-2">{title}</h3>
+              <p className="text-gray-600 text-sm line-clamp-1 mb-2">{merchant}</p>
+              <p className="text-gray-500 text-xs line-clamp-3 mb-3">{description}</p>
+              <div className="flex items-center gap-2">
+                <div className="text-gray-600">{categoryData?.icon}</div>
+                <span className="text-sm text-gray-600">{categoryData?.label}</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Default fallback to M size
+      return renderCubeCard({ ...item, size: 'M' }, index);
+    };
+
+    return (
+      <div className="mb-6">
+        {/* Header */}
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-white">{widget.name || 'Kategori Iklan'}</h2>
+          {widget.description && (
+            <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
+          )}
+        </div>
+
+        {/* Category Selector */}
+        <div className="mb-4">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {adCategories.map((category) => {
+              const isSelected = selectedCategory?.id === category.id;
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => handleCategorySelect(category)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    isSelected
+                      ? 'bg-white text-gray-900 shadow-lg'
+                      : 'bg-white/20 text-white hover:bg-white/30'
+                  }`}
+                >
+                  {category.label || category.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Content */}
+        {loadingCategory ? (
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex-shrink-0 w-[280px] h-[120px] bg-white/10 rounded-[16px] animate-pulse" />
+            ))}
+          </div>
+        ) : categoryData.length > 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {categoryData.map((item, index) => renderCubeCard(item, index))}
+          </div>
+        ) : selectedCategory ? (
+          <div className="text-center py-8 text-white/60">
+            Tidak ada kubus untuk kategori &quot;{selectedCategory.label || selectedCategory.name}&quot;
+          </div>
+        ) : (
+          <div className="text-center py-8 text-white/60">
+            Pilih kategori untuk melihat kubus
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const NearbyWidget = ({ widget, communityId, buildImageUrl, getIsInformation, getIsAdvertising }) => {
     const [items, setItems] = useState([]);
     const [loadingNearby, setLoadingNearby] = useState(true);
@@ -598,6 +929,51 @@ const CommunityPromoPage = () => {
                 <div className="col-span-3">
                   <p className="font-semibold text-white drop-shadow-sm">{title}</p>
                   {!!address && <p className="text-white/90 text-xs my-1 drop-shadow-sm">{address}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ======== CATEGORY BOX WIDGET COMPONENT ========
+  const CategoryBoxWidget = ({ widget }) => {
+    return (
+      <div className="mb-6">
+        <div className="mb-2">
+          <h2 className="text-lg font-bold text-white">{widget.name || 'Kotak Kategori'}</h2>
+          {widget.description && (
+            <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
+          )}
+        </div>
+        
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          {adCategories.map((category) => {
+            const imgSrc = category.image || buildImageUrl(category.picture_source) || '/default-avatar.png';
+            const label = category.label || category.name || 'Kategori';
+            const id = category.id || category.value;
+
+            return (
+              <div
+                key={id}
+                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
+                style={{ minWidth: 90 }}
+                onClick={() =>
+                  router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
+                }
+              >
+                <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
+                  <Image
+                    src={imgSrc}
+                    alt={label}
+                    fill
+                    className="object-cover brightness-90"
+                  />
+                  <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
+                    <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
+                  </div>
                 </div>
               </div>
             );
@@ -886,12 +1262,14 @@ const CommunityPromoPage = () => {
   const WidgetRenderer = ({ widget }) => {
     const { source_type, size, dynamic_content_cubes, name, content_type } = widget;
 
-    // jika widget adalah ad_category kita hide UI di sini (data sudah diambil di parent)
-    if (source_type === 'ad_category') return null;
+    // Handle ad_category widget
+    if (source_type === 'ad_category') {
+      return <AdCategoryWidget widget={widget} />;
+    }
 
-    // Handle shuffle_cube widget
-    if (source_type === 'shuffle_cube') {
-      return <ShuffleCubeWidget widget={widget} />;
+    // Handle category_box widget
+    if (source_type === 'category_box' || content_type === 'category_box') {
+      return <CategoryBoxWidget widget={widget} />;
     }
 
     // Handle shuffle_cube widget
@@ -957,6 +1335,8 @@ const CommunityPromoPage = () => {
         />
       );
     }
+
+
 
     // Handle recommendation widget type
     if (widget.content_type === 'recommendation') {
@@ -1410,10 +1790,10 @@ const CommunityPromoPage = () => {
 
         <div className="lg:mx-auto lg:max-w-md">
           {/* Render Widgets dengan level-aware ordering */}
-          {(widgetData.length > 0 || adCategories.length > 0) && (
+          {(widgetData.length > 0 || adCategoryWidget || categoryBoxWidget) && (
             <>
               {(() => {
-                // Create combined items with widgets and categories at correct level
+                // Create combined items with widgets and specific category widgets at correct level
                 const items = [];
 
                 // Add all widgets
@@ -1425,12 +1805,21 @@ const CommunityPromoPage = () => {
                   });
                 });
 
-                // Add category block if available
-                if (adCategories.length > 0 && adCategoryLevel !== null) {
+                // Add CategoryBoxWidget if available
+                if (categoryBoxWidget && adCategories.length > 0) {
                   items.push({
-                    type: 'categories',
-                    level: adCategoryLevel,
-                    data: adCategories
+                    type: 'category_box_widget',
+                    level: categoryBoxWidget.level || 0,
+                    data: categoryBoxWidget
+                  });
+                }
+
+                // Add AdCategoryWidget if available (can coexist with CategoryBoxWidget)
+                if (adCategoryWidget && adCategories.length > 0) {
+                  items.push({
+                    type: 'ad_category_widget',
+                    level: adCategoryWidget.level || 0,
+                    data: adCategoryWidget
                   });
                 }
 
@@ -1441,43 +1830,10 @@ const CommunityPromoPage = () => {
                 return items.map((item) => {
                   if (item.type === 'widget') {
                     return <WidgetRenderer key={item.data.id} widget={item.data} />;
-                  } else if (item.type === 'categories') {
-                    return (
-                      <div key="categories" className="mb-6">
-                        <div className="mb-2">
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                          {item.data.map((cat) => {
-                            const imgSrc = cat.image || buildImageUrl(cat.picture_source) || '/default-avatar.png';
-                            const label = cat.label || cat.name || 'Kategori';
-                            const id = cat.id || cat.value;
-
-                            return (
-                              <div
-                                key={id}
-                                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
-                                style={{ minWidth: 90 }}
-                                onClick={() =>
-                                  router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
-                                }
-                              >
-                                <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
-                                  <Image
-                                    src={imgSrc}
-                                    alt={label}
-                                    fill
-                                    className="object-cover brightness-90"
-                                  />
-                                  <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
-                                    <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
+                  } else if (item.type === 'category_box_widget') {
+                    return <CategoryBoxWidget key="category_box_widget" widget={item.data} />;
+                  } else if (item.type === 'ad_category_widget') {
+                    return <AdCategoryWidget key="ad_category_widget" widget={item.data} />;
                   }
                   return null;
                 });

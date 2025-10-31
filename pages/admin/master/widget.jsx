@@ -188,7 +188,7 @@ export default function Widget() {
                 label: 'Jenis Konten',
                 placeholder: 'Pilih jenis tampilan konten...',
                 options: [
-                  { label: 'Kotak Kategori', value: 'category' },
+                  { label: 'Kotak Kategori', value: 'category_box' },
                   { label: 'Terdekat', value: 'nearby' },
                   { label: 'Rekomendasi', value: 'recommendation' },
                   { label: 'Promo / Iklan', value: 'promo' },
@@ -205,19 +205,18 @@ export default function Widget() {
                   (val) => val.name === 'source_type'
                 )?.value;
 
-                // 🟢 CASE 1: Kotak Kategori — otomatis ambil semua kategori utama
-                if (content_type === 'category') {
+                // 🟢 CASE 1: Kotak Kategori — otomatis ambil semua kategori utama untuk navigasi ke page-category
+                if (content_type === 'category_box') {
                   return (
                     <div className="mt-2">
                       <input
                         type="hidden"
                         name="source_type"
-                        value="ad_category"
+                        value="category_box"
                         {...formControl('source_type')}
                       />
                       <p className="text-sm text-slate-500 italic">
-                        Semua kategori utama (is_primary_parent = 1) akan
-                        ditampilkan otomatis di halaman komunitas.
+                        Kotak kategori akan menampilkan semua kategori dan mengarahkan ke halaman kategori saat diklik.
                       </p>
                     </div>
                   );
