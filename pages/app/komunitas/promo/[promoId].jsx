@@ -82,6 +82,22 @@ const isYouTubeLink = (url) => {
   return /(?:youtube\.com|youtu\.be)/i.test(url);
 };
 
+const safeExternalUrl = (raw) => {
+  if (!raw || typeof raw !== 'string') return null;
+  let url = raw.trim();
+  // auto tambahkan protokol
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  try {
+    const u = new URL(url);
+    // opsional: tambahkan UTM
+    if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', 'huehuy');
+    if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', 'promo_online');
+    return u.toString();
+  } catch {
+    return null;
+  }
+};
+
 export default function PromoDetailUnified() {
   const router = useRouter();
   const { promoId, communityId } = router.query;
@@ -1479,6 +1495,9 @@ export default function PromoDetailUnified() {
     );
   }
 
+  // compute a safe community primary color to use in inline styles (fallback to blue)
+  const communityPrimary = getCommunityPrimaryColor() || '#2563eb';
+
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
       {/* Header */}
@@ -1647,7 +1666,7 @@ export default function PromoDetailUnified() {
                         window.open(whatsappUrl, '_blank');
                       }}
                       className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
-                      style={{ backgroundColor: getCommunityPrimaryColor() }}
+                      style={{ backgroundColor: communityPrimary }}
                     >
                       <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
                         <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
@@ -1657,6 +1676,39 @@ export default function PromoDetailUnified() {
                 )}
               </div>
             </div>
+
+            {promoData?.status?.type === 'Online' && promoData?.link_information && (
+              <div className="mb-4 mt-3">
+                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                  <div className="flex items-center mb-3">
+                    <FontAwesomeIcon icon={faWifi} className="mr-3 text-slate-600 text-sm" />
+                    <span className="font-semibold text-slate-900 text-sm">Promo Online</span>
+                  </div>
+
+                  {/* tampilkan link mentah (truncate) */}
+                  <div className="bg-slate-50 rounded-[12px] p-3 text-xs text-slate-700 mb-3">
+                    <span className="break-all">{promoData.link_information}</span>
+                  </div>
+
+                  {/* tombol buka link */}
+                  <a
+                    href={safeExternalUrl(promoData.link_information) || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center text-white py-3 px-4 rounded-[12px] font-semibold hover:opacity-90 transition-all"
+                    style={{ backgroundColor: communityPrimary }}
+                    onClick={(e) => {
+                      if (!safeExternalUrl(promoData.link_information)) e.preventDefault();
+                    }}
+                  >
+                    Buka Link Promo
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            )}
 
             {/* Video/Link Section - hanya untuk tipe Informasi */}
             {promoData?.link_information && promoData?.categoryLabel === 'Informasi' && (
