@@ -17,6 +17,8 @@ const CommunityPromoPage = () => {
   const [widgetData, setWidgetData] = useState([]); // widgets "hunting"
   const [adCategories, setAdCategories] = useState([]); // ambil ad_category di parent
   const [adCategoryLevel, setAdCategoryLevel] = useState(null); // level untuk posisi kategori
+  const [adCategoryWidget, setAdCategoryWidget] = useState(null); // ad_category widget
+  const [categoryBoxWidget, setCategoryBoxWidget] = useState(null); // category_box widget
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -428,13 +430,18 @@ const CommunityPromoPage = () => {
         }
       };
 
-      // --- ONLY fetch types relevant to promo page: promo + hunting
+      // --- Fetch types relevant to promo page: promo + hunting + information (for ad_category widgets)
       const adminPromo = await tryJson(
         `${apiUrl}/admin/dynamic-content?type=promo&community_id=${communityId}&paginate=all`,
         { headers: authHeaders }
       );
       const adminHunting = await tryJson(
         `${apiUrl}/admin/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
+        { headers: authHeaders }
+      );
+      // Fetch information type to get ad_category and category_box widgets
+      const adminInformation = await tryJson(
+        `${apiUrl}/admin/dynamic-content?type=information&community_id=${communityId}&paginate=all`,
         { headers: authHeaders }
       );
 
@@ -447,6 +454,10 @@ const CommunityPromoPage = () => {
         `${base}/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
         { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
       );
+      const publicInformation = adminPromo?.length ? null : await tryJson(
+        `${base}/dynamic-content?type=information&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' }, credentials: 'include', mode: 'cors' }
+      );
 
       // alias fallback (if neither admin nor public returned)
       const aliasPromo = (adminPromo?.length || publicPromo?.length) ? null : await tryJson(
@@ -457,14 +468,21 @@ const CommunityPromoPage = () => {
         `${apiUrl}/dynamic-content?type=hunting&community_id=${communityId}&paginate=all`,
         { headers: { 'Content-Type': 'application/json' } }
       );
+      const aliasInformation = (adminPromo?.length || publicPromo?.length) ? null : await tryJson(
+        `${apiUrl}/dynamic-content?type=information&community_id=${communityId}&paginate=all`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
       const merged = [
         ...(adminPromo || []),
         ...(adminHunting || []),
+        ...(adminInformation || []),
         ...(publicPromo || []),
         ...(publicHunting || []),
+        ...(publicInformation || []),
         ...(aliasPromo || []),
         ...(aliasHunting || []),
+        ...(aliasInformation || []),
       ].filter(Boolean);
 
       if (!merged.length) {
@@ -480,32 +498,65 @@ const CommunityPromoPage = () => {
         .filter(w => w?.is_active)
         .sort((a, b) => (a.level || 0) - (b.level || 0));
 
+      // Identify both ad_category and category_box widgets
       const adCategoryWidget = widgets.find(w => w.source_type === 'ad_category' || w.content_type === 'category');
-      if (adCategoryWidget) {
+      const categoryBoxWidget = widgets.find(w => 
+        w.source_type === 'category_box' || 
+        w.content_type === 'category_box' || 
+        (w.name && w.name.toLowerCase().includes('kotak kategori'))
+      );
+
+      // Handle both ad_category and category_box widgets
+      if (adCategoryWidget || categoryBoxWidget) {
         try {
           const catRes = await fetch(`${apiUrl}/admin/options/ad-category?community_id=${communityId}`, { headers: getAuthHeaders() });
           const catResult = await catRes.json();
           if (catResult?.message === 'success' && Array.isArray(catResult.data)) {
             setAdCategories(catResult.data);
-            setAdCategoryLevel(adCategoryWidget.level ?? 0);
+            // Set level based on ad_category widget specifically
+            setAdCategoryLevel(adCategoryWidget?.level ?? 0);
           } else if (Array.isArray(catResult)) {
             setAdCategories(catResult);
-            setAdCategoryLevel(adCategoryWidget.level ?? 0);
+            // Set level based on ad_category widget specifically
+            setAdCategoryLevel(adCategoryWidget?.level ?? 0);
           } else {
             setAdCategories([]); setAdCategoryLevel(null);
           }
         } catch {
           setAdCategories([]); setAdCategoryLevel(null);
         }
-        widgets = widgets.filter(w => w.id !== adCategoryWidget.id);
       } else {
         setAdCategories([]); setAdCategoryLevel(null);
+      }
+
+      // Set adCategoryWidget state
+      if (adCategoryWidget) {
+        setAdCategoryWidget(adCategoryWidget);
+      } else {
+        setAdCategoryWidget(null);
+      }
+
+      // Set categoryBoxWidget state
+      if (categoryBoxWidget) {
+        setCategoryBoxWidget(categoryBoxWidget);
+      } else {
+        setCategoryBoxWidget(null);
+      }
+
+      // Remove both ad_category and category_box widgets from main widgets array
+      // (they will be handled separately in the rendering logic)
+      if (adCategoryWidget) {
+        widgets = widgets.filter(w => w.id !== adCategoryWidget.id);
+      }
+      if (categoryBoxWidget) {
+        widgets = widgets.filter(w => w.id !== categoryBoxWidget.id);
       }
 
       setWidgetData(widgets);
     } catch (e) {
       console.error('Error fetching widget data:', e);
       setWidgetData([]); setAdCategories([]); setAdCategoryLevel(null);
+      setAdCategoryWidget(null); setCategoryBoxWidget(null);
     }
   };
 
@@ -887,6 +938,51 @@ const CommunityPromoPage = () => {
     );
   };
 
+  // ======== CATEGORY BOX WIDGET COMPONENT ========
+  const CategoryBoxWidget = ({ widget }) => {
+    return (
+      <div className="mb-6">
+        <div className="mb-2">
+          <h2 className="text-lg font-bold text-white">{widget.name || 'Kotak Kategori'}</h2>
+          {widget.description && (
+            <p className="text-sm text-white/80 mt-[1px]">{widget.description}</p>
+          )}
+        </div>
+        
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          {adCategories.map((category) => {
+            const imgSrc = category.image || buildImageUrl(category.picture_source) || '/default-avatar.png';
+            const label = category.label || category.name || 'Kategori';
+            const id = category.id || category.value;
+
+            return (
+              <div
+                key={id}
+                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
+                style={{ minWidth: 90 }}
+                onClick={() =>
+                  router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
+                }
+              >
+                <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
+                  <Image
+                    src={imgSrc}
+                    alt={label}
+                    fill
+                    className="object-cover brightness-90"
+                  />
+                  <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
+                    <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const RecommendationWidget = ({ widget, communityId, buildImageUrl, getIsInformation, getIsAdvertising }) => {
     const [items, setItems] = useState([]);
     const [loadingRec, setLoadingRec] = useState(true);
@@ -1169,6 +1265,11 @@ const CommunityPromoPage = () => {
     // Handle ad_category widget
     if (source_type === 'ad_category') {
       return <AdCategoryWidget widget={widget} />;
+    }
+
+    // Handle category_box widget
+    if (source_type === 'category_box' || content_type === 'category_box') {
+      return <CategoryBoxWidget widget={widget} />;
     }
 
     // Handle shuffle_cube widget
@@ -1689,10 +1790,10 @@ const CommunityPromoPage = () => {
 
         <div className="lg:mx-auto lg:max-w-md">
           {/* Render Widgets dengan level-aware ordering */}
-          {(widgetData.length > 0 || adCategories.length > 0) && (
+          {(widgetData.length > 0 || adCategoryWidget || categoryBoxWidget) && (
             <>
               {(() => {
-                // Create combined items with widgets and categories at correct level
+                // Create combined items with widgets and specific category widgets at correct level
                 const items = [];
 
                 // Add all widgets
@@ -1704,12 +1805,21 @@ const CommunityPromoPage = () => {
                   });
                 });
 
-                // Add category block if available
-                if (adCategories.length > 0 && adCategoryLevel !== null) {
+                // Add CategoryBoxWidget if available
+                if (categoryBoxWidget && adCategories.length > 0) {
                   items.push({
-                    type: 'categories',
-                    level: adCategoryLevel,
-                    data: adCategories
+                    type: 'category_box_widget',
+                    level: categoryBoxWidget.level || 0,
+                    data: categoryBoxWidget
+                  });
+                }
+
+                // Add AdCategoryWidget if available (can coexist with CategoryBoxWidget)
+                if (adCategoryWidget && adCategories.length > 0) {
+                  items.push({
+                    type: 'ad_category_widget',
+                    level: adCategoryWidget.level || 0,
+                    data: adCategoryWidget
                   });
                 }
 
@@ -1720,43 +1830,10 @@ const CommunityPromoPage = () => {
                 return items.map((item) => {
                   if (item.type === 'widget') {
                     return <WidgetRenderer key={item.data.id} widget={item.data} />;
-                  } else if (item.type === 'categories') {
-                    return (
-                      <div key="categories" className="mb-6">
-                        <div className="mb-2">
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                          {item.data.map((cat) => {
-                            const imgSrc = cat.image || buildImageUrl(cat.picture_source) || '/default-avatar.png';
-                            const label = cat.label || cat.name || 'Kategori';
-                            const id = cat.id || cat.value;
-
-                            return (
-                              <div
-                                key={id}
-                                className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
-                                style={{ minWidth: 90 }}
-                                onClick={() =>
-                                  router.push(`/app/komunitas/category?categoryId=${id}&communityId=${communityId}`)
-                                }
-                              >
-                                <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
-                                  <Image
-                                    src={imgSrc}
-                                    alt={label}
-                                    fill
-                                    className="object-cover brightness-90"
-                                  />
-                                  <div className="absolute bottom-0 left-0 w-full text-center bg-white/40 backdrop-blur-md py-1.5 px-1">
-                                    <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
+                  } else if (item.type === 'category_box_widget') {
+                    return <CategoryBoxWidget key="category_box_widget" widget={item.data} />;
+                  } else if (item.type === 'ad_category_widget') {
+                    return <AdCategoryWidget key="ad_category_widget" widget={item.data} />;
                   }
                   return null;
                 });
