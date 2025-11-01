@@ -65,8 +65,7 @@ export default function KomunitasDashboard() {
 
   /** MEMBER HISTORY modal state */
   const [modalMemberHistory, setModalMemberHistory] = useState(false);
-  const [memberHistoryList, setMemberHistoryList] = useState([]);
-  const [memberHistoryLoading, setMemberHistoryLoading] = useState(false);
+  // Riwayat member dikelola langsung oleh TableSupervisionComponent
   const [memberHistoryError, setMemberHistoryError] = useState("");
 
   // CUBES modal state
@@ -186,34 +185,10 @@ export default function KomunitasDashboard() {
   };
 
   const openMemberHistoryModal = async (communityRow) => {
+    // Biarkan TableSupervisionComponent yang melakukan fetch & render
     setActiveCommunity(communityRow);
-    setModalMemberHistory(true);
-    setMemberHistoryLoading(true);
     setMemberHistoryError("");
-    setMemberHistoryList([]);
-
-    try {
-      const res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/member-history`));
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json().catch(() => ({}));
-
-      // ✅ normalize data (gabung yang dari BE fix terbaru)
-      const rows = Array.isArray(json?.data) ? json.data.map((r) => ({
-        ...r,
-        action: (r?.action || '').toLowerCase(),
-        created_at: r?.created_at || null,
-        user_name: r?.user_name || r?.user?.name || "-",
-      })) : [];
-
-      // ✅ urutkan descending by waktu
-      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      setMemberHistoryList(rows);
-    } catch (err) {
-      console.error("Gagal memuat riwayat member:", err);
-      setMemberHistoryError("Tidak bisa memuat riwayat member");
-    } finally {
-      setMemberHistoryLoading(false);
-    }
+    setModalMemberHistory(true);
   };
 
   // Tambahkan fungsi auto-refresh riwayat member
@@ -1062,23 +1037,18 @@ export default function KomunitasDashboard() {
         show={modalMemberHistory}
         onClose={() => {
           setModalMemberHistory(false);
-          setMemberHistoryList([]);
           setMemberHistoryError("");
         }}
         title={`Riwayat Member: ${activeCommunity?.name || "-"}`}
         size="lg"
       >
         <div className="p-6">
-          {memberHistoryLoading ? (
-            <div className="py-10 text-center text-gray-500 font-medium">Memuat riwayat member…</div>
-          ) : memberHistoryError ? (
+          {memberHistoryError ? (
             <div className="py-10 text-center text-red-600 font-semibold">{memberHistoryError}</div>
-          ) : memberHistoryList.length === 0 ? (
-            <div className="py-10 text-center text-gray-500 font-medium">Tidak ada riwayat member.</div>
           ) : (
             <TableSupervisionComponent
-              key={`member-history-${activeCommunity?.id}-${memberHistoryList.length}`}
-              title={`Riwayat Member (${memberHistoryList.length})`}
+              key={`member-history-${activeCommunity?.id}`}
+              title={`Riwayat Member`}
               searchable={true}
               noControlBar={false}
               customTopBar={<></>} // tampilkan bar kontrol (filter, search)
@@ -1094,7 +1064,7 @@ export default function KomunitasDashboard() {
               }}
               // Tambahkan kolom searchable dan definisi custom filter
               columnControl={{
-                searchable: ["user_name", "action", "created_at"],
+                searchable: ["user_name", "created_at"],
                 custom: [
                   {
                     selector: "user_name",
@@ -1117,7 +1087,7 @@ export default function KomunitasDashboard() {
                     ),
                   },
                   {
-                    selector: "action",
+                    selector: "status",
                     label: "Status",
                     // Tambahkan filter agar bisa memilih Masuk/Keluar/Dihapus
                     filter: {
@@ -1130,6 +1100,7 @@ export default function KomunitasDashboard() {
                     },
                     item: (history) => {
                       const action = (history?.action || "").toLowerCase();
+
                       let text = "-";
                       let cls = "bg-gray-100 text-gray-800";
 
