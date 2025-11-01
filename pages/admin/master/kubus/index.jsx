@@ -96,6 +96,14 @@ function KubusMain() {
     withVersion
   } = useCropFunctionality();
 
+  // Keep stable refs for preview values so we don't recreate createImageField when preview changes
+  const previewUrlRef = useRef(previewUrl);
+  const previewOwnerKeyRef = useRef(previewOwnerKey);
+  useEffect(() => {
+    previewUrlRef.current = previewUrl;
+    previewOwnerKeyRef.current = previewOwnerKey;
+  }, [previewUrl, previewOwnerKey]);
+
   // Clear image handler
   const handleClearImage = useCallback((formControl, fieldKey) => {
     formControl.onChange('');
@@ -131,8 +139,8 @@ function KubusMain() {
         formSessionId={formSessionId}
         getServerImageUrl={getServerImageUrl}
         withVersion={withVersion}
-        previewUrl={previewUrl}
-        previewOwnerKey={previewOwnerKey}
+        previewUrl={previewUrlRef.current}
+        previewOwnerKey={previewOwnerKeyRef.current}
         handleFileInput={handleFileInput}
         handleRecrop={handleRecrop}
         onClearImage={handleClearImage}
@@ -140,7 +148,7 @@ function KubusMain() {
     );
     ImageFieldWrapper.displayName = `ImageFieldWrapper(${fieldName})`;
     return ImageFieldWrapper;
-  }, [selected, formSessionId, getServerImageUrl, withVersion, previewUrl, previewOwnerKey, handleFileInput, handleRecrop, handleClearImage]);
+  }, [selected, formSessionId, getServerImageUrl, withVersion, handleFileInput, handleRecrop, handleClearImage]);
 
   // Mapper default value untuk mode update (dipakai untuk Ubah Kubus maupun Ubah Iklan)
   const mapUpdateDefault = (data) => {
@@ -251,6 +259,7 @@ function KubusMain() {
     <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
       <h1 className="text-xl font-bold mb-6 text-slate-700 tracking-wide">Manajemen Kubus</h1>
 
+      {/* Memoized formControl to avoid re-creating forms on unrelated re-renders (e.g. crop open/close) */}
       <TableSupervisionComponent
         setToRefresh={refresh}
         title="Kubus"
@@ -374,7 +383,7 @@ function KubusMain() {
             },
           ],
         }}
-        formControl={{
+        formControl={React.useMemo(() => ({
           contentType: 'multipart/form-data',
           customDefaultValue: {
             'ads[is_daily_grab]': 0,
@@ -395,53 +404,32 @@ function KubusMain() {
             'ads[detail]': '',
           },
           transformData: (formData) => {
-            // ✅ CRITICAL FIX: Hanya call helper voucher jika content_type === 'voucher'
             if (formData.content_type === 'voucher') {
-              console.log('📦 Processing voucher data...');
               const transformedData = prepareKubusVoucherData(formData);
-
-              // Validasi khusus untuk voucher
               const validation = validateVoucherData(transformedData);
               if (!validation.isValid) {
                 console.error('Voucher validation failed:', validation.errors);
-                // Bisa throw error atau return false untuk menghentikan submit
-                // throw new Error('Data voucher tidak valid: ' + Object.values(validation.errors).join(', '));
               }
-
-              console.log('📦 Voucher data after transformation:', transformedData);
               return transformedData;
-            } else {
-              // ✅ PERBAIKAN: Untuk promo/iklan, return original data tanpa voucher processing
-              console.log('📦 Non-voucher content, returning original data for:', formData.content_type);
-              return formData;
             }
+            return formData;
           },
           onModalOpen: () => {
-            // Jika ada pendingEditRow atau sudah ada selected dengan ads, ini edit mode
             if (pendingEditRow || (selected?.ads?.[0]?.id && isAdsEditMode)) {
-              // Sesi Ubah Iklan
               setIsFormEdit(true);
               setIsAdsEditMode(true);
-
-              // Gunakan data yang tersedia
               const editData = pendingEditRow || selected;
               setSelected(editData);
               tableCtx?.setDataSelected?.(editData);
-              setPendingEditRow(null); // habiskan tag agar tidak nempel ke sesi berikutnya
+              setPendingEditRow(null);
             } else {
-              // Sesi Tambah Baru / Ubah Kubus biasa
-
-              // Reset semua state secara eksplisit PERTAMA
-              setIsAdsEditMode(false); // pastikan reset isAdsEditMode untuk Tambah Baru
+              setIsAdsEditMode(false);
               setIsFormEdit(false);
               setSelected(null);
-              setPendingEditRow(null); // double ensure
-
+              setPendingEditRow(null);
               tableCtx?.setDataSelected?.(null);
               formValuesRef.current = [];
               resetCropState();
-
-              // Force state update dengan setTimeout
               setTimeout(() => {
                 setIsAdsEditMode(false);
                 setSelected(null);
@@ -1209,7 +1197,7 @@ function KubusMain() {
               },
             },
           ],
-        }}
+        }), [selected, merchantManagers, managersLoading, managersError, isAdsEditMode, pendingEditRow, tableCtx, createImageField, onlyUsers, resetCropState])}
 
         formUpdateControl={isAdsEditMode ? {
           customDefaultValue: (data) => ({
@@ -1427,8 +1415,14 @@ function KubusMain() {
       <CropperDialog
         open={cropOpen}
         imageUrl={rawImageUrl}
-        onClose={() => setCropOpen(false)}
-        onSave={handleCropSave}
+        onClose={() => {
+          console.log('Kubus: CropperDialog onClose called');
+          setCropOpen(false);
+        }}
+        onSave={(file) => {
+          console.log('Kubus: CropperDialog onSave called with file', file);
+          handleCropSave(file);
+        }}
         aspect={1}
       />
 

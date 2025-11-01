@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { useState, useCallback } from 'react';
 import { toStoragePath, withVersion } from '../utils/helpers';
 
@@ -31,6 +32,7 @@ export const useCropFunctionality = () => {
 	}, []);
 
 	const handleCropSave = useCallback(async (croppedFile) => {
+		console.log('useCropFunctionality: handleCropSave called with', croppedFile);
 		setCropOpen(false);
 
 		// Cleanup blob URL lama
@@ -42,11 +44,14 @@ export const useCropFunctionality = () => {
 		const newPreviewUrl = URL.createObjectURL(croppedFile);
 		setPreviewUrl(newPreviewUrl);
 
+		console.log('useCropFunctionality: previewUrl set to', newPreviewUrl);
 		// Set ke form control (immediate + delayed guard)
 		if (currentFormControl) {
+			console.log('useCropFunctionality: invoking currentFormControl.onChange');
 			currentFormControl.onChange(croppedFile);
 			setTimeout(() => {
 				if (currentFormControl?.onChange) {
+					console.log('useCropFunctionality: delayed invoke currentFormControl.onChange');
 					currentFormControl.onChange(croppedFile);
 				}
 			}, 100);

@@ -38,15 +38,16 @@ export default function CropperDialog({
   }, []);
 
   const handleSave = async () => {
+    console.log('CropperDialog: handleSave called', { imageUrl, croppedAreaPixels });
     if (!imageUrl || !croppedAreaPixels) {
       setError('Gambar atau area crop tidak valid');
       return;
     }
-    
+
     try {
       setLoading(true);
       setError('');
-      
+
       const croppedBlob = await getCroppedImg(imageUrl, croppedAreaPixels);
       if (croppedBlob) {
         // Convert Blob to File with proper name and type
@@ -54,8 +55,10 @@ export default function CropperDialog({
           type: 'image/jpeg',
           lastModified: Date.now(),
         });
-        
+
+        console.log('CropperDialog: invoking onSave with cropped file', croppedFile);
         onSave(croppedFile);
+        console.log('CropperDialog: onSave invoked');
       } else {
         setError('Gagal memproses gambar');
       }
@@ -79,8 +82,12 @@ export default function CropperDialog({
                 <h2 className="text-xl font-semibold text-gray-900">Crop Gambar</h2>
                 <p className="text-sm text-gray-500">Sesuaikan ukuran dan posisi gambar</p>
               </div>
-              <button 
-                onClick={onClose}
+              <button
+                type="button"
+                onClick={() => {
+                  console.log('CropperDialog: header close clicked (Batal)');
+                  if (onClose) onClose();
+                }}
                 className="btn btn-ghost btn-sm"
                 disabled={loading}
               >
@@ -95,14 +102,14 @@ export default function CropperDialog({
                   <span>{error}</span>
                 </div>
               )}
-              
+
               {/* Image not loaded warning */}
               {!imageUrl && (
                 <div className="alert alert-warning">
                   <span>Gambar tidak dapat dimuat. Silakan coba lagi atau pilih gambar yang berbeda.</span>
                 </div>
               )}
-              
+
               {/* Cropper Area */}
               {imageUrl ? (
                 <div className="relative w-full h-96 bg-gray-50 rounded-lg border border-gray-200">
@@ -132,27 +139,32 @@ export default function CropperDialog({
                   </div>
                 </div>
               )}
-              
+
               {/* Tips */}
               <div className="text-xs text-gray-500">
                 Drag gambar untuk mengatur posisi, scroll untuk zoom
               </div>
             </div>
-            
+
             {/* Action Buttons */}
             <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
               <p className="text-sm text-gray-500">
                 {croppedAreaPixels ? 'Crop area siap untuk disimpan' : 'Sesuaikan crop area terlebih dahulu'}
               </p>
               <div className="flex gap-3">
-                <button 
-                  onClick={onClose}
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log('CropperDialog: Batal clicked');
+                    if (onClose) onClose();
+                  }}
                   disabled={loading}
                   className="btn btn-outline btn-neutral px-6 py-2 min-h-[44px] font-medium border-2"
                 >
                   Batal
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={handleSave}
                   disabled={!croppedAreaPixels || loading}
                   className="btn btn-primary px-6 py-2 min-h-[44px] font-medium border-2 disabled:opacity-60 disabled:cursor-not-allowed"
