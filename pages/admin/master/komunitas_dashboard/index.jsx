@@ -75,6 +75,10 @@ export default function KomunitasDashboard() {
   const [cubeLoading, setCubeLoading] = useState(false);
   const [cubeError, setCubeError] = useState("");
 
+  // ADD MEMBER modal state
+  const [modalAddMember, setModalAddMember] = useState(false);
+
+
 
   // const router = useRouter();
 
@@ -798,7 +802,7 @@ export default function KomunitasDashboard() {
                     icon={faPlus}
                     size="sm"
                     paint="primary"
-                    onClick={() => {/* Implementasi tambah anggota baru */ }}
+                    onClick={() => setModalAddMember(true)}
                   />
                   <div className="flex items-center gap-3">
                     <ButtonComponent
@@ -1075,16 +1079,22 @@ export default function KomunitasDashboard() {
             <TableSupervisionComponent
               key={`member-history-${activeCommunity?.id}-${memberHistoryList.length}`}
               title={`Riwayat Member (${memberHistoryList.length})`}
-              // ⬇️ Tambahkan ini untuk menghilangkan tombol "Tambah Baru"
-              customTopBar={<div />}
+              searchable={true}
+              noControlBar={false}
+              customTopBar={<></>} // tampilkan bar kontrol (filter, search)
+              unUrlPage={true}
               fetchControl={{
                 path: `admin/communities/${activeCommunity?.id}/member-history`,
                 includeHeaders: authHeaders("GET"),
+                mapData: (result) => {
+                  const d = result?.data ?? result;
+                  const rows = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
+                  return { data: rows, totalRow: rows.length };
+                },
               }}
-              searchable={true}
-              noControlBar={true}
-              unUrlPage={true}
+              // Tambahkan kolom searchable dan definisi custom filter
               columnControl={{
+                searchable: ["user_name", "action", "created_at"],
                 custom: [
                   {
                     selector: "user_name",
@@ -1101,13 +1111,23 @@ export default function KomunitasDashboard() {
                           <div className="text-sm font-medium text-gray-900">
                             {history.user?.name || history.user_name || "-"}
                           </div>
+                          <div className="text-xs text-gray-500">{history.user?.email || "-"}</div>
                         </div>
                       </div>
                     ),
                   },
                   {
-                    selector: "status",
+                    selector: "action",
                     label: "Status",
+                    // Tambahkan filter agar bisa memilih Masuk/Keluar/Dihapus
+                    filter: {
+                      type: "multiple-select",
+                      options: [
+                        { label: "Masuk", value: "joined" },
+                        { label: "Keluar", value: "left" },
+                        { label: "Dihapus", value: "removed" },
+                      ],
+                    },
                     item: (history) => {
                       const action = (history?.action || "").toLowerCase();
                       let text = "-";
@@ -1139,14 +1159,13 @@ export default function KomunitasDashboard() {
                       <span className="text-sm text-gray-600">
                         {history.created_at
                           ? new Date(history.created_at).toLocaleDateString("id-ID", {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
                           })
-                          : "-"
-                        }
+                          : "-"}
                       </span>
                     ),
                   },
@@ -1157,6 +1176,47 @@ export default function KomunitasDashboard() {
               }}
             />
           )}
+        </div>
+      </FloatingPageComponent>
+
+      {/* ADD MEMBER MODAL */}
+      <FloatingPageComponent
+        show={modalAddMember}
+        onClose={() => setModalAddMember(false)}
+        title="Tambah Anggota Baru"
+        size="md"
+      >
+        <div className="p-6">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const userId = formData.get("user_id");
+              try {
+                const res = await fetch(apiJoin(`admin/communities/${activeCommunity?.id}/members`), {
+                  method: "POST",
+                  headers: authHeaders("POST"),
+                  body: JSON.stringify({ user_identifier: userId }),
+                });
+
+                if (!res.ok) throw new Error("Gagal menambah anggota");
+                setModalAddMember(false);
+                openMemberModal(activeCommunity); // refresh data
+              } catch (err) {
+                alert(err.message);
+              }
+            }}
+          >
+            <label className="block mb-2 text-sm font-medium">Email Terdaftar</label>
+            <input
+              name="user_id"
+              type="text"
+              placeholder="Masukkan Email User"
+              className="border rounded w-full p-2 mb-4"
+              required
+            />
+            <ButtonComponent label="Simpan" paint="primary" type="submit" />
+          </form>
         </div>
       </FloatingPageComponent>
 
