@@ -1,7 +1,12 @@
 /* eslint-disable no-console */
 /* eslint-disable @next/next/no-img-element */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { faEdit, faPlus, faTrash, faDownload } from '@fortawesome/free-solid-svg-icons';
+import {
+  faEdit,
+  faPlus,
+  faTrash,
+  faDownload,
+} from '@fortawesome/free-solid-svg-icons';
 import { destroy, useGet } from '../../../helpers';
 import { ButtonComponent } from '../button';
 import { TableComponent } from '../table';
@@ -21,7 +26,9 @@ interface TableSupervisionProps {
   // Optional static data mode: when no fetchControl.path/url provided, use this data instead
   data?: any[];
   customTopBar?: React.ReactNode;
-  customTopBarWithForm?: (args: { setModalForm: (b: boolean) => void }) => React.ReactNode;
+  customTopBarWithForm?: (args: {
+    setModalForm: (b: boolean) => void;
+  }) => React.ReactNode;
   headBar?: React.ReactNode;
   columnControl?: any;
   formControl?: any;
@@ -43,6 +50,7 @@ interface TableSupervisionProps {
   onUpdateSuccess?: (data?: any) => void;
   onSubmitSuccess?: (data?: any) => void;
   onFormClose?: () => void;
+  onModalClose?: () => void;
 }
 
 export function TableSupervisionComponent({
@@ -71,6 +79,7 @@ export function TableSupervisionComponent({
   onUpdateSuccess,
   onSubmitSuccess,
   onFormClose,
+  onModalClose,
 }: TableSupervisionProps) {
   const router = useRouter();
   const {
@@ -90,7 +99,10 @@ export function TableSupervisionComponent({
   const [paginate, setPaginate] = useState(10);
   const [page, setPage] = useState(1);
   const [totalRow, setTotalRow] = useState(0);
-  const [sort, setSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'created_at', direction: 'desc' });
+  const [sort, setSort] = useState<{
+    column: string;
+    direction: 'asc' | 'desc';
+  }>({ column: 'created_at', direction: 'desc' });
   const [search, setSearch] = useState('');
   const [searchColumn, setSearchColumn] = useState('');
   const [filter, setFilter] = useState<Record<string, any>>({});
@@ -104,7 +116,9 @@ export function TableSupervisionComponent({
   const [forms, setForms] = useState<any[]>([]);
 
   // Base URL API tanpa trailing slash
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+  const apiBase = (
+    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  ).replace(/\/+$/, '');
   // Base URL untuk storage: hapus '/api' di ujung jika ada
   const storageBase = apiBase.replace(/\/api\/?$/, '');
 
@@ -120,8 +134,14 @@ export function TableSupervisionComponent({
           ? path
           : `${storageBase}/storage/${path}`.replace(/([^:]\/)\/+/g, '$1');
 
-        if (typeof window !== 'undefined' && window.location.protocol === 'https:' && fileUrl.startsWith('http:')) {
-          alert('Gagal mengunduh karena mixed-content. Pastikan file tersedia via HTTPS.');
+        if (
+          typeof window !== 'undefined' &&
+          window.location.protocol === 'https:' &&
+          fileUrl.startsWith('http:')
+        ) {
+          alert(
+            'Gagal mengunduh karena mixed-content. Pastikan file tersedia via HTTPS.'
+          );
           return;
         }
 
@@ -145,7 +165,9 @@ export function TableSupervisionComponent({
         const svgText = await res.text();
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        const svg64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+        const svg64 =
+          'data:image/svg+xml;base64,' +
+          btoa(unescape(encodeURIComponent(svgText)));
 
         await new Promise((resolve, reject) => {
           img.onload = resolve;
@@ -195,7 +217,9 @@ export function TableSupervisionComponent({
         filter: mutatefilter.length ? mutatefilter : undefined,
       },
     },
-    setToLoading || (includeFilters && mutatefilter.length < (includeFilters?.length || 0)) || isStatic
+    setToLoading ||
+      (includeFilters && mutatefilter.length < (includeFilters?.length || 0)) ||
+      isStatic
   );
 
   const hasPermissions = useMemo<number[]>(() => {
@@ -233,11 +257,21 @@ export function TableSupervisionComponent({
   useEffect(() => {
     if (unUrlPage || typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    search ? url.searchParams.set('search', search) : url.searchParams.delete('search');
-    page ? url.searchParams.set('page', String(page)) : url.searchParams.delete('page');
-    paginate ? url.searchParams.set('paginate', String(paginate)) : url.searchParams.delete('paginate');
-    sort?.column ? url.searchParams.set('sort.column', sort.column) : url.searchParams.delete('sort.column');
-    sort?.direction ? url.searchParams.set('sort.direction', sort.direction) : url.searchParams.delete('sort.direction');
+    search
+      ? url.searchParams.set('search', search)
+      : url.searchParams.delete('search');
+    page
+      ? url.searchParams.set('page', String(page))
+      : url.searchParams.delete('page');
+    paginate
+      ? url.searchParams.set('paginate', String(paginate))
+      : url.searchParams.delete('paginate');
+    sort?.column
+      ? url.searchParams.set('sort.column', sort.column)
+      : url.searchParams.delete('sort.column');
+    sort?.direction
+      ? url.searchParams.set('sort.direction', sort.direction)
+      : url.searchParams.delete('sort.direction');
     window.history.replaceState({}, '', url.toString());
   }, [page, paginate, sort, search, unUrlPage]);
 
@@ -259,12 +293,18 @@ export function TableSupervisionComponent({
     if (apiCode === 200 || apiCode === 204) {
       // Normalisasi payload agar tahan segala bentuk (array langsung, laravel paginator, dsb)
       let originalData: any[] = [];
-      const payload = (apiData && typeof apiData === 'object') ? (apiData.data ?? apiData) : apiData;
+      const payload =
+        apiData && typeof apiData === 'object'
+          ? apiData.data ?? apiData
+          : apiData;
 
       if (Array.isArray(payload)) originalData = payload;
-      else if (Array.isArray(payload?.data)) originalData = payload.data;        // { data: [...] }
-      else if (Array.isArray(payload?.items)) originalData = payload.items;      // { items: [...] }
-      else if (Array.isArray(apiData?.data?.data)) originalData = apiData.data.data;   // { data: { data: [...] } }
+      else if (Array.isArray(payload?.data))
+        originalData = payload.data; // { data: [...] }
+      else if (Array.isArray(payload?.items))
+        originalData = payload.items; // { items: [...] }
+      else if (Array.isArray(apiData?.data?.data))
+        originalData = apiData.data.data; // { data: { data: [...] } }
 
       const newColumns: any[] = [];
       const newData: any[] = [];
@@ -284,16 +324,21 @@ export function TableSupervisionComponent({
       if (originalData.length) {
         // Auto generate kolom
         if (!columnControl?.custom) {
-            Object.keys(originalData[0] || {}).forEach((keyName) => {
-              if (!columnControl?.except || !columnControl.except.includes(keyName)) {
-                newColumns.push({
-                  label: keyName.charAt(0).toUpperCase() + keyName.slice(1),
-                  selector: keyName,
-                  width: '200px',
-                  sortable: !columnControl?.exceptSorts || !columnControl.exceptSorts.includes(keyName),
-                });
-              }
-            });
+          Object.keys(originalData[0] || {}).forEach((keyName) => {
+            if (
+              !columnControl?.except ||
+              !columnControl.except.includes(keyName)
+            ) {
+              newColumns.push({
+                label: keyName.charAt(0).toUpperCase() + keyName.slice(1),
+                selector: keyName,
+                width: '200px',
+                sortable:
+                  !columnControl?.exceptSorts ||
+                  !columnControl.exceptSorts.includes(keyName),
+              });
+            }
+          });
         }
 
         // Auto generate forms
@@ -301,20 +346,26 @@ export function TableSupervisionComponent({
           let newForms: any[] = [];
           Object.keys(originalData[0] || {}).forEach((keyName) => {
             if (!formControl?.except || !formControl.except.includes(keyName)) {
-              const custom = (formControl?.change && formControl.change[keyName]) || {};
+              const custom =
+                (formControl?.change && formControl.change[keyName]) || {};
               newForms.push({
                 type: custom.type || 'default',
                 construction: {
-                  label: custom.construction?.label || keyName.charAt(0).toUpperCase() + keyName.slice(1),
+                  label:
+                    custom.construction?.label ||
+                    keyName.charAt(0).toUpperCase() + keyName.slice(1),
                   name: keyName,
-                  placeholder: custom.construction?.placeholder || 'Please enter ' + keyName + '...',
+                  placeholder:
+                    custom.construction?.placeholder ||
+                    'Please enter ' + keyName + '...',
                   options: custom.construction?.options || [],
                   validations: custom.construction?.validations || {},
                 },
               });
             }
           });
-          if (formControl?.include?.length) newForms = [...newForms, ...formControl.include];
+          if (formControl?.include?.length)
+            newForms = [...newForms, ...formControl.include];
           setForms(newForms);
         }
 
@@ -326,17 +377,19 @@ export function TableSupervisionComponent({
         originalData.forEach((row, idx) => {
           let items: Record<string, any> = row;
 
-            if (columnControl?.custom) {
-              const mapped: Record<string, any> = {};
-              columnControl.custom.forEach((col: any) => {
-                mapped[col.selector] = col.item(row);
-              });
-              items = mapped;
-            }
+          if (columnControl?.custom) {
+            const mapped: Record<string, any> = {};
+            columnControl.custom.forEach((col: any) => {
+              mapped[col.selector] = col.item(row);
+            });
+            items = mapped;
+          }
 
           Object.keys(items).forEach((k) => {
             const includeBefore =
-              columnControl?.include?.filter((c: any) => c.before && c.before === k) || [];
+              columnControl?.include?.filter(
+                (c: any) => c.before && c.before === k
+              ) || [];
             includeBefore.forEach((inc: any) => {
               if (inc.selector) {
                 items[inc.selector] = inc.item ? inc.item(row) : null;
@@ -348,7 +401,9 @@ export function TableSupervisionComponent({
               const originalVal = row[k];
               if (
                 originalVal &&
-                !(columnControl.include || []).some((c: any) => c.selector === k) &&
+                !(columnControl.include || []).some(
+                  (c: any) => c.selector === k
+                ) &&
                 (typeof originalVal === 'object' || Array.isArray(originalVal))
               ) {
                 items[k] = JSON.stringify(items[k]);
@@ -388,7 +443,8 @@ export function TableSupervisionComponent({
                   )}
 
                 {canEdit &&
-                  (!actionControl?.except || !actionControl.except.includes('edit')) && (
+                  (!actionControl?.except ||
+                    !actionControl.except.includes('edit')) && (
                     <ButtonComponent
                       icon={faEdit}
                       label="Ubah"
@@ -413,14 +469,17 @@ export function TableSupervisionComponent({
                     rounded
                     onClick={async () => {
                       const path = row.qr_code || row.path;
-                      const filenameBase = `qr-${row.tenant_name || row.id || 'code'}`;
+                      const filenameBase = `qr-${
+                        row.tenant_name || row.id || 'code'
+                      }`;
                       await downloadQrAsPng(path, filenameBase);
                     }}
                   />
                 )}
 
                 {canDelete &&
-                  (!actionControl?.except || !actionControl.except.includes('delete')) && (
+                  (!actionControl?.except ||
+                    !actionControl.except.includes('delete')) && (
                     <ButtonComponent
                       icon={faTrash}
                       label="Hapus"
@@ -460,7 +519,18 @@ export function TableSupervisionComponent({
     } else {
       setIsError(true);
     }
-  }, [isStatic, apiLoading, apiCode, apiData, columnControl, formControl, actionControl, hasPermissions, downloadQrAsPng, permissionCode]);
+  }, [
+    isStatic,
+    apiLoading,
+    apiCode,
+    apiData,
+    columnControl,
+    formControl,
+    actionControl,
+    hasPermissions,
+    downloadQrAsPng,
+    permissionCode,
+  ]);
 
   // Proses data Static mode (no fetch)
   useEffect(() => {
@@ -474,12 +544,17 @@ export function TableSupervisionComponent({
     if (originalData.length) {
       if (!columnControl?.custom) {
         Object.keys(originalData[0] || {}).forEach((keyName) => {
-          if (!columnControl?.except || !columnControl.except.includes(keyName)) {
+          if (
+            !columnControl?.except ||
+            !columnControl.except.includes(keyName)
+          ) {
             newColumns.push({
               label: keyName.charAt(0).toUpperCase() + keyName.slice(1),
               selector: keyName,
               width: '200px',
-              sortable: !columnControl?.exceptSorts || !columnControl.exceptSorts.includes(keyName),
+              sortable:
+                !columnControl?.exceptSorts ||
+                !columnControl.exceptSorts.includes(keyName),
             });
           }
         });
@@ -489,20 +564,26 @@ export function TableSupervisionComponent({
         let newForms: any[] = [];
         Object.keys(originalData[0] || {}).forEach((keyName) => {
           if (!formControl?.except || !formControl.except.includes(keyName)) {
-            const custom = (formControl?.change && formControl.change[keyName]) || {};
+            const custom =
+              (formControl?.change && formControl.change[keyName]) || {};
             newForms.push({
               type: custom.type || 'default',
               construction: {
-                label: custom.construction?.label || keyName.charAt(0).toUpperCase() + keyName.slice(1),
+                label:
+                  custom.construction?.label ||
+                  keyName.charAt(0).toUpperCase() + keyName.slice(1),
                 name: keyName,
-                placeholder: custom.construction?.placeholder || 'Please enter ' + keyName + '...',
+                placeholder:
+                  custom.construction?.placeholder ||
+                  'Please enter ' + keyName + '...',
                 options: custom.construction?.options || [],
                 validations: custom.construction?.validations || {},
               },
             });
           }
         });
-        if (formControl?.include?.length) newForms = [...newForms, ...formControl.include];
+        if (formControl?.include?.length)
+          newForms = [...newForms, ...formControl.include];
         setForms(newForms);
       }
 
@@ -522,7 +603,10 @@ export function TableSupervisionComponent({
         }
 
         Object.keys(items).forEach((k) => {
-          const includeBefore = columnControl?.include?.filter((c: any) => c.before && c.before === k) || [];
+          const includeBefore =
+            columnControl?.include?.filter(
+              (c: any) => c.before && c.before === k
+            ) || [];
           includeBefore.forEach((inc: any) => {
             if (inc.selector) {
               items[inc.selector] = inc.item ? inc.item(row) : null;
@@ -534,7 +618,9 @@ export function TableSupervisionComponent({
             const originalVal = row[k];
             if (
               originalVal &&
-              !(columnControl.include || []).some((c: any) => c.selector === k) &&
+              !(columnControl.include || []).some(
+                (c: any) => c.selector === k
+              ) &&
               (typeof originalVal === 'object' || Array.isArray(originalVal))
             ) {
               items[k] = JSON.stringify(items[k]);
@@ -547,65 +633,67 @@ export function TableSupervisionComponent({
 
         newData.push({
           ...items,
-          action: actionControl?.custom
-            ? actionControl.custom(
-                row,
-                {
-                  setModalView: (e: boolean) => setModalView(e),
-                  setDataSelected: () => setDataSelected(idx),
-                  setModalForm: (e: boolean) => setModalForm(e),
-                  setModalDelete: (e: boolean) => setModalDelete(e),
-                },
-                hasPermissions,
-                originalData.length
-              )
-            : (
-                <>
-                  {actionControl?.include &&
-                    actionControl.include(
-                      row,
-                      {
-                        setModalView: (e: boolean) => setModalView(e),
-                        setDataSelected: () => setDataSelected(idx),
-                        setModalForm: (e: boolean) => setModalForm(e),
-                        setModalDelete: (e: boolean) => setModalDelete(e),
-                      },
-                      hasPermissions
-                    )}
+          action: actionControl?.custom ? (
+            actionControl.custom(
+              row,
+              {
+                setModalView: (e: boolean) => setModalView(e),
+                setDataSelected: () => setDataSelected(idx),
+                setModalForm: (e: boolean) => setModalForm(e),
+                setModalDelete: (e: boolean) => setModalDelete(e),
+              },
+              hasPermissions,
+              originalData.length
+            )
+          ) : (
+            <>
+              {actionControl?.include &&
+                actionControl.include(
+                  row,
+                  {
+                    setModalView: (e: boolean) => setModalView(e),
+                    setDataSelected: () => setDataSelected(idx),
+                    setModalForm: (e: boolean) => setModalForm(e),
+                    setModalDelete: (e: boolean) => setModalDelete(e),
+                  },
+                  hasPermissions
+                )}
 
-                  {canEdit &&
-                    (!actionControl?.except || !actionControl.except.includes('edit')) && (
-                      <ButtonComponent
-                        icon={faEdit}
-                        label="Ubah"
-                        variant="outline"
-                        paint="warning"
-                        size="xs"
-                        rounded
-                        onClick={() => {
-                          setModalForm(true);
-                          setDataSelected(idx);
-                        }}
-                      />
-                    )}
+              {canEdit &&
+                (!actionControl?.except ||
+                  !actionControl.except.includes('edit')) && (
+                  <ButtonComponent
+                    icon={faEdit}
+                    label="Ubah"
+                    variant="outline"
+                    paint="warning"
+                    size="xs"
+                    rounded
+                    onClick={() => {
+                      setModalForm(true);
+                      setDataSelected(idx);
+                    }}
+                  />
+                )}
 
-                  {canDelete &&
-                    (!actionControl?.except || !actionControl.except.includes('delete')) && (
-                      <ButtonComponent
-                        icon={faTrash}
-                        label="Hapus"
-                        variant="outline"
-                        paint="danger"
-                        size="xs"
-                        rounded
-                        onClick={() => {
-                          setModalDelete(true);
-                          setDataSelected(idx);
-                        }}
-                      />
-                    )}
-                </>
-              ),
+              {canDelete &&
+                (!actionControl?.except ||
+                  !actionControl.except.includes('delete')) && (
+                  <ButtonComponent
+                    icon={faTrash}
+                    label="Hapus"
+                    variant="outline"
+                    paint="danger"
+                    size="xs"
+                    rounded
+                    onClick={() => {
+                      setModalDelete(true);
+                      setDataSelected(idx);
+                    }}
+                  />
+                )}
+            </>
+          ),
         });
       });
 
@@ -617,7 +705,15 @@ export function TableSupervisionComponent({
       setTotalRow(0);
     }
     setIsError(false);
-  }, [isStatic, data, columnControl, formControl, actionControl, hasPermissions, permissionCode]);
+  }, [
+    isStatic,
+    data,
+    columnControl,
+    formControl,
+    actionControl,
+    hasPermissions,
+    permissionCode,
+  ]);
 
   const canCreate = !permissionCode || hasPermissions.includes(2);
 
@@ -634,35 +730,50 @@ export function TableSupervisionComponent({
               customTopBar
             ) : (
               <>
-                {canCreate && <ButtonComponent label="Tambah Baru" icon={faPlus} size="sm" onClick={() => setModalForm(true)} />}
+                {canCreate && (
+                  <ButtonComponent
+                    label="Tambah Baru"
+                    icon={faPlus}
+                    size="sm"
+                    onClick={() => setModalForm(true)}
+                  />
+                )}
               </>
             )
           }
           noControlBar={noControlBar}
-            headBar={headBar}
-            columns={
-              !columnControl?.custom
-                ? columns
-                : columnControl.custom
-                    .filter(
-                      (col: any) => !col.permissionCode || apiData?.allowed_privileges?.includes(col.permissionCode)
-                    )
-                    .map((col: any) => ({
-                      label: col.label || '',
-                      selector: col.selector,
-                      width: col.width || '200px',
-                      sortable: col.sortable,
-                      filter: col.filter,
-                    }))
-            }
+          headBar={headBar}
+          columns={
+            !columnControl?.custom
+              ? columns
+              : columnControl.custom
+                  .filter(
+                    (col: any) =>
+                      !col.permissionCode ||
+                      apiData?.allowed_privileges?.includes(col.permissionCode)
+                  )
+                  .map((col: any) => ({
+                    label: col.label || '',
+                    selector: col.selector,
+                    width: col.width || '200px',
+                    sortable: col.sortable,
+                    filter: col.filter,
+                  }))
+          }
           data={dataTable}
           sortBy={sort}
-          onChangeSortBy={(column: string, direction: 'asc' | 'desc') => setSort({ column, direction })}
+          onChangeSortBy={(column: string, direction: 'asc' | 'desc') =>
+            setSort({ column, direction })
+          }
           pagination={{
             page,
             paginate,
             totalRow,
-            onChange: (_totalRow: number, newPaginate: number, newPage: number) => {
+            onChange: (
+              _totalRow: number,
+              newPaginate: number,
+              newPage: number
+            ) => {
               setPaginate(newPaginate);
               setPage(newPage);
             },
@@ -707,13 +818,24 @@ export function TableSupervisionComponent({
         }
         tip="Masukkan data yang valid dan benar!"
         show={modalForm}
-        size={(dataSelected === null ? formControl?.size : formUpdateControl?.size || formControl?.size) || 'md'}
+        size={
+          (dataSelected === null
+            ? formControl?.size
+            : formUpdateControl?.size || formControl?.size) || 'md'
+        }
         onClose={() => {
           setModalForm(false);
           setDataSelected(null);
           if (refreshOnClose && formUpdateControl?.custom) reset();
           // bubble close to parent if provided (for external cleanup)
-          try { onFormClose?.(); } catch {}
+          try {
+            onFormClose?.();
+          } catch {}
+          // some callers (legacy/typo) may pass `onModalClose` instead of `onFormClose`
+          // call it as well to ensure parent cleanup runs regardless of prop name
+          try {
+            /* eslint-disable-next-line @typescript-eslint/ban-ts-comment */ /* @ts-ignore */ onModalClose?.();
+          } catch {}
         }}
       >
         <div className="px-6 pt-4 pb-20 h-full overflow-scroll scroll_control">
@@ -723,14 +845,21 @@ export function TableSupervisionComponent({
                 url: fetchControl.url
                   ? dataSelected === null
                     ? fetchControl.url
-                    : fetchControl.url + '/' + (dataOriginal?.at(dataSelected) || {}).id
+                    : fetchControl.url +
+                      '/' +
+                      (dataOriginal?.at(dataSelected) || {}).id
                   : '',
                 path:
                   dataSelected === null
                     ? fetchControl.path
                     : updateEndpoint == null
-                    ? fetchControl.path + '/' + (dataOriginal?.at(dataSelected) || {}).id
-                    : fetchControl.path + '/' + (dataOriginal?.at(dataSelected) || {}).id + updateEndpoint,
+                    ? fetchControl.path +
+                      '/' +
+                      (dataOriginal?.at(dataSelected) || {}).id
+                    : fetchControl.path +
+                      '/' +
+                      (dataOriginal?.at(dataSelected) || {}).id +
+                      updateEndpoint,
                 // Strip Content-Type untuk request FormData - biarkan browser yang atur boundary
                 includeHeaders: (() => {
                   const h = { ...(fetchControl.includeHeaders || {}) };
@@ -752,15 +881,22 @@ export function TableSupervisionComponent({
                   : formUpdateControl?.customDefaultValue
                   ? {
                       _method: 'PUT',
-                      ...(formUpdateControl.customDefaultValue(dataOriginal?.at(dataSelected) || {}) || {}),
+                      ...(formUpdateControl.customDefaultValue(
+                        dataOriginal?.at(dataSelected) || {}
+                      ) || {}),
                     }
-                  : { _method: 'PUT', ...(dataOriginal?.at(dataSelected) || {}) }
+                  : {
+                      _method: 'PUT',
+                      ...(dataOriginal?.at(dataSelected) || {}),
+                    }
               }
               onSuccess={(resp: any) => {
                 const wasUpdate = dataSelected !== null;
                 setModalForm(false);
                 reset();
-                try { onSubmitSuccess?.(resp); } catch {}
+                try {
+                  onSubmitSuccess?.(resp);
+                } catch {}
                 try {
                   if (wasUpdate) onUpdateSuccess?.(resp);
                   else onStoreSuccess?.(resp);
@@ -773,7 +909,11 @@ export function TableSupervisionComponent({
       </FloatingPageComponent>
 
       <ModalConfirmComponent
-        title={typeof title === 'string' ? 'Yakin ingin menghapus ' + title : 'Yakin ingin menghapus'}
+        title={
+          typeof title === 'string'
+            ? 'Yakin ingin menghapus ' + title
+            : 'Yakin ingin menghapus'
+        }
         show={modalDelete}
         onClose={() => {
           setModalDelete(false);
@@ -783,7 +923,10 @@ export function TableSupervisionComponent({
           try {
             setLoadingDelete(true);
             if (dataSelected !== null) {
-              const row = dataSelected !== null ? dataOriginal?.at(dataSelected) : undefined;
+              const row =
+                dataSelected !== null
+                  ? dataOriginal?.at(dataSelected)
+                  : undefined;
               if (!row?.id) {
                 setLoadingDelete(false);
                 return;
@@ -822,11 +965,17 @@ export function TableSupervisionComponent({
         ) : (
           <div className="flex flex-col gap-2 p-6">
             {columns.map((column, i) => (
-              <div className="flex justify-between gap-4 py-2.5 border-b" key={column.selector || i}>
+              <div
+                className="flex justify-between gap-4 py-2.5 border-b"
+                key={column.selector || i}
+              >
                 <h6 className="text-lg">{column.label} :</h6>
                 <p className="text-lg font-semibold">
                   {(() => {
-                    const row = dataSelected !== null ? dataOriginal?.at(dataSelected) : undefined;
+                    const row =
+                      dataSelected !== null
+                        ? dataOriginal?.at(dataSelected)
+                        : undefined;
                     if (!row) return '-';
                     const val = row[column.selector];
                     if (val === null || val === undefined) return '-';

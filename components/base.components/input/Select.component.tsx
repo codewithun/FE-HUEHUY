@@ -47,7 +47,7 @@ export function SelectComponent({
   const [inputShowValue, setInputShowValue] = useState('');
   const [inputValue, setInputValue] = useState<
     string | string[] | number | number[]
-  >('');
+  >(() => (value !== undefined && value !== null ? value : ''));
   const [isFocus, setIsFocus] = useState(false);
   const [isInvalid, setIsInvalid] = useState('');
   const [isFirst, setIsFirst] = useState(true);
@@ -62,6 +62,9 @@ export function SelectComponent({
   const [showOption, setShowOption] = useState(false);
 
   const [useTemp, setUseTemp] = useState(true);
+  // Cache last known label for given values so we can keep showing the label
+  // while options are reloading (prevents disappearing selected label)
+  const lastLabelRef = React.useRef(new Map<string | number, string>());
 
   // const [search, setSearch] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -213,17 +216,40 @@ export function SelectComponent({
   // ## Change value handler
   // =========================>
   useEffect(() => {
-    if (value) {
-      setInputValue(value);
-      Array.isArray(dataOptions) &&
-        setInputShowValue(
-          dataOptions?.find((option) => option.value == value)?.label || ''
-        );
-      setIsFirst(false);
+    // Treat null/undefined specially to avoid uncontrolled -> controlled switches
+    const hasValue = value !== undefined && value !== null && value !== '';
+    const newVal = hasValue ? value : multiple ? [] : '';
+    setInputValue(newVal as any);
+
+    if (hasValue) {
+      // update shown label when options are available
+      const found = Array.isArray(dataOptions)
+        ? dataOptions.find((option) => option.value == value)
+        : undefined;
+      if (found && found.label) {
+        setInputShowValue(found.label);
+        try {
+          lastLabelRef.current.set(String(found.value), found.label);
+        } catch (e) {}
+      } else {
+        // fallback to last known label for this value if available
+        const cached = lastLabelRef.current.get(String(value));
+        if (cached) {
+          // eslint-disable-next-line no-console
+          console.log(
+            '[SelectComponent] using cached label fallback for',
+            String(value),
+            '->',
+            cached
+          );
+        }
+        setInputShowValue(cached || '');
+      }
     } else {
-      setInputValue('');
       setInputShowValue('');
     }
+
+    setIsFirst(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, dataOptions]);
 
