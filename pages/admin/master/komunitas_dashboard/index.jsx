@@ -8,6 +8,8 @@ import {
   ButtonComponent,
   FloatingPageComponent,
   TableSupervisionComponent,
+  SelectComponent,
+  InputComponent,
 } from "../../../../components/base.components";
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
 import InputHexColor from "../../../../components/construct.components/input/InputHexColor";
@@ -73,6 +75,9 @@ export default function KomunitasDashboard() {
   const [cubeList, setCubeList] = useState([]);
   const [cubeLoading, setCubeLoading] = useState(false);
   const [cubeError, setCubeError] = useState("");
+  // Search & filter untuk Cube table (Widget Asal)
+  const [cubeTypeFilter, setCubeTypeFilter] = useState([]); // ['home','hunting','information']
+  const [cubeWidgetSearch, setCubeWidgetSearch] = useState("");
 
   // ADD MEMBER modal state
   const [modalAddMember, setModalAddMember] = useState(false);
@@ -171,6 +176,22 @@ export default function KomunitasDashboard() {
       setCubeLoading(false);
     }
   };
+
+  // Client-side filtered cube list by widget type (dropdown) + search (widget name/type/cube name)
+  const filteredCubeList = useMemo(() => {
+    const q = String(cubeWidgetSearch || "").toLowerCase().trim();
+    const types = Array.isArray(cubeTypeFilter)
+      ? cubeTypeFilter.map((t) => String(t).toLowerCase())
+      : [];
+    return (Array.isArray(cubeList) ? cubeList : []).filter((c) => {
+      const wtype = String(c?.widget_type || "").toLowerCase();
+      const wname = String(c?.widget_name || "").toLowerCase();
+      const cname = String(c?.name || "").toLowerCase();
+      const typeOk = !types.length || types.includes(wtype);
+      const searchOk = !q || wtype.includes(q) || wname.includes(q) || cname.includes(q);
+      return typeOk && searchOk;
+    });
+  }, [cubeList, cubeWidgetSearch, cubeTypeFilter]);
 
 
 
@@ -1210,15 +1231,45 @@ export default function KomunitasDashboard() {
           ) : cubeList.length === 0 ? (
             <div className="py-10 text-center text-gray-500 font-medium">Tidak ada kubus dalam komunitas ini.</div>
           ) : (
-            // ⬇️ DI SINI kamu tempelkan TableSupervisionComponent barumu
+            // ⬇️ Tabel Kubus dengan filter tipe (home/hunting/information) dan pencarian widget
             <TableSupervisionComponent
               key={`cube-table-${activeCommunity?.id}-${cubeList.length}`}
               title={`Daftar Kubus (${cubeList.length})`}
-              data={cubeList}
-              customTopBar={<div />}
-              noControlBar={true}
+              data={filteredCubeList}
+              // Top bar: filter tipe widget + pencarian nama widget
+              customTopBar={
+                <div className="flex items-center gap-3 w-full">
+                  <div className="w-64">
+                    <SelectComponent
+                      name="widgetTypeFilter"
+                      label="Tipe Widget"
+                      placeholder="Pilih tipe..."
+                      multiple
+                      searchable={false}
+                      options={[
+                        { label: "Home", value: "home" },
+                        { label: "Hunting", value: "hunting" },
+                        { label: "Information", value: "information" },
+                      ]}
+                      value={cubeTypeFilter}
+                      onChange={(val) => setCubeTypeFilter(Array.isArray(val) ? val : [])}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <InputComponent
+                      name="widgetSearch"
+                      label="Cari Widget/Tipe/Nama Kubus"
+                      placeholder="Contoh: home / hunting / information / nama widget"
+                      size="md"
+                      value={cubeWidgetSearch}
+                      onChange={(e) => setCubeWidgetSearch(String(e || ""))}
+                    />
+                  </div>
+                </div>
+              }
+              noControlBar={false}
               unUrlPage={true}
-              searchable
+              searchable={false}
               columnControl={{
                 custom: [
                   {
@@ -1232,10 +1283,18 @@ export default function KomunitasDashboard() {
                     item: (cube) => (
                       <div>
                         <span className="font-medium text-gray-800">{cube.widget_name ?? "-"}</span>
-                        <div className="text-xs text-gray-500 italic">
-                          ({cube.widget_type ?? "unknown"})
-                        </div>
+                        <div className="text-xs text-gray-500 italic">({cube.widget_type ?? "unknown"})</div>
                       </div>
+                    ),
+                  },
+                  {
+                    selector: "widget_type",
+                    label: "Tipe",
+                    width: "120px",
+                    item: (cube) => (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200">
+                        {(cube.widget_type || "-").toString().charAt(0).toUpperCase() + (cube.widget_type || "-").toString().slice(1)}
+                      </span>
                     ),
                   },
                   {
