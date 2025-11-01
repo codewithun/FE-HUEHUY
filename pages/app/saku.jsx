@@ -105,6 +105,22 @@ const toAbsMediaUrl = (raw) => {
   return `${apiUrl}/${s}`;
 };
 
+// === Helper konsisten ambil expired_at item (voucher/promo) ===
+const getExpiredAt = (item) => {
+  if (!item) return null;
+  // Voucher: prioritas expired_at (hasil perhitungan claimed_at + ad_limit), fallback ke valid_until
+  if (item?.type === 'voucher' || item?.voucher) {
+    return item?.expired_at || item?.voucher?.valid_until || null;
+  }
+  // Promo: expired_at dari mapping
+  return item?.expired_at || null;
+};
+
+const isExpiredItem = (item) => {
+  const ea = getExpiredAt(item);
+  return ea ? new Date(ea) < new Date() : false;
+};
+
 export default function Save() {
   const router = useRouter();
   const [modalValidation, setModalValidation] = useState(false);
@@ -419,6 +435,7 @@ export default function Save() {
 
   // ====== Helpers ======
   const isItemValidatable = (item) => {
+    if (!item) return false;
     // VOUCHER: cek used_at
     // PROMO: cek redeemed_at/status
     const isValidated =
@@ -434,14 +451,8 @@ export default function Save() {
 
     if (isValidated) return false;
 
-    let expiredAt = null;
-    if (item?.type === 'voucher' || item?.voucher) {
-      expiredAt = item?.voucher?.valid_until || item?.expired_at || null;
-    } else {
-      expiredAt = item?.expired_at || null; // promo: sumber tunggal
-    }
-    const isExpired = expiredAt && new Date(expiredAt) < new Date();
-    if (isExpired) return false;
+    // kadaluwarsa? stop (gunakan helper konsisten)
+    if (isExpiredItem(item)) return false;
 
     if (item?.type === 'voucher' || item?.voucher) {
       if (item?.voucher_item) return true;
@@ -541,10 +552,7 @@ export default function Save() {
       );
     }
 
-    const expiredAt = (item?.type === 'voucher' || item?.voucher)
-      ? (item?.voucher?.valid_until || item?.expired_at || null)
-      : (item?.expired_at || null);
-    const isExpired = expiredAt && new Date(expiredAt) < new Date();
+    const isExpired = isExpiredItem(item);
 
     if (isExpired) {
       return (
@@ -921,10 +929,10 @@ export default function Save() {
                           <div className="mb-2">{getStatusBadge(item)}</div>
 
                           {/* Expiry */}
-                          {item?.expired_at && (
+                          {getExpiredAt(item) && (
                             <div className="flex items-center gap-1 text-xs">
                               <FontAwesomeIcon icon={faClock} className="text-red-500" />
-                              <span className="text-red-600 font-medium">{getTimeRemaining(item.expired_at)}</span>
+                              <span className="text-red-600 font-medium">{getTimeRemaining(getExpiredAt(item))}</span>
                             </div>
                           )}
                         </div>
@@ -1148,16 +1156,15 @@ export default function Save() {
 
             // Voucher section
             if (selected?.type === 'voucher' || selected?.voucher) {
-              const voucher = selected?.voucher || selected?.ad;
-              const isVoucherExpired = voucher?.valid_until && new Date(voucher.valid_until) < new Date();
+              const isVoucherExpired = isExpiredItem(selected);
 
               if (isVoucherExpired) {
                 return (
                   <div className="bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl py-8">
                     <div className="text-center">
                       <FontAwesomeIcon icon={faTimesCircle} className="text-red-500 text-4xl mb-3" />
-                      <div className="font-bold text-red-700 text-lg">Voucher Tidak Tersedia</div>
-                      <p className="text-red-600 text-sm mt-1">Voucher kedaluwarsa</p>
+                      <div className="font-bold text-red-700 text-lg">Voucher Kadaluwarsa</div>
+                      <p className="text-red-600 text-sm mt-1">Tidak bisa divalidasi</p>
                     </div>
                   </div>
                 );

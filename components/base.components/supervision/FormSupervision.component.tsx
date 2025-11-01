@@ -4,7 +4,8 @@ import {
   faQuestionCircle,
   faSave,
 } from '@fortawesome/free-solid-svg-icons';
-import React, { useEffect, useState } from 'react';
+/* eslint-disable no-console */
+import React, { useEffect, useState, useRef } from 'react';
 import { useForm } from '../../../helpers';
 import { ButtonComponent } from '../button';
 import {
@@ -48,6 +49,15 @@ export function FormSupervisionComponent({
   const [modalFailed, setModalFailed] = useState<boolean>(false);
   const [modalSuccess, setModalSuccess] = useState<boolean>(false);
   const [fresh, setFresh] = useState<boolean>(true);
+  const prevFormsRef = useRef<any[] | null>(forms || null);
+
+  useEffect(() => {
+    console.log('FormSupervision: mounted', { formsLength: forms?.length });
+    return () => {
+      console.log('FormSupervision: unmounted');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const success = (data: any) => {
     onSuccess?.(data);
@@ -99,10 +109,53 @@ export function FormSupervisionComponent({
   }, [defaultValue]);
 
   useEffect(() => {
-    setFresh(false);
-    setTimeout(() => {
-      setFresh(true);
-    }, 500);
+    const prev = prevFormsRef.current;
+    const sameIdentity = prev === forms;
+
+    // Do a lightweight structural equality check to avoid remounting when only
+    // the array identity changed but the form definitions are the same.
+    const structurallyEqual = (() => {
+      if (!prev || !forms) return false;
+      if (prev.length !== forms.length) return false;
+      for (let i = 0; i < prev.length; i++) {
+        const a = prev[i] || {};
+        const b = forms[i] || {};
+        if (a.type !== b.type) return false;
+        const aName =
+          a.construction?.name ||
+          a.construction?.label ||
+          (a as any).displayName ||
+          '';
+        const bName =
+          b.construction?.name ||
+          b.construction?.label ||
+          (b as any).displayName ||
+          '';
+        if (aName !== bName) return false;
+      }
+      return true;
+    })();
+
+    console.log('FormSupervision: forms change detected', {
+      sameIdentity,
+      structurallyEqual,
+      prevLength: prev?.length,
+      nextLength: forms?.length,
+    });
+
+    // Only toggle fresh (remount inputs) when the structure actually changed.
+    if (!sameIdentity && !structurallyEqual) {
+      setFresh(false);
+      setTimeout(() => {
+        setFresh(true);
+      }, 500);
+    } else {
+      console.log(
+        'FormSupervision: skipping remount because forms are structurally equal'
+      );
+    }
+
+    prevFormsRef.current = forms;
   }, [forms]);
 
   return (

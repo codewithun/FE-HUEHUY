@@ -28,6 +28,12 @@ export const useForm = (
   }, [submitControl?.path]);
 
   const onChange = (name: string, value?: any) => {
+    // Debug: log change attempts to trace unexpected resets/clears
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[useForm] onChange()', { name, value, prevValuesSnapshot: formValues.map(v => ({ name: v.name, type: typeof v.value })) });
+    } catch (e) {}
+
     setFormValues([
       ...formValues.filter((val) => val.name != name),
       { name, value: value != undefined ? value : '' },
@@ -744,17 +750,51 @@ export const useForm = (
   };
 
   const setDefaultValues = (values: object) => {
-    const newValues: { name: string; value?: any }[] = [];
+    // Merge incoming defaults with existing form values instead of fully replacing.
+    // This prevents accidental clearing of fields when a partial default object is applied
+    // (e.g., when FormSupervision passes a subset of fields).
+    const merged = new Map<string, any>();
 
-    Object.keys(values).map((keyName: string) => {
-      // if (formRegisters.find((form) => form.name == keyName)) {
-      newValues.push({
-        name: keyName,
-        value: values[keyName as keyof object],
-      });
-      // }
+    // Start with current values so we preserve any user-typed fields
+    formValues.forEach((fv) => merged.set(fv.name, fv.value));
+
+    // Override/add incoming defaults, but do NOT overwrite existing values with undefined
+    Object.keys(values).forEach((keyName: string) => {
+      const incoming = values[keyName as keyof object];
+      const existing = merged.has(keyName) ? merged.get(keyName) : undefined;
+
+      // Do not overwrite an existing non-empty value with defaults.
+      const existingHasValue = existing !== undefined && existing !== null && existing !== '';
+
+      if (incoming === undefined || incoming === null) {
+        // Skip undefined/null incoming to avoid clearing user input
+        try {
+          // eslint-disable-next-line no-console
+          console.log('[useForm] setDefaultValues() skipped null/undefined incoming for', keyName);
+        } catch (e) {}
+        return;
+      }
+
+      if (existingHasValue) {
+        try {
+          // eslint-disable-next-line no-console
+          console.log('[useForm] setDefaultValues() not overriding existing value for', keyName);
+        } catch (e) {}
+        return;
+      }
+
+      // Safe to set incoming default
+      merged.set(keyName, incoming);
     });
-    setFormValues(newValues);
+
+    const newValuesArr = Array.from(merged.entries()).map(([name, value]) => ({ name, value }));
+    // Debug: log default values being applied (helps detect unintended resets)
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[useForm] setDefaultValues() merged', { incomingKeys: Object.keys(values), mergedLength: newValuesArr.length });
+    } catch (e) {}
+
+    setFormValues(newValuesArr);
   };
 
   return [
