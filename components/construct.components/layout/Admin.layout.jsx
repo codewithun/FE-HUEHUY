@@ -46,6 +46,11 @@ export function AdminLayout({ children }) {
           icon: faHandshake,
           path: 'master/mitra',
         },
+        {
+          label: 'Manajemen Komunitas',
+          icon: faUsers, // Tambahkan icon komunitas, import dulu di atas
+          path: 'master/komunitas_dashboard',
+        },
         // {
         //   label: 'Dunia',
         //   icon: faGlobe,
@@ -100,11 +105,6 @@ export function AdminLayout({ children }) {
         //   icon: faBullhorn,
         //   path: 'master/promo_dashborad',
         // },
-        {
-          label: 'Manajemen Komunitas',
-          icon: faUsers, // Tambahkan icon komunitas, import dulu di atas
-          path: 'master/komunitas_dashboard',
-        },
       ],
     },
   ];
