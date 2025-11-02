@@ -37,8 +37,8 @@ export default function Widget() {
         fetchControl={{
           path: 'admin/dynamic-content',
           includeParams: {
-            // kirim hanya saat hunting & ada communityId
-            community_id: type === 'hunting' && communityId ? communityId : undefined,
+            // kirim community_id untuk hunting dan information
+            community_id: (type === 'hunting' || type === 'information') && communityId ? communityId : undefined,
           },
         }}
         setToRefresh={refresh}
@@ -52,7 +52,7 @@ export default function Widget() {
                   variant={type === 'home' ? 'solid' : 'outline'}
                   onClick={() => {
                     setType('home');
-                    // opsional: paksa refetch tambahan
+                    setCommunityId(null); // Reset filter komunitas
                     setRefresh(r => !r);
                   }}
                 />
@@ -62,6 +62,7 @@ export default function Widget() {
                   variant={type === 'hunting' ? 'solid' : 'outline'}
                   onClick={() => {
                     setType('hunting');
+                    // Tidak reset communityId untuk hunting agar filter tetap
                     setRefresh(r => !r);
                   }}
                 />
@@ -71,6 +72,7 @@ export default function Widget() {
                   variant={type === 'information' ? 'solid' : 'outline'}
                   onClick={() => {
                     setType('information');
+                    // Tidak reset communityId untuk information agar filter tetap
                     setRefresh(r => !r);
                   }}
                 />
@@ -87,19 +89,27 @@ export default function Widget() {
         )}
         headBar={
           <div>
-            {type === 'hunting' ? (
-              <SelectComponent
-                placeholder="Filter Komunitas"
-                serverOptionControl={{
-                  path: 'admin/communities',
-                  mapOptions: (data) =>
-                    Array.isArray(data)
-                      ? data.map((item) => ({ label: item.name, value: item.id }))
-                      : [],
-                }}
-                value={communityId}
-                onChange={(e) => setCommunityId(e)}
-              />
+            {(type === 'hunting' || type === 'information') ? (
+              <div className="flex gap-4 items-center">
+                <SelectComponent
+                  placeholder="Filter Komunitas"
+                  serverOptionControl={{
+                    path: 'admin/communities',
+                    mapOptions: (data) =>
+                      Array.isArray(data)
+                        ? [
+                            { label: 'Semua Komunitas (Global)', value: null },
+                            ...data.map((item) => ({ label: item.name, value: item.id }))
+                          ]
+                        : [{ label: 'Semua Komunitas (Global)', value: null }],
+                  }}
+                  value={communityId}
+                  onChange={(e) => setCommunityId(e)}
+                />
+                <span className="text-sm text-slate-500">
+                  {type === 'hunting' ? 'Filter widget Beranda Promo' : 'Filter widget Beranda Komunitas'}
+                </span>
+              </div>
             ) : null}
           </div>
         }
@@ -116,22 +126,62 @@ export default function Widget() {
               selector: 'name',
               label: 'Nama',
               sortable: true,
-              width: '250px',
+              width: '200px',
               item: ({ name }) => name,
             },
             {
               selector: 'type',
               label: 'Halaman',
               sortable: true,
-              width: '150px',
+              width: '120px',
               item: ({ type }) =>
                 type === 'home' ? 'Beranda' : type === 'hunting' ? 'Berburu' : 'Komunitas',
+            },
+            {
+              selector: 'community_id',
+              label: 'Komunitas',
+              sortable: false,
+              width: '180px',
+              item: ({ community_id, community }) => {
+                if (!community_id) {
+                  return (
+                    <span className="text-slate-500 italic text-sm">
+                      Global (Semua)
+                    </span>
+                  );
+                }
+                // Jika ada community_id, tampilkan nama komunitas dari relasi
+                return (
+                  <span className="text-blue-600 font-medium text-sm">
+                    {community?.name || `Komunitas #${community_id}`}
+                  </span>
+                );
+              },
+            },
+            {
+              selector: 'content_type',
+              label: 'Jenis Konten',
+              sortable: true,
+              width: '150px',
+              item: ({ content_type }) => {
+                const typeMap = {
+                  'category_box': 'Kotak Kategori',
+                  'nearby': 'Terdekat',
+                  'recommendation': 'Rekomendasi',
+                  'promo': 'Promo/Iklan',
+                  'horizontal': 'Horizontal',
+                  'vertical': 'Vertikal',
+                  'category': 'Kategori',
+                  'ad_category': 'Kategori Iklan'
+                };
+                return typeMap[content_type] || content_type;
+              },
             },
             {
               selector: 'status',
               label: 'Status',
               sortable: true,
-              width: '150px',
+              width: '120px',
               item: ({ is_active }) =>
                 is_active ? (
                   <span className="uppercase font-medium text-green-600 py-1 px-2.5 rounded-md text-sm bg-green-100">
@@ -148,8 +198,8 @@ export default function Widget() {
         formControl={{
           customDefaultValue: {
             type,
-            // default community hanya untuk hunting; hindari '' supaya tidak terkirim sbg query kosong
-            community_id: type === 'hunting' ? (communityId ?? undefined) : undefined,
+            // default community untuk hunting dan information; hindari '' supaya tidak terkirim sbg query kosong
+            community_id: (type === 'hunting' || type === 'information') ? (communityId ?? undefined) : undefined,
           },
           custom: [
             {
