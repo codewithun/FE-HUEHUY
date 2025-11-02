@@ -377,7 +377,11 @@ export default function CommunityDashboard({ communityId }) {
         }
 
         // 🔹 Cari widget ad_category: ambil kategorinya dan simpan widget untuk rendering khusus
-        const adCategoryWidget = widgets.find((w) => w.source_type === 'ad_category');
+        const adCategoryWidget = widgets.find((w) => 
+          w.source_type === 'ad_category' || 
+          w.content_type === 'category' ||
+          (w.content_type === 'promo' && w.source_type === 'ad_category')
+        );
         
         // 🔹 Cari widget category_box/kotak_kategori: untuk navigasi ke page-category
         const categoryBoxWidget = widgets.find((w) => 
@@ -389,7 +393,7 @@ export default function CommunityDashboard({ communityId }) {
         
         if (adCategoryWidget || categoryBoxWidget) {
           try {
-            const catRes = await fetch(`${apiBase}/api/admin/options/ad-category?community_id=${communityId}`, { headers });
+            const catRes = await fetch(`${apiBase}/api/admin/options/ad-category?community_id=${communityId}&full=1`, { headers });
             const catJson = await catRes.json();
             if (catJson?.message === 'success' && Array.isArray(catJson.data)) {
               setAdCategories(catJson.data);
