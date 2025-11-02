@@ -82,7 +82,21 @@ export default function Verification() {
 
       // 4) jika tidak ada token dari BE setelah verify, arahkan ke login agar sesi jelas
       if (!maybeToken) {
-        const loginUrl = email ? `/?email=${encodeURIComponent(String(email))}&verified=1` : '/';
+        // Teruskan tujuan awal agar setelah login tetap kembali ke halaman join (redirect)
+        let forwarded = null;
+        if (qNext) {
+          try { forwarded = decodeURIComponent(String(qNext)); } catch { forwarded = String(qNext); }
+          try { forwarded = decodeURIComponent(String(forwarded)); } catch { }
+          if (!isSafeInternal(String(forwarded))) forwarded = null;
+        }
+        if (!forwarded) {
+          const stored = consumeNext();
+          if (stored && isSafeInternal(stored)) forwarded = stored;
+        }
+        if (!forwarded && redirectUrl && isSafeInternal(redirectUrl)) forwarded = redirectUrl;
+
+        const base = email ? `/?email=${encodeURIComponent(String(email))}&verified=1` : '/?verified=1';
+        const loginUrl = forwarded ? `${base}&redirect=${encodeURIComponent(String(forwarded))}` : base;
         setTimeout(() => { window.location.href = loginUrl; }, 300);
         return;
       }
@@ -109,7 +123,7 @@ export default function Verification() {
   );
 
   // Selalu fetch account-unverified agar punya fallback email
-  const [loadingAccount, codeDataAccount, dataAccount] = useGet(
+  const [, , dataAccount] = useGet(
     { path: 'account-unverified' },
     false
   );

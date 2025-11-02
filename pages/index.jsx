@@ -71,7 +71,15 @@ export default function Login() {
       res?.need_verification === true;
 
     if (needVerify) {
-      const next = consumeNext(router); // ambil dari ?next atau localStorage
+      // Prioritaskan ?redirect jika ada (diset saat scan QR komunitas)
+      const redirectParam = router?.query?.redirect
+        ? String(router.query.redirect)
+        : null;
+      const safeRedirect = redirectParam && isSafeInternal(redirectParam)
+        ? redirectParam
+        : null;
+
+      const next = safeRedirect || consumeNext(router); // ambil dari ?redirect -> ?next -> localStorage
       const base = rurl || `/verifikasi?email=${encodeURIComponent(email)}`;
       const target = next ? `${base}&next=${encodeURIComponent(next)}` : base;
       window.location.href = target;
@@ -85,7 +93,9 @@ export default function Login() {
       const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
       Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
       // Ambil URL redirect dari query, fallback ke helper consumeNext
-      const redirect = router.query.redirect || consumeNext(router);
+      const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
+      const safeRedirect = redirectParam && isSafeInternal(redirectParam) ? redirectParam : null;
+      const redirect = safeRedirect || consumeNext(router);
       setTimeout(() => {
         if (redirect) {
           window.location.href = decodeURIComponent(redirect);
@@ -116,6 +126,15 @@ export default function Login() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Simpan redirect ke localStorage agar tetap terbawa saat user pindah ke Buat Akun tanpa query
+  useEffect(() => {
+    if (!router?.isReady) return;
+    const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
+    if (redirectParam && isSafeInternal(redirectParam)) {
+      try { localStorage.setItem('postAuthRedirect', redirectParam); } catch { }
+    }
+  }, [router?.isReady, router?.query?.redirect]);
 
   // Perbaiki loginFirebase function juga
   const loginFirebase = async (
@@ -157,13 +176,18 @@ export default function Login() {
       const response = await loginFirebase(idToken, true);
 
       if (response?.status === 200) {
-        const nextUrl = consumeNext(router);
+        // Utamakan ?redirect (kasus scan QR komunitas), lalu ?next/localStorage
+        const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
+        const safeRedirect = redirectParam && isSafeInternal(redirectParam) ? redirectParam : null;
+        const nextUrl = safeRedirect || consumeNext(router);
         setTimeout(() => {
           window.location.href = nextUrl || '/app';
         }, 100);
       } else if (response?.status === 202) {
         const user = response?.data?.user || response?.user;
-        const next = consumeNext(router);
+        const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
+        const safeRedirect = redirectParam && isSafeInternal(redirectParam) ? redirectParam : null;
+        const next = safeRedirect || consumeNext(router);
         const base = `/verifikasi?email=${encodeURIComponent(user?.email || '')}`;
         setTimeout(() => {
           window.location.href = next ? `${base}&next=${encodeURIComponent(next)}` : base;
@@ -270,7 +294,14 @@ export default function Login() {
             </div>
             <div className="text-center mt-2 relative z-40">
               Belum memiliki akun?{' '}
-              <Link href="/buat-akun">
+              <Link
+                href={{
+                  pathname: '/buat-akun',
+                  query: router?.query?.redirect
+                    ? { redirect: String(router.query.redirect) }
+                    : (router?.query?.next ? { next: String(router.query.next) } : {})
+                }}
+              >
                 <span className="text-primary font-semibold underline">
                   Buat Akun
                 </span>

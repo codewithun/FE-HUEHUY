@@ -20,12 +20,25 @@ export default function BuatAkun() {
     if (sudahRegister) router.replace('/dashboard');
   }, [router]);
 
+  // Simpan redirect agar tetap terbawa sampai selesai verifikasi/login
+  useEffect(() => {
+    if (!router?.isReady) return;
+    const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
+    if (redirectParam) {
+      try { localStorage.setItem('postAuthRedirect', redirectParam); } catch { }
+    }
+  }, [router?.isReady, router?.query?.redirect]);
+
   const onSuccess = (data) => {
     try { Cookies.remove(token_cookie_name); } catch (e) { }
 
     const user = data?.data?.user;
     const userEmail = user?.email || '';
-    const rawNext = router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
+    // Utamakan ?redirect (kasus scan QR komunitas), lalu ?next/localStorage
+    const redirectParam = router?.query?.redirect
+      ? String(router.query.redirect)
+      : null;
+    const rawNext = redirectParam || router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
     const target = rawNext
       ? `/verifikasi?email=${encodeURIComponent(userEmail)}&next=${encodeURIComponent(String(rawNext))}`
       : `/verifikasi?email=${encodeURIComponent(userEmail)}`;
@@ -60,13 +73,17 @@ export default function BuatAkun() {
       const response = await loginFirebase(idToken, true);
 
       if (response.status === 200) {
-        Cookies.set(token_cookie_name, Encrypt(response.data.token), { secure: true });
-        const rawNext = router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
+        const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
+        Cookies.set(token_cookie_name, Encrypt(response.data.token), cookieOpts);
+        // Utamakan ?redirect (kasus scan QR komunitas), lalu ?next/localStorage
+        const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
+        const rawNext = redirectParam || router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
         const next = rawNext ? decodeURIComponent(String(rawNext)) : null;
         if (rawNext) localStorage.removeItem('postAuthRedirect');
         window.location.href = next || '/app';
       } else if (response.status === 202) {
-        const rawNext = router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
+        const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
+        const rawNext = redirectParam || router?.query?.next || (typeof window !== 'undefined' ? localStorage.getItem('postAuthRedirect') : null);
         const next = rawNext ? String(rawNext) : null;
         if (rawNext) localStorage.removeItem('postAuthRedirect');
         window.location.href = next ? `/verifikasi?next=${encodeURIComponent(next)}` : '/verifikasi';
@@ -202,9 +219,9 @@ export default function BuatAkun() {
               <Link
                 href={{
                   pathname: '/',
-                  query: router?.query?.next
-                    ? { next: String(router.query.next) }
-                    : {}
+                  query: router?.query?.redirect
+                    ? { redirect: String(router.query.redirect) }
+                    : (router?.query?.next ? { next: String(router.query.next) } : {})
                 }}
               >
                 <span className="text-primary font-semibold underline">
