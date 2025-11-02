@@ -30,8 +30,7 @@ export const useForm = (
   const onChange = (name: string, value?: any) => {
     // Debug: log change attempts to trace unexpected resets/clears
     try {
-      // eslint-disable-next-line no-console
-      console.log('[useForm] onChange()', { name, value, prevValuesSnapshot: formValues.map(v => ({ name: v.name, type: typeof v.value })) });
+      
     } catch (e) {}
 
     setFormValues([
@@ -39,7 +38,7 @@ export const useForm = (
       { name, value: value != undefined ? value : '' },
     ]);
   };
-  // console.log(formValues);
+  
 
   const formControl = (name: string) => {
     return {
@@ -122,7 +121,7 @@ export const useForm = (
              name.startsWith('ads_');
     });
 
-    // Debug khusus untuk field yang bermasalah
+    
     const problemFieldsInForm = formValues.filter(val => {
       const name = val.name;
       return ['ads[level_umkm]', 'ads[max_production_per_day]', 'ads[sell_per_day]'].includes(name) ||
@@ -130,12 +129,7 @@ export const useForm = (
     });
     
     if (problemFieldsInForm.length > 0) {
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] 🎯 PROBLEM FIELDS DETECTED IN FORM VALUES:');
-      problemFieldsInForm.forEach(val => {
-        // eslint-disable-next-line no-console
-        console.log(`  ${val.name}:`, val.value, `(${typeof val.value})`);
-      });
+      
     }
 
     // Periksa apakah ada field cube yang akan di-update  
@@ -149,8 +143,7 @@ export const useForm = (
     // === STRATEGY FOR MIXED UPDATES ===
     // Jika ada mixed update (cube + ads), lakukan 2 request terpisah
     if (hasAdsFieldUpdate && hasCubeFieldUpdate && isAdUpdate) {
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] Mixed update detected - will perform 2 separate requests');
+      
       
       try {
         // 1. Update cube fields first
@@ -179,8 +172,7 @@ export const useForm = (
             }
           }
 
-          // eslint-disable-next-line no-console
-          console.log('[DEBUG] Sending cube update request...');
+          
           const cubeResult = await post({
             url: submitControl.url,
             path: `admin/cubes/${cubeId}`,
@@ -191,8 +183,6 @@ export const useForm = (
           });
 
           if (cubeResult?.status !== 200 && cubeResult?.status !== 201) {
-            // eslint-disable-next-line no-console
-            console.error('[DEBUG] Cube update failed:', cubeResult);
             setLoading(false);
             onFailed?.(cubeResult?.status || 500);
             return;
@@ -200,15 +190,13 @@ export const useForm = (
         }
 
         // 2. Continue with ads update menggunakan logica original
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] Proceeding with ads update...');
+        
         
         // Tidak perlu reset formData, lanjut ke logika build FormData normal
         // Logika di bawah akan handle field ads dengan benar
         
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('[DEBUG] Mixed update error:', error);
+        
         setLoading(false);
         onFailed?.(500);
         return;
@@ -229,14 +217,12 @@ export const useForm = (
           const cubeId = formValues.find(v => v.name === 'cube_id')?.value;
           if (cubeId) {
             effectivePath = `admin/cubes/${cubeId}`;
-            // eslint-disable-next-line no-console
-            console.log(`[DEBUG] Switched endpoint from ads/${adsId} to cubes/${cubeId}`);
+            
           }
         }
       }
       
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] Detected cube field updates, switching to cube update mode');
+      
     }
 
     // helper: convert HH:mm:ss → HH:mm
@@ -273,10 +259,7 @@ export const useForm = (
             const [main, sub] = inner.split('][');     // 'custom_days', 'saturday'
             const flat = `${main}[${sub}]`;            // 'custom_days[saturday]'
 
-            // ✅ FIX: Debug logging untuk nested fields yang bermasalah
             if (main === 'custom_days') {
-              // eslint-disable-next-line no-console
-              console.log(`[DEBUG] 🔧 Processing nested field: ads[${inner}] → ${flat}, value:`, v);
             }
 
             if (v instanceof File) {
@@ -296,11 +279,7 @@ export const useForm = (
           // regular ads field → root: 'title', 'image_1', ...
           const flatKey = inner;
 
-          // Debug khusus untuk field yang bermasalah
-          if (['level_umkm', 'max_production_per_day', 'sell_per_day'].includes(inner)) {
-            // eslint-disable-next-line no-console
-            console.log(`[DEBUG] 🎯 Processing ads field: ads[${inner}] → ${flatKey}, value:`, v);
-          }
+          
 
           if (v instanceof File) {
             if (!appended.has(flatKey)) { formData.append(flatKey, v); appended.add(flatKey); }
@@ -354,10 +333,7 @@ export const useForm = (
               adsFields[main] = adsFields[main] || {};
               adsFields[main][sub] = jsonValue;
               
-              // ✅ FIX: Debug logging untuk nested ads fields
               if (main === 'custom_days') {
-                // eslint-disable-next-line no-console
-                console.log(`[DEBUG] 🔧 Creating ads nested object: ${main}.${sub} =`, jsonValue);
               }
             } else {
               adsFields[inner] = jsonValue;
@@ -417,9 +393,7 @@ export const useForm = (
 
     // Kirim ads JSON HANYA saat BUKAN update ads
     if (!actualIsAdUpdate && Object.keys(adsFields).length > 0) {
-      formData.append('ads', JSON.stringify(adsFields));
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] Sending ads JSON object:', adsFields);
+  formData.append('ads', JSON.stringify(adsFields));
     }
 
     // Handle opening hours data conversion (tetap)
@@ -454,14 +428,9 @@ export const useForm = (
 
       if (openingHoursData.length > 0) {
         formData.append('opening_hours', JSON.stringify(openingHoursData));
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] Sending opening_hours JSON with days:', openingHoursData);
       }
     }
 
-    // Debug logging
-    // eslint-disable-next-line no-console
-    console.log('[DEBUG] Form submission data:');
     if (formData instanceof FormData) {
       const entries = Array.from(formData.entries());
 
@@ -471,53 +440,19 @@ export const useForm = (
         problemFields.some(field => key === field || key.includes(field))
       );
       
-      if (foundProblemFields.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] 🎯 PROBLEM FIELDS BEING SENT:');
-        foundProblemFields.forEach(([key, value]) => {
-          // eslint-disable-next-line no-console
-          console.log(`  ✅ ${key}:`, value, `(${typeof value})`);
-        });
-      } else {
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] ❌ PROBLEM FIELDS NOT FOUND IN FORM DATA!');
-      }
+      
 
       const adsEntries = entries.filter(([key]) => key.startsWith('ads'));
-      if (adsEntries.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] ADS FIELDS BEING SENT:');
-        adsEntries.forEach(([key, value]) => {
-          // eslint-disable-next-line no-console
-          console.log(`  ${key}:`, value, typeof value);
-        });
-      }
-
-      entries.forEach(([key, value]) => {
-        // eslint-disable-next-line no-console
-        console.log(`  ${key}:`, value);
-      });
     } else {
-      // eslint-disable-next-line no-console
-      console.log('  Form data:', formData);
     }
 
     // === VOUCHER SYNC PREPARATION ===
     // Check if this is a voucher creation from kubus
     const contentType = formData.get('content_type');
-    // eslint-disable-next-line no-console
-    console.log('[DEBUG] 🔍 VOUCHER CHECK:', {
-      contentType,
-      path: submitControl.path,
-      url: submitControl.url,
-      condition1: contentType === 'voucher',
-      condition2: submitControl.path?.includes('/admin/cubes'),
-      finalCondition: contentType === 'voucher' && submitControl.path?.includes('/admin/cubes')
-    });
+    
     
     if (contentType === 'voucher' && (submitControl.path?.includes('/admin/cubes') || submitControl.path?.includes('cubes'))) {
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] 🎯 VOUCHER DETECTED - Preparing voucher sync data...');
+      
       
       // Convert FormData to object for voucher helper
       const formDataObject: any = {};
@@ -546,14 +481,12 @@ export const useForm = (
         }
       });
 
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] Form data object for voucher helper:', formDataObject);
+      
 
       // Prepare voucher sync data
       const voucherData = prepareKubusVoucherData(formDataObject);
       
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] 🔧 VOUCHER DATA PREPARED:', voucherData);
+      
       
       // Add voucher sync data to form
       if (voucherData._sync_to_voucher_management && voucherData._voucher_sync_data) {
@@ -565,62 +498,43 @@ export const useForm = (
           try {
             voucherSyncData = JSON.parse(voucherSyncData);
           } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('[DEBUG] ❌ Failed to parse voucher sync data as JSON:', e);
           }
         }
         
         formData.append('_voucher_sync_data', JSON.stringify(voucherSyncData));
         
-        // ✅ CRITICAL FIX: Override code field untuk avoid duplicate constraint
-        const uniqueCode = `KUBUS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        // ✅ CRITICAL FIX: Handle code based on validation_type
+        // DON'T auto-generate code here - it's already handled in voucher.helpers.js
+        // The code is already in voucherSyncData.code
+        const validationType = voucherSyncData.validation_type || 'auto';
+        const voucherCode = voucherSyncData.code || '';
         
-        // Backend expects 'code' field, not 'ads[code]' for cube creation
-        formData.set('code', uniqueCode);
         
-        // ✅ REMOVE potential duplicate/conflicting fields for backend
+        
+        // Set code field di root level untuk backend
+        // Code sudah di-generate/validate di prepareKubusVoucherData
+        if (voucherCode) {
+          formData.set('code', voucherCode);
+        }
+        
+        // Clean up potential duplicate fields
         const fieldsToClean = ['ads.code', 'ads[code]'];
         fieldsToClean.forEach(field => {
           if (formData.has(field)) {
             formData.delete(field);
-            // eslint-disable-next-line no-console
-            console.log(`[DEBUG] 🗑️ Removed conflicting field: ${field}`);
           }
         });
         
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] ✅ VOUCHER SYNC DATA ADDED:', {
-          flag: voucherData._sync_to_voucher_management,
-          data: voucherData._voucher_sync_data,
-          uniqueCode: uniqueCode
-        });
         
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] 📤 COMPLETE REQUEST DATA BEING SENT:');
-        const finalEntries = Array.from(formData.entries());
-        finalEntries.forEach(([key, value]) => {
-          if (key === '_voucher_sync_data') {
-            // eslint-disable-next-line no-console
-            console.log(`  ${key}:`, JSON.parse(value as string));
-          } else if (value instanceof File) {
-            // eslint-disable-next-line no-console
-            console.log(`  ${key}: [FILE] ${value.name} (${value.size} bytes)`);
-          } else {
-            // eslint-disable-next-line no-console
-            console.log(`  ${key}:`, value);
-          }
-        });
       } else {
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG] ❌ VOUCHER SYNC DATA NOT PREPARED');
+      
       }
     }
 
     // === PROMO SYNC PREPARATION ===
     // Check if this is a promo creation from kubus
     if (contentType === 'promo' && (submitControl.path?.includes('/admin/cubes') || submitControl.path?.includes('cubes'))) {
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] 🎯 PROMO DETECTED - Using existing fields for promo sync...');
+      
       
       // Promo menggunakan field yang sudah ada, tidak perlu field tambahan
       const existingPromoFields = [
@@ -632,15 +546,7 @@ export const useForm = (
         'owner_user_id',        // Manager tenant sebagai pemilik
       ];
       
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] 📤 EXISTING PROMO FIELDS BEING SENT:');
-      existingPromoFields.forEach(field => {
-        const value = formData.get(field);
-        if (value !== null) {
-          // eslint-disable-next-line no-console
-          console.log(`  ${field}:`, value);
-        }
-      });
+      
     }
 
     // === Request ===
@@ -661,15 +567,10 @@ export const useForm = (
       setShowConfirm(false);
     } else if (mutate?.status == 422) {
       // Debug logging for validation errors
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] 422 Validation Error Response:', mutate.data);
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] Detailed errors:', mutate.data.errors);
+      
 
       if (mutate.data.errors) {
         Object.entries(mutate.data.errors).forEach(([field, messages]: [string, any]) => {
-          // eslint-disable-next-line no-console
-          console.log(`[DEBUG] Field "${field}" error:`, Array.isArray(messages) ? messages[0] : messages);
         });
       }
 
@@ -703,12 +604,7 @@ export const useForm = (
       setShowConfirm(false);
     } else {
       // Debug logging for other errors (including 500)
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG] Error Response:', {
-        status: mutate?.status,
-        data: mutate?.data,
-        message: mutate?.message
-      });
+      
 
       onFailed?.(mutate?.status || 500);
       setShowConfirm(false);
@@ -769,16 +665,12 @@ export const useForm = (
       if (incoming === undefined || incoming === null) {
         // Skip undefined/null incoming to avoid clearing user input
         try {
-          // eslint-disable-next-line no-console
-          console.log('[useForm] setDefaultValues() skipped null/undefined incoming for', keyName);
         } catch (e) {}
         return;
       }
 
       if (existingHasValue) {
         try {
-          // eslint-disable-next-line no-console
-          console.log('[useForm] setDefaultValues() not overriding existing value for', keyName);
         } catch (e) {}
         return;
       }
@@ -790,8 +682,6 @@ export const useForm = (
     const newValuesArr = Array.from(merged.entries()).map(([name, value]) => ({ name, value }));
     // Debug: log default values being applied (helps detect unintended resets)
     try {
-      // eslint-disable-next-line no-console
-      console.log('[useForm] setDefaultValues() merged', { incomingKeys: Object.keys(values), mergedLength: newValuesArr.length });
     } catch (e) {}
 
     setFormValues(newValuesArr);

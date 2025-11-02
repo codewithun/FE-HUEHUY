@@ -27,6 +27,7 @@ import VoucherModal from '../../../../components/construct.components/modal/Vouc
 import Cookies from 'js-cookie';
 // token_cookie_name intentionally not used here; admin pages use admin_token_cookie_name
 import { admin_token_cookie_name } from '../../../../helpers/api.helpers';
+import { standIn } from '../../../../helpers/standIn.helpers';
 
 import { useUserContext } from '../../../../context/user.context';
 
@@ -405,16 +406,61 @@ function KubusMain() {
           },
           transformData: (formData) => {
             if (formData.content_type === 'voucher') {
-              const transformedData = prepareKubusVoucherData(formData);
-              const validation = validateVoucherData(transformedData);
-              if (!validation.isValid) {
-                console.error('Voucher validation failed:', validation.errors);
+              // eslint-disable-next-line no-console
+              console.log('[TRANSFORM] 🔍 Processing voucher data...');
+              // eslint-disable-next-line no-console
+              console.log('[TRANSFORM] 📋 Input formData:', {
+                content_type: formData.content_type,
+                validation_type: formData['ads[validation_type]'],
+                code: formData['ads[code]'],
+                ads: formData.ads
+              });
+
+              try {
+                const transformedData = prepareKubusVoucherData(formData);
+
+                // eslint-disable-next-line no-console
+                console.log('[TRANSFORM] ✅ Transformed data:', transformedData);
+
+                const validation = validateVoucherData(transformedData);
+
+                if (!validation.isValid) {
+                  // eslint-disable-next-line no-console
+                  console.error('[TRANSFORM] ❌ Voucher validation failed:', validation.errors);
+
+                  // Get first error message
+                  const firstError = Object.values(validation.errors)[0];
+                  const errorMessage = firstError || 'Validasi voucher gagal. Periksa kembali data yang diisi.';
+
+                  // Show error to user
+                  alert(errorMessage);
+
+                  // Throw error to stop form submission
+                  throw new Error(errorMessage);
+                }
+
+                // eslint-disable-next-line no-console
+                console.log('[TRANSFORM] ✅ Validation passed, returning transformed data');
+                return transformedData;
+              } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('[TRANSFORM] 💥 CRITICAL ERROR:', error.message);
+
+                // Show error to user if not already shown
+                if (!error.message.includes('Validasi voucher gagal')) {
+                  alert(error.message);
+                }
+
+                // Re-throw to stop submission
+                throw error;
               }
-              return transformedData;
             }
             return formData;
           },
           onModalOpen: () => {
+            // Clear cache kategori iklan agar selalu fetch data terbaru saat modal dibuka
+            standIn.clear('option_admin/options/ad-category');
+
             if (pendingEditRow || (selected?.ads?.[0]?.id && isAdsEditMode)) {
               setIsFormEdit(true);
               setIsAdsEditMode(true);
@@ -640,7 +686,7 @@ function KubusMain() {
                     />
                   );
                 }
-                return <VoucherForm formControl={formControl} createImageField={createImageField} />;
+                return <VoucherForm formControl={formControl} createImageField={createImageField} values={values} />;
               },
             },
             // Maps and Address for Offline Promo/Voucher
@@ -1386,12 +1432,16 @@ function KubusMain() {
           resetCropState();
           setIsAdsEditMode(false); // pastikan reset ads edit mode
           formValuesRef.current = [];
+          // Clear cache kategori iklan untuk ensure fresh data
+          standIn.clear('option_admin/options/ad-category');
         }}
 
         onUpdateSuccess={() => {
           // Reset states dan refresh data
           setSelected(null);
           setIsAdsEditMode(false);
+          // Clear cache kategori iklan untuk ensure fresh data
+          standIn.clear('option_admin/options/ad-category');
           setIsFormEdit(false);
           setPendingEditRow(null);
           formValuesRef.current = [];
@@ -1408,6 +1458,8 @@ function KubusMain() {
           setIsFormEdit(false);
           setPendingEditRow(null); // pastikan clear pending edit
           setTableCtx(null);
+          // Clear cache kategori iklan untuk ensure fresh data di next open
+          standIn.clear('option_admin/options/ad-category');
         }}
       />
 

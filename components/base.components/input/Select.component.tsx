@@ -62,20 +62,10 @@ export function SelectComponent({
   const [showOption, setShowOption] = useState(false);
 
   const [useTemp, setUseTemp] = useState(true);
-  // Cache last known label for given values so we can keep showing the label
-  // while options are reloading (prevents disappearing selected label)
   const lastLabelRef = React.useRef(new Map<string | number, string>());
 
-  // const [search, setSearch] = useState('');
   const [keyword, setKeyword] = useState('');
   const [keywordSearch] = useLazySearch(keyword);
-
-  // if (serverOptionControl?.path || serverOptionControl?.url) {
-  //   // eslint-disable-next-line react-hooks/rules-of-hooks
-  //   const [loading, code, data] = useGet(serverOptionControl);
-
-  //   console.log(data);
-  // }
 
   useEffect(() => {
     tempOptions && tempOptions.length && searchServer
@@ -116,7 +106,7 @@ export function SelectComponent({
             serverOptionControl?.cacheName ||
             `option_${serverOptionControl?.path}`,
           data: mapped,
-          expired: 5,
+          expired: 0.5,
         });
         setLoadingOption(false);
       }
@@ -165,9 +155,6 @@ export function SelectComponent({
         setShowOption(true);
         setFilteredOptions(newOptions);
       } else {
-        // setDataOptions([]);
-        // setShowOption(false);
-        // setFilteredOptions([]);
       }
 
       // setLoadingOption(false);
@@ -183,15 +170,6 @@ export function SelectComponent({
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keywordSearch, serverOptionControl?.path, serverOptionControl?.url]);
-  // useEffect(() => {
-  //   if (keywordSearch) {
-  //     setSearch?.(keywordSearch);
-  //   } else {
-  //     setSearch?.('');
-  //   }
-
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [keywordSearch]);
 
   useEffect(() => {
     register?.(name, validations);
@@ -232,17 +210,7 @@ export function SelectComponent({
           lastLabelRef.current.set(String(found.value), found.label);
         } catch (e) {}
       } else {
-        // fallback to last known label for this value if available
         const cached = lastLabelRef.current.get(String(value));
-        if (cached) {
-          // eslint-disable-next-line no-console
-          console.log(
-            '[SelectComponent] using cached label fallback for',
-            String(value),
-            '->',
-            cached
-          );
-        }
         setInputShowValue(cached || '');
       }
     } else {

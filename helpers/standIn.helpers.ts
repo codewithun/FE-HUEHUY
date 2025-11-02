@@ -35,4 +35,16 @@ export const standIn = {
       return null;
     }
   },
+  clear: (key: string) => {
+    const data = localStorage.getItem(cacheName)
+      ? JSON.parse(localStorage.getItem(cacheName) || '')
+      : {};
+    if (data[key]) {
+      delete data[key];
+      localStorage.setItem(cacheName, JSON.stringify(data));
+    }
+  },
+  clearAll: () => {
+    localStorage.removeItem(cacheName);
+  },
 };

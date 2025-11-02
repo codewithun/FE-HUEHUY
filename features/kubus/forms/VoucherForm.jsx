@@ -1,12 +1,21 @@
 import React from 'react';
-import { 
-  InputComponent, 
-  TextareaComponent, 
-  SelectComponent, 
-  InputNumberComponent 
+import {
+  InputComponent,
+  TextareaComponent,
+  SelectComponent,
+  InputNumberComponent
 } from '../../../components/base.components';
 
-const VoucherForm = ({ formControl, createImageField }) => {
+const VoucherForm = ({ formControl, createImageField, values }) => {
+  // Get current validation type from form values
+  const validationType = values?.find(v => v.name === 'ads[validation_type]')?.value || 'auto';
+  const currentCode = values?.find(v => v.name === 'ads[code]')?.value || '';
+
+  // Debug logging
+  React.useEffect(() => {
+
+  }, [validationType, currentCode, values]);
+
   return (
     <div className="mt-6 space-y-4">
       <div className="font-semibold text-lg text-slate-700 border-b pb-2">Voucher</div>
@@ -26,6 +35,30 @@ const VoucherForm = ({ formControl, createImageField }) => {
           placeholder="Masukan Deskripsi Voucher..."
           {...formControl('ads[description]')}
           rows={5}
+          validations={{ required: true }}
+        />
+      )}
+
+      {/* Tipe Validasi */}
+      <SelectComponent
+        name="ads[validation_type]"
+        label="Tipe Validasi"
+        placeholder="Pilih Tipe Validasi..."
+        {...formControl('ads[validation_type]')}
+        options={[
+          { label: 'Generate Otomatis (QR Code)', value: 'auto' },
+          { label: 'Masukan Kode Unik (Manual)', value: 'manual' },
+        ]}
+        validations={{ required: true }}
+      />
+
+      {/* Kode Unik (hanya tampil jika manual) */}
+      {validationType === 'manual' && (
+        <InputComponent
+          name="ads[code]"
+          label="Kode Unik Voucher"
+          placeholder="Contoh: MYCODE123, VOUCHER-001, PROMO2025..."
+          {...formControl('ads[code]')}
           validations={{ required: true }}
         />
       )}
