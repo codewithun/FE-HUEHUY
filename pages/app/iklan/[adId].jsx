@@ -462,6 +462,20 @@ export default function AdDetailUnified() {
     setShowInfoModal(true);
   };
 
+  // Safe external URL helper (same behavior as promo page)
+  const safeExternalUrl = (raw) => {
+    if (!raw || typeof raw !== 'string') return null;
+    let url = raw.trim();
+    // auto tambahkan protokol jika tidak ada
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    try {
+      const u = new URL(url);
+      return u.href;
+    } catch (e) {
+      return null;
+    }
+  };
+
   // =========================================================
   // RENDER
   // =========================================================
@@ -490,6 +504,9 @@ export default function AdDetailUnified() {
       </div>
     );
   }
+
+  // compute a safe community primary color to use in inline styles (fallback to blue)
+  const communityPrimary = getCommunityPrimaryColor() || '#2563eb';
 
   return (
     <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
@@ -696,6 +713,34 @@ export default function AdDetailUnified() {
               </div>
             </div>
           </div>
+
+          {/* If ad is online, show external link similar to promo design */}
+          {adData?.promo_type === 'online' && (
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                  Link Iklan
+                </h4>
+                <div>
+                  <a
+                    href={safeExternalUrl(adData.link_information || adData.online_store_link) || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center text-white py-3 px-4 rounded-[12px] font-semibold hover:opacity-90 transition-all"
+                    style={{ backgroundColor: communityPrimary }}
+                    onClick={(e) => {
+                      if (!safeExternalUrl(adData.link_information || adData.online_store_link)) e.preventDefault();
+                    }}
+                  >
+                    Buka Link Iklan
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

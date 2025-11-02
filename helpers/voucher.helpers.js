@@ -18,19 +18,16 @@ const generateUniqueVoucherCode = () => {
 const formatDateForBackend = (dateStr) => {
   if (!dateStr) return null;
   try {
-    // Jika sudah format YYYY-MM-DD, return as is
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       return dateStr;
     }
-    // Jika format DD-MM-YYYY, convert ke YYYY-MM-DD
     if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
       const [day, month, year] = dateStr.split('-');
       return `${year}-${month}-${day}`;
     }
-    // Fallback: parse dengan Date dan format
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return null;
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    return date.toISOString().split('T')[0];
   } catch (e) {
     return null;
   }
@@ -41,30 +38,28 @@ const formatDateForBackend = (dateStr) => {
  */
 export const transformKubusVoucherToManagement = (formData, adId) => {
   const voucherData = {
-    // Data dari ads (kubus)
     ad_id: adId,
     name: formData.ads?.title || formData.title,
     description: formData.ads?.description || formData.description,
 
-    // Data voucher management
+    
     type: 'voucher',
     stock: parseInt(formData.voucher?.stock || formData.stock || 0),
     valid_until: formData.voucher?.valid_until || formData.valid_until,
     target_type: formData.voucher?.target_type || formData.target_type || 'all',
     validation_type: formData.ads?.validation_type || formData.validation_type || 'auto',
-    code: null, // akan di-generate otomatis
+  code: null,
 
-    // Info tenant dari kubus
-    owner_name: formData.owner_name || null,
+  owner_name: formData.owner_name || null,
     owner_phone: formData.owner_phone || null,
     tenant_location: formData.address || formData.tenant_location || null,
 
-    // Target users jika ada
+    
     community_id: formData.voucher?.target_type === 'community' ? formData.community_id : null,
     target_user_id: formData.voucher?.target_type === 'user' ? formData.target_user_id : null,
   };
 
-  // Handle gambar voucher
+  
   if (formData.voucher_image || formData.voucher?.image) {
     voucherData.image = formData.voucher_image || formData.voucher.image;
   }
@@ -86,34 +81,14 @@ export const transformKubusVoucherToManagement = (formData, adId) => {
  * - Target: target_type → ke ads.target_type + vouchers.target_type
  */
 export const prepareKubusVoucherData = (formData) => {
-  // Debug logging untuk cek data masuk
-  // eslint-disable-next-line no-console
-  console.log('[VOUCHER HELPER] 🔍 Input formData:', formData);
-  // eslint-disable-next-line no-console
-  console.log('[VOUCHER HELPER] 📋 content_type check:', formData.content_type);
+  
 
   // ✅ CRITICAL FIX: Hanya process jika content_type adalah 'voucher'
   if (formData.content_type !== 'voucher') {
-    // eslint-disable-next-line no-console
-    console.log('[VOUCHER HELPER] ❌ SKIPPING - Not a voucher content_type:', formData.content_type);
     return formData; // Return original data tanpa modifikasi
   }
 
-  // eslint-disable-next-line no-console
-  console.log('[VOUCHER HELPER] ✅ PROCESSING VOUCHER - content_type is voucher');
-
-  // eslint-disable-next-line no-console
-  console.log('[VOUCHER HELPER] 📋 ads data available:', {
-    'ads': formData.ads,
-    'ads.title': formData['ads.title'],
-    'ads.description': formData['ads.description'],
-    'ads.max_grab': formData['ads.max_grab'],
-    'ads.finish_validate': formData['ads.finish_validate'],
-    'ads.validation_type': formData['ads.validation_type'],
-    'title': formData.title,
-    'max_grab': formData.max_grab,
-    'address': formData.address
-  });
+  
 
   // ✅ Extract owner info dari form data
   const ownerUserId = formData.owner_user_id;
@@ -169,35 +144,62 @@ export const prepareKubusVoucherData = (formData) => {
 
       // ✅ VALIDASI SETTINGS - FIX FIELD MAPPING
       validation_type: formData.ads?.validation_type || formData['ads.validation_type'] || formData.validation_type || 'auto',
-      code: generateUniqueVoucherCode(), // Generate unique code untuk avoid duplicate
+      // ✅ FIX: Handle code based on validation_type
+      code: (() => {
+        const validationType = formData.ads?.validation_type || formData['ads.validation_type'] || formData.validation_type || 'auto';
+        
+        
+        
+        if (validationType === 'manual') {
+          // Use user-provided code for manual validation
+          // PENTING: Cek semua kemungkinan field name
+          const userCode = formData.ads?.code || formData['ads.code'] || formData['ads[code]'] || formData.code || '';
+          const trimmedCode = String(userCode).trim();
+          
+          
+          
+          // Validate that user provided a code
+          if (!trimmedCode) {
+          
+            throw new Error('Kode wajib diisi untuk tipe validasi manual');
+          }
+          
+          // Validate that code is not auto-generated pattern
+          const autoPattern = /^(KUBUS|VCR)-\d{13,}-\d{1,5}$/;
+          if (autoPattern.test(trimmedCode)) {
+          
+            throw new Error('Kode untuk validasi manual tidak boleh menggunakan pattern auto-generated (KUBUS-xxx atau VCR-xxx). Harap masukkan kode unik manual seperti: MYCODE123, VOUCHER-001, atau PROMO2025.');
+          }
+          
+          
+          return trimmedCode;
+        } else {
+          // Generate unique code for auto validation
+          const autoCode = generateUniqueVoucherCode();
+          
+          return autoCode;
+        }
+      })(),
 
-      // ✅ TARGET SETTINGS
       target_type: formData.target_type || 'all',
       community_id: formData.target_type === 'community' ? formData.community_id : null,
       target_user_id: formData.target_type === 'user' ? formData.target_user_id : null,
       target_user_ids: formData.target_type === 'user' ? formData.target_user_ids : null,
+      ad_id: null,
+      cube_id: formData.id || null,
 
-      // ✅ METADATA TAMBAHAN
-      ad_id: null, // akan diisi oleh backend setelah ads dibuat
-      cube_id: formData.id || null, // ID kubus jika update
-
-      // ✅ ADDITIONAL TIMESTAMPS
       created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
       updated_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
 
-      // ✅ METADATA UNTUK BACKEND PROCESSING
-      // Backend akan copy image dari ads.image_1 ke voucher.image setelah upload
       _copy_image_from_ads: true,
-      _image_source_field: 'image_1', // Backend akan copy dari ads.image_1
+      _image_source_field: 'image_1',
 
-      // ✅ DEBUG INFO untuk backend troubleshooting
       _debug_source: 'kubus_voucher_creation',
       _frontend_version: '1.0.0'
     }
   };
 
-  // eslint-disable-next-line no-console
-  console.log('[VOUCHER HELPER] ✅ VOUCHER DATA PREPARED:', enrichedData);
+  
 
   return enrichedData;
 };
@@ -257,8 +259,17 @@ export const validateVoucherData = (formData) => {
     }
 
     // Kode manual (ads[code] → ads.code + vouchers.code)
-    if (formData.ads?.validation_type === 'manual' && !formData.ads?.code) {
-      errors.code = 'Kode validasi wajib diisi untuk tipe validasi manual';
+    if (formData.ads?.validation_type === 'manual') {
+      const code = formData.ads?.code || formData['ads.code'] || '';
+      if (!code || !String(code).trim()) {
+        errors.code = 'Kode validasi wajib diisi untuk tipe validasi manual';
+      } else {
+        // Validate that code is not auto-generated pattern
+        const autoPattern = /^(KUBUS|VCR)-\d{13,}-\d{1,5}$/;
+        if (autoPattern.test(String(code).trim())) {
+          errors.code = 'Kode untuk validasi manual tidak boleh menggunakan pattern auto-generated (KUBUS-xxx atau VCR-xxx). Harap masukkan kode unik manual seperti: MYCODE123, VOUCHER-001, atau PROMO2025.';
+        }
+      }
     }
   }
 

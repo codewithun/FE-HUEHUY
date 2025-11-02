@@ -8,11 +8,14 @@ import {
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { useGet } from '../../../helpers';
-// import { useAccessContext } from '../../../context';
+import { standIn } from '../../../helpers/standIn.helpers';
 
 export default function ManageAdsCategories() {
-  // const { accessActive, loading } = useAccessContext();
   const [modalIcon, setModalIcon] = useState(false);
+
+  const clearAdCategoryCache = () => {
+    standIn.clear('option_admin/options/ad-category');
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [configLoading, codeConfig, dataConfig, resetConfig] = useGet({
@@ -87,12 +90,11 @@ export default function ManageAdsCategories() {
             {
               type: 'select',
               construction: {
-                // multiple: true, // hapus agar kirim single value
                 name: 'parent_id',
                 label: 'Kelompok',
                 placeholder: 'Pilih Kelompok Kategori..',
                 serverOptionControl: {
-                  path: 'admin/options/ad-category', // sesuaikan dengan route BE Anda
+                  path: 'admin/options/ad-category',
                 },
               },
             },
@@ -107,7 +109,6 @@ export default function ManageAdsCategories() {
             {
               type: 'check',
               construction: {
-                // label:"Kategori Utama",
                 name: 'is_primary_parent',
                 options: [{ label: 'Kategori Utama', value: 1 }],
               },
@@ -115,7 +116,6 @@ export default function ManageAdsCategories() {
             {
               type: 'check',
               construction: {
-                // label:"Kategori Utama",
                 name: 'is_home_display',
                 options: [{ label: 'Tampil Di Beranda', value: 1 }],
               },
@@ -128,15 +128,25 @@ export default function ManageAdsCategories() {
             return {
               name: data?.name,
               parent_id: data?.parent_id || '',
-              // Jangan set file image dari URL
               is_primary_parent: data?.is_primary_parent ? 1 : 0,
               is_home_display: data?.is_home_display ? 1 : 0,
-              // Tambahan: default value komunitas (opsional)
               community_id: data?.community_id ?? undefined,
             };
           },
         }}
         actionControl={{ except: 'detail' }}
+        onStoreSuccess={() => {
+          // Clear cache setelah berhasil tambah kategori baru
+          clearAdCategoryCache();
+        }}
+        onUpdateSuccess={() => {
+          // Clear cache setelah berhasil update kategori
+          clearAdCategoryCache();
+        }}
+        onDeleteSuccess={() => {
+          // Clear cache setelah berhasil hapus kategori
+          clearAdCategoryCache();
+        }}
       />
 
       <FloatingPageComponent
