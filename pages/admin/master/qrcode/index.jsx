@@ -192,7 +192,8 @@ export default function QRCodeCrud() {
         if (promo) {
           const communityId =
             promo?.community?.id || promo?.community_id || "default";
-          return `${origin}/app/komunitas/promo/detail_promo?promoId=${promo.id}&communityId=${communityId}&autoRegister=1&source=qr_scan`;
+          return `${origin}/app/komunitas/promo/${promo.id}?communityId=${communityId}&autoRegister=1&source=qr_scan`;
+
         }
       }
       return "";
