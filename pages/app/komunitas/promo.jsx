@@ -79,6 +79,10 @@ const CommunityPromoPage = () => {
   };
 
   // === Helper functions untuk label (sama seperti di home.jsx) ===
+
+  const getAdImage = (ad) =>
+    ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
+
   const normalizeBoolLike = (val) => {
     if (val === true || val === 1) return true;
     if (typeof val === 'number') return val === 1;
@@ -499,7 +503,11 @@ const CommunityPromoPage = () => {
         .sort((a, b) => (a.level || 0) - (b.level || 0));
 
       // Identify both ad_category and category_box widgets
-      const adCategoryWidget = widgets.find(w => w.source_type === 'ad_category' || w.content_type === 'category');
+      const adCategoryWidget = widgets.find(w => 
+        w.source_type === 'ad_category' || 
+        w.content_type === 'category' ||
+        (w.content_type === 'promo' && w.source_type === 'ad_category')
+      );
       const categoryBoxWidget = widgets.find(w => 
         w.source_type === 'category_box' || 
         w.content_type === 'category_box' || 
@@ -509,23 +517,31 @@ const CommunityPromoPage = () => {
       // Handle both ad_category and category_box widgets
       if (adCategoryWidget || categoryBoxWidget) {
         try {
-          const catRes = await fetch(`${apiUrl}/admin/options/ad-category?community_id=${communityId}`, { headers: getAuthHeaders() });
+          console.log('Fetching ad categories for widgets:', { adCategoryWidget, categoryBoxWidget });
+          const catRes = await fetch(`${apiUrl}/admin/options/ad-category?community_id=${communityId}&full=1`, { headers: getAuthHeaders() });
           const catResult = await catRes.json();
+          console.log('Ad category API response:', catResult);
+          
           if (catResult?.message === 'success' && Array.isArray(catResult.data)) {
+            console.log('Setting ad categories:', catResult.data);
             setAdCategories(catResult.data);
             // Set level based on ad_category widget specifically
             setAdCategoryLevel(adCategoryWidget?.level ?? 0);
           } else if (Array.isArray(catResult)) {
+            console.log('Setting ad categories (array format):', catResult);
             setAdCategories(catResult);
             // Set level based on ad_category widget specifically
             setAdCategoryLevel(adCategoryWidget?.level ?? 0);
           } else {
+            console.log('No valid ad category data found');
             setAdCategories([]); setAdCategoryLevel(null);
           }
-        } catch {
+        } catch (error) {
+          console.error('Error fetching ad categories:', error);
           setAdCategories([]); setAdCategoryLevel(null);
         }
       } else {
+        console.log('No ad category or category box widgets found');
         setAdCategories([]); setAdCategoryLevel(null);
       }
 

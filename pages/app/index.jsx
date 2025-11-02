@@ -189,6 +189,70 @@ export default function Index() {
     return true;
   };
 
+  // ======== SHUFFLE CUBE WIDGET COMPONENT ========
+  const ShuffleCubeWidget = ({ widget }) => {
+    const { size, name, description } = widget;
+    
+    // Use the shuffle ads data from the useGet hook
+    const shuffleData = dataShuffleAds?.data || [];
+    const shuffleLoading = loadingShuffleAds;
+
+    if (shuffleLoading) {
+      return (
+        <div className="px-4 mt-8">
+          <div className="mb-2">
+            <p className="font-semibold">{name || 'Promo Acak'}</p>
+            {description && (
+              <p className="text-xs text-slate-500">{description}</p>
+            )}
+          </div>
+          <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-3">
+            <div className="flex flex-nowrap gap-4 w-max">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-[16px] bg-slate-200 animate-pulse flex-shrink-0"
+                  style={{ minWidth: 320, height: 200 }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!shuffleData?.length) return null;
+
+    return (
+      <div className="px-4 mt-8">
+        <div className="flex justify-between items-center gap-2">
+          <div>
+            <p className="font-semibold">{name || 'Promo Acak'}</p>
+            {description && (
+              <p className="text-xs text-slate-500">{description}</p>
+            )}
+          </div>
+          <Link href={`/app/cari?berdasarkan=Promo`}>
+            <div className="text-sm text-primary font-semibold">
+              Lainnya
+              <FontAwesomeIcon icon={faChevronRight} className="ml-2" />
+            </div>
+          </Link>
+        </div>
+
+        <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-3">
+          <div className="flex flex-nowrap gap-4 w-max">
+            {shuffleData.map((ad, i) => (
+              <Link href={buildPromoLink(ad)} key={i}>
+                <AdCardBySize ad={ad} size={size || 'M'} />
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const AdCardBySize = ({ ad, size = 'M' }) => {
     const img = getAdImage(ad);
     const title = ad?.title || 'Promo';
@@ -302,6 +366,12 @@ export default function Index() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingMenu, codeMenu, dataMenu] = useGet({
     path: `admin/dynamic-content?type=home`,
+  }, !apiReady);
+
+  // Add shuffle ads data fetching for shuffle_cube widgets
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [loadingShuffleAds, codeShuffleAds, dataShuffleAds] = useGet({
+    path: `shuffle-ads`,
   }, !apiReady);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -761,34 +831,43 @@ export default function Index() {
                     </>
                   );
                 } else if (menu.content_type === 'promo' && menu.is_active) {
-                  // Widget Promo/Iklan (home): dukung sumber 'cube' & 'shuffle_cube' (ambil ads dari cube)
-                  const adsFromCubes = (menu?.dynamic_content_cubes || [])
-                    .flatMap((dcc) => {
-                      const infoFlag = dcc?.cube?.is_information;
-                      const ctFlag = dcc?.cube?.content_type;
-                      const cubeCode = dcc?.cube?.code;
-                      return (dcc?.cube?.ads || []).map((ad) => ({
-                        ...ad,
-                        // wariskan flag dari cube jika ad belum punya
-                        is_information: ad?.is_information ?? infoFlag,
-                        cube: {
-                          ...(ad?.cube || {}),
-                          code: ad?.cube?.code || cubeCode, // pastikan code tersedia
-                          is_information: ad?.cube?.is_information ?? infoFlag,
-                          content_type: ad?.cube?.content_type ?? ctFlag,
-                        },
-                      }));
-                    })
-                    .filter(Boolean);
+                  // Widget Promo/Iklan (home): dukung sumber 'cube', 'shuffle_cube', dan 'ad_category'
+                  let ads = [];
 
-                  // Fallback: jika source_type 'ad_category', ambil dari dataCategories
-                  const adsFromAdCategory =
-                    menu?.source_type === 'ad_category'
-                      ? ((dataCategories?.data || []).find((c) => c?.id === menu?.ad_category_id)?.ads || [])
-                      : [];
+                  if (menu.source_type === 'shuffle_cube') {
+                    // Use shuffle ads data for shuffle_cube source type
+                    ads = dataShuffleAds?.data || [];
+                  } else {
+                    // Original logic for cube and ad_category sources
+                    const adsFromCubes = (menu?.dynamic_content_cubes || [])
+                      .flatMap((dcc) => {
+                        const infoFlag = dcc?.cube?.is_information;
+                        const ctFlag = dcc?.cube?.content_type;
+                        const cubeCode = dcc?.cube?.code;
+                        return (dcc?.cube?.ads || []).map((ad) => ({
+                          ...ad,
+                          // wariskan flag dari cube jika ad belum punya
+                          is_information: ad?.is_information ?? infoFlag,
+                          cube: {
+                            ...(ad?.cube || {}),
+                            code: ad?.cube?.code || cubeCode, // pastikan code tersedia
+                            is_information: ad?.cube?.is_information ?? infoFlag,
+                            content_type: ad?.cube?.content_type ?? ctFlag,
+                          },
+                        }));
+                      })
+                      .filter(Boolean);
 
-                  // Pakai hasil dari cubes dulu; kalau kosong pakai dari kategori
-                  const ads = adsFromCubes.length ? adsFromCubes : adsFromAdCategory;
+                    // Fallback: jika source_type 'ad_category', ambil dari dataCategories
+                    const adsFromAdCategory =
+                      menu?.source_type === 'ad_category'
+                        ? ((dataCategories?.data || []).find((c) => c?.id === menu?.ad_category_id)?.ads || [])
+                        : [];
+
+                    // Pakai hasil dari cubes dulu; kalau kosong pakai dari kategori
+                    ads = adsFromCubes.length ? adsFromCubes : adsFromAdCategory;
+                  }
+
                   if (!ads?.length) return null;
 
                   return (
@@ -832,6 +911,9 @@ export default function Index() {
                   } else {
                     return <MenuAdPage menu={menu} key={key} />;
                   }
+                } else if (menu.content_type === 'shuffle_cube' && menu.is_active) {
+                  // Handle shuffle_cube widgets
+                  return <ShuffleCubeWidget widget={menu} key={key} />;
                 }
               })}
             </div>
