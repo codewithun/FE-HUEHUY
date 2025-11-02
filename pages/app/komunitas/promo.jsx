@@ -79,6 +79,10 @@ const CommunityPromoPage = () => {
   };
 
   // === Helper functions untuk label (sama seperti di home.jsx) ===
+
+  const getAdImage = (ad) =>
+    ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
+
   const normalizeBoolLike = (val) => {
     if (val === true || val === 1) return true;
     if (typeof val === 'number') return val === 1;
