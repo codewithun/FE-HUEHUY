@@ -108,13 +108,97 @@ export default function NotificationPage() {
     );
   };
 
+  // Fungsi baru untuk mendapatkan start_validate
+  const getVoucherStartDate = (n) => {
+    if (!n || typeof n !== 'object') return null;
+
+    // PRIORITAS 1: Data live dari backend
+    if (n.live_start_validate) {
+      return n.live_start_validate;
+    }
+
+    // PRIORITAS 2: Meta dari notifikasi
+    let meta = n?.meta;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch { meta = null; }
+    }
+
+    return (
+      n?.start_validate ||
+      n?.voucher?.start_validate ||
+      meta?.start_validate ||
+      meta?.voucher?.start_validate ||
+      null
+    );
+  };
+
+  // Fungsi baru untuk mendapatkan finish_validate
+  const getVoucherFinishDate = (n) => {
+    if (!n || typeof n !== 'object') return null;
+
+    // PRIORITAS 1: Data live dari backend
+    if (n.live_finish_validate) {
+      return n.live_finish_validate;
+    }
+
+    // PRIORITAS 2: Meta dari notifikasi
+    let meta = n?.meta;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch { meta = null; }
+    }
+
+    return (
+      n?.finish_validate ||
+      n?.voucher?.finish_validate ||
+      meta?.finish_validate ||
+      meta?.voucher?.finish_validate ||
+      null
+    );
+  };
+
+  // Fungsi baru untuk mendapatkan validation_time_limit
+  const getValidationTimeLimit = (n) => {
+    if (!n || typeof n !== 'object') return null;
+
+    // PRIORITAS 1: Data live dari backend
+    if (n.live_validation_time_limit) {
+      return n.live_validation_time_limit;
+    }
+
+    // PRIORITAS 2: Meta dari notifikasi
+    let meta = n?.meta;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch { meta = null; }
+    }
+
+    return (
+      n?.validation_time_limit ||
+      n?.voucher?.validation_time_limit ||
+      meta?.validation_time_limit ||
+      meta?.voucher?.validation_time_limit ||
+      null
+    );
+  };
+
   const isVoucherExpired = (n) => {
     // PRIORITAS 1: Gunakan status live dari backend
     if (typeof n?.live_expired === 'boolean') {
       return n.live_expired;
     }
 
-    // PRIORITAS 2: Fallback ke parsing manual
+    // PRIORITAS 2: Cek berdasarkan start_validate dan finish_validate
+    const finishRaw = getVoucherFinishDate(n);
+    const finishDt = parseExpiry(finishRaw);
+    const startRaw = getVoucherStartDate(n);
+    const startDt = parseExpiry(startRaw);
+    const now = Date.now();
+
+    // Jika ada finish_validate, cek jika sudah lewat
+    if (finishDt && now > finishDt.getTime()) return true;
+    // Jika ada start_validate, cek jika belum mulai (juga dianggap expired)
+    if (startDt && now < startDt.getTime()) return true;
+
+    // PRIORITAS 3: Fallback ke parsing manual lama
     const raw = getVoucherEndDate(n);
     const dt = parseExpiry(raw);
     return !!dt && dt.getTime() < Date.now();
@@ -427,7 +511,12 @@ export default function NotificationPage() {
       emitNotificationChanged(type, notificationId);
       setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
       setVersion((v) => v + 1);
-      setModalMessage('Voucher berhasil diklaim! Cek di Saku.');
+
+      // Ambil batas waktu validasi
+      const timeLimit = getValidationTimeLimit(live || localItems.find(n => n.id === notificationId));
+      const timeLimitText = timeLimit ? ` Batas waktu validasi: ${timeLimit}.` : '';
+
+      setModalMessage(`Voucher berhasil diklaim! Cek di Saku.${timeLimitText}`);
       setShowSuccessModal(true);
     } catch (e) {
       console.error('Network error:', e);

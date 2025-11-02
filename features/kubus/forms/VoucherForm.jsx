@@ -39,30 +39,6 @@ const VoucherForm = ({ formControl, createImageField, values }) => {
         />
       )}
 
-      {/* Tipe Validasi */}
-      <SelectComponent
-        name="ads[validation_type]"
-        label="Tipe Validasi"
-        placeholder="Pilih Tipe Validasi..."
-        {...formControl('ads[validation_type]')}
-        options={[
-          { label: 'Generate Otomatis (QR Code)', value: 'auto' },
-          { label: 'Masukan Kode Unik (Manual)', value: 'manual' },
-        ]}
-        validations={{ required: true }}
-      />
-
-      {/* Kode Unik (hanya tampil jika manual) */}
-      {validationType === 'manual' && (
-        <InputComponent
-          name="ads[code]"
-          label="Kode Unik Voucher"
-          placeholder="Contoh: MYCODE123, VOUCHER-001, PROMO2025..."
-          {...formControl('ads[code]')}
-          validations={{ required: true }}
-        />
-      )}
-
       {/* Gambar Voucher */}
       {createImageField && createImageField('voucher_image', 'Gambar Voucher')}
 
