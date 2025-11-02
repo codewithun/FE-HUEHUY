@@ -1077,11 +1077,6 @@ export default function KomunitasDashboard() {
               fetchControl={{
                 path: `admin/communities/${activeCommunity?.id}/member-history`,
                 includeHeaders: authHeaders("GET"),
-                mapData: (result) => {
-                  const d = result?.data ?? result;
-                  const rows = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
-                  return { data: rows, totalRow: rows.length };
-                },
               }}
               // Tambahkan kolom searchable dan definisi custom filter
               columnControl={{
@@ -1108,7 +1103,7 @@ export default function KomunitasDashboard() {
                     ),
                   },
                   {
-                    selector: "status",
+                    selector: "status", // Ubah dari "status" ke "action" karena API mengembalikan field "action"
                     label: "Status",
                     // Tambahkan filter agar bisa memilih Masuk/Keluar/Dihapus
                     filter: {
@@ -1120,6 +1115,7 @@ export default function KomunitasDashboard() {
                       ],
                     },
                     item: (history) => {
+                      // Gunakan field action langsung dari API
                       const action = (history?.action || "").toLowerCase();
 
                       let text = "-";
