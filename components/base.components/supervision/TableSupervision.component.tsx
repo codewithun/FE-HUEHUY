@@ -202,6 +202,69 @@ export function TableSupervisionComponent({
     [storageBase]
   );
 
+  // Tambah: unduh QR via API agar tidak kena mixed-content/CORS
+  const downloadQrViaApi = useCallback(
+    async (id: number, filenameBase?: string) => {
+      const url = `${apiBase}/admin/qrcodes/${id}/file`;
+      const headers = { ...(fetchControl?.includeHeaders || {}) };
+      try {
+        const res = await fetch(url, { mode: 'cors', headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const ctype = (res.headers.get('content-type') || '').toLowerCase();
+
+        if (ctype.includes('image/png')) {
+          const blob = await res.blob();
+          const aUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = aUrl;
+          a.download = `${filenameBase || 'qr-code'}.png`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(aUrl);
+          return;
+        }
+
+        const svgText = await res.text();
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        const svg64 =
+          'data:image/svg+xml;base64,' +
+          btoa(unescape(encodeURIComponent(svgText)));
+
+        await new Promise((resolve, reject) => {
+          img.onload = () => resolve(null);
+          img.onerror = reject;
+          img.src = svg64;
+        });
+
+        const TARGET = 2048;
+        const ratio = img.width && img.height ? img.height / img.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = TARGET;
+        canvas.height = Math.round(TARGET * ratio);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas 2D context not available');
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const pngDataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = pngDataUrl;
+        a.download = `${filenameBase || 'qr-code'}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        console.error('Unduh QR PNG gagal:', e);
+        alert('Tidak bisa mengunduh QR. Pastikan login & CORS API aktif.');
+      }
+    },
+    [apiBase, fetchControl?.includeHeaders]
+  );
+
   const shouldFetch = Boolean(fetchControl?.path || fetchControl?.url);
   const isStatic = !shouldFetch;
 
@@ -468,11 +531,13 @@ export function TableSupervisionComponent({
                     size="xs"
                     rounded
                     onClick={async () => {
-                      const path = row.qr_code || row.path;
-                      const filenameBase = `qr-${
-                        row.tenant_name || row.id || 'code'
-                      }`;
-                      await downloadQrAsPng(path, filenameBase);
+                      const filenameBase = `qr-${row.tenant_name || row.id || 'code'}`;
+                      if (row?.id) {
+                        await downloadQrViaApi(row.id, filenameBase);
+                      } else {
+                        const path = row.qr_code || row.path;
+                        await downloadQrAsPng(path, filenameBase);
+                      }
                     }}
                   />
                 )}
@@ -529,6 +594,7 @@ export function TableSupervisionComponent({
     actionControl,
     hasPermissions,
     downloadQrAsPng,
+    downloadQrViaApi, // <— ditambahkan
     permissionCode,
   ]);
 
@@ -662,36 +728,36 @@ export function TableSupervisionComponent({
               {canEdit &&
                 (!actionControl?.except ||
                   !actionControl.except.includes('edit')) && (
-                  <ButtonComponent
-                    icon={faEdit}
-                    label="Ubah"
-                    variant="outline"
-                    paint="warning"
-                    size="xs"
-                    rounded
-                    onClick={() => {
-                      setModalForm(true);
-                      setDataSelected(idx);
-                    }}
-                  />
-                )}
+                <ButtonComponent
+                  icon={faEdit}
+                  label="Ubah"
+                  variant="outline"
+                  paint="warning"
+                  size="xs"
+                  rounded
+                  onClick={() => {
+                    setModalForm(true);
+                    setDataSelected(idx);
+                  }}
+                />
+              )}
 
               {canDelete &&
                 (!actionControl?.except ||
                   !actionControl.except.includes('delete')) && (
-                  <ButtonComponent
-                    icon={faTrash}
-                    label="Hapus"
-                    variant="outline"
-                    paint="danger"
-                    size="xs"
-                    rounded
-                    onClick={() => {
-                      setModalDelete(true);
-                      setDataSelected(idx);
-                    }}
-                  />
-                )}
+                <ButtonComponent
+                  icon={faTrash}
+                  label="Hapus"
+                  variant="outline"
+                  paint="danger"
+                  size="xs"
+                  rounded
+                  onClick={() => {
+                    setModalDelete(true);
+                    setDataSelected(idx);
+                  }}
+                />
+              )}
             </>
           ),
         });

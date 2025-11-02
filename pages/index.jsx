@@ -84,8 +84,15 @@ export default function Login() {
       // Gunakan secure cookie hanya di production agar tersimpan saat dev (http)
       const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
       Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
-      const nextUrl = consumeNext(router);
-      setTimeout(() => { window.location.href = nextUrl || '/app'; }, 100);
+      // Ambil URL redirect dari query, fallback ke helper consumeNext
+      const redirect = router.query.redirect || consumeNext(router);
+      setTimeout(() => {
+        if (redirect) {
+          window.location.href = decodeURIComponent(redirect);
+        } else {
+          window.location.href = '/app';
+        }
+      }, 100);
       return;
     }
 

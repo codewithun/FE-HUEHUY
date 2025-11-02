@@ -8,6 +8,8 @@ import {
   ButtonComponent,
   FloatingPageComponent,
   TableSupervisionComponent,
+  SelectComponent,
+  InputComponent,
 } from "../../../../components/base.components";
 import { AdminLayout } from "../../../../components/construct.components/layout/Admin.layout";
 import InputHexColor from "../../../../components/construct.components/input/InputHexColor";
@@ -65,8 +67,7 @@ export default function KomunitasDashboard() {
 
   /** MEMBER HISTORY modal state */
   const [modalMemberHistory, setModalMemberHistory] = useState(false);
-  const [memberHistoryList, setMemberHistoryList] = useState([]);
-  const [memberHistoryLoading, setMemberHistoryLoading] = useState(false);
+  // Riwayat member dikelola langsung oleh TableSupervisionComponent
   const [memberHistoryError, setMemberHistoryError] = useState("");
 
   // CUBES modal state
@@ -74,6 +75,13 @@ export default function KomunitasDashboard() {
   const [cubeList, setCubeList] = useState([]);
   const [cubeLoading, setCubeLoading] = useState(false);
   const [cubeError, setCubeError] = useState("");
+  // Search & filter untuk Cube table (Widget Asal)
+  const [cubeTypeFilter, setCubeTypeFilter] = useState([]); // ['home','hunting','information']
+  const [cubeWidgetSearch, setCubeWidgetSearch] = useState("");
+
+  // ADD MEMBER modal state
+  const [modalAddMember, setModalAddMember] = useState(false);
+
 
 
   // const router = useRouter();
@@ -169,6 +177,22 @@ export default function KomunitasDashboard() {
     }
   };
 
+  // Client-side filtered cube list by widget type (dropdown) + search (widget name/type/cube name)
+  const filteredCubeList = useMemo(() => {
+    const q = String(cubeWidgetSearch || "").toLowerCase().trim();
+    const types = Array.isArray(cubeTypeFilter)
+      ? cubeTypeFilter.map((t) => String(t).toLowerCase())
+      : [];
+    return (Array.isArray(cubeList) ? cubeList : []).filter((c) => {
+      const wtype = String(c?.widget_type || "").toLowerCase();
+      const wname = String(c?.widget_name || "").toLowerCase();
+      const cname = String(c?.name || "").toLowerCase();
+      const typeOk = !types.length || types.includes(wtype);
+      const searchOk = !q || wtype.includes(q) || wname.includes(q) || cname.includes(q);
+      return typeOk && searchOk;
+    });
+  }, [cubeList, cubeWidgetSearch, cubeTypeFilter]);
+
 
 
 
@@ -182,34 +206,10 @@ export default function KomunitasDashboard() {
   };
 
   const openMemberHistoryModal = async (communityRow) => {
+    // Biarkan TableSupervisionComponent yang melakukan fetch & render
     setActiveCommunity(communityRow);
-    setModalMemberHistory(true);
-    setMemberHistoryLoading(true);
     setMemberHistoryError("");
-    setMemberHistoryList([]);
-
-    try {
-      const res = await tryFetch(apiJoin(`admin/communities/${communityRow.id}/member-history`));
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json().catch(() => ({}));
-
-      // ✅ normalize data (gabung yang dari BE fix terbaru)
-      const rows = Array.isArray(json?.data) ? json.data.map((r) => ({
-        ...r,
-        action: (r?.action || '').toLowerCase(),
-        created_at: r?.created_at || null,
-        user_name: r?.user_name || r?.user?.name || "-",
-      })) : [];
-
-      // ✅ urutkan descending by waktu
-      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      setMemberHistoryList(rows);
-    } catch (err) {
-      console.error("Gagal memuat riwayat member:", err);
-      setMemberHistoryError("Tidak bisa memuat riwayat member");
-    } finally {
-      setMemberHistoryLoading(false);
-    }
+    setModalMemberHistory(true);
   };
 
   // Tambahkan fungsi auto-refresh riwayat member
@@ -798,7 +798,7 @@ export default function KomunitasDashboard() {
                     icon={faPlus}
                     size="sm"
                     paint="primary"
-                    onClick={() => {/* Implementasi tambah anggota baru */ }}
+                    onClick={() => setModalAddMember(true)}
                   />
                   <div className="flex items-center gap-3">
                     <ButtonComponent
@@ -1058,33 +1058,34 @@ export default function KomunitasDashboard() {
         show={modalMemberHistory}
         onClose={() => {
           setModalMemberHistory(false);
-          setMemberHistoryList([]);
           setMemberHistoryError("");
         }}
         title={`Riwayat Member: ${activeCommunity?.name || "-"}`}
         size="lg"
       >
         <div className="p-6">
-          {memberHistoryLoading ? (
-            <div className="py-10 text-center text-gray-500 font-medium">Memuat riwayat member…</div>
-          ) : memberHistoryError ? (
+          {memberHistoryError ? (
             <div className="py-10 text-center text-red-600 font-semibold">{memberHistoryError}</div>
-          ) : memberHistoryList.length === 0 ? (
-            <div className="py-10 text-center text-gray-500 font-medium">Tidak ada riwayat member.</div>
           ) : (
             <TableSupervisionComponent
-              key={`member-history-${activeCommunity?.id}-${memberHistoryList.length}`}
-              title={`Riwayat Member (${memberHistoryList.length})`}
-              // ⬇️ Tambahkan ini untuk menghilangkan tombol "Tambah Baru"
-              customTopBar={<div />}
+              key={`member-history-${activeCommunity?.id}`}
+              title={`Riwayat Member`}
+              searchable={true}
+              noControlBar={false}
+              customTopBar={<></>} // tampilkan bar kontrol (filter, search)
+              unUrlPage={true}
               fetchControl={{
                 path: `admin/communities/${activeCommunity?.id}/member-history`,
                 includeHeaders: authHeaders("GET"),
+                mapData: (result) => {
+                  const d = result?.data ?? result;
+                  const rows = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
+                  return { data: rows, totalRow: rows.length };
+                },
               }}
-              searchable={true}
-              noControlBar={true}
-              unUrlPage={true}
+              // Tambahkan kolom searchable dan definisi custom filter
               columnControl={{
+                searchable: ["user_name", "created_at"],
                 custom: [
                   {
                     selector: "user_name",
@@ -1101,6 +1102,7 @@ export default function KomunitasDashboard() {
                           <div className="text-sm font-medium text-gray-900">
                             {history.user?.name || history.user_name || "-"}
                           </div>
+                          <div className="text-xs text-gray-500">{history.user?.email || "-"}</div>
                         </div>
                       </div>
                     ),
@@ -1108,8 +1110,18 @@ export default function KomunitasDashboard() {
                   {
                     selector: "status",
                     label: "Status",
+                    // Tambahkan filter agar bisa memilih Masuk/Keluar/Dihapus
+                    filter: {
+                      type: "multiple-select",
+                      options: [
+                        { label: "Masuk", value: "joined" },
+                        { label: "Keluar", value: "left" },
+                        { label: "Dihapus", value: "removed" },
+                      ],
+                    },
                     item: (history) => {
                       const action = (history?.action || "").toLowerCase();
+
                       let text = "-";
                       let cls = "bg-gray-100 text-gray-800";
 
@@ -1139,14 +1151,13 @@ export default function KomunitasDashboard() {
                       <span className="text-sm text-gray-600">
                         {history.created_at
                           ? new Date(history.created_at).toLocaleDateString("id-ID", {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
                           })
-                          : "-"
-                        }
+                          : "-"}
                       </span>
                     ),
                   },
@@ -1157,6 +1168,47 @@ export default function KomunitasDashboard() {
               }}
             />
           )}
+        </div>
+      </FloatingPageComponent>
+
+      {/* ADD MEMBER MODAL */}
+      <FloatingPageComponent
+        show={modalAddMember}
+        onClose={() => setModalAddMember(false)}
+        title="Tambah Anggota Baru"
+        size="md"
+      >
+        <div className="p-6">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const userId = formData.get("user_id");
+              try {
+                const res = await fetch(apiJoin(`admin/communities/${activeCommunity?.id}/members`), {
+                  method: "POST",
+                  headers: authHeaders("POST"),
+                  body: JSON.stringify({ user_identifier: userId }),
+                });
+
+                if (!res.ok) throw new Error("Gagal menambah anggota");
+                setModalAddMember(false);
+                openMemberModal(activeCommunity); // refresh data
+              } catch (err) {
+                alert(err.message);
+              }
+            }}
+          >
+            <label className="block mb-2 text-sm font-medium">Email Terdaftar</label>
+            <input
+              name="user_id"
+              type="text"
+              placeholder="Masukkan Email User"
+              className="border rounded w-full p-2 mb-4"
+              required
+            />
+            <ButtonComponent label="Simpan" paint="primary" type="submit" />
+          </form>
         </div>
       </FloatingPageComponent>
 
@@ -1179,15 +1231,45 @@ export default function KomunitasDashboard() {
           ) : cubeList.length === 0 ? (
             <div className="py-10 text-center text-gray-500 font-medium">Tidak ada kubus dalam komunitas ini.</div>
           ) : (
-            // ⬇️ DI SINI kamu tempelkan TableSupervisionComponent barumu
+            // ⬇️ Tabel Kubus dengan filter tipe (home/hunting/information) dan pencarian widget
             <TableSupervisionComponent
               key={`cube-table-${activeCommunity?.id}-${cubeList.length}`}
               title={`Daftar Kubus (${cubeList.length})`}
-              data={cubeList}
-              customTopBar={<div />}
-              noControlBar={true}
+              data={filteredCubeList}
+              // Top bar: filter tipe widget + pencarian nama widget
+              customTopBar={
+                <div className="flex items-center gap-3 w-full">
+                  <div className="w-64">
+                    <SelectComponent
+                      name="widgetTypeFilter"
+                      label="Tipe Widget"
+                      placeholder="Pilih tipe..."
+                      multiple
+                      searchable={false}
+                      options={[
+                        { label: "Home", value: "home" },
+                        { label: "Hunting", value: "hunting" },
+                        { label: "Information", value: "information" },
+                      ]}
+                      value={cubeTypeFilter}
+                      onChange={(val) => setCubeTypeFilter(Array.isArray(val) ? val : [])}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <InputComponent
+                      name="widgetSearch"
+                      label="Cari Widget/Tipe/Nama Kubus"
+                      placeholder="Contoh: home / hunting / information / nama widget"
+                      size="md"
+                      value={cubeWidgetSearch}
+                      onChange={(e) => setCubeWidgetSearch(String(e || ""))}
+                    />
+                  </div>
+                </div>
+              }
+              noControlBar={false}
               unUrlPage={true}
-              searchable
+              searchable={false}
               columnControl={{
                 custom: [
                   {
@@ -1201,10 +1283,18 @@ export default function KomunitasDashboard() {
                     item: (cube) => (
                       <div>
                         <span className="font-medium text-gray-800">{cube.widget_name ?? "-"}</span>
-                        <div className="text-xs text-gray-500 italic">
-                          ({cube.widget_type ?? "unknown"})
-                        </div>
+                        <div className="text-xs text-gray-500 italic">({cube.widget_type ?? "unknown"})</div>
                       </div>
+                    ),
+                  },
+                  {
+                    selector: "widget_type",
+                    label: "Tipe",
+                    width: "120px",
+                    item: (cube) => (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200">
+                        {(cube.widget_type || "-").toString().charAt(0).toUpperCase() + (cube.widget_type || "-").toString().slice(1)}
+                      </span>
                     ),
                   },
                   {
