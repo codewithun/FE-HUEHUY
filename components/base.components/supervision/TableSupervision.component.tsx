@@ -369,6 +369,18 @@ export function TableSupervisionComponent({
       else if (Array.isArray(apiData?.data?.data))
         originalData = apiData.data.data; // { data: { data: [...] } }
 
+      // === Tambahan: Apply front-end filter manual ===
+      if (Object.keys(filter).length > 0) {
+        Object.entries(filter).forEach(([key, values]) => {
+          if (Array.isArray(values) && values.length > 0) {
+            originalData = originalData.filter((row) => {
+              const val = String(row[key] || row.action || "").toLowerCase();
+              return values.includes(val);
+            });
+          }
+        });
+      }
+
       const newColumns: any[] = [];
       const newData: any[] = [];
 
@@ -601,7 +613,20 @@ export function TableSupervisionComponent({
   // Proses data Static mode (no fetch)
   useEffect(() => {
     if (!isStatic) return;
-    const originalData: any[] = Array.isArray(data) ? data : [];
+    let originalData: any[] = Array.isArray(data) ? data : [];
+
+    // === Tambahan: Apply front-end filter manual ===
+    if (Object.keys(filter).length > 0) {
+      Object.entries(filter).forEach(([key, values]) => {
+        if (Array.isArray(values) && values.length > 0) {
+          originalData = originalData.filter((row) => {
+            const val = String(row[key] || row.action || "").toLowerCase();
+            return values.includes(val);
+          });
+        }
+      });
+    }
+
     const newColumns: any[] = [];
     const newData: any[] = [];
 
