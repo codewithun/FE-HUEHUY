@@ -180,28 +180,108 @@ export default function NotificationPage() {
     );
   };
 
+  // Fungsi untuk mendapatkan jam_mulai
+  const getJamMulai = (n) => {
+    if (!n || typeof n !== 'object') return null;
+
+    let meta = n?.meta;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch { meta = null; }
+    }
+
+    return (
+      n?.jam_mulai ||
+      n?.voucher?.jam_mulai ||
+      meta?.jam_mulai ||
+      meta?.voucher?.jam_mulai ||
+      null
+    );
+  };
+
+  // Fungsi untuk mendapatkan jam_berakhir
+  const getJamBerakhir = (n) => {
+    if (!n || typeof n !== 'object') return null;
+
+    let meta = n?.meta;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch { meta = null; }
+    }
+
+    return (
+      n?.jam_berakhir ||
+      n?.voucher?.jam_berakhir ||
+      meta?.jam_berakhir ||
+      meta?.voucher?.jam_berakhir ||
+      null
+    );
+  };
+
   const isVoucherExpired = (n) => {
     // PRIORITAS 1: Gunakan status live dari backend
     if (typeof n?.live_expired === 'boolean') {
       return n.live_expired;
     }
 
-    // PRIORITAS 2: Cek berdasarkan start_validate dan finish_validate
+    // PRIORITAS 2: Cek berdasarkan start_validate dan finish_validate (HANYA TANGGAL, ABAIKAN JAM)
     const finishRaw = getVoucherFinishDate(n);
-    const finishDt = parseExpiry(finishRaw);
     const startRaw = getVoucherStartDate(n);
-    const startDt = parseExpiry(startRaw);
-    const now = Date.now();
+    const now = new Date();
 
-    // Jika ada finish_validate, cek jika sudah lewat
-    if (finishDt && now > finishDt.getTime()) return true;
-    // Jika ada start_validate, cek jika belum mulai (juga dianggap expired)
-    if (startDt && now < startDt.getTime()) return true;
+    // Normalisasi ke tanggal saja (set ke awal hari untuk perbandingan)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // PRIORITAS 3: Fallback ke parsing manual lama
+    if (finishRaw) {
+      const finishDt = parseExpiry(finishRaw);
+      if (finishDt) {
+        // Set ke awal hari untuk tanggal finish
+        const finishDayStart = new Date(finishDt.getFullYear(), finishDt.getMonth(), finishDt.getDate());
+        // Voucher expired jika hari ini >= tanggal finish (karena voucher berlaku sampai 1 hari sebelum finish di jam 23:59)
+        if (todayStart >= finishDayStart) return true;
+      }
+    }
+
+    if (startRaw) {
+      const startDt = parseExpiry(startRaw);
+      if (startDt) {
+        // Set ke awal hari untuk tanggal start
+        const startDayStart = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate());
+        // Voucher belum bisa diklaim jika hari ini < tanggal start
+        if (todayStart < startDayStart) return true;
+      }
+    }
+
+    // PRIORITAS 3: Fallback ke parsing manual lama (juga abaikan jam)
     const raw = getVoucherEndDate(n);
-    const dt = parseExpiry(raw);
-    return !!dt && dt.getTime() < Date.now();
+    if (raw) {
+      const dt = parseExpiry(raw);
+      if (dt) {
+        const endDayStart = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        return todayStart >= endDayStart;
+      }
+    }
+
+    return false;
+  };
+
+  const isVoucherNotStarted = (n) => {
+    // PRIORITAS 1: Gunakan status live dari backend
+    if (typeof n?.live_not_started === 'boolean') {
+      return n.live_not_started;
+    }
+
+    // PRIORITAS 2: Cek manual berdasarkan start_validate (DENGAN JAM untuk akurasi)
+    const startRaw = getVoucherStartDate(n);
+    if (startRaw) {
+      const startDt = parseExpiry(startRaw);
+      if (startDt) {
+        const now = new Date();
+        // Jika ada jam di data, gunakan perbandingan lengkap dengan jam
+        // Jika tidak ada jam (hanya tanggal), default ke awal hari
+        return now.getTime() < startDt.getTime();
+      }
+    }
+
+    return false;
   };
 
   const isVoucherAvailable = (n) => {
@@ -214,6 +294,7 @@ export default function NotificationPage() {
     if (n?.live_expired === true) return false;
     if (n?.live_out_of_stock === true) return false;
     if (n?.live_inactive === true) return false;
+    if (isVoucherNotStarted(n)) return false; // Tambahkan cek belum dimulai
 
     // Fallback ke logika lama
     return !isVoucherExpired(n);
@@ -467,13 +548,37 @@ export default function NotificationPage() {
         console.error('Claim failed:', { status: res.status, response: json });
         const msg = String(json?.message || '').toLowerCase();
 
-        // NEW: treat 422/403 as expired too
+        // NEW: Check jika voucher belum dimulai (JANGAN HAPUS NOTIFIKASI, karena bisa diklaim nanti)
+        if (
+          res.status === 422 &&
+          (msg.includes('belum dimulai') ||
+            msg.includes('belum mulai') ||
+            msg.includes('not started yet') ||
+            msg.includes('tanggal mulai'))
+        ) {
+          // Ambil info jam mulai dan jam berakhir
+          const jamMulai = getJamMulai(live || notif);
+          const jamBerakhir = getJamBerakhir(live || notif);
+
+          let timeInfo = '';
+          if (jamMulai && jamBerakhir) {
+            timeInfo = ` Voucher bisa diklaim dari jam ${jamMulai} sampai ${jamBerakhir}.`;
+          } else if (jamMulai) {
+            timeInfo = ` Voucher bisa diklaim mulai jam ${jamMulai}.`;
+          }
+
+          setModalMessage(`Voucher ini belum bisa diklaim. Silakan coba lagi setelah jam mulai voucher.${timeInfo}`);
+          setShowErrorModal(true);
+          return;
+        }        // NEW: treat 422/403 as expired
         if (
           res.status === 422 ||
           res.status === 403 ||
           msg.includes('expired') ||
           msg.includes('kadaluwarsa') ||
-          msg.includes('kadaluarsa')
+          msg.includes('kadaluarsa') ||
+          msg.includes('tidak berlaku') ||
+          msg.includes('sudah berakhir')
         ) {
           setShowVoucherExpiredModal(true);
           markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
@@ -663,9 +768,29 @@ export default function NotificationPage() {
                     const isUnread = !item.read_at;
 
                     // NEW: gunakan status live yang lebih akurat
+                    const notStarted = isVoucher && isVoucherNotStarted(item);
                     const expired = isVoucher && isVoucherExpired(item);
                     const available = isVoucher ? isVoucherAvailable(item) : true;
                     const outOfStock = isVoucher && item.live_out_of_stock === true;
+
+                    // Get start date/time dan jam operasional untuk info tambahan
+                    const startRaw = getVoucherStartDate(item);
+                    const startDt = startRaw ? parseExpiry(startRaw) : null;
+                    const startTimeInfo = startDt ? new Intl.DateTimeFormat('id-ID', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }).format(startDt) : '';
+
+                    // Get jam_mulai dan jam_berakhir
+                    const jamMulai = getJamMulai(item);
+                    const jamBerakhir = getJamBerakhir(item);
+                    const jamOperasional = (jamMulai && jamBerakhir)
+                      ? `${jamMulai} - ${jamBerakhir}`
+                      : jamMulai
+                        ? `Mulai ${jamMulai}`
+                        : '';
 
                     return (
                       <div
@@ -731,11 +856,28 @@ export default function NotificationPage() {
 
                               {/* Status indicator berdasarkan kondisi live */}
                               {isVoucher && !available && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-500">
-                                  {expired ? 'Voucher kadaluwarsa' :
-                                    outOfStock ? 'Voucher habis' :
-                                      'Voucher tidak tersedia'}
-                                </span>
+                                <div className="flex flex-col items-end">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-500">
+                                    {notStarted ? 'Belum dimulai' :
+                                      expired ? 'Kadaluwarsa' :
+                                        outOfStock ? 'Stok habis' :
+                                          'Tidak tersedia'}
+                                  </span>
+                                  {notStarted && (startTimeInfo || jamOperasional) && (
+                                    <div className="flex flex-col items-end mt-1">
+                                      {startTimeInfo && (
+                                        <span className="text-xs text-blue-600">
+                                          Mulai: {startTimeInfo}
+                                        </span>
+                                      )}
+                                      {jamOperasional && (
+                                        <span className="text-xs text-gray-500">
+                                          Jam: {jamOperasional}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
