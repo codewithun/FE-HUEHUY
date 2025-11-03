@@ -253,6 +253,74 @@ export default function Index() {
     );
   };
 
+  // ======== CATEGORY BOX WIDGET (Home) ========
+  const CategoryBoxWidget = ({ menu }) => {
+    const categories = dataCategories?.data || [];
+    const isLoading = loadingCategories;
+
+    if (isLoading) {
+      return (
+        <div className="px-4 mt-8">
+          <div className="mb-2">
+            <p className="font-semibold">{menu?.name || 'Kategori'}</p>
+            {menu?.description && (
+              <p className="text-xs text-slate-500">{menu.description}</p>
+            )}
+          </div>
+          <div className="w-full pb-2 overflow-x-auto relative scroll__hidden mt-3">
+            <div className="flex flex-nowrap gap-3 w-max">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="w-[90px] h-[90px] rounded-[12px] bg-slate-200 animate-pulse flex-shrink-0" />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!categories.length) return null;
+
+    return (
+      <div className="px-4 mt-8">
+        <div className="mb-2">
+          <p className="font-semibold">{menu?.name || 'Kategori'}</p>
+          {menu?.description && (
+            <p className="text-xs text-slate-500">{menu.description}</p>
+          )}
+        </div>
+
+        <div className="w-full pb-2 overflow-x-auto relative scroll__hidden mt-1">
+          <div className="flex flex-nowrap gap-3 w-max">
+            {categories.map((category, i) => {
+              const imgSrc = category?.image || category?.picture_source || '/default-avatar.png';
+              const label = category?.name || category?.label || 'Kategori';
+              return (
+                <Link href={`/app/cari?cari=${encodeURIComponent(label)}`} key={category?.id || i}>
+                  <div
+                    className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
+                    style={{ minWidth: 90 }}
+                  >
+                    <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-slate-200 bg-white shadow-sm">
+                      <img
+                        src={imgSrc}
+                        alt={label}
+                        className="object-cover w-full h-full brightness-95"
+                        loading="lazy"
+                      />
+                      <div className="absolute bottom-0 left-0 w-full text-center bg-white/60 backdrop-blur-sm py-1">
+                        <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const AdCardBySize = ({ ad, size = 'M' }) => {
     const img = getAdImage(ad);
     const title = ad?.title || 'Promo';
@@ -914,6 +982,8 @@ export default function Index() {
                 } else if (menu.content_type === 'shuffle_cube' && menu.is_active) {
                   // Handle shuffle_cube widgets
                   return <ShuffleCubeWidget widget={menu} key={key} />;
+                } else if (menu.content_type === 'category_box' && menu.is_active) {
+                  return <CategoryBoxWidget menu={menu} key={key} />;
                 }
               })}
             </div>
