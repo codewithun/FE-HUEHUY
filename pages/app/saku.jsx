@@ -75,12 +75,27 @@ const resolvePromoExpiry = (ad, claimedAtIso, fallbackExpiredIso) => {
 };
 
 // Resolve the correct ad id from a promo/voucher item
-// Prioritize raw numeric columns from the payload (ad_id/ad.id).
+// Prioritize nested ad.id over other ambiguous id fields (some payloads contain promo.id which is not an ad id)
 const resolveAdId = (row) => {
   if (!row) return null;
   const pick = (v) => (v === 0 || v ? Number(v) : null);
-  // Only resolve using ad_id or ad.id. Do NOT fallback to promo_id (that caused wrong fetch).
-  const cand = [pick(row.ad_id), pick(row?.ad?.id)].filter((v) => Number.isFinite(v) && v > 0);
+  // New priority (most reliable first):
+  // 1) ad.id (nested ad object)
+  // 2) promo.ad.id (promo object that contains ad)
+  // 3) promo_item.ad_id (item-level ad reference)
+  // 4) promo_item.promo_id (item-level promo reference — can still resolve to ad)
+  // 5) promo.id (sometimes confusingly named)
+  // 6) promo_id (legacy)
+  // 7) ad_id (last resort)
+  const cand = [
+    pick(row?.ad?.id),
+    pick(row?.promo?.ad?.id),
+    pick(row?.promo_item?.ad_id),
+    pick(row?.promo_item?.promo_id),
+    pick(row?.promo?.id),
+    pick(row?.promo_id),
+    pick(row?.ad_id),
+  ].filter((v) => Number.isFinite(v) && v > 0);
   return cand[0] ?? null;
 };
 
@@ -196,7 +211,105 @@ export default function Save() {
 
         // === PROMO ITEMS mapping (async karena bisa fetch meta)
         const mapped = await Promise.all(userFilteredRows.map(async (it) => {
-          const ad = it.promo || it.ad || {};
+          // Fetch detail promo-item untuk mendapat ID ads/promo yang tepat
+          let detailedItem = it;
+          let actualAdId = null;
+
+          try {
+            const detailRes = await fetch(`${apiUrl}/api/admin/promo-items/${it.id}`, {
+              headers,
+              signal: controller.signal,
+            });
+
+            if (detailRes.ok) {
+              const detailData = await detailRes.json();
+              detailedItem = detailData?.data || detailData || it;
+
+              // Coba ambil ID dari berbagai sumber di detail response
+              actualAdId =
+                detailedItem?.ad?.id ||
+                detailedItem?.promo?.ad?.id ||
+                detailedItem?.ad_id ||
+                detailedItem?.promo_id ||
+                it.promo_id;
+
+              // CRITICAL: Cek apakah ada cube_id yang bisa kita gunakan untuk fetch ads yang benar
+              const cubeId = detailedItem?.cube_id || it?.cube_id ||
+                detailedItem?.promo?.cube_id || it?.promo?.cube_id ||
+                detailedItem?.ad?.cube_id || it?.ad?.cube_id;
+
+              console.log('✅ Detail promo-item fetched:', {
+                promo_item_id: it.id,
+                original_promo_id: it.promo_id,
+                cube_id: cubeId,
+                detail_ad_id: detailedItem?.ad?.id,
+                detail_promo_ad_id: detailedItem?.promo?.ad?.id,
+                resolved_actual_ad_id: actualAdId,
+                detail_response: detailedItem
+              });
+
+              // WORKAROUND: Jika ada cube_id, coba fetch cube untuk mendapat ads yang benar
+              if (cubeId) {
+                try {
+                  const cubeRes = await fetch(`${apiUrl}/api/cubes/${cubeId}`, {
+                    headers,
+                    signal: controller.signal,
+                  });
+
+                  if (cubeRes.ok) {
+                    const cubeData = await cubeRes.json();
+                    const cube = cubeData?.data || cubeData;
+
+                    // Ambil ads dari cube
+                    const cubeAds = cube?.ads || cube?.ad;
+                    const cubeAdId = Array.isArray(cubeAds)
+                      ? cubeAds.find(a => a.id)?.id // ambil ads pertama yang ada
+                      : cubeAds?.id;
+
+                    if (cubeAdId) {
+                      actualAdId = cubeAdId;
+                      console.log('🎯 FOUND CORRECT ID FROM CUBE:', {
+                        promo_item_id: it.id,
+                        wrong_promo_id: it.promo_id,
+                        correct_ad_id_from_cube: cubeAdId,
+                        cube_data: cube
+                      });
+                    }
+                  }
+                } catch (cubeErr) {
+                  console.warn(`Failed to fetch cube ${cubeId}:`, cubeErr);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch detail for promo-item ${it.id}:`, err);
+            // Fallback ke data original
+            actualAdId = it.promo?.id || it.ad?.id || it.promo_id;
+          }
+
+          // Debug payload dari backend - cari SEMUA kemungkinan field yang berisi ID
+          console.log('🔍 Saku promo-item raw payload:', {
+            promo_item_id: it.id,
+            promo_id: it.promo_id,
+            ad_id: it.ad_id,
+            cube_id: it.cube_id || it.promo?.cube_id || it.ad?.cube_id,
+            actual_ad_id_resolved: actualAdId,
+            has_promo_object: !!it.promo,
+            has_ad_object: !!it.ad,
+            promo_object_id: it.promo?.id,
+            ad_object_id: it.ad?.id,
+            // Cek nested cube
+            promo_cube_id: it.promo?.cube?.id,
+            promo_cube_ad_id: it.promo?.cube?.ad_id,
+            ad_cube_id: it.ad?.cube?.id,
+            ad_cube_ad_id: it.ad?.cube?.ad_id,
+            // Cek semua key yang mengandung 'id'
+            all_keys: Object.keys(it),
+            full_item: it
+          });
+
+          const adFromDetail = detailedItem?.ad || detailedItem?.promo?.ad || it?.ad || it?.promo?.ad || {};
+          const ad = { ...adFromDetail };
           const claimedAt = it.created_at || it.reserved_at || null;
 
           // ✅ ambil limit dari field yang benar (prioritas: it.ad_limit, it.promo?.validation_time_limit, ad.validation_time_limit)
@@ -214,16 +327,38 @@ export default function Save() {
 
           // Resolve ad id for debugging (uses only ad_id/ad.id per resolveAdId)
           const adIdResolved = resolveAdId(it);
+
+          // Pastikan ad.id menggunakan nilai yang benar (utamakan detail.ad.id / detail.promo.ad.id)
+          // Jangan set dari promo.id (nama promo sering rancu)
+          const correctAdId =
+            adFromDetail?.id ||
+            detailedItem?.ad?.id ||
+            detailedItem?.promo?.ad?.id ||
+            it?.ad_id ||
+            null;
+
           // DEBUG: tunjukkan sumber limit dan hasilnya (sertakan resolver info)
           // eslint-disable-next-line no-console
           console.log('🧪Saku limit check', {
             ad_id: adIdResolved,
+            actualAdId,
+            correctAdId,
             raw: {
               promo_item_id: it?.id,
               promo_id_col: it?.promo_id,
               ad_id_col: it?.ad_id,
               ad_id_in_object: ad?.id,
             },
+            sources: {
+              from_promo_object: it?.promo?.id,
+              from_ad_object: it?.ad?.id,
+              direct_promo_id: it?.promo_id,
+              direct_ad_id: it?.ad_id,
+            },
+            resolution: actualAdId ? 'using actualAdId (from detail API)' :
+              ad.id ? 'using ad.id' :
+                it.promo_id ? 'using promo_id' :
+                  'using ad_id (fallback)',
             claimedAt,
             limit: meta?.validation_time_limit,
             expiredAt,
@@ -238,16 +373,18 @@ export default function Save() {
             validated_at: it.redeemed_at || null,
             validation_type: ad.validation_type || it.validation_type || 'auto',
             user_id: it.user_id,
+            promo_id: correctAdId, // tambahkan field promo_id di top level
+            ad_id: it.ad_id || null,  // simpan juga ad_id mentah untuk tracking
             promo_item: {
               id: it.id, code: it.code, user_id: it.user_id,
-              promo_id: it.promo_id || ad.id,
+              promo_id: correctAdId,
               status: it.status || 'available',
               redeemed_at: it.redeemed_at, reserved_at: it.reserved_at,
             },
             voucher_item: null,
             voucher: null,
             ad: {
-              id: ad.id,
+              id: correctAdId,      // ← ini kunci: pakai ad.id yang benar
               title: ad.title || ad.name || 'Promo',
               picture_source:
                 toAbsMediaUrl([ad.picture_source, ad.image_1, ad.image_2, ad.image_3, ad.image]
@@ -846,6 +983,16 @@ export default function Save() {
                       key={key}
                       onClick={() => {
                         if (canValidate) {
+                          console.log('🎯 KLIK ITEM SAKU:', {
+                            item_id: item?.id,
+                            type: item?.type,
+                            promo_id: item?.promo_id,
+                            ad_id: item?.ad_id,
+                            ad_object_id: item?.ad?.id,
+                            promo_item: item?.promo_item,
+                            title: item?.ad?.title || item?.name,
+                            FULL_ITEM: item
+                          });
                           setModalValidation(true);
                           setSelected(item);
                         }
@@ -997,49 +1144,136 @@ export default function Save() {
                 </div>
               </div>
 
-              {/* Perbaiki urutan sumber id untuk detail */}
-              <Link
-                href={
-                  // Jika item voucher -> arahkan ke komunitas/promo dengan source=home (per request)
-                  selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher
-                    ? // Per user request: arahkan tombol Detail voucher ke URL fixed (localhost test)
-                    `/app/komunitas/promo/17?source=home`
-                    : (() => {
-                      const ad = selected?.ad;
-                      const normBool = (v) => {
-                        if (v === true || v === 1) return true;
-                        if (typeof v === 'string') {
-                          const s = v.trim().toLowerCase();
-                          return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
-                        }
-                        return !!v;
+              {/* Perbaiki urutan sumber id untuk detail dengan logging debug */}
+              {(() => {
+                const ad = selected?.ad;
+                const normBool = (v) => {
+                  if (v === true || v === 1) return true;
+                  if (typeof v === 'string') {
+                    const s = v.trim().toLowerCase();
+                    return ['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s);
+                  }
+                  return !!v;
+                };
+                const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+                const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+                const isInformation =
+                  normBool(ad?.cube?.is_information) ||
+                  normBool(ad?.is_information) ||
+                  contentType === 'information' ||
+                  contentType === 'kubus-informasi' ||
+                  typeStr === 'information' ||
+                  typeStr === 'informasi';
+
+                if (isInformation) {
+                  const code = ad?.cube?.code || ad?.code;
+                  const href = code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+                  console.debug('saku: detail render (information)', { selected, ad, href });
+                  return (
+                    <Link href={href}>
+                      <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors" onClick={() => console.debug('saku: detail click (information)', { selected, ad, href })}>
+                        Detail
+                        <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+                      </div>
+                    </Link>
+                  );
+                }
+
+                // Untuk voucher: gunakan resolveAdId
+                if (selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher) {
+                  const href = `/app/komunitas/promo/${resolveAdId(selected)}?source=home`;
+                  console.debug('saku: detail render (voucher)', { selected, ad, href, resolvedPromoId: resolveAdId(selected) });
+                  return (
+                    <Link href={href}>
+                      <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors" onClick={() => console.debug('saku: detail click (voucher)', { selected, ad, href, resolvedPromoId: resolveAdId(selected) })}>
+                        Detail
+                        <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+                      </div>
+                    </Link>
+                  );
+                }
+
+                // Untuk promo: resolve id secara konsisten.
+                // Prioritas yang lebih aman berdasarkan temuan debug:
+                // 1) ad?.id (nested object, paling akurat)
+                // 2) selected?.promo?.ad?.id (promo object that points to ad)
+                // 3) selected?.promo_item?.ad_id (item-level ad reference)
+                // 4) selected?.promo_item?.promo_id (fallback raw promo_id on item, can be wrong)
+                // 5) selected?.promo_id (legacy)
+                // 6) selected?.ad_id (last resort)
+                const resolvedPromoId =
+                  ad?.id ||
+                  selected?.promo?.ad?.id ||
+                  selected?.promo_item?.ad_id ||
+                  selected?.promo_item?.promo_id ||
+                  selected?.promo_id ||
+                  selected?.ad_id ||
+                  null;
+                // Gunakan format URL yang sama seperti voucher (?source=home)
+                const href = resolvedPromoId
+                  ? `/app/komunitas/promo/${resolvedPromoId}?source=home`
+                  : '#';
+
+                // Render button yang melakukan navigation programatik (lebih mudah dilacak)
+                console.debug('saku: detail render (promo)', {
+                  resolvedPromoId,
+                  href,
+                  id_sources: {
+                    ad_id_object: ad?.id,
+                    promo_item_promo_id: selected?.promo_item?.promo_id,
+                    selected_promo_id: selected?.promo_id,
+                    selected_ad_id: selected?.ad_id,
+                  },
+                  selected,
+                  ad
+                });
+                return (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors cursor-pointer"
+                    onClick={() => {
+                      // Debug: print all candidate id fields so we can trace which source is used
+                      const debugIds = {
+                        selected_id: selected?.id ?? null,
+                        selected_ad_id_field: selected?.ad_id ?? null,
+                        selected_ad_id_object: selected?.ad?.id ?? null,
+                        selected_promo_item_id: selected?.promo_item?.id ?? null,
+                        selected_promo_item_promo_id: selected?.promo_item?.promo_id ?? null,
+                        selected_promo_id_field: selected?.promo_id ?? null,
+                        resolvedPromoId,
+                        resolutionSource: ad?.id ? 'ad.id' :
+                          selected?.promo_item?.promo_id ? 'promo_item.promo_id' :
+                            selected?.promo_id ? 'promo_id' :
+                              selected?.ad_id ? 'ad_id (fallback)' : 'none',
+                        href,
                       };
-                      const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
-                      const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
-                      const isInformation =
-                        normBool(ad?.cube?.is_information) ||
-                        normBool(ad?.is_information) ||
-                        contentType === 'information' ||
-                        contentType === 'kubus-informasi' ||
-                        typeStr === 'information' ||
-                        typeStr === 'informasi';
-
-                      if (isInformation) {
-                        const code = ad?.cube?.code || ad?.code;
-                        return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+                      console.debug('saku: detail click (promo) - ids', debugIds);
+                      console.debug('saku: detail click (promo) - full selected object', selected);
+                      try {
+                        if (!resolvedPromoId) return;
+                        router.push(href);
+                      } catch (e) {
+                        console.error('Navigation error (promo detail):', e, { href, resolvedPromoId });
                       }
-
-                      return `/app/komunitas/promo/${ad?.id}?${new URLSearchParams({
-                        communityId: String(ad?.cube?.community_id || 1),
-                        from: 'saku',
-                      }).toString()}`;
-                    })()
-                }>
-                <div className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-3 py-2 rounded-full hover:bg-primary/20 transition-colors">
-                  Detail
-                  <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
-                </div>
-              </Link>
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        try {
+                          if (!resolvedPromoId) return;
+                          router.push(href);
+                        } catch (err) {
+                          console.error('Navigation error (promo detail):', err, { href, resolvedPromoId });
+                        }
+                      }
+                    }}
+                  >
+                    Detail
+                    <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
