@@ -25,21 +25,6 @@ export default function Akun() {
     path: `account`,
   });
 
-  // Helper function untuk generate user data
-  const generateUserData = (profile) => {
-    if (!profile) return 'HUEHUY User';
-    
-    const userData = `HUEHUY User Profile
-Nama: ${profile.name || 'User HUEHUY'}
-Email: ${profile.email || '-'}
-No. HP: ${profile.phone || '-'}
-Kode User: ${profile.code || '-'}
-Platform: HUEHUY
-Website: https://huehuy.app`;
-    
-    return userData;
-  };
-
   return (
     <>
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-gradient-to-br from-cyan-50 min-h-screen px-2 py-2">
@@ -158,10 +143,10 @@ Website: https://huehuy.app`;
               </button>
               <p className="text-lg font-semibold mb-1 text-center">Barcode Akun Anda</p>
               <p className="text-xs text-slate-500 mb-4 text-center px-2">
-                Scan dengan kamera HP atau Google Lens untuk melihat data pengguna
+                Scan dengan kamera HP atau Google Lens
               </p>
               <QRCode
-                value={generateUserData(data?.data?.profile)}
+                value={`${window.location.origin}/profile/${data?.data?.profile?.id}`}
                 size={160}
                 bgColor="#f8fafc"
                 fgColor="#0f172a"
@@ -170,29 +155,32 @@ Website: https://huehuy.app`;
                 className="rounded-lg"
               />
               <p className="text-xs text-slate-400 mt-3 text-center">
-                Scan dengan kamera untuk melihat data pengguna
-              &gt;</p>
+                Scan untuk membuka profil publik Anda
+              </p>
               <p className="text-xs text-slate-500 mt-1 text-center">
-                Kode: {data?.data?.profile?.code}
+                Kode: {data?.data?.profile?.code || `HUEHUY-${String(data?.data?.profile?.id).padStart(6, '0')}`}
               </p>
               
               {/* Preview Data */}
               <div className="mt-4 p-3 bg-slate-50 rounded-lg w-full">
-                <p className="text-xs font-medium text-slate-600 mb-2">Data yang akan ditampilkan:</p>
+                <p className="text-xs font-medium text-slate-600 mb-2">Informasi yang akan ditampilkan di profil publik:</p>
                 <div className="space-y-1">
                   <p className="text-xs text-slate-700">
                     <span className="font-medium">Nama:</span> {data?.data?.profile?.name || '-'}
                   </p>
                   <p className="text-xs text-slate-700">
-                    <span className="font-medium">Email:</span> {data?.data?.profile?.email || '-'}
+                    <span className="font-medium">Kode Pengguna:</span> {data?.data?.profile?.code || `HUEHUY-${String(data?.data?.profile?.id).padStart(6, '0')}`}
                   </p>
                   <p className="text-xs text-slate-700">
-                    <span className="font-medium">No. HP:</span> {data?.data?.profile?.phone || '-'}
+                    <span className="font-medium">Status:</span> {data?.data?.profile?.verified_at ? 'Terverifikasi' : 'Anggota'}
                   </p>
                   <p className="text-xs text-slate-700">
                     <span className="font-medium">Platform:</span> HUEHUY
                   </p>
                 </div>
+                <p className="text-xs text-slate-400 mt-2 italic">
+                  *Email dan nomor HP tidak akan ditampilkan untuk keamanan
+                </p>
               </div>
             </div>
           </div>
