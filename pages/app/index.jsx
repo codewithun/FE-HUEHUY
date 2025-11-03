@@ -14,6 +14,7 @@ import {
   faUsers
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Cookies from 'js-cookie';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Autoplay, Navigation } from 'swiper';
@@ -26,8 +27,9 @@ import BottomBarComponent from '../../components/construct.components/BottomBarC
 import FloatingOriginButton from '../../components/construct.components/FloatingOriginButton';
 import MenuAdPage from '../../components/construct.components/partial-page/MenuAd.page';
 import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
-import { useGet } from '../../helpers';
+import { token_cookie_name, useGet } from '../../helpers';
 import { distanceConvert } from '../../helpers/distanceConvert.helpers';
+import { Decrypt } from '../../helpers/encryption.helpers';
 
 export default function Index() {
 
@@ -245,6 +247,94 @@ export default function Index() {
             {shuffleData.map((ad, i) => (
               <Link href={buildPromoLink(ad)} key={i}>
                 <AdCardBySize ad={ad} size={size || 'M'} />
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ======== AD CATEGORY WIDGET (HOME) ========
+  // Render iklan/promo berdasarkan kategori iklan terpilih di widget (tanpa selector)
+  const AdCategoryWidgetHome = ({ menu }) => {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      const fetchByCategory = async () => {
+        if (!menu?.ad_category_id) return;
+        try {
+          setLoading(true);
+
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+          const apiBase = baseUrl.replace(/\/api\/?$/, '');
+
+          // Ambil token (jika ada)
+          const encryptedToken = Cookies.get(token_cookie_name);
+          const token = encryptedToken ? Decrypt(encryptedToken) : '';
+
+          // Query params: ad_category (+ community_id jika tersedia)
+          const communityParam = menu?.community_id ? `&community_id=${menu.community_id}` : '';
+          const url = `${apiBase}/api/cubes-by-category?ad_category_id=${menu.ad_category_id}${communityParam}`;
+
+          // Header dengan bearer jika token tersedia
+          const headersAuth = {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          };
+
+          let res = await fetch(url, { headers: headersAuth });
+
+          // Fallback ke endpoint publik jika unauthorized/forbidden
+          if (res.status === 401 || res.status === 403) {
+            const publicUrl = `${apiBase}/api/cubes-by-category-public?ad_category_id=${menu.ad_category_id}${communityParam}`;
+            res = await fetch(publicUrl, { headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (!res.ok) {
+            setItems([]);
+            return;
+          }
+
+          const json = await res.json();
+          const data = Array.isArray(json?.data) ? json.data : [];
+          const ads = data.map((it) => it?.ad || it).filter(Boolean);
+          setItems(ads);
+        } catch (e) {
+          setItems([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchByCategory();
+    }, [menu?.ad_category_id, menu?.community_id]);
+
+    if (loading) return null;
+    if (!items.length) return null;
+
+    return (
+      <div className="px-4 mt-8">
+        <div className="flex justify-between items-center gap-2">
+          <div>
+            <p className="font-semibold">{menu?.name || 'Promo Spesial'}</p>
+            {menu?.description && (
+              <p className="text-xs text-slate-500">{menu.description}</p>
+            )}
+          </div>
+          <Link href={`/app/cari?berdasarkan=Promo`}>
+            <div className="text-sm text-primary font-semibold">
+              Lainnya
+              <FontAwesomeIcon icon={faChevronRight} className="ml-2" />
+            </div>
+          </Link>
+        </div>
+
+        <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-3">
+          <div className="flex flex-nowrap gap-4 w-max">
+            {items.map((ad, i) => (
+              <Link href={buildPromoLink(ad)} key={i}>
+                <AdCardBySize ad={ad} size={menu?.size || 'M'} />
               </Link>
             ))}
           </div>
@@ -899,14 +989,19 @@ export default function Index() {
                     </>
                   );
                 } else if (menu.content_type === 'promo' && menu.is_active) {
-                  // Widget Promo/Iklan (home): dukung sumber 'cube', 'shuffle_cube', dan 'ad_category'
+                  // Tangani source ad_category dengan komponen khusus yang memanggil /api/cubes-by-category
+                  if (menu.source_type === 'ad_category') {
+                    return <AdCategoryWidgetHome menu={menu} key={key} />;
+                  }
+
+                  // Widget Promo/Iklan (home): dukung sumber 'cube' dan 'shuffle_cube'
                   let ads = [];
 
                   if (menu.source_type === 'shuffle_cube') {
                     // Use shuffle ads data for shuffle_cube source type
                     ads = dataShuffleAds?.data || [];
                   } else {
-                    // Original logic for cube and ad_category sources
+                    // Original logic for cube sources
                     const adsFromCubes = (menu?.dynamic_content_cubes || [])
                       .flatMap((dcc) => {
                         const infoFlag = dcc?.cube?.is_information;
@@ -926,14 +1021,7 @@ export default function Index() {
                       })
                       .filter(Boolean);
 
-                    // Fallback: jika source_type 'ad_category', ambil dari dataCategories
-                    const adsFromAdCategory =
-                      menu?.source_type === 'ad_category'
-                        ? ((dataCategories?.data || []).find((c) => c?.id === menu?.ad_category_id)?.ads || [])
-                        : [];
-
-                    // Pakai hasil dari cubes dulu; kalau kosong pakai dari kategori
-                    ads = adsFromCubes.length ? adsFromCubes : adsFromAdCategory;
+                    ads = adsFromCubes;
                   }
 
                   if (!ads?.length) return null;
