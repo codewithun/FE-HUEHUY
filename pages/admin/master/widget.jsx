@@ -10,9 +10,9 @@ import {
   ButtonComponent,
   IconButtonComponent,
   ModalConfirmComponent,
+  RadioComponent,
   SelectComponent,
   TableSupervisionComponent,
-  RadioComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { post } from '../../../helpers';
@@ -371,7 +371,7 @@ export default function Widget() {
                       label="Kubus"
                       placeholder="Pilih kubus..."
                       serverOptionControl={{
-                        path: 'admin/options/cube?paginate=all',
+                        path: 'admin/options/cube',
                         mapOptions: (resp) => {
                           const list = Array.isArray(resp?.data) ? resp.data
                             : Array.isArray(resp) ? resp
@@ -383,6 +383,7 @@ export default function Widget() {
                         },
                       }}
                       searchable
+                      searchServer
                       multiple
                       onChange={(value) => {
                         if (formControl('dynamic_content_cubes')?.onChange) {
