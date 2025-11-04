@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import CommunityBottomBar from './dashboard/CommunityBottomBar';
+import KomunitasCard from '../../../components/construct.components/card/Komunitas.card';
 
 const CommunityPromoPage = () => {
   const router = useRouter();
@@ -1172,103 +1173,19 @@ const CommunityPromoPage = () => {
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-          {shuffleData.map((item, index) => {
-            const cube = item?.cube;
-            const ad = item;
-            if (!cube && !ad) return null;
-
-            const imageUrl = buildImageUrl(
-              ad?.image_1 ||
-              ad?.image ||
-              ad?.picture_source ||
-              cube?.image ||
-              FALLBACK_IMAGE
-            );
-            const title = ad?.title || cube?.label || 'Promo';
-            const merchant = ad?.merchant || communityData?.name || 'Merchant';
-            const categoryData = getCategoryWithIcon(ad, cube, communityData);
-            const category = categoryData?.label || getCategoryLabel(ad, cube) || 'Promo';
-
-            // Use same styling as regular cube widgets
-            if (size === 'XL-Ads') {
-              return (
-                <div
-                  key={ad?.id || cube?.id || index}
-                  className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white"
-                  style={{
-                    minWidth: 320,
-                    maxWidth: 360,
-                    borderColor: '#d8d8d8',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => {
-                    if (ad?.id) {
-                      router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
-                    }
-                  }}
-                >
-                  <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
-                    <Image
-                      src={imageUrl}
-                      alt={title}
-                      fill
-                      className="object-contain p-2"
-                    />
-                    <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
-                      {merchant}
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
-                    <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
-                      {title}
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm">
-                        {category}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Default size handling
-            return (
-              <div
-                key={ad?.id || cube?.id || index}
-                className="rounded-[16px] overflow-hidden border border-[#e6e6e6] bg-white shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
-                style={{
-                  minWidth: 320,
-                  maxWidth: 360,
-                  cursor: 'pointer',
-                }}
-                onClick={() => {
-                  if (ad?.id) {
-                    router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
-                  }
-                }}
-              >
-                <div className="relative w-full h-[200px] bg-white flex items-center justify-center">
-                  <Image
-                    src={imageUrl}
-                    alt={title}
-                    fill
-                    className="object-contain p-2"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-2 line-clamp-2">
-                    {title}
-                  </h3>
-                  <p className="text-[12px] text-slate-600 mb-2">{merchant}</p>
-                  <span className="bg-slate-100 text-slate-700 text-[11px] font-semibold px-2 py-1 rounded">
-                    {category}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+          {shuffleData.map((item, index) => (
+            <KomunitasCard
+              key={item?.id || item?.cube?.id || index}
+              item={item}
+              size={widget.size || 'M'}
+              onClick={() => {
+                const ad = item;
+                if (ad?.id) {
+                  router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                }
+              }}
+            />
+          ))}
         </div>
       </div>
     );
