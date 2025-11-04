@@ -6,11 +6,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import KomunitasCard from '../../../../components/construct.components/card/Komunitas.card';
 import { token_cookie_name } from '../../../../helpers';
 import { distanceConvert } from '../../../../helpers/distanceConvert.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import CommunityBottomBar from './CommunityBottomBar';
-import KomunitasCard from '../../../../components/construct.components/card/Komunitas.card';
 
 // Custom hook untuk handle image loading dengan fallback
 const useImageWithFallback = (src, fallback = '/default-avatar.png') => {
@@ -322,7 +322,7 @@ export default function CommunityDashboard({ communityId }) {
   const [isClient, setIsClient] = useState(false);
   const [communityData, setCommunityData] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Tambah state untuk widget komunitas (type=information)
+  // Tambah state untuk widget komunitas (type=home)
   const [widgetData, setWidgetData] = useState([]);
   // ad_category: data options dan level (posisi) widget dimana kategori harus muncul
   const [adCategories, setAdCategories] = useState([]);
@@ -334,7 +334,7 @@ export default function CommunityDashboard({ communityId }) {
   // Use custom hook for avatar image handling
   const avatarUrl = communityData?.avatar ? buildLogoUrl(communityData.avatar) : '/default-avatar.png';
   const { imageSrc: avatarSrc, handleError: handleAvatarError, handleLoad: handleAvatarLoad, isError: avatarError } = useImageWithFallback(avatarUrl);
-  // Fetch widget komunitas (type=information)
+  // Fetch widget komunitas (type=home)
   useEffect(() => {
     const fetchWidgetData = async () => {
       if (!communityId) return;
@@ -351,31 +351,9 @@ export default function CommunityDashboard({ communityId }) {
         // Store headers for use in AdCategoryWidget
         setAuthHeaders(headers);
 
-        const res = await fetch(`${apiBase}/api/admin/dynamic-content?type=information&community_id=${communityId}`, { headers });
+        const res = await fetch(`${apiBase}/api/admin/dynamic-content?type=home&community_id=${communityId}`, { headers });
         const json = await res.json();
         let widgets = Array.isArray(json?.data) ? json.data.filter((w) => w.is_active) : [];
-
-        // === NEW: fetch promo widgets and pick shuffle_cube + ad_category entries so they can show in community dashboard
-        try {
-          const promoRes = await fetch(`${apiBase}/api/admin/dynamic-content?type=promo&community_id=${communityId}`, { headers });
-          const promoJson = await promoRes.json();
-          const promoWidgets = Array.isArray(promoJson?.data) ? promoJson.data : [];
-          // keep only active shuffle_cube and ad_category widgets
-          const relevantPromoWidgets = promoWidgets.filter(w => 
-            w?.is_active && (
-              String(w.source_type || '').toLowerCase() === 'shuffle_cube' ||
-              String(w.source_type || '').toLowerCase() === 'ad_category'
-            )
-          );
-          if (relevantPromoWidgets.length) {
-            // merge with information widgets, dedupe by id
-            const map = new Map();
-            widgets.concat(relevantPromoWidgets).forEach(w => { if (w?.id != null) map.set(w.id, w); });
-            widgets = Array.from(map.values());
-          }
-        } catch (e) {
-          console.warn('Failed to fetch promo widgets for shuffle_cube and ad_category merge:', e);
-        }
 
         // 🔹 Cari widget ad_category: ambil kategorinya dan simpan widget untuk rendering khusus
         const adCategoryWidget = widgets.find((w) => 
@@ -1601,7 +1579,7 @@ export default function CommunityDashboard({ communityId }) {
                 </div>
               </div>
 
-              {/* Widget Komunitas Section (type=information) */}
+              {/* Widget Komunitas Section (type=home) */}
               {(widgetData.length > 0 || adCategories.length > 0 || adCategoryWidget || categoryBoxWidget) && (
                 <div className="mb-6">
                   {(() => {
