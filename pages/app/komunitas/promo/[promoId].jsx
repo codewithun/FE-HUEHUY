@@ -257,7 +257,7 @@ export default function PromoDetailUnified() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showDetailExpanded, setShowDetailExpanded] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
+  const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(router.query.from === 'saku' && router.query.claimed === 'true');
 
   // State untuk mencegah multiple redirects dan rate limiting
   const [hasTriedAuth, setHasTriedAuth] = useState(false);
@@ -430,6 +430,12 @@ export default function PromoDetailUnified() {
   useEffect(() => {
     if (!promoData?.id) return;
 
+    // Jika dari saku, sudah diketahui claimed, skip API call
+    if (router.query.from === 'saku' && router.query.claimed === 'true') {
+      setIsAlreadyClaimed(true);
+      return;
+    }
+
     const checkClaimedStatus = async () => {
       try {
         const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
@@ -489,7 +495,7 @@ export default function PromoDetailUnified() {
     };
 
     checkClaimedStatus();
-  }, [promoData?.id]);
+  }, [promoData?.id, promoData?.code, router.query.from, router.query.claimed]);
 
   // Fallback legacy jika tidak ada communityId - REMOVED DUMMY DATA
   useEffect(() => {
@@ -562,16 +568,16 @@ export default function PromoDetailUnified() {
   const MONTH_ID = useMemo(() => ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'], []);
 
   const pad2 = (n) => String(n).padStart(2, '0');
-  const toHM = (val) => {
+  const toHM = useCallback((val) => {
     if (!val) return '';
     const s = String(val).trim();
-    // Accept "H:mm", "HH:mm", "HH:mm:ss"
     const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if (!m) return '';
     const hh = pad2(Math.min(23, parseInt(m[1], 10)));
     const mm = pad2(Math.min(59, parseInt(m[2], 10)));
-    return `${hh}:${mm}`;
-  };
+    const ss = m[3] ? pad2(Math.min(59, parseInt(m[3], 10))) : '00';
+    return `${hh}:${mm}:${ss}`;
+  }, []);
 
   const fmtDateID = useCallback((raw) => {
     if (!raw) return '';
@@ -612,12 +618,12 @@ export default function PromoDetailUnified() {
     const start = toHM(ad?.jam_mulai);
     const end = toHM(ad?.jam_berakhir);
     if (start && end) return `${start} - ${end}`;
-    if (start && !end) return `${start} - 23:59`;
+    if (start && !end) return `${start} - 23:59:59`;
     if (!start && end) return `Sampai ${end}`;
     const limit = toHM(ad?.validation_time_limit);
     if (limit) return `Sampai ${limit}`;
-    return '00:00 - 23:59';
-  }, []);
+    return '00:00:00 - 23:59:59';
+  }, [toHM]);
 
   const buildScheduleFromAd = useCallback((ad) => ({
     day: labelDayType(ad),
@@ -724,6 +730,7 @@ export default function PromoDetailUnified() {
           end_date: ad?.finish_validate || null,
           jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
           jam_berakhir: ad?.jam_berakhir ?? null,
+          validation_time_limit: ad?.validation_time_limit ?? null,
           schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
@@ -839,6 +846,7 @@ export default function PromoDetailUnified() {
           end_date: ad?.finish_validate || null,
           jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
           jam_berakhir: ad?.jam_berakhir ?? null,
+          validation_time_limit: ad?.validation_time_limit ?? null,
           schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
@@ -898,6 +906,7 @@ export default function PromoDetailUnified() {
           always_available: Boolean(data.always_available),
           expires_at: data.end_date || data.expires_at || data.valid_until || null,
           end_date: data.end_date || null,
+          validation_time_limit: data?.validation_time_limit ?? null,
           schedule: {
             day: data.always_available ? 'Setiap Hari' : 'Weekday',
             details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
@@ -1849,6 +1858,11 @@ export default function PromoDetailUnified() {
               Promo <span className="font-semibold" style={{ color: getCommunityPrimaryColor() }}>{promoData?.title}</span> berhasil direbut dan masuk ke Saku
               Promo Anda!
             </p>
+            {promoData?.validation_time_limit && (
+              <p className="text-slate-600 text-sm mb-4">
+                Batas waktu validasi: {toHM(promoData.validation_time_limit)}
+              </p>
+            )}
             <div className="space-y-3">
               <button
                 onClick={handleSuccessModalClose}
