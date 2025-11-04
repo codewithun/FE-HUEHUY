@@ -10,6 +10,7 @@ import { token_cookie_name } from '../../../../helpers';
 import { distanceConvert } from '../../../../helpers/distanceConvert.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 import CommunityBottomBar from './CommunityBottomBar';
+import KomunitasCard from '../../../../components/construct.components/card/Komunitas.card';
 
 // Custom hook untuk handle image loading dengan fallback
 const useImageWithFallback = (src, fallback = '/default-avatar.png') => {
@@ -563,15 +564,9 @@ export default function CommunityDashboard({ communityId }) {
     const renderCubeCard = (item, index) => {
       const ad = item?.ad || item;
       const cube = item?.cube || ad?.cube;
-      
       if (!ad && !cube) return null;
 
-      const imageUrl = getAdImage(ad) || cube?.picture_source || '/default-avatar.png';
-      const title = ad?.title || cube?.label || cube?.name || 'Promo';
-      const merchant = cube?.name || ad?.merchant || 'Merchant';
-      const description = ad?.description || cube?.description || '';
       const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
-      const categoryData = getCategoryWithIcon(ad, cube, communityData);
 
       const handleClick = () => {
         if (isInformationCube) {
@@ -600,143 +595,14 @@ export default function CommunityDashboard({ communityId }) {
       };
 
       const size = widget.size || 'M';
-
-      // Size S - Compact card
-      if (size === 'S') {
-        return (
-          <div
-            key={ad?.id || cube?.id || index}
-            className="flex rounded-[12px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 hover:scale-[1.02] hover:shadow-xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
-            style={{ minWidth: 240, maxWidth: 280 }}
-            onClick={handleClick}
-          >
-            <div className="relative w-16 h-16 bg-white/20 backdrop-blur-sm overflow-hidden">
-              <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
-            </div>
-            <div className="flex-1 p-2 flex flex-col justify-between">
-              <div>
-                <h3 className="font-semibold text-white text-xs line-clamp-1 mb-1">{title}</h3>
-                <p className="text-xs text-white/70 line-clamp-1">{merchant}</p>
-              </div>
-              <div className="flex items-center gap-1 mt-1">
-                {categoryData?.icon}
-                <span className="text-xs text-white/80">{categoryData?.label}</span>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Size M - Medium card
-      if (size === 'M') {
-        return (
-          <div
-            key={ad?.id || cube?.id || index}
-            className="flex rounded-[14px] overflow-hidden border border-white/20 shadow-lg flex-shrink-0 hover:scale-[1.02] hover:shadow-xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
-            style={{ minWidth: 280, maxWidth: 320 }}
-            onClick={handleClick}
-          >
-            <div className="relative w-20 h-20 bg-white/20 backdrop-blur-sm overflow-hidden">
-              <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
-            </div>
-            <div className="flex-1 p-3 flex flex-col justify-between">
-              <div>
-                <h3 className="font-semibold text-white text-sm line-clamp-2 mb-1">{title}</h3>
-                <p className="text-xs text-white/70 line-clamp-1">{merchant}</p>
-              </div>
-              <div className="flex items-center gap-1 mt-2">
-                {categoryData?.icon}
-                <span className="text-xs text-white/80">{categoryData?.label}</span>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Size L - Large card
-      if (size === 'L') {
-        return (
-          <div
-            key={ad?.id || cube?.id || index}
-            className="flex rounded-[16px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
-            style={{ minWidth: 320, maxWidth: 350 }}
-            onClick={handleClick}
-          >
-            <div className="relative w-24 h-full bg-white/20 backdrop-blur-sm overflow-hidden">
-              <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
-            </div>
-            <div className="flex-1 p-4 flex flex-col justify-between">
-              <div>
-                <h3 className="font-semibold text-white text-base line-clamp-2 mb-2">{title}</h3>
-                <p className="text-sm text-white/70 line-clamp-1 mb-1">{merchant}</p>
-                <p className="text-xs text-white/60 line-clamp-2">{description}</p>
-              </div>
-              <div className="flex items-center gap-2 mt-3">
-                {categoryData?.icon}
-                <span className="text-sm text-white/80">{categoryData?.label}</span>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Size XL - Extra large card
-      if (size === 'XL') {
-        return (
-          <div
-            key={ad?.id || cube?.id || index}
-            className="rounded-[18px] overflow-hidden border border-white/20 shadow-xl flex-shrink-0 hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 bg-white/10 backdrop-blur-md cursor-pointer"
-            style={{ minWidth: 280, maxWidth: 320 }}
-            onClick={handleClick}
-          >
-            <div className="relative w-full h-40 bg-white/20 backdrop-blur-sm overflow-hidden">
-              <Image src={normalizeImageSrc(imageUrl)} alt={title} fill className="object-cover" />
-            </div>
-            <div className="p-4">
-              <h3 className="font-semibold text-white text-base line-clamp-2 mb-2">{title}</h3>
-              <p className="text-sm text-white/70 line-clamp-1 mb-2">{merchant}</p>
-              <p className="text-xs text-white/60 line-clamp-3 mb-3">{description}</p>
-              <div className="flex items-center gap-2">
-                {categoryData?.icon}
-                <span className="text-sm text-white/80">{categoryData?.label}</span>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Size XL-Ads - Extra large ads format
-      if (size === 'XL-Ads') {
-        return (
-          <div
-            key={ad?.id || cube?.id || index}
-            className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300 bg-white cursor-pointer"
-            style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8' }}
-            onClick={handleClick}
-          >
-            <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
-              <Image
-                src={normalizeImageSrc(imageUrl)}
-                alt={title}
-                fill
-                className="object-contain p-2"
-              />
-            </div>
-            <div className="p-4 bg-white">
-              <h3 className="font-bold text-gray-900 text-lg line-clamp-2 mb-2">{title}</h3>
-              <p className="text-gray-600 text-sm line-clamp-1 mb-2">{merchant}</p>
-              <p className="text-gray-500 text-xs line-clamp-3 mb-3">{description}</p>
-              <div className="flex items-center gap-2">
-                <div className="text-gray-600">{categoryData?.icon}</div>
-                <span className="text-sm text-gray-600">{categoryData?.label}</span>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Default fallback to M size
-      return renderCubeCard({ ...item, size: 'M' }, index);
+      return (
+        <KomunitasCard
+          item={item}
+          size={size}
+          onClick={handleClick}
+          key={ad?.id || cube?.id || index}
+        />
+      );
     };
 
     return (
@@ -874,103 +740,20 @@ export default function CommunityDashboard({ communityId }) {
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {shuffleData.map((item, index) => {
-            const cube = item?.cube;
-            const ad = item;
-            if (!cube && !ad) return null;
-
-            const imageUrl = normalizeImageSrc(
-              ad?.image_1 ||
-              ad?.image ||
-              ad?.picture_source ||
-              cube?.image ||
-              '/default-avatar.png'
-            );
-            const title = ad?.title || cube?.label || 'Promo';
-            const merchant = ad?.merchant || communityData?.name || 'Merchant';
-            const categoryData = getCategoryWithIcon(ad, cube, communityData);
-
-            // Use glassmorphism styling consistent with home dashboard
-            if (size === 'XL-Ads') {
-              return (
-                <div
-                  key={ad?.id || cube?.id || index}
-                  className="relative rounded-[18px] overflow-hidden border border-white/20 bg-white/10 backdrop-blur-md shadow-lg flex-shrink-0 hover:scale-[1.02] hover:bg-white/15 transition-all duration-300"
-                  style={{
-                    minWidth: 320,
-                    maxWidth: 360,
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => {
-                    if (ad?.id) {
-                      router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
-                    }
-                  }}
-                >
-                  <div className="relative w-full h-[290px] bg-white/5 flex items-center justify-center">
-                    <Image
-                      src={imageUrl}
-                      alt={title}
-                      fill
-                      className="object-contain p-2"
-                    />
-                    <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
-                      {merchant}
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
-                    <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
-                      {title}
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm flex items-center gap-1">
-                        {categoryData.icon}
-                        {categoryData.label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Default size handling with glassmorphism
-            return (
-              <div
-                key={ad?.id || cube?.id || index}
-                className="rounded-[16px] overflow-hidden border border-white/20 bg-white/10 backdrop-blur-md shadow-lg flex-shrink-0 hover:scale-[1.02] hover:bg-white/15 transition-all duration-300"
-                style={{
-                  minWidth: 320,
-                  maxWidth: 360,
-                  cursor: 'pointer',
-                }}
-                onClick={() => {
-                  if (ad?.id) {
-                    router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
-                  }
-                }}
-              >
-                <div className="relative w-full h-[200px] bg-white/5 flex items-center justify-center">
-                  <Image
-                    src={imageUrl}
-                    alt={title}
-                    fill
-                    className="object-contain p-2"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-2 drop-shadow-sm">
-                    {title}
-                  </h3>
-                  <p className="text-[12px] text-white/80 mb-2 drop-shadow-sm">{merchant}</p>
-                  <span className="bg-white/20 text-white text-[11px] font-semibold px-2 py-1 rounded border border-white/30 backdrop-blur-sm flex items-center gap-1 w-fit">
-                    {categoryData.icon}
-                    {categoryData.label}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+          {shuffleData.map((item, index) => (
+            <KomunitasCard
+              key={item?.id || item?.cube?.id || index}
+              item={item}
+              size={widget.size || 'M'}
+              onClick={() => {
+                const ad = item;
+                const cube = item?.cube;
+                if (ad?.id) {
+                  router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                }
+              }}
+            />
+          ))}
         </div>
       </div>
     );
