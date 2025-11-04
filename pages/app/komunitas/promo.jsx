@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import CommunityBottomBar from './dashboard/CommunityBottomBar';
-import KomunitasCard from '../../components/construct.components/card/Komunitas.card';
+import KomunitasCard from '../../../components/construct.components/card/Komunitas.card';
 
 const CommunityPromoPage = () => {
   const router = useRouter();
