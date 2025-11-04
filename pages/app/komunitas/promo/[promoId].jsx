@@ -20,6 +20,12 @@ import { token_cookie_name } from '../../../../helpers';
 import { get } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
 
+const authHeader = () => {
+  const enc = Cookies.get(token_cookie_name);
+  const token = enc ? Decrypt(enc) : '';
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // === Helper functions untuk label (sama seperti di home.jsx) ===
 const normalizeBoolLike = (val) => {
   if (val === true || val === 1) return true;
@@ -100,7 +106,7 @@ const safeExternalUrl = (raw) => {
 
 export default function PromoDetailUnified() {
   const router = useRouter();
-  const { promoId, communityId } = router.query;
+  const { promoId, communityId, notificationId } = router.query;
 
   // --- Resolve ID promo dari QR lama ---
   // helper aman ambil query string dari URL sebenarnya
@@ -508,6 +514,7 @@ export default function PromoDetailUnified() {
 
   // simpan posisi user untuk origin rute
   const userPosRef = useRef(null);
+  const promoCoordsRef = useRef(null);
 
   // izinkan fetch ulang kalau ID komunitas/Promo berubah
   useEffect(() => {
@@ -1207,6 +1214,17 @@ export default function PromoDetailUnified() {
   useEffect(() => {
     if (!promoData || promoData.lat == null || promoData.lng == null) return;
 
+    // Check if coords changed
+    const currentCoords = { lat: promoData.lat, lng: promoData.lng };
+    if (promoCoordsRef.current &&
+      promoCoordsRef.current.lat === currentCoords.lat &&
+      promoCoordsRef.current.lng === currentCoords.lng &&
+      userPosRef.current) {
+      return; // Already calculated
+    }
+
+    promoCoordsRef.current = currentCoords;
+
     const onOk = (pos) => {
       const { latitude, longitude } = pos.coords || {};
       if (latitude == null || longitude == null) return;
@@ -1214,7 +1232,7 @@ export default function PromoDetailUnified() {
       // simpan origin untuk rute
       userPosRef.current = { lat: Number(latitude), lng: Number(longitude) };
 
-      const km = haversineKm(Number(latitude), Number(longitude), Number(promoData.lat), Number(promoData.lng));
+      const km = haversineKm(Number(latitude), Number(longitude), Number(promoCoordsRef.current.lat), Number(promoCoordsRef.current.lng));
       setPromoData((prev) => (prev ? { ...prev, distance: fmtKm(km) } : prev));
     };
 
@@ -1466,6 +1484,40 @@ export default function PromoDetailUnified() {
       // Promo successfully claimed via API
       setIsAlreadyClaimed(true);
       setShowSuccessModal(true);
+
+      // Hapus notifikasi jika diklaim dari notifikasi
+      if (notificationId) {
+        console.log('🗑️ Attempting to delete notification:', notificationId);
+        try {
+          const deleteResponse = await fetch(`${baseUrl}/api/notification/${notificationId}`, {
+            method: 'DELETE',
+            headers: { Accept: 'application/json', ...authHeader() },
+          });
+          console.log('🗑️ Update notification API response:', deleteResponse.status);
+
+          // Emit event untuk update badge meskipun API gagal
+          console.log('📢 Emitting notification changed event');
+          try {
+            window.dispatchEvent(new CustomEvent('notifications:changed', { detail: { type: 'merchant', id: notificationId, delta: -1 } }));
+          } catch (eventError) {
+            console.warn('Failed to emit event:', eventError);
+          }
+          try {
+            localStorage.setItem('notifications:lastChange', JSON.stringify({ t: Date.now(), type: 'merchant', id: notificationId, delta: -1 }));
+          } catch (storageError) {
+            console.warn('Failed to set localStorage:', storageError);
+          }
+        } catch (error) {
+          console.warn('Failed to delete notification:', error);
+          // Tetap emit event meskipun API gagal
+          console.log('📢 Emitting notification changed event despite API failure');
+          try {
+            window.dispatchEvent(new CustomEvent('notifications:changed', { detail: { type: 'merchant', id: notificationId, delta: -1 } }));
+          } catch (eventError) {
+            console.warn('Failed to emit event:', eventError);
+          }
+        }
+      }
 
     } catch (e) {
       console.error('Claim error:', e);
