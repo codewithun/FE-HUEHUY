@@ -345,8 +345,8 @@ export default function Index() {
 
   // ======== CATEGORY BOX WIDGET (Home) ========
   const CategoryBoxWidget = ({ menu }) => {
-    const categories = dataCategories?.data || [];
-    const isLoading = loadingCategories;
+    const categories = dataPrimaryCategories?.data || [];
+    const isLoading = loadingPrimaryCategories;
 
     if (isLoading) {
       return (
@@ -523,7 +523,7 @@ export default function Index() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingMenu, codeMenu, dataMenu] = useGet({
-    path: `admin/dynamic-content?type=home`,
+    path: `dynamic-content?type=home`,
   }, !apiReady);
 
   // Add shuffle ads data fetching for shuffle_cube widgets
