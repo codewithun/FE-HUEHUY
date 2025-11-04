@@ -426,7 +426,7 @@ export default function Index() {
         <div className="relative rounded-[18px] overflow-hidden border shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
           style={{ minWidth: 320, maxWidth: 360, borderColor: '#d8d8d8', background: '#fffaf0' }}>
           <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
-            <img src={img} alt={title} className="object-contain w-full h-full p-2" />
+            <img src={img} alt={title} className="object-cover w-full h-full" />
           </div>
           <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4"
             style={{ background: 'rgba(90,110,29,0.9)', borderTop: '1px solid #cdd0b3' }}>
@@ -444,7 +444,7 @@ export default function Index() {
         <div className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#fffaf0] shadow-md flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
           style={{ minWidth: 320, maxWidth: 360 }}>
           <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
-            <img src={img} alt={title} className="object-contain w-full h-full p-2" />
+            <img src={img} alt={title} className="object-cover w-full h-full" />
           </div>
           <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
             <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">{title}</h3>
@@ -462,7 +462,7 @@ export default function Index() {
         <div className="flex items-center rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
           style={{ minWidth: 280, maxWidth: 320, height: 130 }}>
           <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
-            <img src={img} alt={title} className="object-contain w-[90%] h-[90%] rounded-[10px]" />
+            <img src={img} alt={title} className="object-cover w-full h-full rounded-[10px]" />
           </div>
           <div className="flex-1 h-full p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
             <div>
@@ -483,7 +483,7 @@ export default function Index() {
       <div className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
         style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160 }}>
         <div className="relative w-full bg-white flex items-center justify-center overflow-hidden" style={{ height: isM ? 150 : 120 }}>
-          <img src={img} alt={title} className="object-contain w-[90%] h-[90%] rounded-[8px]" />
+          <img src={img} alt={title} className="object-cover w-full h-full rounded-[8px]" />
         </div>
         <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]">
           <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-slate-900 line-clamp-2 mb-0.5`}>{title}</h3>
