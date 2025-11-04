@@ -1181,7 +1181,7 @@ export default function Save() {
 
                 // Untuk voucher: gunakan resolveAdId
                 if (selected?.type === 'voucher' || selected?.voucher_item || selected?.voucher) {
-                  const href = `/app/komunitas/promo/${resolveAdId(selected)}?source=home`;
+                  const href = `/app/komunitas/promo/${resolveAdId(selected)}?source=home&from=saku&claimed=true`;
                   console.debug('saku: detail render (voucher)', { selected, ad, href, resolvedPromoId: resolveAdId(selected) });
                   return (
                     <Link href={href}>
@@ -1211,7 +1211,7 @@ export default function Save() {
                   null;
                 // Gunakan format URL yang sama seperti voucher (?source=home)
                 const href = resolvedPromoId
-                  ? `/app/komunitas/promo/${resolvedPromoId}?source=home`
+                  ? `/app/komunitas/promo/${resolvedPromoId}?source=home&from=saku&claimed=true`
                   : '#';
 
                 // Render button yang melakukan navigation programatik (lebih mudah dilacak)
