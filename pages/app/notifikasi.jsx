@@ -3,6 +3,7 @@
 import { faCheckCircle, faExclamationTriangle, faTimesCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
+import { useRouter } from 'next/router';
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { DateFormatComponent } from '../../components/base.components';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
@@ -13,6 +14,7 @@ const DEBUG = process.env.NEXT_PUBLIC_DEBUG === 'true';
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
 
 export default function NotificationPage() {
+  const router = useRouter();
   const [type, setType] = useState('merchant');
   const [version, setVersion] = useState(0);
   const [localItems, setLocalItems] = useState([]);
@@ -303,7 +305,7 @@ export default function NotificationPage() {
   // Helpers to mark notification handled on server and notify UI for badge refresh
   async function markNotificationHandled(notificationId) {
     if (!notificationId) return;
-    // Prefer a single DELETE to reduce extra calls and avoid throttle
+    // Use DELETE to mark as handled instead of PATCH
     try {
       await fetch(`${apiBase}/api/notification/${notificationId}`, {
         method: 'DELETE',
@@ -453,6 +455,56 @@ export default function NotificationPage() {
       initialLoad, version
     });
   }, [type, loading, hasMore, cursor, localItems.length, initialLoad, version]);
+
+  // Listen for notification changes from other pages
+  useEffect(() => {
+    const handleNotificationChange = (e) => {
+      const { type: eventType, id, delta } = e.detail;
+      console.log('🔔 Notification changed event received:', { eventType, id, delta, currentType: type });
+
+      if ((eventType === 'merchant' || eventType === 'hunter' || eventType === 'delete') && id) {
+        // Remove the notification from local state
+        setLocalItems((prev) => prev.filter((n) => n.id !== id));
+        console.log('🗑️ Removed notification from local state:', id);
+      }
+    };
+
+    window.addEventListener('notifications:changed', handleNotificationChange);
+    return () => window.removeEventListener('notifications:changed', handleNotificationChange);
+  }, [type]);
+
+  // Check for pending notification deletions on mount and visibility change
+  useEffect(() => {
+    const checkPendingDeletions = () => {
+      try {
+        const stored = localStorage.getItem('notifications:changed');
+        if (stored) {
+          const { type: eventType, id, timestamp } = JSON.parse(stored);
+          if ((eventType === 'merchant' || eventType === 'hunter' || eventType === 'delete') && id && Date.now() - timestamp < 5000) {
+            console.log('� Processing stored notification deletion:', { eventType, id });
+            setLocalItems((prev) => prev.filter((n) => n.id !== id));
+            localStorage.removeItem('notifications:changed');
+          }
+        }
+      } catch (error) {
+        console.log('❌ Error processing stored notification change:', error);
+      }
+    };
+
+    // Check on mount
+    checkPendingDeletions();
+
+    // Check when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('👁️ Tab became visible, checking for pending deletions');
+        checkPendingDeletions();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   async function fetchVoucherDetail(voucherId) {
     try {
@@ -794,9 +846,14 @@ export default function NotificationPage() {
 
                     return (
                       <div
-                        className={`bg-white rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md ${isUnread ? 'border-l-4 border-primary' : ''
+                        className={`bg-white rounded-2xl p-4 shadow-sm transition-all duration-200 hover:shadow-md cursor-pointer ${isUnread ? 'border-l-4 border-primary' : ''
                           }`}
                         key={item?.id ?? `notif-${idx}`}
+                        onClick={() => {
+                          if (isVoucher && item?.target_id) {
+                            router.push(`/app/komunitas/promo/${item.target_id}?notificationId=${item.id}`);
+                          }
+                        }}
                       >
                         <div className="flex gap-4">
                           <div className="relative flex-shrink-0">
@@ -842,7 +899,10 @@ export default function NotificationPage() {
                               {isVoucher && item?.target_id && available && (
                                 <button
                                   type="button"
-                                  onClick={() => claimVoucher(item.target_id, item.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    claimVoucher(item.target_id, item.id);
+                                  }}
                                   disabled={claimingId === item.id}
                                   className={`inline-flex items-center font-medium text-sm transition-colors ${claimingId === item.id ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:text-primary-dark'
                                     }`}
