@@ -54,15 +54,15 @@ export default function ManageCubePage({
   const role = Profile?.corporate_user?.role?.id;
   let validate =
     selected?.ads?.at(0)?.start_validate &&
-    selected?.ads?.at(0)?.finish_validate
+      selected?.ads?.at(0)?.finish_validate
       ? {
-          start_validate: moment(selected?.ads[0].start_validate).format(
-            'DD-MM-YYYY'
-          ),
-          finish_validate: moment(selected?.ads[0].finish_validate).format(
-            'DD-MM-YYYY'
-          ),
-        }
+        start_validate: moment(selected?.ads[0].start_validate).format(
+          'DD-MM-YYYY'
+        ),
+        finish_validate: moment(selected?.ads[0].finish_validate).format(
+          'DD-MM-YYYY'
+        ),
+      }
       : null;
 
   return (
@@ -159,14 +159,12 @@ export default function ManageCubePage({
                 width: '200px',
                 item: ({ ads }) =>
                   ads?.at(0)?.is_daily_grab
-                    ? `${
-                        ads?.at(0)?.max_grab - (ads?.at(0)?.total_grab || 0) ||
-                        'Tidak ada'
-                      } Promo / Hari`
-                    : `${
-                        ads?.at(0)?.max_grab - (ads?.at(0)?.total_grab || 0) ||
-                        'Tidak ada'
-                      } Promo`,
+                    ? `${ads?.at(0)?.max_grab - (ads?.at(0)?.total_grab || 0) ||
+                    'Tidak ada'
+                    } Promo / Hari`
+                    : `${ads?.at(0)?.max_grab - (ads?.at(0)?.total_grab || 0) ||
+                    'Tidak ada'
+                    } Promo`,
               },
               {
                 selector: 'expired_at',
@@ -228,17 +226,70 @@ export default function ManageCubePage({
             customDefaultValue:
               scopeName == 'corporate_id'
                 ? {
-                    ...scope,
-                    cube_type_id: 1,
-                    'ads[is_daily_grab]': 0,
-                  }
+                  ...scope,
+                  // Default sama seperti admin
+                  'ads[is_daily_grab]': 0,
+                  'ads[unlimited_grab]': 0,
+                  content_type: 'promo',
+                  cube_type_id: 1,
+                  owner_user_id: null,
+                  'ads[validation_type]': 'auto',
+                  'ads[day_type]': 'custom',
+                  target_type: 'all',
+                  target_user_ids: [],
+                  community_id: '',
+                  is_information: [],
+                  is_recommendation: [],
+                  map_distance: 0,
+                  'ads[description]': '',
+                  'ads[detail]': '',
+                  ...(panel === 'corporate' && scope?.corporate_id
+                    ? { corporate_id: scope.corporate_id }
+                    : {}),
+                }
                 : panel == 'corporate'
-                ? {
+                  ? {
                     ...scope,
-                    corporate_id: corpId,
+                    // Default sama seperti admin
                     'ads[is_daily_grab]': 0,
+                    'ads[unlimited_grab]': 0,
+                    content_type: 'promo',
+                    cube_type_id: 1,
+                    owner_user_id: null,
+                    'ads[validation_type]': 'auto',
+                    'ads[day_type]': 'custom',
+                    target_type: 'all',
+                    target_user_ids: [],
+                    community_id: '',
+                    is_information: [],
+                    is_recommendation: [],
+                    map_distance: 0,
+                    'ads[description]': '',
+                    'ads[detail]': '',
+                    // Pastikan corporate_id terisi dari scope jika ada
+                    ...(panel === 'corporate' && scope?.corporate_id
+                      ? { corporate_id: scope.corporate_id }
+                      : {}),
                   }
-                : { ...scope, 'ads[is_daily_grab]': 0 },
+                  : {
+                    ...scope,
+                    // Default sama seperti admin (aman untuk admin juga)
+                    'ads[is_daily_grab]': 0,
+                    'ads[unlimited_grab]': 0,
+                    content_type: 'promo',
+                    cube_type_id: 1,
+                    owner_user_id: null,
+                    'ads[validation_type]': 'auto',
+                    'ads[day_type]': 'custom',
+                    target_type: 'all',
+                    target_user_ids: [],
+                    community_id: '',
+                    is_information: [],
+                    is_recommendation: [],
+                    map_distance: 0,
+                    'ads[description]': '',
+                    'ads[detail]': '',
+                  },
             custom: [
               {
                 type: 'custom',
@@ -280,30 +331,28 @@ export default function ManageCubePage({
                   return scopeName == 'world_id' ? (
                     <>
                       {panel == 'corporate' &&
-                      values.find((i) => i.name == 'cube_type_id')?.value !=
+                        values.find((i) => i.name == 'cube_type_id')?.value !=
                         2 ? (
                         <SelectComponent
                           name="user_id"
                           label="Pemilik"
                           placeholder="Pilih user..."
                           serverOptionControl={{
-                            path: `corporate/options/user?${scopeName}=${
-                              corpId ? corpId : scopeValue
-                            }`,
+                            path: `corporate/options/user?${scopeName}=${corpId ? corpId : scopeValue
+                              }`,
                           }}
                           {...formControl('user_id')}
                         />
                       ) : panel == 'admin' &&
                         values.find((i) => i.name == 'cube_type_id')?.value !=
-                          2 ? (
+                        2 ? (
                         <SelectComponent
                           name="user_id"
                           label="Pemilik"
                           placeholder="Pilih user..."
                           serverOptionControl={{
-                            path: `${
-                              panel ? panel : 'admin'
-                            }/options/user?${scopeName}=${scopeValue}`,
+                            path: `${panel ? panel : 'admin'
+                              }/options/user?${scopeName}=${scopeValue}`,
                           }}
                           {...formControl('user_id')}
                         />
@@ -314,9 +363,8 @@ export default function ManageCubePage({
                             label="Pemilik (Mitra)"
                             placeholder="Pilih Mitra..."
                             serverOptionControl={{
-                              path: `${
-                                panel ? panel : 'admin'
-                              }/options/corporate?${scopeName}=${scopeValue}`,
+                              path: `${panel ? panel : 'admin'
+                                }/options/corporate?${scopeName}=${scopeValue}`,
                             }}
                             {...formControl('corporate_id')}
                           />
@@ -336,9 +384,8 @@ export default function ManageCubePage({
                       label="Dunia (opsional)"
                       placeholder="Pilih Dunia..."
                       serverOptionControl={{
-                        path: `${
-                          panel ? panel : 'admin'
-                        }/options/world?${scopeName}=${scopeValue}`,
+                        path: `${panel ? panel : 'admin'
+                          }/options/world?${scopeName}=${scopeValue}`,
                         // path: `admin/options/world`,
                       }}
                       {...formControl('world_id')}
@@ -588,8 +635,8 @@ export default function ManageCubePage({
                         values.find((i) => i.name == 'cube_tags[0][address]')
                           ?.value
                           ? values.find(
-                              (i) => i.name == 'cube_tags[0][address]'
-                            )?.value
+                            (i) => i.name == 'cube_tags[0][address]'
+                          )?.value
                           : ''
                       }
                       errors={
@@ -617,7 +664,7 @@ export default function ManageCubePage({
                           values.find((i) => i.name == 'cube_tags[0][link]')
                             ?.value
                             ? values.find((i) => i.name == 'cube_tags[0][link]')
-                                ?.value
+                              ?.value
                             : ''
                         }
                         errors={
@@ -815,6 +862,10 @@ export default function ManageCubePage({
                 ...worldID,
                 ...userID,
                 ...corpotareID,
+                // Tambahan agar corporate_id tetap terisi saat edit pada panel corporate
+                ...(panel === 'corporate' && scope?.corporate_id
+                  ? { corporate_id: scope.corporate_id }
+                  : {}),
               };
             },
             contentType: 'multipart/form-data',
@@ -858,7 +909,7 @@ export default function ManageCubePage({
                   return scopeName == 'world_id' ? (
                     <>
                       {panel == 'corporate' &&
-                      values.find((i) => i.name == 'cube_type_id')?.value ==
+                        values.find((i) => i.name == 'cube_type_id')?.value ==
                         2 ? (
                         <div className="mb-3">
                           <CheckboxComponent
@@ -888,30 +939,28 @@ export default function ManageCubePage({
                       ) : null}
                       {panel == 'corporate' ? (
                         values.find((i) => i.name == 'cube_type_id')?.value !=
-                        2 ? (
+                          2 ? (
                           <SelectComponent
                             name="user_id"
                             label="Pemilik"
                             placeholder="Pilih user..."
                             serverOptionControl={{
-                              path: `${
-                                panel ? panel : 'admin'
-                              }/options/user?${scopeName}=${scopeValue}`,
+                              path: `${panel ? panel : 'admin'
+                                }/options/user?${scopeName}=${scopeValue}`,
                             }}
                             {...formControl('user_id')}
                           />
                         ) : null
                       ) : panel == 'admin' &&
                         values.find((i) => i.name == 'cube_type_id')?.value !=
-                          2 ? (
+                        2 ? (
                         <SelectComponent
                           name="user_id"
                           label="Pemilik"
                           placeholder="Pilih user..."
                           serverOptionControl={{
-                            path: `${
-                              panel ? panel : 'admin'
-                            }/options/user?${scopeName}=${scopeValue}`,
+                            path: `${panel ? panel : 'admin'
+                              }/options/user?${scopeName}=${scopeValue}`,
                           }}
                           {...formControl('user_id')}
                         />
@@ -921,9 +970,8 @@ export default function ManageCubePage({
                           label="Pemilik (Mitra)"
                           placeholder="Pilih Mitra..."
                           serverOptionControl={{
-                            path: `${
-                              panel ? panel : 'admin'
-                            }/options/corporate?${scopeName}=${scopeValue}`,
+                            path: `${panel ? panel : 'admin'
+                              }/options/corporate?${scopeName}=${scopeValue}`,
                           }}
                           {...formControl('corporate_id')}
                         />
@@ -1115,8 +1163,8 @@ export default function ManageCubePage({
                         values.find((i) => i.name == 'cube_tags[0][address]')
                           ?.value
                           ? values.find(
-                              (i) => i.name == 'cube_tags[0][address]'
-                            )?.value
+                            (i) => i.name == 'cube_tags[0][address]'
+                          )?.value
                           : ''
                       }
                       errors={
@@ -1144,7 +1192,7 @@ export default function ManageCubePage({
                           values.find((i) => i.name == 'cube_tags[0][link]')
                             ?.value
                             ? values.find((i) => i.name == 'cube_tags[0][link]')
-                                ?.value
+                              ?.value
                             : ''
                         }
                         errors={
@@ -1248,7 +1296,7 @@ export default function ManageCubePage({
                     />
                   )}
                   {panel == 'admin' &&
-                  data.ads.at(0)?.promo_type == 'online' ? (
+                    data.ads.at(0)?.promo_type == 'online' ? (
                     <ButtonComponent
                       icon={faTicket}
                       label={'Voucher'}
@@ -1308,15 +1356,14 @@ export default function ManageCubePage({
 
       <FloatingPageComponent
         show={formAds}
-        title={`${
-          formAds == 'mitra'
-            ? selected?.ads.some((obj) => obj.type == 'mitra')
-              ? 'Ubah iklan Mitra'
-              : 'Tambahkan iklan Mitra'
-            : selected?.ads?.at(0)?.id
+        title={`${formAds == 'mitra'
+          ? selected?.ads.some((obj) => obj.type == 'mitra')
+            ? 'Ubah iklan Mitra'
+            : 'Tambahkan iklan Mitra'
+          : selected?.ads?.at(0)?.id
             ? 'Ubah Iklan Utama'
             : 'Buat Iklan Utama'
-        }`}
+          }`}
         onClose={() => {
           setFormAds(false);
         }}
@@ -1330,19 +1377,19 @@ export default function ManageCubePage({
                     ? `admin/ads`
                     : `admin/ads/${selected?.id}`
                   : selected?.ads?.at(0)?.id
-                  ? `admin/ads/${selected?.ads?.at(0)?.id}`
-                  : `admin/ads`,
+                    ? `admin/ads/${selected?.ads?.at(0)?.id}`
+                    : `admin/ads`,
               contentType: 'multipart/form-data',
             }}
             defaultValue={
               formAds == 'mitra'
                 ? {
-                    ...selected?.ads.filter((obj) => obj.type == 'mitra').at(0),
-                    cube_id: selected?.id,
-                    type: 'mitra',
-                  }
+                  ...selected?.ads.filter((obj) => obj.type == 'mitra').at(0),
+                  cube_id: selected?.id,
+                  type: 'mitra',
+                }
                 : selected?.ads?.at(0)?.id
-                ? {
+                  ? {
                     _method: 'PUT',
                     title: selected?.ads[0].title,
                     description: selected?.ads[0].description,
@@ -1355,7 +1402,7 @@ export default function ManageCubePage({
                     image: selected?.ads[0].picture_source,
                     ...validate,
                   }
-                : {
+                  : {
                     cube_id: selected?.id,
                     type: 'general',
                     is_daily_grab: 0,
@@ -1502,11 +1549,11 @@ export default function ManageCubePage({
                     value={
                       values.find((i) => i.name == 'start_validate')?.value
                         ? // eslint-disable-next-line prettier/prettier
-                          moment(
-                            values.find((i) => i.name == 'start_validate')
-                              ?.value,
-                            'DD-MM-YYYY'
-                          ).format('YYYY-MM-DD')
+                        moment(
+                          values.find((i) => i.name == 'start_validate')
+                            ?.value,
+                          'DD-MM-YYYY'
+                        ).format('YYYY-MM-DD')
                         : ''
                     }
                     errors={
@@ -1537,11 +1584,11 @@ export default function ManageCubePage({
                     value={
                       values.find((i) => i.name == 'finish_validate')?.value
                         ? // eslint-disable-next-line prettier/prettier
-                          moment(
-                            values.find((i) => i.name == 'finish_validate')
-                              ?.value,
-                            'DD-MM-YYYY'
-                          ).format('YYYY-MM-DD')
+                        moment(
+                          values.find((i) => i.name == 'finish_validate')
+                            ?.value,
+                          'DD-MM-YYYY'
+                        ).format('YYYY-MM-DD')
                         : ''
                     }
                     errors={
