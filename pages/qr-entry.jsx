@@ -1,7 +1,9 @@
+import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { ButtonComponent, InputComponent } from '../components/base.components';
-import { useForm } from '../helpers';
+import { token_cookie_name, useForm } from '../helpers';
+import { Encrypt } from '../helpers/encryption.helpers';
 
 const isSafeInternal = (url) => {
   try { return new URL(url, window.location.origin).origin === window.location.origin; }
@@ -32,7 +34,7 @@ export default function QrEntry() {
   useEffect(() => {
     if (!router.isReady) return;
     saveNext(router);
-  }, [router.isReady]);
+  }, [router.isReady, router]);
 
   const onRegisterSuccess = (data) => {
     if (!didSubmitRegister) return; // guard: jangan auto lompat
@@ -45,6 +47,19 @@ export default function QrEntry() {
 
   const onVerifySuccess = (data) => {
     const redirectUrl = data?.data?.redirect_url;
+
+    // Ambil token dari response (jika ada) dan simpan ke cookie
+    const token = data?.data?.token || data?.data?.user_token || null;
+    if (typeof token === 'string' && token) {
+      try {
+        const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
+        Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
+        // Simpan juga ke localStorage sebagai fallback
+        try { localStorage.setItem('auth_token', token); } catch {}
+      } catch (e) {
+        // ignore cookie write errors
+      }
+    }
     const qNext = typeof router.query.next === 'string' ? router.query.next : null;
     const storedNext = consumeNext();
     const target =

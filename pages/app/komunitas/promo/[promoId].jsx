@@ -566,7 +566,7 @@ export default function PromoDetailUnified() {
   }, []);
 
   // === MISSING HELPERS: day label, time range, tanggal Indonesia ===
-  const DAY_ID = {
+  const DAY_ID = useMemo(() => ({
     monday: 'Senin',
     tuesday: 'Selasa',
     wednesday: 'Rabu',
@@ -574,7 +574,7 @@ export default function PromoDetailUnified() {
     friday: 'Jumat',
     saturday: 'Sabtu',
     sunday: 'Minggu',
-  };
+  }), []);
   const MONTH_ID = useMemo(() => ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'], []);
 
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -622,7 +622,7 @@ export default function PromoDetailUnified() {
     if (list.length === 7) return 'Setiap Hari';
     if (list.length > 0) return list.join(', ');
     return 'Sabtu - Minggu'; // default sama dengan tampilan sebelumnya
-  }, []);
+  }, [DAY_ID]);
 
   const buildTimeRange = useCallback((ad) => {
     const start = toHM(ad?.jam_mulai);
@@ -1111,7 +1111,7 @@ export default function PromoDetailUnified() {
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo, communityId]);
+  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo, communityId, autoRegister, router.query.source]);
 
   // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
@@ -1301,8 +1301,8 @@ export default function PromoDetailUnified() {
     if (!router.isReady) return;
     if (!autoRegister) return;
 
-    if (effectivePromoId && communityId && !hasFetched.current) {
-      // panggil fetch ketika semua param sudah lengkap
+    if (effectivePromoId && !hasFetched.current) {
+      // panggil fetch meskipun tanpa communityId (promo umum)
       fetchPromoDetails();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
