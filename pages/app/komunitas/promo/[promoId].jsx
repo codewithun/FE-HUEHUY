@@ -106,7 +106,10 @@ const safeExternalUrl = (raw) => {
 
 export default function PromoDetailUnified() {
   const router = useRouter();
-  const { promoId, communityId, notificationId } = router.query;
+  const { promoId, communityId: initialCommunityId, notificationId } = router.query;
+
+  // State untuk communityId yang bisa diupdate
+  const [communityId, setCommunityId] = useState(initialCommunityId);
 
   // --- Resolve ID promo dari QR lama ---
   // helper aman ambil query string dari URL sebenarnya
@@ -873,6 +876,12 @@ export default function PromoDetailUnified() {
           rawCube: ad?.cube,
         };
         setPromoData(transformed);
+
+        // Update communityId if found in promo data
+        if (transformed.rawCube?.community_id && !communityId) {
+          setCommunityId(String(transformed.rawCube.community_id));
+        }
+
         return transformed;
       }
 
@@ -934,6 +943,12 @@ export default function PromoDetailUnified() {
           rawAd: data,
         };
         setPromoData(transformedData);
+
+        // Update communityId if found in promo data
+        if (data?.community_id && !communityId) {
+          setCommunityId(String(data.community_id));
+        }
+
         return transformedData;
       }
 
@@ -944,7 +959,7 @@ export default function PromoDetailUnified() {
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo]);
+  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo, communityId]);
 
   // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
@@ -1028,7 +1043,7 @@ export default function PromoDetailUnified() {
         handleAutoRegister.isRunning = false;
       }
     },
-    [fetchPromoDetails] // Removed communityId as it's not used in the function
+    [fetchPromoDetails, promoData?.id, promoData?.code] // Added missing dependencies
   );
 
   // --- Cek status verifikasi user ---
