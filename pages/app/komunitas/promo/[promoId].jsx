@@ -67,54 +67,7 @@ const getCategoryLabel = (ad, cube = null) => {
   return 'Promo';
 };
 
-// Professional SVG icons for categories
-const CategoryIcons = {
-  advertising: (
-    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z" />
-    </svg>
-  ),
-  information: (
-    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
-    </svg>
-  ),
-  voucher: (
-    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M4,4A2,2 0 0,0 2,6V10C3.11,10 4,10.9 4,12A2,2 0 0,1 2,14V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V14C20.89,14 20,13.1 20,12A2,2 0 0,1 22,10V6A2,2 0 0,0 20,4H4M4,6H20V8.54C18.81,9.23 18,10.53 18,12C18,13.47 18.81,14.77 20,15.46V18H4V15.46C5.19,14.77 6,13.47 6,12C6,10.53 5.19,9.23 4,8.54V6Z" />
-    </svg>
-  ),
-  promo: (
-    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
-    </svg>
-  ),
-  default: (
-    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
-    </svg>
-  )
-};
-
-// Helper function to get appropriate icon for each category type
-const getCategoryIcon = (category) => {
-  const categoryLower = String(category || '').toLowerCase();
-
-  switch (categoryLower) {
-    case 'advertising':
-    case 'iklan':
-      return CategoryIcons.advertising;
-    case 'information':
-    case 'informasi':
-      return CategoryIcons.information;
-    case 'voucher':
-      return CategoryIcons.voucher;
-    case 'promo':
-      return CategoryIcons.promo;
-    default:
-      return CategoryIcons.default;
-  }
-};
+// Category icons & icon resolver removed (unused)
 
 // Helper function to get category with icon and additional info
 // const getCategoryWithIcon = (ad, cube = null) => {
@@ -597,7 +550,7 @@ export default function PromoDetailUnified() {
   // --- Fetch detail (stabil, anti double-run) ---
   const hasFetched = useRef(false);
 
-  // simpan posisi user untuk origin rute
+  // simpan posisi user untuk origin rute & perhitungan jarak
   const userPosRef = useRef(null);
   const promoCoordsRef = useRef(null);
 
@@ -646,6 +599,55 @@ export default function PromoDetailUnified() {
       coordinates: lat != null && lng != null ? fmtCoord(lat, lng) : '',
     };
   }, []);
+
+  // Hitung jarak promo dari posisi user (jika izin lokasi diberikan)
+  useEffect(() => {
+    if (!promoData) return;
+
+    const { lat, lng } = promoData || {};
+    if (lat == null || lng == null) return;
+
+    promoCoordsRef.current = { lat: Number(lat), lng: Number(lng) };
+
+    // Lengkapi koordinat dalam format teks bila kosong
+    if (!promoData.coordinates) {
+      const text = fmtCoord(Number(lat), Number(lng));
+      if (text) setPromoData((prev) => prev ? { ...prev, coordinates: text } : prev);
+    }
+
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords || {};
+          if (latitude == null || longitude == null) return;
+          userPosRef.current = { lat: latitude, lng: longitude };
+          const dKm = haversineKm(latitude, longitude, Number(lat), Number(lng));
+          setPromoData((prev) => prev ? { ...prev, distance: fmtKm(dKm) } : prev);
+        },
+        () => {
+          // user menolak izin lokasi → biarkan jarak default
+        },
+        { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }
+      );
+    }
+  }, [promoData]);
+
+  // Buka rute Google Maps dari posisi user (jika ada) ke lokasi promo
+  const openRouteMap = useCallback(() => {
+    const dst = promoCoordsRef.current || (promoData && promoData.lat != null && promoData.lng != null
+      ? { lat: Number(promoData.lat), lng: Number(promoData.lng) } : null);
+    if (!dst) return;
+
+    const origin = userPosRef.current;
+    const base = 'https://www.google.com/maps/dir/?api=1';
+    const params = new URLSearchParams({
+      destination: `${dst.lat},${dst.lng}`,
+      travelmode: 'driving',
+    });
+    if (origin) params.set('origin', `${origin.lat},${origin.lng}`);
+    const url = `${base}&${params.toString()}`;
+    if (typeof window !== 'undefined') window.open(url, '_blank');
+  }, [promoData]);
 
   // === MISSING HELPERS: day label, time range, tanggal Indonesia ===
   const DAY_ID = useMemo(() => ({
@@ -836,6 +838,55 @@ export default function PromoDetailUnified() {
               setCommunityId(String(promo.community_id));
             }
 
+            // Enrich with Ads/Cube fields if ad_id exists (align with Kubus Admin)
+            try {
+              const adId = promo?.ad_id || promo?.ad?.id;
+              if (adId) {
+                const adRes = await get({ path: `admin/ads/${adId}`, headers: authHeader() });
+                if (adRes?.status === 200 && (adRes?.data?.data || adRes?.data)) {
+                  const ad = adRes.data?.data || adRes.data;
+                  // images from ad if present
+                  const adImages = [];
+                  if (ad?.picture_source) adImages.push(ad.picture_source);
+                  if (ad?.image_1) adImages.push(ad.image_1);
+                  if (ad?.image_2) adImages.push(ad.image_2);
+                  if (ad?.image_3) adImages.push(ad.image_3);
+                  if (ad?.image) adImages.push(ad.image);
+
+                  // location from cube
+                  let loc = { address: '', coordinates: '', lat: null, lng: null };
+                  try { if (ad?.cube) loc = getCubeLocationInfo(ad.cube); } catch {}
+
+                  const enriched = {
+                    ...transformedData,
+                    schedule: buildScheduleFromAd(ad || {}),
+                    status: {
+                      type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
+                      description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+                    },
+                    location: loc.address || loc.coordinates || transformedData.location,
+                    coordinates: loc.coordinates || transformedData.coordinates,
+                    lat: loc.lat ?? transformedData.lat ?? null,
+                    lng: loc.lng ?? transformedData.lng ?? null,
+                    jam_mulai: ad?.jam_mulai ?? transformedData.jam_mulai ?? null,
+                    jam_berakhir: ad?.jam_berakhir ?? transformedData.jam_berakhir ?? null,
+                    validation_time_limit: ad?.validation_time_limit ?? transformedData.validation_time_limit ?? null,
+                    seller: {
+                      name: ad?.cube?.user?.name || ad?.cube?.corporate?.name || transformedData.seller?.name || 'Admin',
+                      phone: ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || transformedData.seller?.phone || '',
+                    },
+                    link_information: ad?.cube?.link_information || ad?.link_information || transformedData.link_information,
+                    images: adImages.length > 0 ? adImages : transformedData.images,
+                    image: adImages.length > 0 ? adImages[0] : transformedData.image,
+                    rawAd: ad,
+                    rawCube: ad?.cube,
+                  };
+
+                  setPromoData(enriched);
+                }
+              }
+            } catch {}
+
             return transformedData;
           }
         } catch (adminPromoError) {
@@ -906,6 +957,55 @@ export default function PromoDetailUnified() {
           if (data?.community_id && !communityId) {
             setCommunityId(String(data.community_id));
           }
+
+          // Enrich with Ads/Cube fields if ad_id exists (align with Kubus Admin)
+          try {
+            const adId = data?.ad_id || data?.ad?.id;
+            if (adId) {
+              const adRes = await get({ path: `admin/ads/${adId}`, headers: authHeader() });
+              if (adRes?.status === 200 && (adRes?.data?.data || adRes?.data)) {
+                const ad = adRes.data?.data || adRes.data;
+                // images from ad if present
+                const adImages = [];
+                if (ad?.picture_source) adImages.push(ad.picture_source);
+                if (ad?.image_1) adImages.push(ad.image_1);
+                if (ad?.image_2) adImages.push(ad.image_2);
+                if (ad?.image_3) adImages.push(ad.image_3);
+                if (ad?.image) adImages.push(ad.image);
+
+                // location from cube
+                let loc = { address: '', coordinates: '', lat: null, lng: null };
+                try { if (ad?.cube) loc = getCubeLocationInfo(ad.cube); } catch {}
+
+                const enriched = {
+                  ...transformedData,
+                  schedule: buildScheduleFromAd(ad || {}),
+                  status: {
+                    type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
+                    description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+                  },
+                  location: loc.address || loc.coordinates || transformedData.location,
+                  coordinates: loc.coordinates || transformedData.coordinates,
+                  lat: loc.lat ?? transformedData.lat ?? null,
+                  lng: loc.lng ?? transformedData.lng ?? null,
+                  jam_mulai: ad?.jam_mulai ?? transformedData.jam_mulai ?? null,
+                  jam_berakhir: ad?.jam_berakhir ?? transformedData.jam_berakhir ?? null,
+                  validation_time_limit: ad?.validation_time_limit ?? transformedData.validation_time_limit ?? null,
+                  seller: {
+                    name: ad?.cube?.user?.name || ad?.cube?.corporate?.name || transformedData.seller?.name || 'Admin',
+                    phone: ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || transformedData.seller?.phone || '',
+                  },
+                  link_information: ad?.cube?.link_information || ad?.link_information || transformedData.link_information,
+                  images: adImages.length > 0 ? adImages : transformedData.images,
+                  image: adImages.length > 0 ? adImages[0] : transformedData.image,
+                  rawAd: ad,
+                  rawCube: ad?.cube,
+                };
+
+                setPromoData(enriched);
+              }
+            }
+          } catch {}
 
           return transformedData;
         }
@@ -1662,8 +1762,8 @@ export default function PromoDetailUnified() {
         `${apiUrl}/promos/${promoData.id}/items`,
         // 2) Direct claim (payload promo_id/promo_code)
         `${apiUrl}/admin/promo-items`,
-        // 3) Fallback Ad (hanya bila perlu)
-        `${apiUrl}/ads/${promoData.id}/claim`,
+        // 3) Fallback Ad (hanya bila perlu) - fix: must hit admin route
+        `${apiUrl}/admin/ads/${promoData.id}/claim`,
       ];
 
       const claimHeaders = {
@@ -1679,8 +1779,9 @@ export default function PromoDetailUnified() {
         expires_at: promoData.expires_at || null,
       };
 
-      let savedItem = null;
-      let lastError = '';
+  let savedItem = null;
+  let lastError = '';
+  let bestError = '';
 
       for (let i = 0; i < endpoints.length; i++) {
         const url = endpoints[i];
@@ -1707,7 +1808,13 @@ export default function PromoDetailUnified() {
             break;
           }
 
-          lastError = json?.message || json?.error || `HTTP ${res.status}`;
+          // Prefer a meaningful message from the first failing endpoint;
+          // don't let a later 404 fallback overwrite earlier specific reasons (e.g. stok habis)
+          const msg = json?.message || json?.error || `HTTP ${res.status}`;
+          if (!bestError || (res.status !== 404 && !/http\s*404/i.test(bestError))) {
+            bestError = msg;
+          }
+          lastError = msg;
           if (i < endpoints.length - 1) await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           lastError = e?.message || 'Network error';
@@ -1716,7 +1823,7 @@ export default function PromoDetailUnified() {
       }
 
       if (!savedItem) {
-        const low = String(lastError || '').toLowerCase();
+        const low = String(bestError || lastError || '').toLowerCase();
         if (low.includes('habis') || low.includes('stok') || low.includes('stock')) {
           setErrorMessage('Maaf, stok promo sudah habis.');
           setShowErrorModal(true);
@@ -1729,13 +1836,18 @@ export default function PromoDetailUnified() {
           setShowErrorModal(true);
           return;
         }
+        if (low.includes('member') || low.includes('komunitas') || low.includes('community')) {
+          setErrorMessage('Anda harus menjadi member komunitas untuk merebut promo ini.');
+          setShowErrorModal(true);
+          return;
+        }
         if (low.includes('too many') || low.includes('attempts') || low.includes('rate limit')) {
           setErrorMessage('Terlalu banyak percobaan. Silakan tunggu sebentar dan coba lagi.');
           setShowErrorModal(true);
           return;
         }
 
-        setErrorMessage(lastError || 'Gagal merebut promo. Silakan coba lagi.');
+        setErrorMessage(bestError || lastError || 'Gagal merebut promo. Silakan coba lagi.');
         setShowErrorModal(true);
         return;
       }
@@ -1919,16 +2031,7 @@ export default function PromoDetailUnified() {
               <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
 
-              {/* Kotak Kategori - Sama seperti di home */}
-              <div className="mb-4">
-                <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                  <span className="text-slate-700 text-sm font-medium mr-2">Kategori:</span>
-                  <span className="bg-white text-slate-800 text-xs font-semibold px-3 py-1 rounded-md border border-slate-300 flex items-center gap-1">
-                    {getCategoryIcon(promoData.categoryLabel)}
-                    {promoData.categoryLabel}
-                  </span>
-                </div>
-              </div>
+              {/* Kategori dihapus sesuai permintaan: tidak menampilkan badge "Kategori: Promo" di bawah detail */}
 
               <div className="text-left">
                 <button
