@@ -751,79 +751,160 @@ export default function PromoDetailUnified() {
     return communityData?.bg_color_1 || '#16a34a'; // fallback ke green-600
   }, [communityData?.bg_color_1]);
 
+  // === Helper: map Ad -> promoData unified (dipakai saat fallback ke /admin/ads/{id}) ===
+  const mapAdToUnifiedPromo = useCallback((ad) => {
+    if (!ad) return null;
+    const cube = ad.cube || {};
+    const tags = Array.isArray(cube?.tags) ? cube.tags : [];
+    const primaryTag = tags.find(t => t?.map_lat != null && t?.map_lng != null) || tags[0] || null;
+
+    // status online/offline
+    const isOnline = String(ad?.promo_type || '').toLowerCase() === 'online';
+
+    // compose seller/owner info
+    const sellerName =
+      cube?.user?.name ||
+      cube?.corporate?.name ||
+      ad?.owner_name ||
+      'Penjual';
+    const sellerPhone =
+      cube?.user?.phone ||
+      cube?.corporate?.phone ||
+      ad?.owner_contact ||
+      null;
+
+    // link informasi (online store) fallback dari cube tag link
+    const linkInfo =
+      ad?.online_store_link ||
+      primaryTag?.link ||
+      cube?.link_information ||
+      '';
+
+    // gambar (biarkan ImageCarousel gunakan promoImages hook)
+    const images = [ad?.image_1, ad?.image_2, ad?.image_3, ad?.picture_source, ad?.image]
+      .filter(Boolean);
+
+    // stok: null = unlimited
+    const remainingStock = ad?.remaining_stock ?? ad?.total_remaining ?? (ad?.unlimited_grab ? null : ad?.max_grab);
+
+    // jadwal untuk UI
+    const schedule = buildScheduleFromAd(ad);
+
+    return {
+      // penting: id gunakan id iklan agar claim-direct via promo_items tetap bekerja (BE sudah handle)
+      id: ad.id,
+      code: ad.code,
+      title: ad.title,
+      description: ad.description,
+      detail: ad.detail,
+      start_date: ad.start_validate || null,
+      end_date: ad.finish_validate || null,
+      finish_validate: ad.finish_validate || null, // untuk teks "Berlaku hingga"
+      jam_mulai: ad.jam_mulai || '00:00:00',
+      jam_berakhir: ad.jam_berakhir || '23:59:59',
+      validation_time_limit: ad.validation_time_limit || null,
+
+      // kategori/label
+      categoryLabel: getCategoryLabel(ad, cube),
+
+      // status online/offline untuk badge
+      status: {
+        type: isOnline ? 'Online' : 'Offline',
+        description: isOnline ? 'Berlaku di Toko Online' : 'Datang ke lokasi',
+      },
+
+      // lokasi
+      location: primaryTag?.address || cube?.address || '',
+      link_information: linkInfo,
+
+      // gambar list biar promoImages bisa baca
+      images,
+
+      // stok
+      remaining_stock: remainingStock,
+      unlimited_grab: !!ad?.unlimited_grab,
+      is_daily_grab: !!ad?.is_daily_grab,
+
+      // jadwal komponen UI
+      schedule,
+
+      // data mentah untuk kalkulasi jarak/koordinat di efek lain
+      rawCube: cube,
+      community_id: ad?.community_id || cube?.community_id || null,
+    };
+  }, [buildScheduleFromAd, getCategoryLabel]);
+
   // Ubah fetchPromoDetails: urutan berbeda untuk QR scan vs normal navigation
   const fetchPromoDetails = useCallback(async () => {
-    if (!router.isReady || !effectivePromoId) {
-      console.log('⏸️ Skip fetch: router not ready or no promo ID');
-      return;
-    }
+    if (!router.isReady) return;
+    if (!effectivePromoId) return;
 
+    // cegah double-run
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
+    setLoading(true);
     try {
-      setLoading(true);
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(authHeader() || {}),
+      };
 
-      // ✅ SELALU GUNAKAN ENDPOINT DENGAN AUTH
-      const endpoint = communityId 
-        ? `communities/${communityId}/promos/${effectivePromoId}`
-        : `promos/${effectivePromoId}`;
+      // 1) Coba ambil sebagai PROMO dulu
+      const promoRes = await fetch(`${apiUrl}/promos/${encodeURIComponent(effectivePromoId)}`, { headers });
+      if (promoRes.ok) {
+        const resp = await promoRes.json();
+        const data = resp?.data || resp; // jaga-jaga bentuk payload
+        // pastikan beberapa field kunci ada
+        const unified = {
+          ...data,
+          categoryLabel: getCategoryLabel(data?.ad || data, data?.cube || data?.rawCube),
+          schedule: buildScheduleFromAd(data?.ad || data),
+        };
+        setPromoData(unified);
 
-      console.log('📡 Fetching from:', endpoint, '(with auth)');
+        // update communityId dari payload bila tersedia
+        const cid = data?.community_id || data?.rawCube?.community_id;
+        if (cid && !communityId) setCommunityId(cid);
 
-      const response = await get({ 
-        path: endpoint,
-        headers: authHeader() // ✅ WAJIB AUTH HEADER
-      });
-
-      if (!response || response.status !== 200) {
-        console.error('❌ Fetch failed:', response);
-        setPromoData(null);
         setLoading(false);
         return;
       }
 
-      const raw = response.data?.data || response.data;
-      console.log('✅ Raw promo data:', raw);
+      // 2) Jika 404 → fallback ke ADS (sering terjadi jika QR berisi id iklan)
+      if (promoRes.status === 404) {
+        const adRes = await fetch(`${apiUrl}/admin/ads/${encodeURIComponent(effectivePromoId)}`, { headers });
+        if (adRes.ok) {
+          const adPayload = await adRes.json();
+          const ad = adPayload?.data || adPayload;
+          const unifiedFromAd = mapAdToUnifiedPromo(ad);
 
-      // Transform data sesuai kebutuhan UI
-      const transformed = {
-        ...raw,
-        start_date: raw.start_date || raw.created_at,
-        end_date: raw.end_date || raw.expires_at || raw.finish_validate,
-        jam_mulai: raw.jam_mulai || '00:00:00',
-        jam_berakhir: raw.jam_berakhir || '23:59:59',
-        
-        seller: {
-          name: raw.owner_name || raw.seller?.name || 'Penjual',
-          phone: raw.owner_contact || raw.seller?.phone || '-',
-        },
-        
-        status: {
-          type: raw.promo_type === 'online' ? 'Online' : 'Offline',
-          description: raw.promo_type === 'online' 
-            ? 'Promo dapat digunakan secara online' 
-            : 'Promo dapat digunakan di lokasi',
-        },
-        
-        location: raw.location || raw.address || '-',
-        distance: '- km',
-        coordinates: raw.map_lat && raw.map_lng 
-          ? `${raw.map_lat}, ${raw.map_lng}` 
-          : '-',
-        
-        schedule: buildScheduleFromAd(raw),
-        categoryLabel: getCategoryLabel(raw),
-        link_information: raw.online_store_link || raw.link_information,
-      };
+          if (!unifiedFromAd) {
+            throw new Error('Gagal memetakan data iklan');
+          }
 
-      console.log('🔥 Transformed promo data:', transformed);
-      setPromoData(transformed);
+          setPromoData(unifiedFromAd);
 
-    } catch (error) {
-      console.error('❌ Fetch error:', error);
+          // set communityId jika ada
+          if (unifiedFromAd.community_id && !communityId) {
+            setCommunityId(unifiedFromAd.community_id);
+          }
+
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 3) Selain 404 atau gagal semua
+      console.error('❌ Fetch failed detail promo/ads', { status: promoRes.status });
       setPromoData(null);
-    } finally {
+      setLoading(false);
+    } catch (err) {
+      console.error('❌ Fetch exception detail promo', err);
+      setPromoData(null);
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, communityId, buildScheduleFromAd]);
+  }, [router.isReady, effectivePromoId, apiUrl, communityId, mapAdToUnifiedPromo, buildScheduleFromAd, getCategoryLabel]);
 
   // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
