@@ -230,10 +230,9 @@ function KubusMain() {
       'ads[sell_per_day]': ad?.sell_per_day || '',
     };
 
-    const stockSource = ad?.stock_source || (ad?.max_grab != null ? 'ad' : 'promo');
-    const maxGrabForForm = stockSource === 'promo'
-      ? (ad?.remaining_stock ?? '') // ambil stok dari promos
-      : (ad?.max_grab ?? '');
+    // Untuk voucher harian: stock = stok per hari (tidak berubah)
+    // Untuk voucher normal: stock = total sisa
+    const maxGrabForForm = ad?.max_grab ?? '';  // ✅ BENAR! ad.max_grab = 10
 
     const mappedDataFinal = {
       ...mappedData,
@@ -343,16 +342,56 @@ function KubusMain() {
               width: '200px',
               item: ({ ads }) => {
                 const ad = ads?.[0] || {};
-                const sisa = ad?.remaining_stock;     // null = unlimited
                 const harian = !!ad?.is_daily_grab;
+                const unlimited = !!ad?.unlimited_grab;
+                const adType = ad?.type || 'promo';
 
-                if (sisa === null || ad?.unlimited_grab) {
+                if (unlimited) {
                   return <FontAwesomeIcon icon={faInfinity} />;
                 }
 
+                if (adType === 'iklan') {
+                  return '-';
+                }
+
+                const label = adType === 'voucher' ? 'Voucher' : 'Promo';
+
+                // ✅ PERBAIKAN FRONTEND: Untuk voucher harian, hitung ulang dari max_grab
+                // Karena backend bug tidak filter date di list endpoint
+                let displayStock = ad?.total_remaining ?? 0;
+
+                if (harian && ad?.max_grab !== undefined) {
+                  // Untuk harian: tampilkan max_grab sebagai "total per hari"
+                  // karena backend list endpoint tidak menghitung remaining dengan benar
+                  // User akan lihat stok tetap (misal: 5/Hari) sampai klik detail
+                  displayStock = ad.max_grab;
+
+                  // Note: Stok real-time akan tampil di GrabListComponent yang sudah benar
+                }
+
                 return harian
-                  ? `${sisa} Promo / Hari`
-                  : `${sisa} Promo`;
+                  ? `${displayStock} ${label} / Hari`
+                  : `${displayStock} ${label}`;
+              },
+            },
+            {
+              selector: 'is_daily_grab',
+              label: 'Tipe',
+              sortable: true,
+              width: '120px',
+              item: ({ ads }) => {
+                const ad = ads?.[0] || {};
+                const harian = !!ad?.is_daily_grab;
+
+                return harian ? (
+                  <span className="uppercase font-medium text-blue-600 py-1 px-2.5 rounded-md text-sm bg-blue-100">
+                    Harian
+                  </span>
+                ) : (
+                  <span className="uppercase font-medium text-gray-600 py-1 px-2.5 rounded-md text-sm bg-gray-100">
+                    Normal
+                  </span>
+                );
               },
             },
 
@@ -405,7 +444,16 @@ function KubusMain() {
             'ads[detail]': '',
           },
           transformData: (formData) => {
+            // eslint-disable-next-line no-console
+            console.log('🟢 [TRANSFORM] START - All formData:', formData);
+            // eslint-disable-next-line no-console
+            console.log('🟢 [TRANSFORM] ads[max_grab] =', formData['ads[max_grab]']);
+            // eslint-disable-next-line no-console
+            console.log('🟢 [TRANSFORM] Type:', typeof formData['ads[max_grab]']);
+
             if (formData.content_type === 'voucher') {
+              // eslint-disable-next-line no-console
+              console.log('[TRANSFORM] ✅ Is voucher, calling helper...');
               // eslint-disable-next-line no-console
               console.log('[TRANSFORM] 🔍 Processing voucher data...');
               // eslint-disable-next-line no-console
@@ -441,6 +489,12 @@ function KubusMain() {
 
                 // eslint-disable-next-line no-console
                 console.log('[TRANSFORM] ✅ Validation passed, returning transformed data');
+                // eslint-disable-next-line no-console
+                console.log('🟣 [TRANSFORM] FINAL DATA BEFORE SUBMIT:', transformedData);
+                // eslint-disable-next-line no-console
+                console.log('🟣 [TRANSFORM] FINAL ads[max_grab] =', transformedData['ads[max_grab]']);
+                // eslint-disable-next-line no-console
+                console.log('🟣 [TRANSFORM] FINAL _voucher_sync_data.stock =', transformedData._voucher_sync_data?.stock);
                 return transformedData;
               } catch (error) {
                 // eslint-disable-next-line no-console
@@ -968,17 +1022,28 @@ function KubusMain() {
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <InputNumberComponent
-                        type="number"
-                        name="ads[max_grab]"
-                        label={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? 'Jumlah Promo Per Hari' : 'Jumlah Promo'}
-                        placeholder={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? 'Promo yang bisa diambil dalam satu hari...' : 'Masukan Jumlah Promo...'}
-                        validations={{ required: true }}
-                        onChange={(e) => setValues([...values.filter((i) => i.name != 'ads[max_grab]'), { name: 'ads[max_grab]', value: e }])}
-                        value={values.find((i) => i.name == 'ads[max_grab]')?.value}
-                        error={errors.find((i) => i.name == 'ads[max_grab]')?.error}
-                        disabled={values?.find((i) => i.name == 'ads[unlimited_grab]')?.value}
-                      />
+                      <div className="space-y-1">
+                        <InputNumberComponent
+                          type="number"
+                          name="ads[max_grab]"
+                          label={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? 'Jumlah Promo Per Hari' : 'Jumlah Promo'}
+                          placeholder={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? 'Promo yang bisa diambil dalam satu hari...' : 'Masukan Jumlah Promo...'}
+                          validations={{
+                            required: !values?.find((i) => i.name == 'ads[unlimited_grab]')?.value, // Wajib jika bukan unlimited
+                            min: 1 // Minimal 1
+                          }}
+                          onChange={(e) => {
+                            // eslint-disable-next-line no-console
+                            console.log('🔵 [INPUT] User typed max_grab:', e);
+                            // eslint-disable-next-line no-console
+                            console.log('🔵 [INPUT] Type of e:', typeof e);
+                            setValues([...values.filter((i) => i.name != 'ads[max_grab]'), { name: 'ads[max_grab]', value: e }]);
+                          }}
+                          value={values.find((i) => i.name == 'ads[max_grab]')?.value}
+                          error={errors.find((i) => i.name == 'ads[max_grab]')?.error}
+                          disabled={values?.find((i) => i.name == 'ads[unlimited_grab]')?.value}
+                        />
+                      </div>
                       <InputTimeComponent
                         name="ads[validation_time_limit]"
                         label="Batas Waktu Validasi"
@@ -1255,6 +1320,35 @@ function KubusMain() {
           }),
           contentType: 'multipart/form-data',
           updateEndpointOverride: (data) => `admin/ads/${data?.ads?.[0]?.id}`,
+          // 🔥 CRITICAL: Tambahkan transformData untuk ads edit mode
+          transformData: (formData) => {
+            // eslint-disable-next-line no-console
+            console.log('🟠 [TRANSFORM UPDATE] START - formData for ads edit:', formData);
+            // eslint-disable-next-line no-console
+            console.log('🟠 [TRANSFORM UPDATE] ads[max_grab] =', formData['ads[max_grab]']);
+
+            if (formData.content_type === 'voucher') {
+              // eslint-disable-next-line no-console
+              console.log('🟠 [TRANSFORM UPDATE] Is voucher, calling helper...');
+
+              try {
+                const transformedData = prepareKubusVoucherData(formData);
+
+                // eslint-disable-next-line no-console
+                console.log('🟠 [TRANSFORM UPDATE] Transformed data:', transformedData);
+                // eslint-disable-next-line no-console
+                console.log('🟠 [TRANSFORM UPDATE] FINAL max_grab =', transformedData.max_grab);
+
+                return transformedData;
+              } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('🟠 [TRANSFORM UPDATE] ERROR:', error);
+                throw error;
+              }
+            }
+
+            return formData;
+          },
         } : {
           customDefaultValue: mapUpdateDefault,
           contentType: 'multipart/form-data',

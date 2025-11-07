@@ -81,7 +81,14 @@ export const transformKubusVoucherToManagement = (formData, adId) => {
  * - Target: target_type → ke ads.target_type + vouchers.target_type
  */
 export const prepareKubusVoucherData = (formData) => {
-  
+  // eslint-disable-next-line no-console
+  console.log('🔍 [prepareKubusVoucherData] Input formData keys:', Object.keys(formData));
+  // eslint-disable-next-line no-console
+  console.log('🔍 [prepareKubusVoucherData] ads[max_grab] value:', formData['ads[max_grab]']);
+  // eslint-disable-next-line no-console
+  console.log('🔍 [prepareKubusVoucherData] ads[title] value:', formData['ads[title]']);
+  // eslint-disable-next-line no-console
+  console.log('🔍 [prepareKubusVoucherData] ads[validation_type] value:', formData['ads[validation_type]']);
 
   // ✅ CRITICAL FIX: Hanya process jika content_type adalah 'voucher'
   if (formData.content_type !== 'voucher') {
@@ -102,8 +109,16 @@ export const prepareKubusVoucherData = (formData) => {
     ownerPhone = formData.owner_phone || 'TO_BE_RESOLVED';
   }
 
+  // 🔥 CRITICAL: Extract max_grab value dari formData
+  const maxGrabValue = parseInt(formData['ads[max_grab]'] || formData.max_grab || formData.ads?.max_grab || 0);
+  // eslint-disable-next-line no-console
+  console.log('🟡 [HELPER] Extracted max_grab:', maxGrabValue);
+
   const enrichedData = {
     ...formData,
+    
+    // 🔥 SET max_grab di root level untuk backend AdController
+    max_grab: maxGrabValue,
 
     // Data untuk tabel ads (kubus) - menggunakan field yang sudah ada
     ads: {
@@ -113,6 +128,7 @@ export const prepareKubusVoucherData = (formData) => {
       validation_type: formData.ads?.validation_type || 'auto',
       target_type: formData.target_type || 'all',
       community_id: formData.target_type === 'community' ? formData.community_id : null,
+      max_grab: maxGrabValue, // 🔥 Juga set di ads object untuk konsistensi
     },
 
     // ✅ PERBAIKAN: Flag untuk backend dengan data lengkap
@@ -121,13 +137,13 @@ export const prepareKubusVoucherData = (formData) => {
     // ✅ PERBAIKAN: Data voucher management - SEMUA FIELD yang dibutuhkan
     _voucher_sync_data: {
       // Data dasar voucher - FIX FIELD MAPPING
-      name: formData.ads?.title || formData['ads.title'] || formData.title || 'Voucher Tanpa Nama',
-      description: formData.ads?.description || formData['ads.description'] || formData.description || '',
+      name: formData['ads[title]'] || formData.ads?.title || formData['ads.title'] || formData.title || 'Voucher Tanpa Nama',
+      description: formData['ads[description]'] || formData.ads?.description || formData['ads.description'] || formData.description || '',
       type: 'voucher',
 
-      // ✅ STOCK DAN VALIDITAS (field yang hilang) - FIX FIELD MAPPING
-      stock: parseInt(formData.ads?.max_grab || formData['ads.max_grab'] || formData.max_grab || 0),
-      valid_until: formatDateForBackend(formData.ads?.finish_validate || formData['ads.finish_validate'] || formData.finish_validate),
+      // 🔥 Use extracted value
+      stock: maxGrabValue,
+      valid_until: formatDateForBackend(formData['ads[finish_validate]'] || formData.ads?.finish_validate || formData['ads.finish_validate'] || formData.finish_validate),
 
       // ✅ GAMBAR: Backend akan handle image upload dari FormData terpisah
       // Jangan kirim File object di voucher sync data karena akan cause error
@@ -142,18 +158,18 @@ export const prepareKubusVoucherData = (formData) => {
       owner_phone: ownerPhone,
       owner_user_id: ownerUserId, // untuk backend resolve jika perlu
 
-      // ✅ VALIDASI SETTINGS - FIX FIELD MAPPING
-      validation_type: formData.ads?.validation_type || formData['ads.validation_type'] || formData.validation_type || 'auto',
+      // ✅ VALIDASI SETTINGS - FIX FIELD MAPPING dengan prioritas kurung siku
+      validation_type: formData['ads[validation_type]'] || formData.ads?.validation_type || formData['ads.validation_type'] || formData.validation_type || 'auto',
       // ✅ FIX: Handle code based on validation_type
       code: (() => {
-        const validationType = formData.ads?.validation_type || formData['ads.validation_type'] || formData.validation_type || 'auto';
+        const validationType = formData['ads[validation_type]'] || formData.ads?.validation_type || formData['ads.validation_type'] || formData.validation_type || 'auto';
         
         
         
         if (validationType === 'manual') {
           // Use user-provided code for manual validation
-          // PENTING: Cek semua kemungkinan field name
-          const userCode = formData.ads?.code || formData['ads.code'] || formData['ads[code]'] || formData.code || '';
+          // PENTING: Cek semua kemungkinan field name dengan prioritas kurung siku
+          const userCode = formData['ads[code]'] || formData.ads?.code || formData['ads.code'] || formData.code || '';
           const trimmedCode = String(userCode).trim();
           
           
@@ -199,7 +215,35 @@ export const prepareKubusVoucherData = (formData) => {
     }
   };
 
+  // eslint-disable-next-line no-console
+  console.log('✅ [prepareKubusVoucherData] Final stock value:', enrichedData._voucher_sync_data.stock);
+  // eslint-disable-next-line no-console
+  console.log('✅ [prepareKubusVoucherData] Final enrichedData:', enrichedData);
+  // eslint-disable-next-line no-console
+  console.log('🔴 [CRITICAL CHECK] enrichedData.max_grab (root level) =', enrichedData.max_grab);
+  // eslint-disable-next-line no-console
+  console.log('🔴 [CRITICAL CHECK] enrichedData.ads.max_grab =', enrichedData.ads?.max_grab);
+  // eslint-disable-next-line no-console
+  console.log('🔴 [CRITICAL CHECK] enrichedData[\'ads[max_grab]\'] =', enrichedData['ads[max_grab]']);
+  // eslint-disable-next-line no-console
+  console.log('🔴 [CRITICAL CHECK] enrichedData._voucher_sync_data.stock =', enrichedData._voucher_sync_data.stock);
   
+  // ⚠️ WARNING: Cek apakah ada duplicate field
+  if (enrichedData['ads[max_grab]'] && enrichedData._voucher_sync_data.stock) {
+    // eslint-disable-next-line no-console
+    console.warn('⚠️⚠️⚠️ DUPLICATE DETECTED! Both ads[max_grab] and _voucher_sync_data.stock exist!');
+    // eslint-disable-next-line no-console
+    console.warn('   This may cause backend to receive DOUBLE data!');
+  }
+  
+  // ✅ VERIFY: max_grab tersedia di root level untuk backend
+  if (enrichedData.max_grab) {
+    // eslint-disable-next-line no-console
+    console.log('✅✅✅ SUCCESS! enrichedData.max_grab is set at root level =', enrichedData.max_grab);
+  } else {
+    // eslint-disable-next-line no-console
+    console.error('❌❌❌ ERROR! enrichedData.max_grab is NOT set at root level!');
+  }
 
   return enrichedData;
 };
@@ -215,21 +259,21 @@ export const validateVoucherData = (formData) => {
   if (formData.content_type === 'voucher') {
     // ✅ VALIDASI FIELD YANG SUDAH ADA (akan di-sync ke 2 tabel)
 
-    // Judul (ads[title] → ads.title + vouchers.name)  
-    if (!formData.ads?.title) {
+    // Judul (ads[title] → ads.title + vouchers.name) - prioritas kurung siku
+    if (!formData['ads[title]'] && !formData.ads?.title) {
       errors.title = 'Judul voucher wajib diisi';
     }
 
-    // Jumlah Promo (ads[max_grab] → ads.max_grab + vouchers.stock)
-    const maxGrab = formData.ads?.max_grab;
+    // Jumlah Promo (ads[max_grab] → ads.max_grab + vouchers.stock) - prioritas kurung siku
+    const maxGrab = formData['ads[max_grab]'] || formData.ads?.max_grab;
     if (!maxGrab) {
       errors.max_grab = 'Jumlah promo wajib diisi (akan menjadi stok voucher)';
     } else if (parseInt(maxGrab || 0) < 1) {
       errors.max_grab = 'Jumlah promo minimal 1';
     }
 
-    // Berakhir Pada (ads[finish_validate] → ads.finish_validate + vouchers.valid_until)
-    if (!formData.ads?.finish_validate) {
+    // Berakhir Pada (ads[finish_validate] → ads.finish_validate + vouchers.valid_until) - prioritas kurung siku
+    if (!formData['ads[finish_validate]'] && !formData.ads?.finish_validate) {
       errors.finish_validate = 'Tanggal berakhir pada wajib diisi';
     }
 
@@ -258,9 +302,10 @@ export const validateVoucherData = (formData) => {
       }
     }
 
-    // Kode manual (ads[code] → ads.code + vouchers.code)
-    if (formData.ads?.validation_type === 'manual') {
-      const code = formData.ads?.code || formData['ads.code'] || '';
+    // Kode manual (ads[code] → ads.code + vouchers.code) - prioritas kurung siku
+    const validationType = formData['ads[validation_type]'] || formData.ads?.validation_type || 'auto';
+    if (validationType === 'manual') {
+      const code = formData['ads[code]'] || formData.ads?.code || formData['ads.code'] || '';
       if (!code || !String(code).trim()) {
         errors.code = 'Kode validasi wajib diisi untuk tipe validasi manual';
       } else {

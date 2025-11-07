@@ -38,6 +38,8 @@ export default function NotificationPage() {
   const [showVoucherExpiredModal, setShowVoucherExpiredModal] = useState(false);
   // NEW: disable button while verifying/claiming
   const [claimingId, setClaimingId] = useState(null);
+  // ✅ NEW: simpan ID notifikasi yang sedang diproses untuk modal
+  const [processingNotificationId, setProcessingNotificationId] = useState(null);
   // Guard concurrent loads and apply cooldown to avoid 429
   const inFlightRef = useRef(false);
   const cooldownRef = useRef(0);
@@ -533,17 +535,23 @@ export default function NotificationPage() {
     try {
       console.log('Claiming voucher:', { voucherId, notificationId });
       setClaimingId(notificationId);
+      setProcessingNotificationId(notificationId); // ✅ Simpan untuk digunakan di modal
 
       // Pre-check dari payload notifikasi (mungkin stale)
       const notif = localItems.find((n) => n.id === notificationId);
       if (notif && isVoucherExpired(notif)) {
         setShowVoucherExpiredModal(true);
-        // Mark handled on server so it won't come back on refresh
-        markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+        // ✅ PERBAIKAN: Hanya hapus notifikasi jika BUKAN voucher harian
+        const isDaily = notif?.live_is_daily_grab === true || notif?.is_daily_grab === true;
+        if (!isDaily) {
+          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+        }
         setTimeout(() => {
           setShowVoucherExpiredModal(false);
-          setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
-          setVersion((v) => v + 1);
+          if (!isDaily) {
+            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+            setVersion((v) => v + 1);
+          }
         }, 3000);
         return;
       }
@@ -558,25 +566,32 @@ export default function NotificationPage() {
           String(live?.status || '').toLowerCase() === 'expired';
         if (expiredLive) {
           setShowVoucherExpiredModal(true);
-          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+          // ✅ PERBAIKAN: Hanya hapus notifikasi jika BUKAN voucher harian
+          const isDaily = live?.is_daily_grab === true;
+          if (!isDaily) {
+            markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+          }
           setTimeout(() => {
             setShowVoucherExpiredModal(false);
-            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
-            setVersion((v) => v + 1);
+            if (!isDaily) {
+              setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+              setVersion((v) => v + 1);
+            }
           }, 3000);
           return;
         }
 
-        // Optional: guard jika stok sudah habis
-        const stockLeft = Number(live?.stock ?? live?.remaining ?? live?.quota_remaining ?? NaN);
+        // ✅ PERBAIKAN: Guard jika stok sudah habis
+        const stockLeft = Number(live?.stock ?? live?.remaining ?? live?.quota_remaining ?? live?.total_remaining ?? NaN);
+        const isDaily = live?.is_daily_grab === true;
+
         if (Number.isFinite(stockLeft) && stockLeft <= 0) {
           setShowVoucherOutOfStockModal(true);
-          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
-          setTimeout(() => {
-            setShowVoucherOutOfStockModal(false);
-            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
-            setVersion((v) => v + 1);
-          }, 3000);
+          // ✅ JANGAN hapus notifikasi jika voucher harian (akan restock besok)
+          if (!isDaily) {
+            markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+          }
+          // ✅ Modal akan ditutup manual oleh user, tidak auto-close
           return;
         }
       }
@@ -633,11 +648,18 @@ export default function NotificationPage() {
           msg.includes('sudah berakhir')
         ) {
           setShowVoucherExpiredModal(true);
-          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+          // ✅ PERBAIKAN: Hanya hapus notifikasi jika BUKAN voucher harian
+          const notif = localItems.find((n) => n.id === notificationId);
+          const isDaily = notif?.live_is_daily_grab === true || notif?.is_daily_grab === true;
+          if (!isDaily) {
+            markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+          }
           setTimeout(() => {
             setShowVoucherExpiredModal(false);
-            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
-            setVersion((v) => v + 1);
+            if (!isDaily) {
+              setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
+              setVersion((v) => v + 1);
+            }
           }, 3000);
           return;
         }
@@ -649,12 +671,13 @@ export default function NotificationPage() {
           res.status === 410
         ) {
           setShowVoucherOutOfStockModal(true);
-          markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
-          setTimeout(() => {
-            setShowVoucherOutOfStockModal(false);
-            setLocalItems((prev) => prev.filter((n) => n.id !== notificationId));
-            setVersion((v) => v + 1);
-          }, 3000);
+          // ✅ PERBAIKAN: JANGAN hapus notifikasi jika voucher harian (akan restock besok)
+          const notif = localItems.find((n) => n.id === notificationId);
+          const isDaily = notif?.live_is_daily_grab === true || notif?.is_daily_grab === true;
+          if (!isDaily) {
+            markNotificationHandled(notificationId).then(() => emitNotificationChanged(type, notificationId));
+          }
+          // ✅ Modal akan ditutup manual oleh user via tombol Tutup
           return;
         }
 
@@ -680,6 +703,7 @@ export default function NotificationPage() {
       setModalMessage('Gagal klaim: ' + (e?.message || 'Network error'));
       setShowErrorModal(true);
     } finally {
+      // ✅ Reset hanya claimingId, tapi pertahankan processingNotificationId untuk modal
       setClaimingId(null);
     }
   }
@@ -1090,11 +1114,37 @@ export default function NotificationPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Voucher Sudah Habis</h3>
-                <p className="text-gray-600 text-sm mb-4">Maaf, voucher ini sudah tidak tersedia lagi. Notifikasi akan dihapus otomatis.</p>
-                <div className="text-orange-600 text-xs font-medium">
-                  Popup akan tertutup otomatis dalam 3 detik
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Stok Voucher Habis</h3>
+                <p className="text-gray-600 text-sm mb-6">
+                  Maaf, stok voucher ini sudah habis untuk hari ini.
+                  {/* ✅ Tampilkan info restock untuk voucher harian */}
+                  {(() => {
+                    const notif = localItems.find((n) => n.id === processingNotificationId);
+                    const isDaily = notif?.live_is_daily_grab === true || notif?.is_daily_grab === true;
+                    return isDaily ? (
+                      <span className="block mt-2 text-blue-600 font-medium text-xs">
+                        💡 Voucher harian akan restock otomatis besok!
+                      </span>
+                    ) : null;
+                  })()}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVoucherOutOfStockModal(false);
+                    // ✅ Hapus dari list HANYA jika bukan voucher harian
+                    const notif = localItems.find((n) => n.id === processingNotificationId);
+                    const isDaily = notif?.live_is_daily_grab === true || notif?.is_daily_grab === true;
+                    if (!isDaily) {
+                      setLocalItems((prev) => prev.filter((n) => n.id !== processingNotificationId));
+                      setVersion((v) => v + 1);
+                    }
+                    setProcessingNotificationId(null); // ✅ Reset setelah tutup modal
+                  }}
+                  className="px-6 py-2 rounded-lg text-sm font-semibold bg-orange-600 text-white hover:bg-orange-700 transition"
+                >
+                  Tutup
+                </button>
               </div>
             </div>
           </div>

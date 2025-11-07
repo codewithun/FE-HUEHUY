@@ -591,12 +591,13 @@ export default function Save() {
     // kadaluwarsa? stop (gunakan helper konsisten)
     if (isExpiredItem(item)) return false;
 
+    // ✅ VOUCHER: Jika voucher_item exists, berarti sudah diklaim
+    // Stok berkurang saat KLAIM (bukan validasi), jadi skip cek stok
     if (item?.type === 'voucher' || item?.voucher) {
-      if (item?.voucher_item) return true;
+      if (item?.voucher_item) return true; // Sudah di saku, pasti bisa divalidasi
       const voucher = item?.voucher || item?.ad;
-      const hasStock = voucher?.stock === undefined || voucher?.stock > 0;
       const isVoucherActive = voucher?.status !== 'inactive' && voucher?.status !== 'disabled';
-      return hasStock && isVoucherActive;
+      return isVoucherActive; // Skip cek stok global
     }
 
     const promo = item?.ad;
@@ -702,17 +703,21 @@ export default function Save() {
       );
     }
 
+    // ✅ VOUCHER: Jika sudah ada di saku (voucher_item exists), berarti sudah diklaim
+    // Stok berkurang saat KLAIM, bukan saat validasi
+    // Jadi voucher di saku pasti masih valid untuk digunakan
     if (item?.type === 'voucher' || item?.voucher) {
       const voucher = item?.voucher || item?.ad;
-      const hasStock = voucher?.stock === undefined || voucher?.stock > 0;
       const isVoucherActive = voucher?.status !== 'inactive' && voucher?.status !== 'disabled';
 
-      if (!hasStock || !isVoucherActive) {
+      // ⚠️ Hanya cek status aktif, SKIP cek stok global
+      // Karena voucher_item sudah di-assign ke user ini saat klaim
+      if (!isVoucherActive) {
         return (
           <div className="flex items-center gap-1">
             <FontAwesomeIcon icon={faTimesCircle} className="text-danger text-xs" />
             <span className="font-medium text-danger bg-red-50 px-2 py-1 rounded-full text-xs">
-              {!hasStock ? 'Voucher Habis' : 'Voucher Tidak Tersedia'}
+              Voucher Tidak Tersedia
             </span>
           </div>
         );
@@ -1098,7 +1103,7 @@ export default function Save() {
                   Jelajahi komunitas dan kumpulkan promo untuk mengisi saku Anda
                 </p>
                 <button
-                  onClick={() => router.push('/app/komunitas')}
+                  onClick={() => router.push('/app/komunitas/komunitas')}
                   className="bg-primary text-white px-6 py-3 rounded-[12px] font-semibold hover:bg-opacity-90 transition-all"
                 >
                   Cari Promo
