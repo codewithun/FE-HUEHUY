@@ -562,7 +562,6 @@ const CommunityPromoPage = () => {
       // Store headers for use in AdCategoryWidget
       setAuthHeaders(authHeaders);
 
-      // ✅ Fetch SEMUA widgets untuk community ini (tanpa type filter di URL)
       const res = await fetch(`${apiBase}/api/admin/dynamic-content?type=hunting&community_id=${communityId}`, {
         headers: authHeaders
       });
