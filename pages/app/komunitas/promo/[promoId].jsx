@@ -67,7 +67,54 @@ const getCategoryLabel = (ad, cube = null) => {
   return 'Promo';
 };
 
-// Category icons & icon resolver removed (unused)
+// Professional SVG icons for categories
+const CategoryIcons = {
+  advertising: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z" />
+    </svg>
+  ),
+  information: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+    </svg>
+  ),
+  voucher: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M4,4A2,2 0 0,0 2,6V10C3.11,10 4,10.9 4,12A2,2 0 0,1 2,14V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V14C20.89,14 20,13.1 20,12A2,2 0 0,1 22,10V6A2,2 0 0,0 20,4H4M4,6H20V8.54C18.81,9.23 18,10.53 18,12C18,13.47 18.81,14.77 20,15.46V18H4V15.46C5.19,14.77 6,13.47 6,12C6,10.53 5.19,9.23 4,8.54V6Z" />
+    </svg>
+  ),
+  promo: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+    </svg>
+  ),
+  default: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+    </svg>
+  )
+};
+
+// Helper function to get appropriate icon for each category type
+const getCategoryIcon = (category) => {
+  const categoryLower = String(category || '').toLowerCase();
+
+  switch (categoryLower) {
+    case 'advertising':
+    case 'iklan':
+      return CategoryIcons.advertising;
+    case 'information':
+    case 'informasi':
+      return CategoryIcons.information;
+    case 'voucher':
+      return CategoryIcons.voucher;
+    case 'promo':
+      return CategoryIcons.promo;
+    default:
+      return CategoryIcons.default;
+  }
+};
 
 // Helper function to get category with icon and additional info
 // const getCategoryWithIcon = (ad, cube = null) => {
@@ -126,25 +173,6 @@ export default function PromoDetailUnified() {
 
   // State untuk communityId yang bisa diupdate
   const [communityId, setCommunityId] = useState(initialCommunityId);
-
-  // Jika datang dari QR (autoRegister) tapi belum login → lempar ke /qr-entry dengan qr_data=url saat ini
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!router.isReady) return;
-    const hasAutoRegister = !!(router.query?.autoRegister || router.query?.source);
-    if (!hasAutoRegister) return;
-    // cek token; jika sudah login, tidak perlu redirect
-    try {
-      const enc = Cookies.get(token_cookie_name);
-      const token = enc ? Decrypt(enc) : '';
-      if (token && token.trim() !== '') return;
-    } catch {}
-
-    const fullUrl = new URL(router.asPath, window.location.origin).toString();
-    const nextUrl = `/qr-entry?qr_data=${encodeURIComponent(fullUrl)}`;
-    // Hindari loop jika sudah berada di /qr-entry (seharusnya tidak terjadi di halaman ini)
-    router.replace(nextUrl);
-  }, [router, router.isReady, router.asPath, router.query?.autoRegister, router.query?.source]);
 
   // --- Resolve ID promo dari QR lama ---
   // helper aman ambil query string dari URL sebenarnya
@@ -550,7 +578,7 @@ export default function PromoDetailUnified() {
   // --- Fetch detail (stabil, anti double-run) ---
   const hasFetched = useRef(false);
 
-  // simpan posisi user untuk origin rute & perhitungan jarak
+  // simpan posisi user untuk origin rute
   const userPosRef = useRef(null);
   const promoCoordsRef = useRef(null);
 
@@ -599,55 +627,6 @@ export default function PromoDetailUnified() {
       coordinates: lat != null && lng != null ? fmtCoord(lat, lng) : '',
     };
   }, []);
-
-  // Hitung jarak promo dari posisi user (jika izin lokasi diberikan)
-  useEffect(() => {
-    if (!promoData) return;
-
-    const { lat, lng } = promoData || {};
-    if (lat == null || lng == null) return;
-
-    promoCoordsRef.current = { lat: Number(lat), lng: Number(lng) };
-
-    // Lengkapi koordinat dalam format teks bila kosong
-    if (!promoData.coordinates) {
-      const text = fmtCoord(Number(lat), Number(lng));
-      if (text) setPromoData((prev) => prev ? { ...prev, coordinates: text } : prev);
-    }
-
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords || {};
-          if (latitude == null || longitude == null) return;
-          userPosRef.current = { lat: latitude, lng: longitude };
-          const dKm = haversineKm(latitude, longitude, Number(lat), Number(lng));
-          setPromoData((prev) => prev ? { ...prev, distance: fmtKm(dKm) } : prev);
-        },
-        () => {
-          // user menolak izin lokasi → biarkan jarak default
-        },
-        { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }
-      );
-    }
-  }, [promoData]);
-
-  // Buka rute Google Maps dari posisi user (jika ada) ke lokasi promo
-  const openRouteMap = useCallback(() => {
-    const dst = promoCoordsRef.current || (promoData && promoData.lat != null && promoData.lng != null
-      ? { lat: Number(promoData.lat), lng: Number(promoData.lng) } : null);
-    if (!dst) return;
-
-    const origin = userPosRef.current;
-    const base = 'https://www.google.com/maps/dir/?api=1';
-    const params = new URLSearchParams({
-      destination: `${dst.lat},${dst.lng}`,
-      travelmode: 'driving',
-    });
-    if (origin) params.set('origin', `${origin.lat},${origin.lng}`);
-    const url = `${base}&${params.toString()}`;
-    if (typeof window !== 'undefined') window.open(url, '_blank');
-  }, [promoData]);
 
   // === MISSING HELPERS: day label, time range, tanggal Indonesia ===
   const DAY_ID = useMemo(() => ({
@@ -751,160 +730,451 @@ export default function PromoDetailUnified() {
     return communityData?.bg_color_1 || '#16a34a'; // fallback ke green-600
   }, [communityData?.bg_color_1]);
 
-  // === Helper: map Ad -> promoData unified (dipakai saat fallback ke /admin/ads/{id}) ===
-  const mapAdToUnifiedPromo = useCallback((ad) => {
-    if (!ad) return null;
-    const cube = ad.cube || {};
-    const tags = Array.isArray(cube?.tags) ? cube.tags : [];
-    const primaryTag = tags.find(t => t?.map_lat != null && t?.map_lng != null) || tags[0] || null;
-
-    // status online/offline
-    const isOnline = String(ad?.promo_type || '').toLowerCase() === 'online';
-
-    // compose seller/owner info
-    const sellerName =
-      cube?.user?.name ||
-      cube?.corporate?.name ||
-      ad?.owner_name ||
-      'Penjual';
-    const sellerPhone =
-      cube?.user?.phone ||
-      cube?.corporate?.phone ||
-      ad?.owner_contact ||
-      null;
-
-    // link informasi (online store) fallback dari cube tag link
-    const linkInfo =
-      ad?.online_store_link ||
-      primaryTag?.link ||
-      cube?.link_information ||
-      '';
-
-    // gambar (biarkan ImageCarousel gunakan promoImages hook)
-    const images = [ad?.image_1, ad?.image_2, ad?.image_3, ad?.picture_source, ad?.image]
-      .filter(Boolean);
-
-    // stok: null = unlimited
-    const remainingStock = ad?.remaining_stock ?? ad?.total_remaining ?? (ad?.unlimited_grab ? null : ad?.max_grab);
-
-    // jadwal untuk UI
-    const schedule = buildScheduleFromAd(ad);
-
-    return {
-      // penting: id gunakan id iklan agar claim-direct via promo_items tetap bekerja (BE sudah handle)
-      id: ad.id,
-      code: ad.code,
-      title: ad.title,
-      description: ad.description,
-      detail: ad.detail,
-      start_date: ad.start_validate || null,
-      end_date: ad.finish_validate || null,
-      finish_validate: ad.finish_validate || null, // untuk teks "Berlaku hingga"
-      jam_mulai: ad.jam_mulai || '00:00:00',
-      jam_berakhir: ad.jam_berakhir || '23:59:59',
-      validation_time_limit: ad.validation_time_limit || null,
-
-      // kategori/label
-      categoryLabel: getCategoryLabel(ad, cube),
-
-      // status online/offline untuk badge
-      status: {
-        type: isOnline ? 'Online' : 'Offline',
-        description: isOnline ? 'Berlaku di Toko Online' : 'Datang ke lokasi',
-      },
-
-      // lokasi
-      location: primaryTag?.address || cube?.address || '',
-      link_information: linkInfo,
-
-      // gambar list biar promoImages bisa baca
-      images,
-
-      // stok
-      remaining_stock: remainingStock,
-      unlimited_grab: !!ad?.unlimited_grab,
-      is_daily_grab: !!ad?.is_daily_grab,
-
-      // jadwal komponen UI
-      schedule,
-
-      // data mentah untuk kalkulasi jarak/koordinat di efek lain
-      rawCube: cube,
-      community_id: ad?.community_id || cube?.community_id || null,
-    };
-  }, [buildScheduleFromAd, getCategoryLabel]);
-
   // Ubah fetchPromoDetails: urutan berbeda untuk QR scan vs normal navigation
   const fetchPromoDetails = useCallback(async () => {
-    if (!router.isReady) return;
-    if (!effectivePromoId) return;
-
-    // cegah double-run
-    if (hasFetched.current) return;
+    if (!router.isReady || !effectivePromoId) return null;
+    if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null;
+    if (hasFetched.current) return null;
     hasFetched.current = true;
 
-    setLoading(true);
     try {
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(authHeader() || {}),
-      };
+      setLoading(true);
 
-      // 1) Coba ambil sebagai PROMO dulu
-      const promoRes = await fetch(`${apiUrl}/promos/${encodeURIComponent(effectivePromoId)}`, { headers });
-      if (promoRes.ok) {
-        const resp = await promoRes.json();
-        const data = resp?.data || resp; // jaga-jaga bentuk payload
-        // pastikan beberapa field kunci ada
-        const unified = {
-          ...data,
-          categoryLabel: getCategoryLabel(data?.ad || data, data?.cube || data?.rawCube),
-          schedule: buildScheduleFromAd(data?.ad || data),
-        };
-        setPromoData(unified);
+      let response = null;
 
-        // update communityId dari payload bila tersedia
-        const cid = data?.community_id || data?.rawCube?.community_id;
-        if (cid && !communityId) setCommunityId(cid);
+      // ✅ PERBAIKAN: Jika dari QR scan (autoRegister=1), langsung fetch dari promo endpoint
+      if (autoRegister || router.query.source === 'qr_scan') {
+        console.log('🔍 Fetching from promo endpoint (QR scan mode)...');
 
-        setLoading(false);
-        return;
-      }
+        // Coba endpoint admin promo dulu (lebih lengkap)
+        try {
+          response = await get({
+            path: `admin/promos/${effectivePromoId}`,
+            headers: authHeader()
+          });
 
-      // 2) Jika 404 → fallback ke ADS (sering terjadi jika QR berisi id iklan)
-      if (promoRes.status === 404) {
-        const adRes = await fetch(`${apiUrl}/admin/ads/${encodeURIComponent(effectivePromoId)}`, { headers });
-        if (adRes.ok) {
-          const adPayload = await adRes.json();
-          const ad = adPayload?.data || adPayload;
-          const unifiedFromAd = mapAdToUnifiedPromo(ad);
+          if (response?.status === 200 && response?.data?.data) {
+            console.log('✅ Data found from admin/promos endpoint');
+            const promo = response.data.data;
 
-          if (!unifiedFromAd) {
-            throw new Error('Gagal memetakan data iklan');
+            // Transform promo data untuk UI
+            const imageUrls = [];
+            if (promo.image_url) imageUrls.push(promo.image_url);
+            if (promo.image) imageUrls.push(promo.image);
+
+            // Fallback to default if no images
+            if (imageUrls.length === 0) {
+              imageUrls.push('/default-avatar.png');
+            }
+
+            const transformedData = {
+              id: promo.id,
+              title: promo.title,
+              merchant: promo.owner_name || 'Merchant',
+              images: imageUrls,
+              image: imageUrls[0],
+              code: promo.code || null,
+              distance: promo.promo_distance ? `${promo.promo_distance} KM` : '3 KM',
+              location: promo.location || '',
+              coordinates: '',
+              originalPrice: null,
+              discountPrice: null,
+              discount: null,
+              detail: promo.detail || '',
+              description: promo.description || '',
+              start_date: promo.start_date,
+              always_available: Boolean(promo.always_available),
+              expires_at: promo.end_date,
+              end_date: promo.end_date,
+              jam_mulai: null,
+              jam_berakhir: null,
+              validation_time_limit: null,
+              schedule: {
+                day: promo.always_available ? 'Setiap Hari' : 'Weekday',
+                details: promo.end_date ? `Berlaku hingga ${fmtDateID(promo.end_date)}` : 'Berlaku',
+                time: '00:00 - 23:59',
+                timeDetails: 'Jam Berlaku Promo',
+              },
+              status: {
+                type: promo.promo_type === 'online' ? 'Online' : 'Offline',
+                description: `Tipe Promo: ${promo.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+              },
+              seller: {
+                name: promo.owner_name || 'Admin',
+                phone: promo.owner_contact || ''
+              },
+              terms: 'TERM & CONDITIONS APPLY',
+              categoryLabel: 'Promo',
+              link_information: promo.online_store_link || null,
+              rawAd: null,
+              rawPromo: promo,
+            };
+
+            setPromoData(transformedData);
+
+            // Update communityId if found in promo data
+            if (promo?.community_id && !communityId) {
+              setCommunityId(String(promo.community_id));
+            }
+
+            return transformedData;
+          }
+        } catch (adminPromoError) {
+          console.log('ℹ️ Admin promo endpoint not available, trying public endpoint...');
+        }
+
+        // Fallback ke public endpoint
+        response = await get({ path: `promos/${effectivePromoId}/public` });
+
+        if (response?.status === 200 && response?.data?.data) {
+          console.log('✅ Data found from promos/public endpoint');
+          const data = response.data.data;
+
+          // Collect all available images
+          const imageUrls = [];
+          if (data.image_url) imageUrls.push(data.image_url);
+          if (data.image) imageUrls.push(data.image);
+
+          // Fallback to default if no images
+          if (imageUrls.length === 0) {
+            imageUrls.push('/default-avatar.png');
           }
 
-          setPromoData(unifiedFromAd);
+          const transformedData = {
+            id: data.id,
+            title: data.title,
+            merchant: data.owner_name || 'Merchant',
+            images: imageUrls,
+            image: imageUrls[0],
+            code: data.code || null,
+            distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
+            location: data.location || '',
+            coordinates: '',
+            originalPrice: null,
+            discountPrice: null,
+            discount: null,
+            detail: data.detail || '',
+            description: data.description || '',
+            start_date: data.start_date,
+            always_available: Boolean(data.always_available),
+            expires_at: data.end_date,
+            end_date: data.end_date,
+            validation_time_limit: null,
+            schedule: {
+              day: data.always_available ? 'Setiap Hari' : 'Weekday',
+              details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
+              time: '00:00 - 23:59',
+              timeDetails: 'Jam Berlaku Promo',
+            },
+            status: {
+              type: data.promo_type === 'online' ? 'Online' : 'Offline',
+              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+            },
+            seller: {
+              name: data.owner_name || 'Admin',
+              phone: data.owner_contact || ''
+            },
+            terms: 'TERM & CONDITIONS APPLY',
+            categoryLabel: 'Promo',
+            link_information: data.online_store_link || null,
+            rawAd: null,
+            rawPromo: data,
+          };
 
-          // set communityId jika ada
-          if (unifiedFromAd.community_id && !communityId) {
-            setCommunityId(unifiedFromAd.community_id);
+          setPromoData(transformedData);
+
+          // Update communityId if found in promo data
+          if (data?.community_id && !communityId) {
+            setCommunityId(String(data.community_id));
           }
 
-          setLoading(false);
-          return;
+          return transformedData;
         }
       }
 
-      // 3) Selain 404 atau gagal semua
-      console.error('❌ Fetch failed detail promo/ads', { status: promoRes.status });
-      setPromoData(null);
-      setLoading(false);
+      // 1) Mode normal: Coba dari CubeController (pakai cube id)
+      response = await get({ path: `admin/cubes/${effectivePromoId}` });
+
+      if (response?.status === 200 && (response?.data?.data || response?.data)) {
+        const cube = response.data?.data || response.data;
+        const ads = Array.isArray(cube?.ads) ? cube.ads : [];
+        const ad = ads.find(a => a?.status === 'active') || ads[0] || null;
+
+        // Collect all available images from ad
+        const imageUrls = [];
+        if (ad?.picture_source) imageUrls.push(ad.picture_source);
+        if (ad?.image_1) imageUrls.push(ad.image_1);
+        if (ad?.image_2) imageUrls.push(ad.image_2);
+        if (ad?.image_3) imageUrls.push(ad.image_3);
+        if (ad?.image) imageUrls.push(ad.image);
+
+        // Fallback to cube image if no ad images
+        if (imageUrls.length === 0 && cube?.picture_source) {
+          imageUrls.push(cube.picture_source);
+        }
+
+        // Fallback to default if still no images
+        if (imageUrls.length === 0) {
+          imageUrls.push('/default-avatar.png');
+        }
+
+        console.log('🖼️ Collected images from cube/ads endpoint:', {
+          imageCount: imageUrls.length,
+          imageUrls,
+          adData: {
+            picture_source: ad?.picture_source,
+            image_1: ad?.image_1,
+            image_2: ad?.image_2,
+            image_3: ad?.image_3,
+            image: ad?.image
+          }
+        });
+
+        const loc = getCubeLocationInfo(cube);
+
+        const transformed = {
+          id: ad?.id || cube?.id,
+          title: ad?.title || cube?.label || 'Promo',
+          merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
+          images: imageUrls,
+          image: imageUrls[0], // Keep for backward compatibility
+          code: ad?.code || cube?.code || null,
+          distance: '3 KM',
+          location: loc.address || (loc.coordinates ? loc.coordinates : ''),
+          coordinates: loc.coordinates,
+          lat: loc.lat,
+          lng: loc.lng,
+          originalPrice: ad?.original_price ?? null,
+          discountPrice: ad?.discount_price ?? null,
+          discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
+          detail: ad?.detail || '',
+          description: ad?.description || '',
+          start_date: ad?.start_validate || null,
+          always_available: false,
+          expires_at: ad?.finish_validate || null,
+          end_date: ad?.finish_validate || null,
+          jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
+          jam_berakhir: ad?.jam_berakhir ?? null,
+          validation_time_limit: ad?.validation_time_limit ?? null,
+          schedule: buildScheduleFromAd(ad || {}),
+          status: {
+            type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
+            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+          },
+          seller: {
+            name: cube?.user?.name || cube?.corporate?.name || 'Admin',
+            phone: cube?.user?.phone || cube?.corporate?.phone || '',
+          },
+          terms: 'TERM & CONDITIONS APPLY',
+          // Tambahkan informasi kategori
+          categoryLabel: getCategoryLabel(ad, cube),
+          // Tambahkan link informasi (untuk video YouTube)
+          link_information: cube?.link_information || cube?.tags?.[0]?.link || null,
+          // Simpan raw data untuk keperluan lain
+          rawAd: ad,
+          rawCube: cube,
+        };
+
+        setPromoData(transformed);
+        return transformed;
+      }
+
+      // 2) Fallback: coba endpoint ads langsung jika ada
+      response = await get({ path: `admin/ads/${effectivePromoId}` });
+      if (response?.status === 200 && (response?.data?.data || response?.data)) {
+        const ad = response.data?.data || response.data;
+        // Collect all available images from ad
+        const imageUrls = [];
+        if (ad?.picture_source) imageUrls.push(ad.picture_source);
+        if (ad?.image_1) imageUrls.push(ad.image_1);
+        if (ad?.image_2) imageUrls.push(ad.image_2);
+        if (ad?.image_3) imageUrls.push(ad.image_3);
+        if (ad?.image) imageUrls.push(ad.image);
+
+        // Fallback to default if no images
+        if (imageUrls.length === 0) {
+          imageUrls.push('/default-avatar.png');
+        }
+
+        console.log('🖼️ Collected images from ads endpoint:', {
+          imageCount: imageUrls.length,
+          imageUrls,
+          adData: {
+            picture_source: ad?.picture_source,
+            image_1: ad?.image_1,
+            image_2: ad?.image_2,
+            image_3: ad?.image_3,
+            image: ad?.image
+          }
+        });
+
+        // >>> Perbaikan: manfaatkan relasi ad.cube terlebih dahulu
+        let cubeInfo = {
+          address: '',
+          coordinates: '',
+          lat: null,
+          lng: null,
+          sellerName: 'Admin',
+          sellerPhone: '',
+        };
+
+        try {
+          if (ad?.cube) {
+            const loc = getCubeLocationInfo(ad.cube);
+            cubeInfo = {
+              address: loc.address,
+              coordinates: loc.coordinates,
+              lat: loc.lat,
+              lng: loc.lng,
+              sellerName:
+                ad?.cube?.user?.name || ad?.cube?.corporate?.name || 'Admin',
+              sellerPhone:
+                ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || '',
+            };
+          } else if (ad?.cube_id) {
+            const cubeRes = await get({ path: `admin/cubes/${ad.cube_id}` });
+            if (cubeRes?.status === 200 && (cubeRes?.data?.data || cubeRes?.data)) {
+              const cube = cubeRes.data?.data || cubeRes.data;
+              const loc = getCubeLocationInfo(cube);
+              cubeInfo = {
+                address: loc.address,
+                coordinates: loc.coordinates,
+                lat: loc.lat,
+                lng: loc.lng,
+                sellerName: cube?.user?.name || cube?.corporate?.name || 'Admin',
+                sellerPhone: cube?.user?.phone || cube?.corporate?.phone || '',
+              };
+            }
+          }
+        } catch { }
+
+        const transformed = {
+          id: ad?.id,
+          title: ad?.title || 'Promo',
+          merchant: ad?.merchant || cubeInfo.sellerName || 'Merchant',
+          images: imageUrls,
+          image: imageUrls[0], // Keep for backward compatibility
+          code: ad?.code || null,
+          distance: '3 KM',
+          location: cubeInfo.address || cubeInfo.coordinates || ad?.location || '',
+          coordinates: cubeInfo.coordinates || '',
+          lat: cubeInfo.lat,
+          lng: cubeInfo.lng,
+          originalPrice: ad?.original_price ?? null,
+          discountPrice: ad?.discount_price ?? null,
+          discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
+          detail: ad?.detail || '',
+          description: ad?.description || '',
+          start_date: ad?.start_validate || null,
+          always_available: false,
+          expires_at: ad?.finish_validate || null,
+          end_date: ad?.finish_validate || null,
+          jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
+          jam_berakhir: ad?.jam_berakhir ?? null,
+          validation_time_limit: ad?.validation_time_limit ?? null,
+          schedule: buildScheduleFromAd(ad || {}),
+          status: {
+            type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
+            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+          },
+          seller: {
+            name: cubeInfo.sellerName || ad?.owner_name || 'Admin',
+            phone: cubeInfo.sellerPhone || ad?.owner_contact || '',
+          },
+          terms: 'TERM & CONDITIONS APPLY',
+          // Tambahkan informasi kategori
+          categoryLabel: getCategoryLabel(ad, ad?.cube),
+          // Tambahkan link informasi (untuk video YouTube)
+          link_information: ad?.cube?.link_information || ad?.link_information || ad?.cube?.tags?.[0]?.link || null,
+          // Simpan raw data untuk keperluan lain
+          rawAd: ad,
+          rawCube: ad?.cube,
+        };
+        setPromoData(transformed);
+
+        // Update communityId if found in promo data
+        if (transformed.rawCube?.community_id && !communityId) {
+          setCommunityId(String(transformed.rawCube.community_id));
+        }
+
+        return transformed;
+      }
+
+      // 3) Legacy terakhir (publik)
+      response = await get({ path: `promos/${effectivePromoId}/public` });
+      if (response?.status === 200 && response?.data?.data) {
+        const data = response.data.data;
+        // Collect all available images
+        const imageUrls = [];
+        if (data.image_url) imageUrls.push(data.image_url);
+        if (data.image) imageUrls.push(data.image);
+        if (data.picture_source) imageUrls.push(data.picture_source);
+        if (data.image_1) imageUrls.push(data.image_1);
+        if (data.image_2) imageUrls.push(data.image_2);
+        if (data.image_3) imageUrls.push(data.image_3);
+
+        // Fallback to default if no images
+        if (imageUrls.length === 0) {
+          imageUrls.push('/default-avatar.png');
+        }
+
+        const transformedData = {
+          id: data.id,
+          title: data.title,
+          merchant: data.owner_name || 'Merchant',
+          images: imageUrls,
+          image: imageUrls[0], // Keep for backward compatibility
+          code: data.code || null,
+          distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
+          location: data.location || '',
+          coordinates: '',
+          originalPrice: data.original_price ?? null,
+          discountPrice: data.discount_price ?? null,
+          discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
+          detail: data.detail || '',
+          description: data.description || '',
+          start_date: data.start_date || data.start_at || data.starts_at || data.valid_from || null,
+          always_available: Boolean(data.always_available),
+          expires_at: data.end_date || data.expires_at || data.valid_until || null,
+          end_date: data.end_date || null,
+          validation_time_limit: data?.validation_time_limit ?? null,
+          schedule: {
+            day: data.always_available ? 'Setiap Hari' : 'Weekday',
+            details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
+            time: '00:00 - 23:59',
+            timeDetails: 'Jam Berlaku Promo',
+          },
+          status: {
+            type: data.promo_type === 'online' ? 'Online' : 'Offline',
+            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+          },
+          seller: { name: data.owner_name || 'Admin', phone: data.owner_contact || '' },
+          terms: 'TERM & CONDITIONS APPLY',
+          // Tambahkan informasi kategori (untuk legacy endpoint, gunakan data langsung)
+          categoryLabel: getCategoryLabel(data, null),
+          // Tambahkan link informasi (untuk video YouTube)
+          link_information: data?.link_information || data?.tags?.[0]?.link || null,
+          // Simpan raw data
+          rawAd: data,
+        };
+        setPromoData(transformedData);
+
+        // Update communityId if found in promo data
+        if (data?.community_id && !communityId) {
+          setCommunityId(String(data.community_id));
+        }
+
+        return transformedData;
+      }
+
+      return null;
     } catch (err) {
-      console.error('❌ Fetch exception detail promo', err);
-      setPromoData(null);
+      console.error('Error fetching promo details:', err);
+      return null;
+    } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, apiUrl, communityId, mapAdToUnifiedPromo, buildScheduleFromAd, getCategoryLabel]);
+  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo, communityId, autoRegister, router.query.source]);
 
   // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
@@ -976,18 +1246,9 @@ export default function PromoDetailUnified() {
 
           if (alreadyClaimed) {
             setIsAlreadyClaimed(true);
-          } else {
-            // Auto-claim hanya jika datang dari QR dan ada flag autoClaim=1
-            const wantAutoClaim = String(router.query?.autoClaim || '').toLowerCase() === '1';
-            if (wantAutoClaim) {
-              try {
-                await handleClaimPromo();
-              } catch (autoErr) {
-                // Biarkan user klik manual jika auto klaim gagal
-                console.warn('Auto-claim failed, user can claim manually:', autoErr);
-              }
-            }
           }
+
+          // TIDAK melakukan auto claim - biarkan user klik tombol manual
         } catch (checkError) {
           // Silent error checking claimed status
         }
@@ -997,8 +1258,7 @@ export default function PromoDetailUnified() {
         handleAutoRegister.isRunning = false;
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fetchPromoDetails, promoData?.code, promoData?.id, router.query?.autoClaim] /* Lines 1031-1032 omitted */
+    [fetchPromoDetails, promoData?.code, promoData?.id] /* Lines 1031-1032 omitted */
   );
 
   // --- Cek status verifikasi user ---
@@ -1373,8 +1633,8 @@ export default function PromoDetailUnified() {
         `${apiUrl}/promos/${promoData.id}/items`,
         // 2) Direct claim (payload promo_id/promo_code)
         `${apiUrl}/admin/promo-items`,
-        // 3) Fallback Ad (hanya bila perlu) - fix: must hit admin route
-        `${apiUrl}/admin/ads/${promoData.id}/claim`,
+        // 3) Fallback Ad (hanya bila perlu)
+        `${apiUrl}/ads/${promoData.id}/claim`,
       ];
 
       const claimHeaders = {
@@ -1390,9 +1650,8 @@ export default function PromoDetailUnified() {
         expires_at: promoData.expires_at || null,
       };
 
-  let savedItem = null;
-  let lastError = '';
-  let bestError = '';
+      let savedItem = null;
+      let lastError = '';
 
       for (let i = 0; i < endpoints.length; i++) {
         const url = endpoints[i];
@@ -1419,13 +1678,7 @@ export default function PromoDetailUnified() {
             break;
           }
 
-          // Prefer a meaningful message from the first failing endpoint;
-          // don't let a later 404 fallback overwrite earlier specific reasons (e.g. stok habis)
-          const msg = json?.message || json?.error || `HTTP ${res.status}`;
-          if (!bestError || (res.status !== 404 && !/http\s*404/i.test(bestError))) {
-            bestError = msg;
-          }
-          lastError = msg;
+          lastError = json?.message || json?.error || `HTTP ${res.status}`;
           if (i < endpoints.length - 1) await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           lastError = e?.message || 'Network error';
@@ -1434,7 +1687,7 @@ export default function PromoDetailUnified() {
       }
 
       if (!savedItem) {
-        const low = String(bestError || lastError || '').toLowerCase();
+        const low = String(lastError || '').toLowerCase();
         if (low.includes('habis') || low.includes('stok') || low.includes('stock')) {
           setErrorMessage('Maaf, stok promo sudah habis.');
           setShowErrorModal(true);
@@ -1447,18 +1700,13 @@ export default function PromoDetailUnified() {
           setShowErrorModal(true);
           return;
         }
-        if (low.includes('member') || low.includes('komunitas') || low.includes('community')) {
-          setErrorMessage('Anda harus menjadi member komunitas untuk merebut promo ini.');
-          setShowErrorModal(true);
-          return;
-        }
         if (low.includes('too many') || low.includes('attempts') || low.includes('rate limit')) {
           setErrorMessage('Terlalu banyak percobaan. Silakan tunggu sebentar dan coba lagi.');
           setShowErrorModal(true);
           return;
         }
 
-        setErrorMessage(bestError || lastError || 'Gagal merebut promo. Silakan coba lagi.');
+        setErrorMessage(lastError || 'Gagal merebut promo. Silakan coba lagi.');
         setShowErrorModal(true);
         return;
       }
@@ -1642,7 +1890,16 @@ export default function PromoDetailUnified() {
               <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
 
-              {/* Kategori dihapus sesuai permintaan: tidak menampilkan badge "Kategori: Promo" di bawah detail */}
+              {/* Kotak Kategori - Sama seperti di home */}
+              <div className="mb-4">
+                <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  <span className="text-slate-700 text-sm font-medium mr-2">Kategori:</span>
+                  <span className="bg-white text-slate-800 text-xs font-semibold px-3 py-1 rounded-md border border-slate-300 flex items-center gap-1">
+                    {getCategoryIcon(promoData.categoryLabel)}
+                    {promoData.categoryLabel}
+                  </span>
+                </div>
+              </div>
 
               <div className="text-left">
                 <button
@@ -1787,7 +2044,7 @@ export default function PromoDetailUnified() {
                           rel="noopener noreferrer"
                           className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                           </svg>
                           Tonton di YouTube
