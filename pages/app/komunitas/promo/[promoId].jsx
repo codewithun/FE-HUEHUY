@@ -174,6 +174,25 @@ export default function PromoDetailUnified() {
   // State untuk communityId yang bisa diupdate
   const [communityId, setCommunityId] = useState(initialCommunityId);
 
+  // Jika datang dari QR (autoRegister) tapi belum login → lempar ke /qr-entry dengan qr_data=url saat ini
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!router.isReady) return;
+    const hasAutoRegister = !!(router.query?.autoRegister || router.query?.source);
+    if (!hasAutoRegister) return;
+    // cek token; jika sudah login, tidak perlu redirect
+    try {
+      const enc = Cookies.get(token_cookie_name);
+      const token = enc ? Decrypt(enc) : '';
+      if (token && token.trim() !== '') return;
+    } catch {}
+
+    const fullUrl = new URL(router.asPath, window.location.origin).toString();
+    const nextUrl = `/qr-entry?qr_data=${encodeURIComponent(fullUrl)}`;
+    // Hindari loop jika sudah berada di /qr-entry (seharusnya tidak terjadi di halaman ini)
+    router.replace(nextUrl);
+  }, [router, router.isReady, router.asPath, router.query?.autoRegister, router.query?.source]);
+
   // --- Resolve ID promo dari QR lama ---
   // helper aman ambil query string dari URL sebenarnya
   const getFromSearch = useCallback((key) => {
@@ -1246,9 +1265,18 @@ export default function PromoDetailUnified() {
 
           if (alreadyClaimed) {
             setIsAlreadyClaimed(true);
+          } else {
+            // Auto-claim hanya jika datang dari QR dan ada flag autoClaim=1
+            const wantAutoClaim = String(router.query?.autoClaim || '').toLowerCase() === '1';
+            if (wantAutoClaim) {
+              try {
+                await handleClaimPromo();
+              } catch (autoErr) {
+                // Biarkan user klik manual jika auto klaim gagal
+                console.warn('Auto-claim failed, user can claim manually:', autoErr);
+              }
+            }
           }
-
-          // TIDAK melakukan auto claim - biarkan user klik tombol manual
         } catch (checkError) {
           // Silent error checking claimed status
         }
@@ -1258,7 +1286,8 @@ export default function PromoDetailUnified() {
         handleAutoRegister.isRunning = false;
       }
     },
-    [fetchPromoDetails, promoData?.code, promoData?.id] /* Lines 1031-1032 omitted */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fetchPromoDetails, promoData?.code, promoData?.id, router.query?.autoClaim] /* Lines 1031-1032 omitted */
   );
 
   // --- Cek status verifikasi user ---
