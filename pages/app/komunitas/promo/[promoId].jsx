@@ -753,547 +753,77 @@ export default function PromoDetailUnified() {
 
   // Ubah fetchPromoDetails: urutan berbeda untuk QR scan vs normal navigation
   const fetchPromoDetails = useCallback(async () => {
-    if (!router.isReady || !effectivePromoId) return null;
-    if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null;
-    if (hasFetched.current) return null;
-    hasFetched.current = true;
+    if (!router.isReady || !effectivePromoId) {
+      console.log('⏸️ Skip fetch: router not ready or no promo ID');
+      return;
+    }
 
     try {
       setLoading(true);
 
-      let response = null;
+      // ✅ SELALU GUNAKAN ENDPOINT DENGAN AUTH
+      const endpoint = communityId 
+        ? `communities/${communityId}/promos/${effectivePromoId}`
+        : `promos/${effectivePromoId}`;
 
-      // ✅ PERBAIKAN: Jika dari QR scan (autoRegister=1), langsung fetch dari promo endpoint
-      if (autoRegister || router.query.source === 'qr_scan') {
-        console.log('🔍 Fetching from promo endpoint (QR scan mode)...');
+      console.log('📡 Fetching from:', endpoint, '(with auth)');
 
-        // Coba endpoint admin promo dulu (lebih lengkap)
-        try {
-          response = await get({
-            path: `admin/promos/${effectivePromoId}`,
-            headers: authHeader()
-          });
+      const response = await get({ 
+        path: endpoint,
+        headers: authHeader() // ✅ WAJIB AUTH HEADER
+      });
 
-          if (response?.status === 200 && response?.data?.data) {
-            console.log('✅ Data found from admin/promos endpoint');
-            const promo = response.data.data;
-
-            // Transform promo data untuk UI
-            const imageUrls = [];
-            if (promo.image_url) imageUrls.push(promo.image_url);
-            if (promo.image) imageUrls.push(promo.image);
-
-            // Fallback to default if no images
-            if (imageUrls.length === 0) {
-              imageUrls.push('/default-avatar.png');
-            }
-
-            const transformedData = {
-              id: promo.id,
-              title: promo.title,
-              merchant: promo.owner_name || 'Merchant',
-              images: imageUrls,
-              image: imageUrls[0],
-              code: promo.code || null,
-              distance: promo.promo_distance ? `${promo.promo_distance} KM` : '3 KM',
-              location: promo.location || '',
-              coordinates: '',
-              originalPrice: null,
-              discountPrice: null,
-              discount: null,
-              detail: promo.detail || '',
-              description: promo.description || '',
-              start_date: promo.start_date,
-              always_available: Boolean(promo.always_available),
-              expires_at: promo.end_date,
-              end_date: promo.end_date,
-              jam_mulai: null,
-              jam_berakhir: null,
-              validation_time_limit: null,
-              schedule: {
-                day: promo.always_available ? 'Setiap Hari' : 'Weekday',
-                details: promo.end_date ? `Berlaku hingga ${fmtDateID(promo.end_date)}` : 'Berlaku',
-                time: '00:00 - 23:59',
-                timeDetails: 'Jam Berlaku Promo',
-              },
-              status: {
-                type: promo.promo_type === 'online' ? 'Online' : 'Offline',
-                description: `Tipe Promo: ${promo.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-              },
-              seller: {
-                name: promo.owner_name || 'Admin',
-                phone: promo.owner_contact || ''
-              },
-              terms: 'TERM & CONDITIONS APPLY',
-              categoryLabel: 'Promo',
-              link_information: promo.online_store_link || null,
-              rawAd: null,
-              rawPromo: promo,
-            };
-
-            setPromoData(transformedData);
-
-            // Update communityId if found in promo data
-            if (promo?.community_id && !communityId) {
-              setCommunityId(String(promo.community_id));
-            }
-
-            // Enrich with Ads/Cube fields if ad_id exists (align with Kubus Admin)
-            try {
-              const adId = promo?.ad_id || promo?.ad?.id;
-              if (adId) {
-                const adRes = await get({ path: `admin/ads/${adId}`, headers: authHeader() });
-                if (adRes?.status === 200 && (adRes?.data?.data || adRes?.data)) {
-                  const ad = adRes.data?.data || adRes.data;
-                  // images from ad if present
-                  const adImages = [];
-                  if (ad?.picture_source) adImages.push(ad.picture_source);
-                  if (ad?.image_1) adImages.push(ad.image_1);
-                  if (ad?.image_2) adImages.push(ad.image_2);
-                  if (ad?.image_3) adImages.push(ad.image_3);
-                  if (ad?.image) adImages.push(ad.image);
-
-                  // location from cube
-                  let loc = { address: '', coordinates: '', lat: null, lng: null };
-                  try { if (ad?.cube) loc = getCubeLocationInfo(ad.cube); } catch {}
-
-                  const enriched = {
-                    ...transformedData,
-                    schedule: buildScheduleFromAd(ad || {}),
-                    status: {
-                      type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
-                      description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-                    },
-                    location: loc.address || loc.coordinates || transformedData.location,
-                    coordinates: loc.coordinates || transformedData.coordinates,
-                    lat: loc.lat ?? transformedData.lat ?? null,
-                    lng: loc.lng ?? transformedData.lng ?? null,
-                    jam_mulai: ad?.jam_mulai ?? transformedData.jam_mulai ?? null,
-                    jam_berakhir: ad?.jam_berakhir ?? transformedData.jam_berakhir ?? null,
-                    validation_time_limit: ad?.validation_time_limit ?? transformedData.validation_time_limit ?? null,
-                    seller: {
-                      name: ad?.cube?.user?.name || ad?.cube?.corporate?.name || transformedData.seller?.name || 'Admin',
-                      phone: ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || transformedData.seller?.phone || '',
-                    },
-                    link_information: ad?.cube?.link_information || ad?.link_information || transformedData.link_information,
-                    images: adImages.length > 0 ? adImages : transformedData.images,
-                    image: adImages.length > 0 ? adImages[0] : transformedData.image,
-                    rawAd: ad,
-                    rawCube: ad?.cube,
-                  };
-
-                  setPromoData(enriched);
-                }
-              }
-            } catch {}
-
-            return transformedData;
-          }
-        } catch (adminPromoError) {
-          console.log('ℹ️ Admin promo endpoint not available, trying public endpoint...');
-        }
-
-        // Fallback ke public endpoint
-        response = await get({ path: `promos/${effectivePromoId}/public` });
-
-        if (response?.status === 200 && response?.data?.data) {
-          console.log('✅ Data found from promos/public endpoint');
-          const data = response.data.data;
-
-          // Collect all available images
-          const imageUrls = [];
-          if (data.image_url) imageUrls.push(data.image_url);
-          if (data.image) imageUrls.push(data.image);
-
-          // Fallback to default if no images
-          if (imageUrls.length === 0) {
-            imageUrls.push('/default-avatar.png');
-          }
-
-          const transformedData = {
-            id: data.id,
-            title: data.title,
-            merchant: data.owner_name || 'Merchant',
-            images: imageUrls,
-            image: imageUrls[0],
-            code: data.code || null,
-            distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
-            location: data.location || '',
-            coordinates: '',
-            originalPrice: null,
-            discountPrice: null,
-            discount: null,
-            detail: data.detail || '',
-            description: data.description || '',
-            start_date: data.start_date,
-            always_available: Boolean(data.always_available),
-            expires_at: data.end_date,
-            end_date: data.end_date,
-            validation_time_limit: null,
-            schedule: {
-              day: data.always_available ? 'Setiap Hari' : 'Weekday',
-              details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
-              time: '00:00 - 23:59',
-              timeDetails: 'Jam Berlaku Promo',
-            },
-            status: {
-              type: data.promo_type === 'online' ? 'Online' : 'Offline',
-              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-            },
-            seller: {
-              name: data.owner_name || 'Admin',
-              phone: data.owner_contact || ''
-            },
-            terms: 'TERM & CONDITIONS APPLY',
-            categoryLabel: 'Promo',
-            link_information: data.online_store_link || null,
-            rawAd: null,
-            rawPromo: data,
-          };
-
-          setPromoData(transformedData);
-
-          // Update communityId if found in promo data
-          if (data?.community_id && !communityId) {
-            setCommunityId(String(data.community_id));
-          }
-
-          // Enrich with Ads/Cube fields if ad_id exists (align with Kubus Admin)
-          try {
-            const adId = data?.ad_id || data?.ad?.id;
-            if (adId) {
-              const adRes = await get({ path: `admin/ads/${adId}`, headers: authHeader() });
-              if (adRes?.status === 200 && (adRes?.data?.data || adRes?.data)) {
-                const ad = adRes.data?.data || adRes.data;
-                // images from ad if present
-                const adImages = [];
-                if (ad?.picture_source) adImages.push(ad.picture_source);
-                if (ad?.image_1) adImages.push(ad.image_1);
-                if (ad?.image_2) adImages.push(ad.image_2);
-                if (ad?.image_3) adImages.push(ad.image_3);
-                if (ad?.image) adImages.push(ad.image);
-
-                // location from cube
-                let loc = { address: '', coordinates: '', lat: null, lng: null };
-                try { if (ad?.cube) loc = getCubeLocationInfo(ad.cube); } catch {}
-
-                const enriched = {
-                  ...transformedData,
-                  schedule: buildScheduleFromAd(ad || {}),
-                  status: {
-                    type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
-                    description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-                  },
-                  location: loc.address || loc.coordinates || transformedData.location,
-                  coordinates: loc.coordinates || transformedData.coordinates,
-                  lat: loc.lat ?? transformedData.lat ?? null,
-                  lng: loc.lng ?? transformedData.lng ?? null,
-                  jam_mulai: ad?.jam_mulai ?? transformedData.jam_mulai ?? null,
-                  jam_berakhir: ad?.jam_berakhir ?? transformedData.jam_berakhir ?? null,
-                  validation_time_limit: ad?.validation_time_limit ?? transformedData.validation_time_limit ?? null,
-                  seller: {
-                    name: ad?.cube?.user?.name || ad?.cube?.corporate?.name || transformedData.seller?.name || 'Admin',
-                    phone: ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || transformedData.seller?.phone || '',
-                  },
-                  link_information: ad?.cube?.link_information || ad?.link_information || transformedData.link_information,
-                  images: adImages.length > 0 ? adImages : transformedData.images,
-                  image: adImages.length > 0 ? adImages[0] : transformedData.image,
-                  rawAd: ad,
-                  rawCube: ad?.cube,
-                };
-
-                setPromoData(enriched);
-              }
-            }
-          } catch {}
-
-          return transformedData;
-        }
+      if (!response || response.status !== 200) {
+        console.error('❌ Fetch failed:', response);
+        setPromoData(null);
+        setLoading(false);
+        return;
       }
 
-      // 1) Mode normal: Coba dari CubeController (pakai cube id)
-      response = await get({ path: `admin/cubes/${effectivePromoId}` });
+      const raw = response.data?.data || response.data;
+      console.log('✅ Raw promo data:', raw);
 
-      if (response?.status === 200 && (response?.data?.data || response?.data)) {
-        const cube = response.data?.data || response.data;
-        const ads = Array.isArray(cube?.ads) ? cube.ads : [];
-        const ad = ads.find(a => a?.status === 'active') || ads[0] || null;
+      // Transform data sesuai kebutuhan UI
+      const transformed = {
+        ...raw,
+        start_date: raw.start_date || raw.created_at,
+        end_date: raw.end_date || raw.expires_at || raw.finish_validate,
+        jam_mulai: raw.jam_mulai || '00:00:00',
+        jam_berakhir: raw.jam_berakhir || '23:59:59',
+        
+        seller: {
+          name: raw.owner_name || raw.seller?.name || 'Penjual',
+          phone: raw.owner_contact || raw.seller?.phone || '-',
+        },
+        
+        status: {
+          type: raw.promo_type === 'online' ? 'Online' : 'Offline',
+          description: raw.promo_type === 'online' 
+            ? 'Promo dapat digunakan secara online' 
+            : 'Promo dapat digunakan di lokasi',
+        },
+        
+        location: raw.location || raw.address || '-',
+        distance: '- km',
+        coordinates: raw.map_lat && raw.map_lng 
+          ? `${raw.map_lat}, ${raw.map_lng}` 
+          : '-',
+        
+        schedule: buildScheduleFromAd(raw),
+        categoryLabel: getCategoryLabel(raw),
+        link_information: raw.online_store_link || raw.link_information,
+      };
 
-        // Collect all available images from ad
-        const imageUrls = [];
-        if (ad?.picture_source) imageUrls.push(ad.picture_source);
-        if (ad?.image_1) imageUrls.push(ad.image_1);
-        if (ad?.image_2) imageUrls.push(ad.image_2);
-        if (ad?.image_3) imageUrls.push(ad.image_3);
-        if (ad?.image) imageUrls.push(ad.image);
+      console.log('🔥 Transformed promo data:', transformed);
+      setPromoData(transformed);
 
-        // Fallback to cube image if no ad images
-        if (imageUrls.length === 0 && cube?.picture_source) {
-          imageUrls.push(cube.picture_source);
-        }
-
-        // Fallback to default if still no images
-        if (imageUrls.length === 0) {
-          imageUrls.push('/default-avatar.png');
-        }
-
-        console.log('🖼️ Collected images from cube/ads endpoint:', {
-          imageCount: imageUrls.length,
-          imageUrls,
-          adData: {
-            picture_source: ad?.picture_source,
-            image_1: ad?.image_1,
-            image_2: ad?.image_2,
-            image_3: ad?.image_3,
-            image: ad?.image
-          }
-        });
-
-        const loc = getCubeLocationInfo(cube);
-
-        const transformed = {
-          id: ad?.id || cube?.id,
-          title: ad?.title || cube?.label || 'Promo',
-          merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
-          images: imageUrls,
-          image: imageUrls[0], // Keep for backward compatibility
-          code: ad?.code || cube?.code || null,
-          distance: '3 KM',
-          location: loc.address || (loc.coordinates ? loc.coordinates : ''),
-          coordinates: loc.coordinates,
-          lat: loc.lat,
-          lng: loc.lng,
-          originalPrice: ad?.original_price ?? null,
-          discountPrice: ad?.discount_price ?? null,
-          discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
-          detail: ad?.detail || '',
-          description: ad?.description || '',
-          start_date: ad?.start_validate || null,
-          always_available: false,
-          expires_at: ad?.finish_validate || null,
-          end_date: ad?.finish_validate || null,
-          jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
-          jam_berakhir: ad?.jam_berakhir ?? null,
-          validation_time_limit: ad?.validation_time_limit ?? null,
-          schedule: buildScheduleFromAd(ad || {}),
-          status: {
-            type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-          },
-          seller: {
-            name: cube?.user?.name || cube?.corporate?.name || 'Admin',
-            phone: cube?.user?.phone || cube?.corporate?.phone || '',
-          },
-          terms: 'TERM & CONDITIONS APPLY',
-          // Tambahkan informasi kategori
-          categoryLabel: getCategoryLabel(ad, cube),
-          // Tambahkan link informasi (untuk video YouTube)
-          link_information: cube?.link_information || cube?.tags?.[0]?.link || null,
-          // Simpan raw data untuk keperluan lain
-          rawAd: ad,
-          rawCube: cube,
-        };
-
-        setPromoData(transformed);
-        return transformed;
-      }
-
-      // 2) Fallback: coba endpoint ads langsung jika ada
-      response = await get({ path: `admin/ads/${effectivePromoId}` });
-      if (response?.status === 200 && (response?.data?.data || response?.data)) {
-        const ad = response.data?.data || response.data;
-        // Collect all available images from ad
-        const imageUrls = [];
-        if (ad?.picture_source) imageUrls.push(ad.picture_source);
-        if (ad?.image_1) imageUrls.push(ad.image_1);
-        if (ad?.image_2) imageUrls.push(ad.image_2);
-        if (ad?.image_3) imageUrls.push(ad.image_3);
-        if (ad?.image) imageUrls.push(ad.image);
-
-        // Fallback to default if no images
-        if (imageUrls.length === 0) {
-          imageUrls.push('/default-avatar.png');
-        }
-
-        console.log('🖼️ Collected images from ads endpoint:', {
-          imageCount: imageUrls.length,
-          imageUrls,
-          adData: {
-            picture_source: ad?.picture_source,
-            image_1: ad?.image_1,
-            image_2: ad?.image_2,
-            image_3: ad?.image_3,
-            image: ad?.image
-          }
-        });
-
-        // >>> Perbaikan: manfaatkan relasi ad.cube terlebih dahulu
-        let cubeInfo = {
-          address: '',
-          coordinates: '',
-          lat: null,
-          lng: null,
-          sellerName: 'Admin',
-          sellerPhone: '',
-        };
-
-        try {
-          if (ad?.cube) {
-            const loc = getCubeLocationInfo(ad.cube);
-            cubeInfo = {
-              address: loc.address,
-              coordinates: loc.coordinates,
-              lat: loc.lat,
-              lng: loc.lng,
-              sellerName:
-                ad?.cube?.user?.name || ad?.cube?.corporate?.name || 'Admin',
-              sellerPhone:
-                ad?.cube?.user?.phone || ad?.cube?.corporate?.phone || '',
-            };
-          } else if (ad?.cube_id) {
-            const cubeRes = await get({ path: `admin/cubes/${ad.cube_id}` });
-            if (cubeRes?.status === 200 && (cubeRes?.data?.data || cubeRes?.data)) {
-              const cube = cubeRes.data?.data || cubeRes.data;
-              const loc = getCubeLocationInfo(cube);
-              cubeInfo = {
-                address: loc.address,
-                coordinates: loc.coordinates,
-                lat: loc.lat,
-                lng: loc.lng,
-                sellerName: cube?.user?.name || cube?.corporate?.name || 'Admin',
-                sellerPhone: cube?.user?.phone || cube?.corporate?.phone || '',
-              };
-            }
-          }
-        } catch { }
-
-        const transformed = {
-          id: ad?.id,
-          title: ad?.title || 'Promo',
-          merchant: ad?.merchant || cubeInfo.sellerName || 'Merchant',
-          images: imageUrls,
-          image: imageUrls[0], // Keep for backward compatibility
-          code: ad?.code || null,
-          distance: '3 KM',
-          location: cubeInfo.address || cubeInfo.coordinates || ad?.location || '',
-          coordinates: cubeInfo.coordinates || '',
-          lat: cubeInfo.lat,
-          lng: cubeInfo.lng,
-          originalPrice: ad?.original_price ?? null,
-          discountPrice: ad?.discount_price ?? null,
-          discount: ad?.discount_percentage ? `${ad.discount_percentage}%` : null,
-          detail: ad?.detail || '',
-          description: ad?.description || '',
-          start_date: ad?.start_validate || null,
-          always_available: false,
-          expires_at: ad?.finish_validate || null,
-          end_date: ad?.finish_validate || null,
-          jam_mulai: ad?.jam_mulai ?? null,      // ✅ tambahkan di sini
-          jam_berakhir: ad?.jam_berakhir ?? null,
-          validation_time_limit: ad?.validation_time_limit ?? null,
-          schedule: buildScheduleFromAd(ad || {}),
-          status: {
-            type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-          },
-          seller: {
-            name: cubeInfo.sellerName || ad?.owner_name || 'Admin',
-            phone: cubeInfo.sellerPhone || ad?.owner_contact || '',
-          },
-          terms: 'TERM & CONDITIONS APPLY',
-          // Tambahkan informasi kategori
-          categoryLabel: getCategoryLabel(ad, ad?.cube),
-          // Tambahkan link informasi (untuk video YouTube)
-          link_information: ad?.cube?.link_information || ad?.link_information || ad?.cube?.tags?.[0]?.link || null,
-          // Simpan raw data untuk keperluan lain
-          rawAd: ad,
-          rawCube: ad?.cube,
-        };
-        setPromoData(transformed);
-
-        // Update communityId if found in promo data
-        if (transformed.rawCube?.community_id && !communityId) {
-          setCommunityId(String(transformed.rawCube.community_id));
-        }
-
-        return transformed;
-      }
-
-      // 3) Legacy terakhir (publik)
-      response = await get({ path: `promos/${effectivePromoId}/public` });
-      if (response?.status === 200 && response?.data?.data) {
-        const data = response.data.data;
-        // Collect all available images
-        const imageUrls = [];
-        if (data.image_url) imageUrls.push(data.image_url);
-        if (data.image) imageUrls.push(data.image);
-        if (data.picture_source) imageUrls.push(data.picture_source);
-        if (data.image_1) imageUrls.push(data.image_1);
-        if (data.image_2) imageUrls.push(data.image_2);
-        if (data.image_3) imageUrls.push(data.image_3);
-
-        // Fallback to default if no images
-        if (imageUrls.length === 0) {
-          imageUrls.push('/default-avatar.png');
-        }
-
-        const transformedData = {
-          id: data.id,
-          title: data.title,
-          merchant: data.owner_name || 'Merchant',
-          images: imageUrls,
-          image: imageUrls[0], // Keep for backward compatibility
-          code: data.code || null,
-          distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
-          location: data.location || '',
-          coordinates: '',
-          originalPrice: data.original_price ?? null,
-          discountPrice: data.discount_price ?? null,
-          discount: data.discount_percentage ? `${data.discount_percentage}%` : null,
-          detail: data.detail || '',
-          description: data.description || '',
-          start_date: data.start_date || data.start_at || data.starts_at || data.valid_from || null,
-          always_available: Boolean(data.always_available),
-          expires_at: data.end_date || data.expires_at || data.valid_until || null,
-          end_date: data.end_date || null,
-          validation_time_limit: data?.validation_time_limit ?? null,
-          schedule: {
-            day: data.always_available ? 'Setiap Hari' : 'Weekday',
-            details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
-            time: '00:00 - 23:59',
-            timeDetails: 'Jam Berlaku Promo',
-          },
-          status: {
-            type: data.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
-          },
-          seller: { name: data.owner_name || 'Admin', phone: data.owner_contact || '' },
-          terms: 'TERM & CONDITIONS APPLY',
-          // Tambahkan informasi kategori (untuk legacy endpoint, gunakan data langsung)
-          categoryLabel: getCategoryLabel(data, null),
-          // Tambahkan link informasi (untuk video YouTube)
-          link_information: data?.link_information || data?.tags?.[0]?.link || null,
-          // Simpan raw data
-          rawAd: data,
-        };
-        setPromoData(transformedData);
-
-        // Update communityId if found in promo data
-        if (data?.community_id && !communityId) {
-          setCommunityId(String(data.community_id));
-        }
-
-        return transformedData;
-      }
-
-      return null;
-    } catch (err) {
-      console.error('Error fetching promo details:', err);
-      return null;
+    } catch (error) {
+      console.error('❌ Fetch error:', error);
+      setPromoData(null);
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo, communityId, autoRegister, router.query.source]);
+  }, [router.isReady, effectivePromoId, communityId, buildScheduleFromAd]);
 
   // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
@@ -2176,7 +1706,7 @@ export default function PromoDetailUnified() {
                           rel="noopener noreferrer"
                           className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
                         >
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                           </svg>
                           Tonton di YouTube
