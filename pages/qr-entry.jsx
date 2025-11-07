@@ -1,27 +1,17 @@
+/* eslint-disable no-console */
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ButtonComponent, InputComponent } from '../components/base.components';
 import { token_cookie_name, useForm } from '../helpers';
 import { Encrypt } from '../helpers/encryption.helpers';
 
 const isSafeInternal = (url) => {
-  try { return new URL(url, window.location.origin).origin === window.location.origin; }
-  catch { return false; }
-};
-const saveNext = (router) => {
-  const rawNext = router?.query?.next;
-  const guess = typeof window !== 'undefined' ? window.location.href : null;
-  const target = (typeof rawNext === 'string' && rawNext) ? rawNext : guess;
-  if (target) localStorage.setItem('postAuthRedirect', target);
-};
-const consumeNext = () => {
-  const stored = localStorage.getItem('postAuthRedirect');
-  if (stored && isSafeInternal(stored)) {
-    localStorage.removeItem('postAuthRedirect');
-    return stored;
+  try { 
+    return new URL(url, window.location.origin).origin === window.location.origin; 
+  } catch { 
+    return false; 
   }
-  return null;
 };
 
 export default function QrEntry() {
@@ -30,43 +20,47 @@ export default function QrEntry() {
   const [userEmail, setUserEmail] = useState('');
   const [didSubmitRegister, setDidSubmitRegister] = useState(false);
 
-  // Simpan tujuan awal saat masuk flow QR
-  useEffect(() => {
-    if (!router.isReady) return;
-    saveNext(router);
-  }, [router.isReady, router]);
-
   const onRegisterSuccess = (data) => {
-    if (!didSubmitRegister) return; // guard: jangan auto lompat
+    if (!didSubmitRegister) return;
     setDidSubmitRegister(false);
+    
     if (data?.data?.user?.email) {
       setUserEmail(data.data.user.email);
+      
+      // ✅ SIMPAN TOKEN LANGSUNG SETELAH REGISTER
+      const token = data?.data?.user_token;
+      if (token) {
+        try {
+          const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
+          Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
+          localStorage.setItem('auth_token', token);
+        } catch (e) {
+          console.error('Failed to save token:', e);
+        }
+      }
+      
       setStep('verify');
     }
   };
 
   const onVerifySuccess = (data) => {
-    const redirectUrl = data?.data?.redirect_url;
-
-    // Ambil token dari response (jika ada) dan simpan ke cookie
-    const token = data?.data?.token || data?.data?.user_token || null;
-    if (typeof token === 'string' && token) {
+    // ✅ SIMPAN TOKEN SETELAH VERIFIKASI
+    const token = data?.data?.token || data?.data?.user_token;
+    if (token) {
       try {
         const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
         Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
-        // Simpan juga ke localStorage sebagai fallback
-        try { localStorage.setItem('auth_token', token); } catch {}
+        localStorage.setItem('auth_token', token);
       } catch (e) {
-        // ignore cookie write errors
+        console.error('Failed to save token:', e);
       }
     }
-    const qNext = typeof router.query.next === 'string' ? router.query.next : null;
-    const storedNext = consumeNext();
-    const target =
-      (redirectUrl && isSafeInternal(redirectUrl) && redirectUrl) ||
-      (qNext && isSafeInternal(qNext) && qNext) ||
-      storedNext ||
-      '/app';
+
+    // ✅ REDIRECT KE URL YANG AMAN
+    const redirectUrl = data?.data?.redirect_url;
+    const target = (redirectUrl && isSafeInternal(redirectUrl)) ? redirectUrl : '/app';
+    
+    console.log('🔐 QR Entry Success - Redirecting to:', target);
     window.location.href = target;
   };
 
@@ -75,7 +69,6 @@ export default function QrEntry() {
       path: 'qr-entry/register',
       data: {
         qr_data: router.query.qr_data || null,
-        next: typeof router.query.next === 'string' ? router.query.next : null
       }
     },
     false,
@@ -88,7 +81,6 @@ export default function QrEntry() {
       data: {
         email: userEmail,
         qr_data: router.query.qr_data || null,
-        next: typeof router.query.next === 'string' ? router.query.next : null
       }
     },
     false,
