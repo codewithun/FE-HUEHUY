@@ -685,7 +685,7 @@ export default function PromoDetailUnified() {
     if (list.length === 7) return 'Setiap Hari';
     if (list.length > 0) return list.join(', ');
     return 'Sabtu - Minggu'; // default sama dengan tampilan sebelumnya
-  }, [DAY_IDDAY_ID]);
+  }, [DAY_ID]);
 
   const buildTimeRange = useCallback((ad) => {
     const start = toHM(ad?.jam_mulai);
