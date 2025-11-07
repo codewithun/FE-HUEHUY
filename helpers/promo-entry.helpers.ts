@@ -82,26 +82,55 @@ export const clearOtpMarker = (): void => {
 };
 
 /**
- * Generate URL untuk promo entry
+ * Generate URL halaman detail promo (bukan QR Entry)
  * Mendukung promo dengan atau tanpa komunitas
- * @param promoId - ID promo
- * @param communityId - ID komunitas (optional untuk promo umum)
- * @param baseUrl - Base URL aplikasi
+ * Catatan: Tambahkan flag autoRegister & source agar halaman detail tahu asalnya dari QR Scan
  */
 export const generatePromoEntryUrl = (
-  promoId: string, 
+  promoId: string,
   communityId?: string | null,
   baseUrl: string = 'https://v2.huehuy.com'
 ): string => {
   const cleanBase = baseUrl.replace(/\/+$/, '');
-  
+
+  const qs = new URLSearchParams({ autoRegister: '1', source: 'qr_scan' });
+
   if (communityId) {
-    // Promo dengan komunitas
-    return `${cleanBase}/app/komunitas/promo/${promoId}?communityId=${communityId}&autoRegister=1&source=qr_scan`;
-  } else {
-    // Promo umum (tanpa komunitas)
-    return `${cleanBase}/app/komunitas/promo/${promoId}?autoRegister=1&source=qr_scan`;
+    qs.set('communityId', communityId);
   }
+
+  return `${cleanBase}/app/komunitas/promo/${promoId}?${qs.toString()}`;
+};
+
+/**
+ * Generate LINK QR-ENTRY untuk suatu promo.
+ * Hasil akhirnya adalah: /qr-entry?qr_data=<encoded(detailPromoUrl)>
+ * - Tidak wajib komunitas: jika communityId tidak diisi → promo umum tetap valid
+ * - Jika ada communityId → tetap diteruskan sebagai query ke halaman promo
+ * Opsi aman dipakai untuk membuat QR dari Kubus.
+ */
+export const generateQrEntryLinkForPromo = (
+  promoId: string,
+  communityId?: string | null,
+  baseUrl: string = 'https://v2.huehuy.com'
+): string => {
+  const cleanBase = baseUrl.replace(/\/+$/, '');
+  // Tidak menambahkan autoClaim: user harus menekan tombol klaim sendiri di halaman promo
+  const detailUrl = generatePromoEntryUrl(promoId, communityId, baseUrl);
+  const encoded = encodeURIComponent(detailUrl);
+  return `${cleanBase}/qr-entry?qr_data=${encoded}`;
+};
+
+/**
+ * Helper membuat QR-entry link dengan base dari window.location.origin (jika di browser)
+ */
+export const generateSelfQrEntryLinkForPromo = (
+  promoId: string,
+  communityId?: string | null
+): string | null => {
+  if (typeof window === 'undefined') return null;
+  const origin = window.location.origin.replace(/\/+$/, '');
+  return generateQrEntryLinkForPromo(promoId, communityId || undefined, origin);
 };
 
 /**
