@@ -67,6 +67,69 @@ const getCategoryLabel = (ad, cube = null) => {
   return 'Promo';
 };
 
+// Professional SVG icons for categories
+const CategoryIcons = {
+  advertising: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z" />
+    </svg>
+  ),
+  information: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+    </svg>
+  ),
+  voucher: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M4,4A2,2 0 0,0 2,6V10C3.11,10 4,10.9 4,12A2,2 0 0,1 2,14V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V14C20.89,14 20,13.1 20,12A2,2 0 0,1 22,10V6A2,2 0 0,0 20,4H4M4,6H20V8.54C18.81,9.23 18,10.53 18,12C18,13.47 18.81,14.77 20,15.46V18H4V15.46C5.19,14.77 6,13.47 6,12C6,10.53 5.19,9.23 4,8.54V6Z" />
+    </svg>
+  ),
+  promo: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+    </svg>
+  ),
+  default: (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+    </svg>
+  )
+};
+
+// Helper function to get appropriate icon for each category type
+const getCategoryIcon = (category) => {
+  const categoryLower = String(category || '').toLowerCase();
+
+  switch (categoryLower) {
+    case 'advertising':
+    case 'iklan':
+      return CategoryIcons.advertising;
+    case 'information':
+    case 'informasi':
+      return CategoryIcons.information;
+    case 'voucher':
+      return CategoryIcons.voucher;
+    case 'promo':
+      return CategoryIcons.promo;
+    default:
+      return CategoryIcons.default;
+  }
+};
+
+// Helper function to get category with icon and additional info
+// const getCategoryWithIcon = (ad, cube = null) => {
+//   const label = getCategoryLabel(ad, cube);
+//   const icon = getCategoryIcon(label);
+//   const additionalInfo = {}; // bisa ditambahkan info tambahan jika perlu
+
+//   return {
+//     label,
+//     icon,
+//     additionalInfo,
+//     display: label
+//   };
+// };
+
 // Helper functions untuk YouTube video
 const getYouTubeVideoId = (url) => {
   if (!url || typeof url !== 'string') return null;
@@ -619,7 +682,7 @@ export default function PromoDetailUnified() {
     if (list.length === 7) return 'Setiap Hari';
     if (list.length > 0) return list.join(', ');
     return 'Sabtu - Minggu'; // default sama dengan tampilan sebelumnya
-  }, []);
+  }, [DAY_ID]);
 
   const buildTimeRange = useCallback((ad) => {
     const start = toHM(ad?.jam_mulai);
@@ -1028,7 +1091,7 @@ export default function PromoDetailUnified() {
         handleAutoRegister.isRunning = false;
       }
     },
-    [fetchPromoDetails] // Removed communityId as it's not used in the function
+    [fetchPromoDetails, promoData?.code, promoData?.id] /* Lines 1031-1032 omitted */
   );
 
   // --- Cek status verifikasi user ---
@@ -1659,6 +1722,17 @@ export default function PromoDetailUnified() {
             <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
               <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
               <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
+
+              {/* Kotak Kategori - Sama seperti di home */}
+              <div className="mb-4">
+                <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  <span className="text-slate-700 text-sm font-medium mr-2">Kategori:</span>
+                  <span className="bg-white text-slate-800 text-xs font-semibold px-3 py-1 rounded-md border border-slate-300 flex items-center gap-1">
+                    {getCategoryIcon(promoData.categoryLabel)}
+                    {promoData.categoryLabel}
+                  </span>
+                </div>
+              </div>
 
               <div className="text-left">
                 <button

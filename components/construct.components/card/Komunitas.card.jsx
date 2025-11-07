@@ -100,23 +100,59 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
   const ad = item?.ad || (Array.isArray(item?.ads) ? item.ads[0] : null) || (item?.type ? item : null) || null;
   const cube = item?.cube || item?.rawCube || ad?.cube || (item?.ads ? item : null) || null;
 
+  // Debug logging
+  // eslint-disable-next-line no-console
+  console.log('🎴 KomunitasCard received:', {
+    has_ad: !!ad,
+    has_cube: !!cube,
+    ad_id: ad?.id,
+    ad_title: ad?.title,
+    cube_id: cube?.id,
+    cube_label: cube?.label,
+    cube_name: cube?.name,
+    size: size
+  });
+
+  // Prioritas gambar: ad.image_1 > ad.image_2 > ad.image_3 > ad.picture_source > ad.image > cube.image > cube.picture_source
   const imageUrl =
     ad?.image_1 ||
     ad?.image_2 ||
     ad?.image_3 ||
-    ad?.image ||
     ad?.picture_source ||
+    ad?.image ||
     cube?.image ||
     cube?.picture_source ||
+    cube?.image_1 ||
+    cube?.image_2 ||
+    cube?.image_3 ||
     '/default-avatar.png';
 
-  const title = ad?.title || cube?.label || cube?.name || 'Promo';
-  const merchant = ad?.merchant || cube?.name || 'Merchant';
-  const description = ad?.description || cube?.description || '';
+  // Prioritas title: ad.title > cube.label > cube.name > cube.code > address > "Kubus #ID"
+  const title = ad?.title ||
+    cube?.label ||
+    cube?.name ||
+    (cube?.code ? `Kubus ${cube.code}` : null) ||
+    (cube?.address ? cube.address.substring(0, 30) : null) ||
+    (cube?.id ? `Kubus #${cube.id}` : 'Promo');
+
+  // Prioritas address: ad.cube.address > cube.address
+  const address = ad?.cube?.address || cube?.address || '';
+
   const categoryLabel = getCategoryLabel(ad, cube);
   const icon = getCategoryIcon(categoryLabel);
 
   const img = normalizeImageSrc(imageUrl);
+
+  // Debug final values
+  // eslint-disable-next-line no-console
+  console.log('🎴 KomunitasCard final values:', {
+    cube_id: cube?.id,
+    title: title,
+    imageUrl: imageUrl,
+    img: img,
+    address: address,
+    categoryLabel: categoryLabel
+  });
 
   // Theme konsisten untuk halaman komunitas (glassmorphism)
   const wrapperBase = 'flex-shrink-0 cursor-pointer transition-all duration-300';
@@ -130,22 +166,23 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
         style={{ minWidth: 320, maxWidth: 360 }}
         onClick={onClick}
       >
-        <div className="relative w-full h-[290px] bg-white/5 flex items-center justify-center">
-          <Image src={img} alt={title} fill className="object-contain p-2" />
-          <div className="absolute top-3 left-3 bg-black/40 text-white text-[11px] font-semibold px-3 py-[3px] rounded-full shadow-sm border border-white/30 backdrop-blur-sm">
-            {merchant}
-          </div>
+        <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0" style={{ height: '290px' }}>
+          {/* Gunakan img tag biasa untuk testing - Next.js Image mungkin block localhost:8000 */}
+          <img
+            src={img}
+            alt={title}
+            className="w-full h-full object-contain p-2"
+          />
         </div>
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-black/20 backdrop-blur-sm p-4 border-t border-white/20">
-          <h3 className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1">
+        <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4 border-t border-white/20"
+          style={{ background: 'rgba(255,255,255,0.15)' }}>
+          <h3 title={title} className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1 drop-shadow-sm">
             {title}
           </h3>
-          <div className="flex items-center gap-2">
-            <span className="bg-white/20 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 backdrop-blur-sm flex items-center gap-1">
-              {icon}
-              {categoryLabel}
-            </span>
-          </div>
+          <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 flex items-center gap-1 w-fit">
+            {icon}
+            {categoryLabel}
+          </span>
         </div>
       </div>
     );
@@ -154,20 +191,29 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
   if (size === 'XL') {
     return (
       <div
-        className={`rounded-[18px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
-        style={{ minWidth: 280, maxWidth: 320 }}
+        className={`rounded-[16px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
+        style={{ minWidth: 320, maxWidth: 360 }}
         onClick={onClick}
       >
-        <div className="relative w-full h-40 bg-white/5 overflow-hidden">
-          <Image src={img} alt={title} fill className="object-cover" />
+        <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0" style={{ height: '180px' }}>
+          <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 360px" className="object-contain p-2" />
         </div>
-        <div className="p-4">
-          <h3 className="font-semibold text-white text-base line-clamp-2 mb-2">{title}</h3>
-          <p className="text-sm text-white/80 line-clamp-1 mb-2">{merchant}</p>
-          <p className="text-xs text-white/60 line-clamp-3 mb-3">{description}</p>
-          <div className="flex items-center gap-2">
-            {icon}
-            <span className="text-sm text-white/80">{categoryLabel}</span>
+        <div className="p-4 bg-white/5 border-t border-white/20" style={{ height: 120 }}>
+          <div className="flex flex-col h-full justify-between">
+            <div>
+              <h3 title={title} className="text-[15px] font-bold text-white leading-snug mb-1 line-clamp-2 drop-shadow-sm">{title}</h3>
+              {address ? (
+                <p className="text-[13px] text-white/90 line-clamp-2 mb-3 drop-shadow-sm">{address}</p>
+              ) : (
+                <div className="h-5 mb-3" />
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 flex items-center gap-1">
+                {icon}
+                {categoryLabel}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -177,22 +223,27 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
   if (size === 'L') {
     return (
       <div
-        className={`flex rounded-[16px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
-        style={{ minWidth: 320, maxWidth: 350 }}
+        className={`flex items-center rounded-[14px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
+        style={{ minWidth: 280, maxWidth: 320, height: 130 }}
         onClick={onClick}
       >
-        <div className="relative w-24 h-full bg-white/5 overflow-hidden">
-          <Image src={img} alt={title} fill className="object-cover" />
+        <div className="relative bg-transparent flex items-center justify-center overflow-hidden flex-shrink-0" style={{ width: '120px', height: '130px' }}>
+          <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 120px" className="object-contain p-1 rounded-[10px]" />
         </div>
-        <div className="flex-1 p-4 flex flex-col justify-between">
-          <div>
-            <h3 className="font-semibold text-white text-base line-clamp-2 mb-2">{title}</h3>
-            <p className="text-sm text-white/70 line-clamp-1 mb-1">{merchant}</p>
-            <p className="text-xs text-white/60 line-clamp-2">{description}</p>
+        <div className="flex-1 p-3 flex flex-col justify-between bg-white/5 border-l border-white/20 overflow-hidden" style={{ height: '130px' }}>
+          <div className="flex-grow overflow-hidden">
+            <h3 title={title} className="text-[15px] font-bold text-white line-clamp-2 leading-snug mb-1 drop-shadow-sm">{title}</h3>
+            {address ? (
+              <p className="text-[13px] text-white/90 line-clamp-2 drop-shadow-sm">{address}</p>
+            ) : (
+              <div className="h-10" />
+            )}
           </div>
-          <div className="flex items-center gap-2 mt-3">
-            {icon}
-            <span className="text-sm text-white/80">{categoryLabel}</span>
+          <div className="mt-1 flex items-center justify-between flex-shrink-0">
+            <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 flex items-center gap-1">
+              {icon}
+              {categoryLabel}
+            </span>
           </div>
         </div>
       </div>
@@ -202,21 +253,25 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
   if (size === 'M') {
     return (
       <div
-        className={`flex rounded-[14px] overflow-hidden shadow-lg ${borderGlass} ${wrapperBase} ${hoverGlass}`}
-        style={{ minWidth: 280, maxWidth: 320 }}
+        className={`flex flex-col rounded-[12px] overflow-hidden shadow-lg ${borderGlass} ${wrapperBase} hover:scale-[1.02] transition-all duration-300`}
+        style={{ minWidth: 180, maxWidth: 200 }}
         onClick={onClick}
       >
-        <div className="relative w-20 h-20 bg-white/5 overflow-hidden">
-          <Image src={img} alt={title} fill className="object-cover" />
+        <div className="relative w-full bg-transparent flex items-center justify-center overflow-hidden flex-shrink-0" style={{ height: '150px' }}>
+          <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 180px" className="object-contain p-1 rounded-[8px]" />
         </div>
-        <div className="flex-1 p-3 flex flex-col justify-between">
-          <div>
-            <h3 className="font-semibold text-white text-sm line-clamp-2 mb-1">{title}</h3>
-            <p className="text-xs text-white/70 line-clamp-1">{merchant}</p>
-          </div>
-          <div className="flex items-center gap-1 mt-2">
-            {icon}
-            <span className="text-xs text-white/80">{categoryLabel}</span>
+        <div className="p-2 bg-white/5 border-t border-white/20 flex flex-col" style={{ minHeight: '82px' }}>
+          <h3 title={title} className="text-[14px] font-bold text-white line-clamp-2 mb-0.5 drop-shadow-sm">{title}</h3>
+          {address ? (
+            <p className="text-[12px] text-white/90 line-clamp-1 drop-shadow-sm truncate">{address}</p>
+          ) : (
+            <div className="h-4" />
+          )}
+          <div className="mt-auto flex items-center justify-between flex-shrink-0">
+            <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1">
+              {icon}
+              {categoryLabel}
+            </span>
           </div>
         </div>
       </div>
@@ -226,21 +281,25 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
   // S
   return (
     <div
-      className={`flex rounded-[12px] overflow-hidden shadow-lg ${borderGlass} ${wrapperBase} ${hoverGlass}`}
-      style={{ minWidth: 240, maxWidth: 280 }}
+      className={`flex flex-col rounded-[12px] overflow-hidden shadow-lg ${borderGlass} ${wrapperBase} hover:scale-[1.02] transition-all duration-300`}
+      style={{ minWidth: 140, maxWidth: 160 }}
       onClick={onClick}
     >
-      <div className="relative w-16 h-16 bg-white/5 overflow-hidden">
-        <Image src={img} alt={title} fill className="object-cover" />
+      <div className="relative w-full bg-transparent flex items-center justify-center overflow-hidden flex-shrink-0" style={{ height: '120px' }}>
+        <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 140px" className="object-contain p-1 rounded-[8px]" />
       </div>
-      <div className="flex-1 p-2 flex flex-col justify-between">
-        <div>
-          <h3 className="font-semibold text-white text-xs line-clamp-1 mb-1">{title}</h3>
-          <p className="text-xs text-white/70 line-clamp-1">{merchant}</p>
-        </div>
-        <div className="flex items-center gap-1 mt-1">
-          {icon}
-          <span className="text-xs text-white/80">{categoryLabel}</span>
+      <div className="p-2 bg-white/5 border-t border-white/20 flex flex-col" style={{ height: '72px' }}>
+        <h3 title={title} className="text-[13px] font-bold text-white line-clamp-1 mb-0.5 flex-grow overflow-hidden drop-shadow-sm">{title}</h3>
+        {address ? (
+          <p className="text-[11px] text-white/90 line-clamp-1 drop-shadow-sm">{address}</p>
+        ) : (
+          <div className="h-3" />
+        )}
+        <div className="mt-1 flex items-center justify-between flex-shrink-0">
+          <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1">
+            {icon}
+            {categoryLabel}
+          </span>
         </div>
       </div>
     </div>
