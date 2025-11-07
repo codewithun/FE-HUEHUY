@@ -761,7 +761,7 @@ export default function PromoDetailUnified() {
     try {
       setLoading(true);
 
-      // ✅ SELALU GUNAKAN ENDPOINT DENGAN AUTH
+      // ✅ Gunakan endpoint dengan auth
       const endpoint = communityId 
         ? `communities/${communityId}/promos/${effectivePromoId}`
         : `promos/${effectivePromoId}`;
@@ -783,19 +783,23 @@ export default function PromoDetailUnified() {
       const raw = response.data?.data || response.data;
       console.log('✅ Raw promo data:', raw);
 
-      // Transform data sesuai kebutuhan UI
+      // ✅ Transform data sesuai kebutuhan UI
       const transformed = {
         ...raw,
+        // Pastikan field waktu ada dengan fallback
         start_date: raw.start_date || raw.created_at,
         end_date: raw.end_date || raw.expires_at || raw.finish_validate,
+        expires_at: raw.expires_at || raw.finish_validate || raw.end_date,
         jam_mulai: raw.jam_mulai || '00:00:00',
         jam_berakhir: raw.jam_berakhir || '23:59:59',
         
+        // Seller info dengan fallback
         seller: {
           name: raw.owner_name || raw.seller?.name || 'Penjual',
           phone: raw.owner_contact || raw.seller?.phone || '-',
         },
         
+        // Status & location
         status: {
           type: raw.promo_type === 'online' ? 'Online' : 'Offline',
           description: raw.promo_type === 'online' 
@@ -804,13 +808,19 @@ export default function PromoDetailUnified() {
         },
         
         location: raw.location || raw.address || '-',
+        address: raw.address || raw.location || '-',
         distance: '- km',
         coordinates: raw.map_lat && raw.map_lng 
           ? `${raw.map_lat}, ${raw.map_lng}` 
           : '-',
-        
+      
+        // Build schedule
         schedule: buildScheduleFromAd(raw),
+        
+        // Category label
         categoryLabel: getCategoryLabel(raw),
+        
+        // Link info
         link_information: raw.online_store_link || raw.link_information,
       };
 
