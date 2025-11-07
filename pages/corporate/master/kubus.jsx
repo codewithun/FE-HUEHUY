@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { CorporateLayout } from '../../../components/construct.components/layout/Corporate.layout';
-import ManageCubePage from '../../../components/construct.components/partial-page/ManageCube.page';
+import CorporateKubusPage from '../../../components/construct.components/partial-page/CorporateKubus.page';
 import { useUserContext } from '../../../context/user.context';
 // import { useAccessContext } from '../../../context';
 import Cookies from 'js-cookie';
@@ -21,10 +21,8 @@ export default function KubusCorporate() {
 
   return (
     <>
-      <ManageCubePage
-        panel={'corporate'}
+      <CorporateKubusPage
         scope={{ corporate_id: Profile?.corporate_user?.corporate_id }}
-        noFilter={true}
       />
     </>
   );

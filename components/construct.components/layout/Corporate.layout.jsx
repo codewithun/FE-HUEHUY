@@ -40,9 +40,9 @@ export function CorporateLayout({ children }) {
         //   path: 'master/mitra',
         // },
         {
-          label: 'Dunia',
+          label: 'Manajemen Komunitas',
           icon: faGlobe,
-          path: 'master/dunia',
+          path: 'master/komunitas',
         },
         // {
         //   label: 'Kategori Iklan',

@@ -169,7 +169,10 @@ const safeExternalUrl = (raw) => {
 
 export default function PromoDetailUnified() {
   const router = useRouter();
-  const { promoId, communityId, notificationId } = router.query;
+  const { promoId, communityId: initialCommunityId, notificationId } = router.query;
+
+  // State untuk communityId yang bisa diupdate
+  const [communityId, setCommunityId] = useState(initialCommunityId);
 
   // --- Resolve ID promo dari QR lama ---
   // helper aman ambil query string dari URL sebenarnya
@@ -626,7 +629,7 @@ export default function PromoDetailUnified() {
   }, []);
 
   // === MISSING HELPERS: day label, time range, tanggal Indonesia ===
-  const DAY_ID = {
+  const DAY_ID = useMemo(() => ({
     monday: 'Senin',
     tuesday: 'Selasa',
     wednesday: 'Rabu',
@@ -634,7 +637,7 @@ export default function PromoDetailUnified() {
     friday: 'Jumat',
     saturday: 'Sabtu',
     sunday: 'Minggu',
-  };
+  }), []);
   const MONTH_ID = useMemo(() => ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'], []);
 
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -682,7 +685,7 @@ export default function PromoDetailUnified() {
     if (list.length === 7) return 'Setiap Hari';
     if (list.length > 0) return list.join(', ');
     return 'Sabtu - Minggu'; // default sama dengan tampilan sebelumnya
-  }, [DAY_ID]);
+  }, [DAY_IDDAY_ID]);
 
   const buildTimeRange = useCallback((ad) => {
     const start = toHM(ad?.jam_mulai);
@@ -727,7 +730,7 @@ export default function PromoDetailUnified() {
     return communityData?.bg_color_1 || '#16a34a'; // fallback ke green-600
   }, [communityData?.bg_color_1]);
 
-  // Ubah fetchPromoDetails: urutan cubes → ads → promos/public
+  // Ubah fetchPromoDetails: urutan berbeda untuk QR scan vs normal navigation
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady || !effectivePromoId) return null;
     if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null;
@@ -737,8 +740,160 @@ export default function PromoDetailUnified() {
     try {
       setLoading(true);
 
-      // 1) Coba dari CubeController (pakai cube id)\
-      let response = await get({ path: `admin/cubes/${effectivePromoId}` });
+      let response = null;
+
+      // ✅ PERBAIKAN: Jika dari QR scan (autoRegister=1), langsung fetch dari promo endpoint
+      if (autoRegister || router.query.source === 'qr_scan') {
+        console.log('🔍 Fetching from promo endpoint (QR scan mode)...');
+
+        // Coba endpoint admin promo dulu (lebih lengkap)
+        try {
+          response = await get({
+            path: `admin/promos/${effectivePromoId}`,
+            headers: authHeader()
+          });
+
+          if (response?.status === 200 && response?.data?.data) {
+            console.log('✅ Data found from admin/promos endpoint');
+            const promo = response.data.data;
+
+            // Transform promo data untuk UI
+            const imageUrls = [];
+            if (promo.image_url) imageUrls.push(promo.image_url);
+            if (promo.image) imageUrls.push(promo.image);
+
+            // Fallback to default if no images
+            if (imageUrls.length === 0) {
+              imageUrls.push('/default-avatar.png');
+            }
+
+            const transformedData = {
+              id: promo.id,
+              title: promo.title,
+              merchant: promo.owner_name || 'Merchant',
+              images: imageUrls,
+              image: imageUrls[0],
+              code: promo.code || null,
+              distance: promo.promo_distance ? `${promo.promo_distance} KM` : '3 KM',
+              location: promo.location || '',
+              coordinates: '',
+              originalPrice: null,
+              discountPrice: null,
+              discount: null,
+              detail: promo.detail || '',
+              description: promo.description || '',
+              start_date: promo.start_date,
+              always_available: Boolean(promo.always_available),
+              expires_at: promo.end_date,
+              end_date: promo.end_date,
+              jam_mulai: null,
+              jam_berakhir: null,
+              validation_time_limit: null,
+              schedule: {
+                day: promo.always_available ? 'Setiap Hari' : 'Weekday',
+                details: promo.end_date ? `Berlaku hingga ${fmtDateID(promo.end_date)}` : 'Berlaku',
+                time: '00:00 - 23:59',
+                timeDetails: 'Jam Berlaku Promo',
+              },
+              status: {
+                type: promo.promo_type === 'online' ? 'Online' : 'Offline',
+                description: `Tipe Promo: ${promo.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+              },
+              seller: {
+                name: promo.owner_name || 'Admin',
+                phone: promo.owner_contact || ''
+              },
+              terms: 'TERM & CONDITIONS APPLY',
+              categoryLabel: 'Promo',
+              link_information: promo.online_store_link || null,
+              rawAd: null,
+              rawPromo: promo,
+            };
+
+            setPromoData(transformedData);
+
+            // Update communityId if found in promo data
+            if (promo?.community_id && !communityId) {
+              setCommunityId(String(promo.community_id));
+            }
+
+            return transformedData;
+          }
+        } catch (adminPromoError) {
+          console.log('ℹ️ Admin promo endpoint not available, trying public endpoint...');
+        }
+
+        // Fallback ke public endpoint
+        response = await get({ path: `promos/${effectivePromoId}/public` });
+
+        if (response?.status === 200 && response?.data?.data) {
+          console.log('✅ Data found from promos/public endpoint');
+          const data = response.data.data;
+
+          // Collect all available images
+          const imageUrls = [];
+          if (data.image_url) imageUrls.push(data.image_url);
+          if (data.image) imageUrls.push(data.image);
+
+          // Fallback to default if no images
+          if (imageUrls.length === 0) {
+            imageUrls.push('/default-avatar.png');
+          }
+
+          const transformedData = {
+            id: data.id,
+            title: data.title,
+            merchant: data.owner_name || 'Merchant',
+            images: imageUrls,
+            image: imageUrls[0],
+            code: data.code || null,
+            distance: data.promo_distance ? `${data.promo_distance} KM` : '3 KM',
+            location: data.location || '',
+            coordinates: '',
+            originalPrice: null,
+            discountPrice: null,
+            discount: null,
+            detail: data.detail || '',
+            description: data.description || '',
+            start_date: data.start_date,
+            always_available: Boolean(data.always_available),
+            expires_at: data.end_date,
+            end_date: data.end_date,
+            validation_time_limit: null,
+            schedule: {
+              day: data.always_available ? 'Setiap Hari' : 'Weekday',
+              details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
+              time: '00:00 - 23:59',
+              timeDetails: 'Jam Berlaku Promo',
+            },
+            status: {
+              type: data.promo_type === 'online' ? 'Online' : 'Offline',
+              description: `Tipe Promo: ${data.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+            },
+            seller: {
+              name: data.owner_name || 'Admin',
+              phone: data.owner_contact || ''
+            },
+            terms: 'TERM & CONDITIONS APPLY',
+            categoryLabel: 'Promo',
+            link_information: data.online_store_link || null,
+            rawAd: null,
+            rawPromo: data,
+          };
+
+          setPromoData(transformedData);
+
+          // Update communityId if found in promo data
+          if (data?.community_id && !communityId) {
+            setCommunityId(String(data.community_id));
+          }
+
+          return transformedData;
+        }
+      }
+
+      // 1) Mode normal: Coba dari CubeController (pakai cube id)
+      response = await get({ path: `admin/cubes/${effectivePromoId}` });
 
       if (response?.status === 200 && (response?.data?.data || response?.data)) {
         const cube = response.data?.data || response.data;
@@ -936,6 +1091,12 @@ export default function PromoDetailUnified() {
           rawCube: ad?.cube,
         };
         setPromoData(transformed);
+
+        // Update communityId if found in promo data
+        if (transformed.rawCube?.community_id && !communityId) {
+          setCommunityId(String(transformed.rawCube.community_id));
+        }
+
         return transformed;
       }
 
@@ -997,6 +1158,12 @@ export default function PromoDetailUnified() {
           rawAd: data,
         };
         setPromoData(transformedData);
+
+        // Update communityId if found in promo data
+        if (data?.community_id && !communityId) {
+          setCommunityId(String(data.community_id));
+        }
+
         return transformedData;
       }
 
@@ -1007,7 +1174,7 @@ export default function PromoDetailUnified() {
     } finally {
       setLoading(false);
     }
-  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo]);
+  }, [router.isReady, effectivePromoId, buildScheduleFromAd, fmtDateID, getCubeLocationInfo, communityId, autoRegister, router.query.source]);
 
   // Panggil fetch ketika BUKAN QR autoRegister (tanpa syarat communityId)
   useEffect(() => {
@@ -1197,8 +1364,8 @@ export default function PromoDetailUnified() {
     if (!router.isReady) return;
     if (!autoRegister) return;
 
-    if (effectivePromoId && communityId && !hasFetched.current) {
-      // panggil fetch ketika semua param sudah lengkap
+    if (effectivePromoId && !hasFetched.current) {
+      // panggil fetch meskipun tanpa communityId (promo umum)
       fetchPromoDetails();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,6 +1,7 @@
 /**
  * Promo Entry Helpers
  * Utility functions untuk menangani promo entry dari QR scan
+ * Mendukung promo dengan atau tanpa komunitas
  */
 
 const PROMO_ID_KEY = 'huehuy_promo_id';
@@ -82,21 +83,49 @@ export const clearOtpMarker = (): void => {
 
 /**
  * Generate URL untuk promo entry
+ * Mendukung promo dengan atau tanpa komunitas
+ * @param promoId - ID promo
+ * @param communityId - ID komunitas (optional untuk promo umum)
+ * @param baseUrl - Base URL aplikasi
  */
-export const generatePromoEntryUrl = (promoId: string, baseUrl: string = 'https://promo.huehuy.com'): string => {
-  return `${baseUrl}/entry?promoId=${promoId}`;
+export const generatePromoEntryUrl = (
+  promoId: string, 
+  communityId?: string | null,
+  baseUrl: string = 'https://v2.huehuy.com'
+): string => {
+  const cleanBase = baseUrl.replace(/\/+$/, '');
+  
+  if (communityId) {
+    // Promo dengan komunitas
+    return `${cleanBase}/app/komunitas/promo/${promoId}?communityId=${communityId}&autoRegister=1&source=qr_scan`;
+  } else {
+    // Promo umum (tanpa komunitas)
+    return `${cleanBase}/app/komunitas/promo/${promoId}?autoRegister=1&source=qr_scan`;
+  }
 };
 
 /**
- * Parse promo ID dari URL
+ * Parse promo ID dan community ID dari URL
  */
-export const parsePromoIdFromUrl = (url: string): string | null => {
+export const parsePromoDataFromUrl = (url: string): { promoId: string | null; communityId: string | null } => {
   try {
     const urlObj = new URL(url);
-    return urlObj.searchParams.get('promoId');
+    const promoId = urlObj.searchParams.get('promoId') || extractPromoIdFromPath(urlObj.pathname);
+    const communityId = urlObj.searchParams.get('communityId');
+    
+    return { promoId, communityId };
   } catch (error) {
-    return null;
+    return { promoId: null, communityId: null };
   }
+};
+
+/**
+ * Helper: Extract promo ID dari path URL
+ * Pattern: /app/komunitas/promo/{promoId}
+ */
+const extractPromoIdFromPath = (pathname: string): string | null => {
+  const match = pathname.match(/\/app\/komunitas\/promo\/(\d+)/);
+  return match ? match[1] : null;
 };
 
 /**
@@ -105,4 +134,20 @@ export const parsePromoIdFromUrl = (url: string): string | null => {
 export const isValidPromoId = (promoId: string): boolean => {
   // Promo ID bisa berupa angka atau string alfanumerik
   return /^[a-zA-Z0-9\-_]+$/.test(promoId) && promoId.length >= 1 && promoId.length <= 50;
+};
+
+/**
+ * Cek apakah promo memerlukan membership komunitas
+ * @param promoData - Data promo yang di-fetch dari API
+ */
+export const requiresCommunityMembership = (promoData: any): boolean => {
+  // Promo memerlukan membership jika punya community_id
+  return Boolean(promoData?.community_id || promoData?.rawCube?.community_id);
+};
+
+/**
+ * Get community ID dari promo data
+ */
+export const getCommunityIdFromPromo = (promoData: any): string | null => {
+  return promoData?.community_id || promoData?.rawCube?.community_id || null;
 };
