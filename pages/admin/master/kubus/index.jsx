@@ -337,7 +337,7 @@ function KubusMain() {
             },
             {
               selector: 'remaining_stock',
-              label: 'Sisa Promo',
+              label: 'Sisa Promo/Voucher',
               sortable: true,
               width: '200px',
               item: ({ ads }) => {
@@ -355,19 +355,10 @@ function KubusMain() {
                 }
 
                 const label = adType === 'voucher' ? 'Voucher' : 'Promo';
-
-                // ✅ PERBAIKAN FRONTEND: Untuk voucher harian, hitung ulang dari max_grab
-                // Karena backend bug tidak filter date di list endpoint
-                let displayStock = ad?.total_remaining ?? 0;
-
-                if (harian && ad?.max_grab !== undefined) {
-                  // Untuk harian: tampilkan max_grab sebagai "total per hari"
-                  // karena backend list endpoint tidak menghitung remaining dengan benar
-                  // User akan lihat stok tetap (misal: 5/Hari) sampai klik detail
-                  displayStock = ad.max_grab;
-
-                  // Note: Stok real-time akan tampil di GrabListComponent yang sudah benar
-                }
+                // Tampilkan sisa real-time bila tersedia dari backend.
+                // Untuk harian, backend diharapkan mengembalikan sisa HARI INI pada total_remaining.
+                // Fallback ke 0 jika tidak tersedia.
+                const displayStock = ad?.total_remaining ?? 0;
 
                 return harian
                   ? `${displayStock} ${label} / Hari`
