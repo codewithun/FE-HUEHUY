@@ -1103,7 +1103,7 @@ export default function Save() {
                   Jelajahi komunitas dan kumpulkan promo untuk mengisi saku Anda
                 </p>
                 <button
-                  onClick={() => router.push('/app/komunitas/komunitas')}
+                  onClick={() => router.push('/app/cari')}
                   className="bg-primary text-white px-6 py-3 rounded-[12px] font-semibold hover:bg-opacity-90 transition-all"
                 >
                   Cari Promo
