@@ -355,10 +355,10 @@ function KubusMain() {
                 }
 
                 const label = adType === 'voucher' ? 'Voucher' : 'Promo';
-                // Tampilkan sisa real-time bila tersedia dari backend.
-                // Untuk harian, backend diharapkan mengembalikan sisa HARI INI pada total_remaining.
-                // Fallback ke 0 jika tidak tersedia.
-                const displayStock = ad?.total_remaining ?? 0;
+
+                // ✅ FIXED: Gunakan total_remaining dari backend (sudah diperbaiki di BE)
+                // Backend sekarang sudah menghitung dengan benar untuk promo harian dari summary_grabs
+                let displayStock = ad?.total_remaining ?? 0;
 
                 return harian
                   ? `${displayStock} ${label} / Hari`
