@@ -8,7 +8,6 @@ import {
   faCheckCircle,
   faExclamationTriangle,
   faMapMarkerAlt,
-  faPhone,
   faShare,
   faWifi,
   faWifiSlash,
@@ -66,6 +65,11 @@ export function Cube({ cubeData }) {
     const year = d.getFullYear();
     return `${day} ${month} ${year}`;
   }, [MONTH_ID]);
+
+  // Function untuk mendapatkan warna utama community
+  const getCommunityPrimaryColor = useCallback(() => {
+    return '#16a34a'; // fallback ke green-600
+  }, []);
 
   // Ambil data promo aktif
   const currentPromo = data?.data?.ads?.at(activeIndex);

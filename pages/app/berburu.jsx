@@ -31,7 +31,114 @@ import { distanceConvert } from '../../helpers/distanceConvert.helpers';
 import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
 import MenuAdPage from '../../components/construct.components/partial-page/MenuAd.page';
 
+// Helper functions
+const normalizeBoolLike = (val) => {
+  if (val === true || val === 1) return true;
+  if (typeof val === 'number') return val === 1;
+  if (Array.isArray(val)) {
+    return val.length > 0 && (val.includes(1) || val.includes('1') || val.includes(true));
+  }
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (['1', 'true', 'y', 'yes', 'ya', 'iya', 'on'].includes(s)) return true;
+    if (['0', 'false', 'n', 'no', 'off', ''].includes(s)) return false;
+    try {
+      const j = JSON.parse(val);
+      return normalizeBoolLike(j);
+    } catch { }
+  }
+  return !!val;
+};
+
+const getIsInformation = (ad) => {
+  const cubeInfo = normalizeBoolLike(ad?.cube?.is_information);
+  const adInfo = normalizeBoolLike(ad?.is_information);
+  const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+  const contentTypeInfo = contentType === 'kubus-informasi';
+  const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+  const looksInfoType = ['information', 'informasi'].includes(typeStr);
+  return cubeInfo || adInfo || contentTypeInfo || looksInfoType;
+};
+
+const buildPromoLink = (ad) => {
+  const id = ad?.id || ad?.ad_id;
+  const contentType = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+  const typeStr = String(ad?.type || ad?.cube?.type || '').toLowerCase();
+  const isInformation =
+    normalizeBoolLike(ad?.cube?.is_information) ||
+    normalizeBoolLike(ad?.is_information) ||
+    contentType === 'information' ||
+    contentType === 'kubus-informasi' ||
+    typeStr === 'information' ||
+    typeStr === 'informasi';
+
+  if (isInformation) {
+    const code = ad?.cube?.code || ad?.code;
+    return code ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}` : '#';
+  }
+
+  if (id) {
+    const cat = String(ad?.ad_category?.name || '').toLowerCase();
+    if (
+      typeStr === 'iklan' ||
+      cat === 'advertising' ||
+      ad?.is_advertising === true ||
+      ad?.advertising === true
+    ) {
+      return `/app/iklan/${id}?source=berburu`;
+    }
+    return `/app/komunitas/promo/${id}?source=berburu`;
+  }
+
+  const cubeCode = ad?.cube?.code;
+  return cubeCode ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(cubeCode)}` : '#';
+};
+
+const getNormalizedType = (ad) => {
+  const t1 = String(ad?.type || '').toLowerCase();
+  const t2 = String(ad?.cube?.type || '').toLowerCase();
+  const ct = String(ad?.cube?.content_type || ad?.content_type || '').toLowerCase();
+
+  if (normalizeBoolLike(ad?.is_information) || normalizeBoolLike(ad?.cube?.is_information)) return 'information';
+  if (t1 === 'information' || t2 === 'information' || ct === 'kubus-informasi') return 'information';
+  if (t1 === 'voucher' || normalizeBoolLike(ad?.is_voucher) || normalizeBoolLike(ad?.voucher)) return 'voucher';
+  if (t1 === 'iklan' || t2 === 'iklan' || normalizeBoolLike(ad?.is_advertising) || normalizeBoolLike(ad?.advertising)) return 'iklan';
+  return 'promo';
+};
+
 export default function Berburu() {
+  // Helper functions from index.jsx
+
+  const getAdImage = (ad) =>
+    ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
+
+  const getCategoryLabel = (ad) => {
+    const t = getNormalizedType(ad);
+    if (t === 'information') return 'Informasi';
+    if (t === 'voucher') return 'Voucher';
+    if (t === 'iklan') return 'Advertising';
+    return 'Promo';
+  };
+
+  const isPromoOnly = (ad) => {
+    if (getIsInformation(ad)) return false;
+    const typeStr = String(ad?.type || '').toLowerCase();
+    const cat = String(ad?.ad_category?.name || '').toLowerCase();
+    if (
+      typeStr === 'voucher' ||
+      cat === 'voucher' ||
+      ad?.is_voucher === true ||
+      ad?.voucher === true
+    ) return false;
+    if (
+      typeStr === 'iklan' ||
+      cat === 'advertising' ||
+      ad?.is_advertising === true ||
+      ad?.advertising === true
+    ) return false;
+    return true;
+  };
+
   const [expands, setExpands] = useState([]);
   const [map, setMap] = useState(null);
   const [mapZoom, setMapZoom] = useState(false);
@@ -48,7 +155,7 @@ export default function Berburu() {
             lng: pos.coords.longitude,
           });
         },
-        () => {},
+        () => { },
         { enableHighAccuracy: true }
       );
     }
@@ -56,9 +163,8 @@ export default function Berburu() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingMenu, codeMenu, dataMenu] = useGet({
-    path: `dynamic-content?type=hunting${
-      selectedWorld ? `&world_id=${selectedWorld?.id}` : ''
-    }`,
+    path: `dynamic-content?type=hunting${selectedWorld ? `&world_id=${selectedWorld?.id}` : ''
+      }`,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -73,18 +179,16 @@ export default function Berburu() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingAds, codeAds, dataAds] = useGet({
     path: map
-      ? `ads/${map?.lat}/${map?.lng}${
-          selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
-        }`
+      ? `ads/${map?.lat}/${map?.lng}${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
+      }`
       : null,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingChildCategories, codeChildCategories, dataChildCategories] =
     useGet({
-      path: `categories${
-        selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
-      }`,
+      path: `categories${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
+        }`,
     });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -95,9 +199,8 @@ export default function Berburu() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingNear, codeNear, dataNear] = useGet({
     path: map
-      ? `ads/promo-nearest/${map?.lat}/${map?.lng}${
-          selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
-        }`
+      ? `ads/promo-nearest/${map?.lat}/${map?.lng}${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
+      }`
       : '',
   });
 
@@ -109,9 +212,8 @@ export default function Berburu() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingRecommendation, codeRecommendation, dataRecommendation] =
     useGet({
-      path: `ads/promo-recommendation${
-        selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
-      }`,
+      path: `ads/promo-recommendation${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
+        }`,
     });
 
   return (
@@ -269,16 +371,18 @@ export default function Berburu() {
                   </div>
 
                   <div className="flex flex-col gap-3 mt-4">
-                    {dataNear?.data?.map((item, key) => {
+                    {dataNear?.data?.filter(item => isPromoOnly(item)).map((item, key) => {
+                      const img = getAdImage(item);
                       return (
-                        <Link href={`/app/${item?.cube?.code}`} key={key}>
+                        <Link href={buildPromoLink(item)} key={key}>
                           <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
                             <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                               <img
-                                src={item?.picture_source}
+                                src={img}
                                 height={700}
                                 width={700}
                                 alt=""
+                                className="object-cover w-full h-full"
                               />
                             </div>
                             <div className="col-span-3">
@@ -319,7 +423,7 @@ export default function Berburu() {
             ) {
               return (
                 <>
-                  <div className="mt-8">
+                  <div className="mt-6" key={key}>
                     <div className="flex justify-between items-center gap-2">
                       <div>
                         <p className="font-semibold">{menu.name}</p>
@@ -329,18 +433,20 @@ export default function Berburu() {
                       </div>
                     </div>
                   </div>
-                  <div className="w-full pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2">
+                  <div className="w-full overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2 pb-20">
                     <div className="flex flex-nowrap gap-4 w-max">
-                      {dataRecommendation?.data?.map((item, key) => {
+                      {dataRecommendation?.data?.filter(item => isPromoOnly(item)).map((item, key) => {
+                        const img = getAdImage(item);
                         return (
-                          <Link href={`/app/${item?.cube?.code}`} key={key}>
+                          <Link href={buildPromoLink(item)} key={key}>
                             <div className="relative snap-center w-[330px] shadow-sm bg-white bg-opacity-40 backdrop-blur-sm rounded-[14px] overflow-hidden p-3">
-                              <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90">
+                              <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90 flex items-center justify-center">
                                 <img
-                                  src={item?.picture_source}
+                                  src={img}
                                   height={1200}
                                   width={600}
                                   alt=""
+                                  className="object-cover w-full h-full"
                                 />
                               </div>
                               <div className="px-1">
@@ -359,11 +465,11 @@ export default function Berburu() {
 
                                   {(item?.total_remaining ||
                                     item?.max_grab) && (
-                                    <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                      Sisa{' '}
-                                      {item?.total_remaining || item?.max_grab}
-                                    </p>
-                                  )}
+                                      <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                        Sisa{' '}
+                                        {item?.total_remaining || item?.max_grab}
+                                      </p>
+                                    )}
                                 </div>
                               </div>
                             </div>
@@ -417,19 +523,21 @@ export default function Berburu() {
                         </div>
 
                         <div className="flex flex-col gap-4 mt-4">
-                          {category?.ads?.map((ad, ad_key) => {
+                          {category?.ads?.filter(ad => isPromoOnly(ad)).map((ad, ad_key) => {
+                            const img = getAdImage(ad);
                             return (
                               <Link
-                                href={`/app/${ad?.cube?.code}`}
+                                href={buildPromoLink(ad)}
                                 key={ad_key}
                               >
                                 <div className="relative">
-                                  <div className="aspect-[4/3] bg-slate-400 rounded-[20px] overflow-hidden brightness-90">
+                                  <div className="aspect-[4/3] bg-slate-400 rounded-[20px] overflow-hidden brightness-90 flex items-center justify-center">
                                     <img
-                                      src={ad?.picture_source}
+                                      src={img}
                                       height={1200}
                                       width={600}
                                       alt=""
+                                      className="object-cover w-full h-full"
                                     />
                                   </div>
                                   <div className="absolute bottom-4 w-full px-4">
@@ -444,12 +552,12 @@ export default function Berburu() {
                                           </p>
                                           {(ad?.total_remaining ||
                                             ad?.max_grab) && (
-                                            <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                              Sisa{' '}
-                                              {ad?.total_remaining ||
-                                                ad?.max_grab}
-                                            </p>
-                                          )}
+                                              <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                                Sisa{' '}
+                                                {ad?.total_remaining ||
+                                                  ad?.max_grab}
+                                              </p>
+                                            )}
                                         </div>
                                       </div>
                                     </div>
@@ -537,11 +645,10 @@ export default function Berburu() {
           {dataWorlds?.data?.map((item, key) => {
             return (
               <div
-                className={`${
-                  item?.active || item?.type != 'lock'
-                    ? 'bg-white'
-                    : 'bg-slate-200 pointer-events-none'
-                } px-5 py-3 shadow-sm rounded-lg`}
+                className={`${item?.active || item?.type != 'lock'
+                  ? 'bg-white'
+                  : 'bg-slate-200 pointer-events-none'
+                  } px-5 py-3 shadow-sm rounded-lg`}
                 key={key}
                 onClick={() => {
                   setSelectedWorld(item);
@@ -599,7 +706,7 @@ function MapWithAMarker({ position, dataAds }) {
           options={{ closeBoxURL: '', enableEventPropagation: true }}
           key={key}
         >
-          <Link href={`/app/${ad?.cube?.code}`}>
+          <Link href={buildPromoLink(ad)}>
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
                 {ad?.cube?.picture_source ? (
