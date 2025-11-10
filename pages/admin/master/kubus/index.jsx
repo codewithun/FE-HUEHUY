@@ -337,7 +337,7 @@ function KubusMain() {
             },
             {
               selector: 'remaining_stock',
-              label: 'Sisa Promo',
+              label: 'Sisa Promo/Voucher',
               sortable: true,
               width: '200px',
               item: ({ ads }) => {
