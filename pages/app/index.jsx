@@ -894,14 +894,12 @@ export default function Index() {
                                         )}
                                       </p>
 
-                                      {(item?.total_remaining ||
-                                        item?.max_grab) && (
-                                          <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                            Sisa{' '}
-                                            {item?.total_remaining ||
-                                              item?.max_grab}
-                                          </p>
-                                        )}
+                                      {((item?.total_remaining ?? item?.max_grab) != null) && (
+                                        <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                          Sisa{' '}
+                                          {item?.total_remaining ?? item?.max_grab}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -987,14 +985,12 @@ export default function Index() {
                                               <p className="text-slate-600 text-sm font-medium my-1 limit__line__2">
                                                 {ad?.cube?.address}
                                               </p>
-                                              {(ad?.total_remaining ||
-                                                ad?.max_grab) && (
-                                                  <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                                    Sisa{' '}
-                                                    {ad?.total_remaining ||
-                                                      ad?.max_grab}
-                                                  </p>
-                                                )}
+                                              {((ad?.total_remaining ?? ad?.max_grab) != null) && (
+                                                <p className="text-danger bg-red-100 bg-opacity-70 text-sm whitespace-nowrap px-1 rounded-md mt-1">
+                                                  Sisa{' '}
+                                                  {ad?.total_remaining ?? ad?.max_grab}
+                                                </p>
+                                              )}
                                             </div>
                                           </div>
                                         </div>

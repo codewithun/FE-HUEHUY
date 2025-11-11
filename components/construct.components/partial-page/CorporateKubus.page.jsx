@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import moment from 'moment';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faInfinity } from '@fortawesome/free-solid-svg-icons';
+import { faInfinity, faFilePen } from '@fortawesome/free-solid-svg-icons';
 
 import {
     DateFormatComponent,
@@ -10,6 +10,10 @@ import {
     InputComponent,
     InputMapComponent,
     SelectComponent,
+    ButtonComponent,
+    CheckboxComponent,
+    InputNumberComponent,
+    InputTimeComponent,
 } from '../../base.components';
 
 import GrabListComponent from './GrabList.component';
@@ -23,25 +27,35 @@ import ImageFieldComponent from '../../../features/kubus/components/ImageFieldCo
 import InformationForm from '../../../features/kubus/forms/InformationForm';
 import VoucherForm from '../../../features/kubus/forms/VoucherForm';
 import IklanForm from '../../../features/kubus/forms/IklanForm';
+import PromoForm from '../../../features/kubus/forms/PromoForm';
 import CropperDialog from '../../crop.components/CropperDialog';
 
 // helpers used in admin transform
 import { standIn } from '../../../helpers/standIn.helpers';
 import { prepareKubusVoucherData, validateVoucherData } from '../../../helpers/voucher.helpers';
+// using local getCT/isInfo helpers declared below
+import MultiSelectDropdown from '../../form/MultiSelectDropdown';
+import ToggleComponent from '../input/TogleComponet';
+import InputOpenHours from '../input/InputOpenHours';
+import UpdateCubeStatusModal from '../modal/UpdateCubeStatus.modal';
+import VoucherModal from '../modal/Voucher.modal';
 
 function CorporateKubusPage({ scope }) {
     // State mirroring admin
     const [selected, setSelected] = useState(null);
     const [pendingEditRow, setPendingEditRow] = useState(null);
-    const [refresh] = useState(false);
+    const [refresh, setRefresh] = useState(false);
+    const [updateStatus, setUpdateStatus] = useState(false);
+    const [voucherModal, setVoucherModal] = useState(false);
     const [formSessionId] = useState(0);
     const [isAdsEditMode, setIsAdsEditMode] = useState(false);
     const [, setIsFormEdit] = useState(false);
     const formValuesRef = useRef([]);
+    // const [tableCtx, setTableCtx] = useState(null); // removed, unused
 
     useUserContext(); // reserved for future guards
     const { merchantManagers, managersLoading, managersError } = useManagersData();
-    useUsersData(); // prefetch users list for parity; not directly used here
+    const { onlyUsers } = useUsersData();
 
     const {
         cropOpen,
@@ -268,17 +282,19 @@ function CorporateKubusPage({ scope }) {
                         },
                         {
                             selector: 'remaining_stock',
-                            label: 'Sisa Promo',
+                            label: 'Sisa Promo/Voucher',
                             sortable: true,
                             width: '200px',
                             item: ({ ads }) => {
                                 const ad = ads?.[0] || {};
-                                const sisa = ad?.remaining_stock;
                                 const harian = !!ad?.is_daily_grab;
-                                if (sisa === null || ad?.unlimited_grab) {
-                                    return <FontAwesomeIcon icon={faInfinity} />;
-                                }
-                                return harian ? `${sisa} Promo / Hari` : `${sisa} Promo`;
+                                const unlimited = !!ad?.unlimited_grab;
+                                const adType = ad?.type || 'promo';
+                                if (unlimited) return <FontAwesomeIcon icon={faInfinity} />;
+                                if (adType === 'iklan') return '-';
+                                const label = adType === 'voucher' ? 'Voucher' : 'Promo';
+                                const displayStock = ad?.total_remaining ?? ad?.remaining_stock ?? ad?.max_grab ?? 0;
+                                return harian ? `${displayStock} ${label} / Hari` : `${displayStock} ${label}`;
                             },
                         },
                         {
@@ -542,7 +558,7 @@ function CorporateKubusPage({ scope }) {
                                 const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
                                 if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
                                 if (contentType === 'promo') {
-                                    return <IklanForm formControl={formControl} values={values} setValues={setValues} mode="promo" />;
+                                    return <PromoForm formControl={formControl} values={values} setValues={setValues} />;
                                 }
                                 return <VoucherForm formControl={formControl} createImageField={createImageField} values={values} />;
                             },
@@ -753,18 +769,447 @@ function CorporateKubusPage({ scope }) {
                                 );
                             },
                         },
-
-                        // Promo Settings (delegated to forms in admin - keep minimal here)
-                        // ... Keeping rest of admin custom sections as needed ...
+                        // Promo / Voucher Settings (Harian, Unlimited, Kuota, Tanggal & Jam, Hari)
+                        {
+                            type: 'custom',
+                            custom: ({ values, setValues, errors }) => {
+                                const contentType = values.find((i) => i.name == 'content_type')?.value || 'promo';
+                                const isInformation = values.find((i) => i.name === 'is_information')?.value?.at?.(0);
+                                if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
+                                const unlimited = values.find(i => i.name === 'ads[unlimited_grab]')?.value;
+                                const daily = values.find(i => i.name === 'ads[is_daily_grab]')?.value;
+                                return (
+                                    <div className="mt-6 space-y-4">
+                                        <div className="font-semibold text-base text-slate-700">Pengaturan {contentType === 'promo' ? 'Promo' : 'Voucher'}</div>
+                                        <div className="flex gap-4">
+                                            <CheckboxComponent
+                                                label="Promo Tak Terbatas"
+                                                name="ads[unlimited_grab]"
+                                                onChange={() => setValues([
+                                                    ...values.filter(i => i.name !== 'ads[unlimited_grab]'),
+                                                    { name: 'ads[unlimited_grab]', value: unlimited ? 0 : 1 }
+                                                ])}
+                                                checked={!!unlimited}
+                                            />
+                                            <CheckboxComponent
+                                                label="Promo Harian"
+                                                name="ads[is_daily_grab]"
+                                                onChange={() => setValues([
+                                                    ...values.filter(i => i.name !== 'ads[is_daily_grab]'),
+                                                    { name: 'ads[is_daily_grab]', value: daily ? 0 : 1 }
+                                                ])}
+                                                checked={!!daily}
+                                                disabled={!!unlimited}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <InputNumberComponent
+                                                    type="number"
+                                                    name="ads[max_grab]"
+                                                    label={daily ? 'Jumlah Promo Per Hari' : 'Jumlah Promo'}
+                                                    placeholder={daily ? 'Promo yang bisa diambil per hari...' : 'Masukan Jumlah Promo...'}
+                                                    validations={{ required: !unlimited, min: 1 }}
+                                                    onChange={(e) => setValues([
+                                                        ...values.filter(i => i.name !== 'ads[max_grab]'),
+                                                        { name: 'ads[max_grab]', value: e }
+                                                    ])}
+                                                    value={values.find(i => i.name === 'ads[max_grab]')?.value}
+                                                    error={errors.find(i => i.name === 'ads[max_grab]')?.error}
+                                                    disabled={!!unlimited}
+                                                />
+                                            </div>
+                                            <InputTimeComponent
+                                                name="ads[validation_time_limit]"
+                                                label="Batas Waktu Validasi"
+                                                placeholder="Masukan Batas Waktu Validasi..."
+                                                onChange={(v) => setValues([
+                                                    ...values.filter(i => i.name !== 'ads[validation_time_limit]'),
+                                                    { name: 'ads[validation_time_limit]', value: v }
+                                                ])}
+                                                value={values.find(i => i.name === 'ads[validation_time_limit]')?.value || ''}
+                                                validations={{ required: true }}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <InputComponent
+                                                type="date"
+                                                name="ads[start_validate]"
+                                                label="Berlaku Mulai"
+                                                placeholder="Pilih Tanggal..."
+                                                forceFormat="DD-MM-YYYY HH:mm:ss"
+                                                onChange={(e) => setValues([
+                                                    ...values.filter(i => i.name !== 'ads[start_validate]'),
+                                                    { name: 'ads[start_validate]', value: moment(e).format('DD-MM-YYYY') }
+                                                ])}
+                                                value={values.find(i => i.name === 'ads[start_validate]')?.value || ''}
+                                                errors={errors.filter(i => i.name === 'ads[start_validate]')?.error}
+                                                validations={{ required: true }}
+                                            />
+                                            <InputComponent
+                                                type="date"
+                                                name="ads[finish_validate]"
+                                                label="Berakhir Pada"
+                                                placeholder="Pilih Tanggal..."
+                                                forceFormat="DD-MM-YYYY HH:mm:ss"
+                                                onChange={(e) => setValues([
+                                                    ...values.filter(i => i.name !== 'ads[finish_validate]'),
+                                                    { name: 'ads[finish_validate]', value: moment(e).format('DD-MM-YYYY') }
+                                                ])}
+                                                value={values.find(i => i.name === 'ads[finish_validate]')?.value || ''}
+                                                errors={errors.filter(i => i.name === 'ads[finish_validate]')?.error}
+                                                validations={{ required: true }}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <InputTimeComponent
+                                                name="ads[jam_mulai]"
+                                                label="Jam Mulai"
+                                                placeholder="Pilih Jam..."
+                                                onChange={(v) => setValues([
+                                                    ...values.filter(i => i.name !== 'ads[jam_mulai]'),
+                                                    { name: 'ads[jam_mulai]', value: v }
+                                                ])}
+                                                value={values.find(i => i.name === 'ads[jam_mulai]')?.value || ''}
+                                                validations={{ required: true }}
+                                            />
+                                            <InputTimeComponent
+                                                name="ads[jam_berakhir]"
+                                                label="Jam Berakhir"
+                                                placeholder="Pilih Jam..."
+                                                onChange={(v) => setValues([
+                                                    ...values.filter(i => i.name !== 'ads[jam_berakhir]'),
+                                                    { name: 'ads[jam_berakhir]', value: v }
+                                                ])}
+                                                value={values.find(i => i.name === 'ads[jam_berakhir]')?.value || ''}
+                                                validations={{ required: true }}
+                                            />
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div className="font-medium text-sm text-slate-700">Hanya Di Waktu Tertentu</div>
+                                            <div className="border border-slate-200 bg-white rounded-xl p-3 w-full">
+                                                <div className="flex items-center gap-6">
+                                                    {[{ key: 'weekend', label: 'Weekend' }, { key: 'weekday', label: 'Weekdays' }, { key: 'custom', label: 'Hari Lain' }].map(opt => {
+                                                        const checked = values.find(i => i.name === 'ads[day_type]')?.value === opt.key;
+                                                        return (
+                                                            <label key={opt.key} className="flex items-center gap-2 cursor-pointer">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="day_type"
+                                                                    value={opt.key}
+                                                                    checked={checked}
+                                                                    onChange={() => {
+                                                                        const next = [
+                                                                            ...values.filter(i => i.name !== 'ads[day_type]'),
+                                                                            { name: 'ads[day_type]', value: opt.key },
+                                                                        ];
+                                                                        const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                                                                        const cleaned = next.filter(i => !dayNames.some(d => i.name === `ads[custom_days][${d}]`));
+                                                                        if (opt.key !== 'custom') {
+                                                                            const preset = {
+                                                                                weekend: { saturday: true, sunday: true },
+                                                                                weekday: { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true }
+                                                                            }[opt.key] || {};
+                                                                            const injected = Object.entries(preset).map(([d, v]) => ({ name: `ads[custom_days][${d}]`, value: v }));
+                                                                            setValues([...cleaned, ...injected]);
+                                                                        } else {
+                                                                            setValues(cleaned);
+                                                                        }
+                                                                    }}
+                                                                    className="h-4 w-4 accent-green-600"
+                                                                    style={{ accentColor: '#16a34a' }}
+                                                                />
+                                                                <span className={checked ? 'font-semibold text-slate-800' : 'text-slate-600'}>{opt.label}</span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                            <div className="font-medium text-sm text-slate-700">Hanya Di Hari</div>
+                                            {(() => {
+                                                const dayType = values.find(i => i.name === 'ads[day_type]')?.value || 'custom';
+                                                const isCustom = dayType === 'custom';
+                                                const days = [
+                                                    { label: 'Senin', key: 'monday' },
+                                                    { label: 'Selasa', key: 'tuesday' },
+                                                    { label: 'Rabu', key: 'wednesday' },
+                                                    { label: 'Kamis', key: 'thursday' },
+                                                    { label: 'Jumat', key: 'friday' },
+                                                    { label: 'Sabtu', key: 'saturday' },
+                                                    { label: 'Minggu', key: 'sunday' },
+                                                ];
+                                                const selectedDay = k => !!values.find(i => i.name === `ads[custom_days][${k}]`)?.value;
+                                                return (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {days.map(d => {
+                                                            const active = selectedDay(d.key);
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={d.key}
+                                                                    onClick={() => {
+                                                                        if (!isCustom) return;
+                                                                        const exists = values.find(i => i.name === `ads[custom_days][${d.key}]`)?.value || false;
+                                                                        setValues([
+                                                                            ...values.filter(i => i.name !== `ads[custom_days][${d.key}]`),
+                                                                            { name: `ads[custom_days][${d.key}]`, value: !exists }
+                                                                        ]);
+                                                                    }}
+                                                                    className={[
+                                                                        'px-3 py-1.5 rounded-md border text-sm font-medium transition',
+                                                                        active ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400',
+                                                                        isCustom ? 'cursor-pointer' : 'opacity-70 cursor-not-allowed'
+                                                                    ].join(' ')}
+                                                                >{d.label}</button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+                                );
+                            },
+                        },
+                        // Voucher target type
+                        {
+                            type: 'custom',
+                            custom: ({ formControl, values, setValues }) => {
+                                const contentType = getCT(values);
+                                if (contentType !== 'voucher') return null;
+                                const fc = formControl('target_type');
+                                const current = fc.value ?? 'all';
+                                const handleChange = v => {
+                                    const newValue = v?.target?.value ?? v?.value ?? v;
+                                    fc.onChange(newValue);
+                                    setValues(prev => prev.filter(i => !['target_user_ids', 'community_id'].includes(i.name)));
+                                };
+                                return (
+                                    <div className="space-y-3">
+                                        <div className="font-semibold text-base text-slate-700">Target Penerima Voucher</div>
+                                        <SelectComponent
+                                            name="target_type"
+                                            label="Siapa Yang Bisa Menggunakan Voucher?"
+                                            required
+                                            value={current}
+                                            onChange={handleChange}
+                                            options={[
+                                                { label: 'Semua User', value: 'all' },
+                                                { label: 'User Tertentu', value: 'user' },
+                                                { label: 'Komunitas Tertentu', value: 'community' },
+                                            ]}
+                                        />
+                                    </div>
+                                );
+                            }
+                        },
+                        // Community selection
+                        {
+                            type: 'custom',
+                            custom: ({ values, setValues }) => {
+                                const contentType = getCT(values);
+                                const targetType = values.find(i => i.name === 'target_type')?.value;
+                                if (contentType !== 'voucher' || targetType !== 'community') return null;
+                                const currentValue = values.find(i => i.name === 'community_id')?.value || '';
+                                return (
+                                    <SelectComponent
+                                        name="community_id"
+                                        label="Pilih Komunitas"
+                                        placeholder="Pilih komunitas yang bisa menggunakan voucher"
+                                        required
+                                        value={currentValue}
+                                        onChange={(val) => setValues([
+                                            ...values.filter(i => i.name !== 'community_id'),
+                                            { name: 'community_id', value: val }
+                                        ])}
+                                        serverOptionControl={{ path: 'admin/options/community' }}
+                                    />
+                                );
+                            }
+                        },
+                        // User selection
+                        {
+                            type: 'custom',
+                            custom: ({ formControl, values }) => {
+                                const contentType = getCT(values);
+                                const targetType = values.find(i => i.name === 'target_type')?.value;
+                                if (contentType !== 'voucher' || targetType !== 'user') return null;
+                                return (
+                                    <div className="form-control w-full">
+                                        <label className="label">
+                                            <span className="label-text font-medium">Pilih Pengguna</span>
+                                            <span className="label-text-alt text-red-500">*</span>
+                                        </label>
+                                        <MultiSelectDropdown
+                                            options={onlyUsers.map(u => ({ label: `${u.name || u.email || `#${u.id}`}`, value: u.id }))}
+                                            value={formControl('target_user_ids').value || []}
+                                            onChange={formControl('target_user_ids').onChange}
+                                            placeholder="Pilih satu atau lebih pengguna..."
+                                            maxHeight={200}
+                                        />
+                                        <label className="label">
+                                            <span className="label-text-alt text-gray-500">Anda dapat memilih beberapa pengguna sekaligus</span>
+                                        </label>
+                                    </div>
+                                );
+                            }
+                        },
+                        // Opening hours toggle
+                        {
+                            type: 'custom',
+                            custom: ({ values, setValues, errors }) => {
+                                const contentType = values.find(i => i.name === 'content_type')?.value || 'promo';
+                                const information = values.find(i => i.name === 'is_information')?.value?.at?.(0);
+                                if (information || contentType === 'iklan' || contentType === 'kubus-informasi') return null;
+                                const openHours = values.find(i => i.name === 'openHours')?.value;
+                                return (
+                                    <div className="mt-3">
+                                        <ToggleComponent
+                                            label="Tambahkan Jam Buka"
+                                            name="openHours"
+                                            onChange={() => setValues([
+                                                ...values.filter(i => i.name !== 'openHours'),
+                                                { name: 'openHours', value: !openHours }
+                                            ])}
+                                            checked={!!openHours}
+                                        />
+                                        {openHours && (
+                                            <div className="bg-stone-50 py-6">
+                                                <InputOpenHours values={values} setValues={setValues} errors={errors} />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+                        },
                     ],
-                }), [selected, merchantManagers, managersLoading, managersError, isAdsEditMode, pendingEditRow, createImageField, resetCropState, scope?.corporate_id])}
+                }), [selected, merchantManagers, managersLoading, managersError, isAdsEditMode, pendingEditRow, createImageField, resetCropState, scope?.corporate_id, onlyUsers])}
 
-                formUpdateControl={{
+                formUpdateControl={isAdsEditMode ? {
+                    customDefaultValue: (data) => ({
+                        ...mapUpdateDefault(data),
+                        _method: 'PUT',
+                        id: data?.ads?.[0]?.id,
+                        __endpoint_override: `admin/ads/${data?.ads?.[0]?.id}`,
+                        cube_id: data?.id,
+                        ...(scope?.corporate_id ? { corporate_id: scope.corporate_id } : {}),
+                    }),
+                    contentType: 'multipart/form-data',
+                    updateEndpointOverride: (d) => `admin/ads/${d?.ads?.[0]?.id}`,
+                    transformData: (formData) => {
+                        if (formData.content_type === 'voucher') {
+                            const transformed = prepareKubusVoucherData(formData);
+                            return transformed;
+                        }
+                        return formData;
+                    },
+                } : {
                     customDefaultValue: (data) => ({
                         ...mapUpdateDefault(data),
                         ...(scope?.corporate_id ? { corporate_id: scope.corporate_id } : {}),
                     }),
                     contentType: 'multipart/form-data',
+                    custom: [
+                        // Manager Tenant (editable on update)
+                        {
+                            type: 'custom',
+                            custom: ({ formControl, values }) => (
+                                <ManagerTenantSelector
+                                    formControl={formControl}
+                                    values={values}
+                                    merchantManagers={merchantManagers}
+                                    managersLoading={managersLoading}
+                                    managersError={managersError}
+                                />
+                            ),
+                        },
+                        // Recommendation checkbox
+                        {
+                            type: 'check',
+                            construction: {
+                                name: 'is_recommendation',
+                                options: [{ label: 'Rekomendasi Di Beranda', value: 1 }],
+                            },
+                        },
+                        // Toggle change map
+                        {
+                            type: 'custom',
+                            custom: ({ values, setValues }) => {
+                                const isInfoVal = values?.find(i => i.name == 'is_information')?.value;
+                                const info = Array.isArray(isInfoVal) && isInfoVal.length > 0;
+                                if (info) return null;
+                                const changeMapActive = values?.find(i => i.name == 'change_map')?.value;
+                                const ensure = (name, fallbackName) => {
+                                    const exists = values.some(i => i.name === name);
+                                    if (!exists) {
+                                        const fallback = values.find(i => i.name === fallbackName)?.value || '';
+                                        if (fallback !== '') setValues([...values, { name, value: fallback }]);
+                                    }
+                                };
+                                ensure('map_lat', '_original_map_lat');
+                                ensure('map_lng', '_original_map_lng');
+                                ensure('address', '_original_address');
+                                ensure('cube_tags[0][map_lat]', '_original_map_lat');
+                                ensure('cube_tags[0][map_lng]', '_original_map_lng');
+                                ensure('cube_tags[0][address]', '_original_address');
+                                return (
+                                    <ToggleComponent
+                                        label="Ubah Lokasi Kubus"
+                                        onChange={() => setValues([...values.filter(i => i.name != 'change_map'), { name: 'change_map', value: !changeMapActive }])}
+                                        checked={!!changeMapActive}
+                                    />
+                                );
+                            },
+                        },
+                        // Map editor when change_map is on
+                        {
+                            type: 'custom',
+                            custom: ({ values, setValues }) => {
+                                const isInfoVal = values?.find((i) => i.name == 'is_information')?.value;
+                                const info = Array.isArray(isInfoVal) && isInfoVal.length > 0;
+                                if (info) return null;
+                                const change = values?.find(i => i.name == 'change_map')?.value;
+                                const lat0 = values?.find(i => i.name == '_original_map_lat')?.value;
+                                const lng0 = values?.find(i => i.name == '_original_map_lng')?.value;
+                                const addr0 = values?.find(i => i.name == '_original_address')?.value;
+                                if (!change) return null;
+                                return (
+                                    <div className="mx-10 hover:mx-8 hover:border-4 border-green-500 rounded-lg">
+                                        <InputMapComponent
+                                            name="map"
+                                            initialLat={lat0}
+                                            initialLng={lng0}
+                                            initialAddress={addr0}
+                                            onChange={(e) => {
+                                                const rm = ['map_lat', 'map_lng', 'address', 'cube_tags[0][map_lat]', 'cube_tags[0][map_lng]', 'cube_tags[0][address]'];
+                                                setValues([
+                                                    ...values.filter(i => !rm.includes(i.name)),
+                                                    { name: 'map_lat', value: e?.lat },
+                                                    { name: 'map_lng', value: e?.lng },
+                                                    { name: 'address', value: e?.address },
+                                                    { name: 'cube_tags[0][map_lat]', value: e?.lat },
+                                                    { name: 'cube_tags[0][map_lng]', value: e?.lng },
+                                                    { name: 'cube_tags[0][address]', value: e?.address },
+                                                ]);
+                                            }}
+                                        />
+                                    </div>
+                                );
+                            },
+                        },
+                        // Hidden flag update_location
+                        {
+                            type: 'custom',
+                            custom: ({ values, setValues }) => {
+                                const changeMapActive = values?.find((i) => i.name == 'change_map')?.value;
+                                const hasUpdateLocationFlag = values.some((i) => i.name === 'update_location');
+                                if (!hasUpdateLocationFlag) {
+                                    setValues([...values, { name: 'update_location', value: changeMapActive ? 1 : 0 }]);
+                                }
+                                return null;
+                            },
+                        },
+                    ],
                 }}
 
                 customDetail={(data) => (
@@ -778,6 +1223,65 @@ function CorporateKubusPage({ scope }) {
 
                 actionControl={{
                     except: ['edit'],
+                    include: (row, ctx) => (
+                        <>
+                            <ButtonComponent
+                                icon={faFilePen}
+                                label={'Ubah Iklan'}
+                                variant="outline"
+                                paint={'warning'}
+                                size={'xs'}
+                                rounded
+                                onClick={() => {
+                                    resetCropState();
+                                    formValuesRef.current = [];
+                                    setPendingEditRow(row);
+                                    setIsAdsEditMode(true);
+                                    setSelected(row);
+                                    setIsFormEdit(true);
+                                    // setTableCtx(ctx); // removed
+                                    ctx.setDataSelected?.(row);
+                                    ctx.setModalForm?.(true);
+                                }}
+                            />
+                            <ButtonComponent
+                                label={row?.status === 'active' ? 'Non-Aktifkan' : 'Aktifkan'}
+                                variant="outline"
+                                paint={row?.status === 'active' ? 'danger' : 'success'}
+                                size={'xs'}
+                                rounded
+                                onClick={() => { setSelected(row); setUpdateStatus(true); }}
+                            />
+                        </>
+                    )
+                }}
+                onStoreSuccess={() => {
+                    setSelected(null);
+                    setRefresh(r => !r);
+                    resetCropState();
+                    setIsAdsEditMode(false);
+                    formValuesRef.current = [];
+                    standIn.clear('option_admin/options/ad-category');
+                }}
+                onUpdateSuccess={() => {
+                    setSelected(null);
+                    setIsAdsEditMode(false);
+                    standIn.clear('option_admin/options/ad-category');
+                    setIsFormEdit(false);
+                    setPendingEditRow(null);
+                    formValuesRef.current = [];
+                    resetCropState();
+                    setRefresh(r => !r);
+                }}
+                onModalClose={() => {
+                    setSelected(null);
+                    resetCropState();
+                    setIsAdsEditMode(false);
+                    formValuesRef.current = [];
+                    setIsFormEdit(false);
+                    setPendingEditRow(null);
+                    // setTableCtx(null); // removed
+                    standIn.clear('option_admin/options/ad-category');
                 }}
             />
 
@@ -792,6 +1296,18 @@ function CorporateKubusPage({ scope }) {
                     handleCropSave(file);
                 }}
                 aspect={1}
+            />
+            <UpdateCubeStatusModal
+                data={selected}
+                show={updateStatus}
+                setShow={setUpdateStatus}
+                onSuccess={() => { setRefresh(r => !r); }}
+            />
+            <VoucherModal
+                data={selected}
+                show={voucherModal}
+                setShow={setVoucherModal}
+                onSuccess={() => { setRefresh(r => !r); }}
             />
         </div>
     );
