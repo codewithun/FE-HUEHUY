@@ -54,6 +54,11 @@ export function CorporateLayout({ children }) {
           icon: faCubes,
           path: 'master/kubus',
         },
+        {
+          label: 'Widget',
+          icon: faCubes,
+          path: 'master/widget',
+        },
       ],
     },
   ];
