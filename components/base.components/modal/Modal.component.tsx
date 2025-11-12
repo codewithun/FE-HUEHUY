@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { modalProps } from './modal.props';
 import styles from './modal.module.css';
 import { IconButtonComponent } from '../button';
@@ -14,12 +14,38 @@ export function ModalComponent({
   tip,
   footer,
 }: modalProps) {
+  const prevBodyOverflow = useRef<string | null>(null);
+  const prevHtmlOverflow = useRef<string | null>(null);
+
   useEffect(() => {
+    const bodyEl = document.getElementsByTagName('body')[0];
+    const htmlEl = document.documentElement;
+
     if (show) {
-      document.getElementsByTagName('body')[0].style.overflow = 'hidden';
+      // save previous values to be restored later
+      prevBodyOverflow.current = bodyEl.style.overflow || '';
+      prevHtmlOverflow.current = htmlEl.style.overflow || '';
+
+      bodyEl.style.overflow = 'hidden';
+      htmlEl.style.overflow = 'hidden';
     } else {
-      document.getElementsByTagName('body')[0].style.removeProperty('overflow');
+      // restore previous values
+      if (prevBodyOverflow.current !== null) bodyEl.style.overflow = prevBodyOverflow.current;
+      else bodyEl.style.removeProperty('overflow');
+
+      if (prevHtmlOverflow.current !== null) htmlEl.style.overflow = prevHtmlOverflow.current;
+      else htmlEl.style.removeProperty('overflow');
     }
+
+    // cleanup on unmount to ensure scrolling is restored even if closed during navigation
+    return () => {
+      const b = document.getElementsByTagName('body')[0];
+      const h = document.documentElement;
+      if (prevBodyOverflow.current !== null) b.style.overflow = prevBodyOverflow.current;
+      else b.style.removeProperty('overflow');
+      if (prevHtmlOverflow.current !== null) h.style.overflow = prevHtmlOverflow.current;
+      else h.style.removeProperty('overflow');
+    };
   }, [show]);
 
   return (

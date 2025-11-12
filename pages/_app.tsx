@@ -7,6 +7,7 @@ import { Roboto } from "next/font/google";
 import { ReactElement, ReactNode } from 'react';
 import { UserProvider } from '../context/user.context';
 import '../styles/general.css';
+import HuehuyAdPopup from '../components/construct.components/modal/HuehuyAdPopup';
 config.autoAddCss = false;
 
 const font = Roboto({
@@ -35,6 +36,8 @@ export default function App({ Component, pageProps }: AppPropsWithLayout) {
         <>
           <main className={font.className}>
             <Component {...pageProps} />
+            {/* Global popup that appears on promo/voucher detail pages */}
+            <HuehuyAdPopup />
           </main>
         </>
       )}
