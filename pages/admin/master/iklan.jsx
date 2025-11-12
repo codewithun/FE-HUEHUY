@@ -1,7 +1,7 @@
 import React from 'react';
 import {
-    InputNumberComponent,
-    TableSupervisionComponent,
+  InputNumberComponent,
+  TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 
@@ -57,38 +57,15 @@ const Iklan = () => {
               },
             },
             {
-              type: 'select',
-              construction: {
-                name: 'type',
-                label: 'Jenis Iklan',
-                placeholder: 'Pilih jenis iklan...',
-                options: [
-                  {
-                    label: 'Kubus',
-                    value: 'cube',
-                  },
-                  {
-                    label: 'Konten',
-                    value: 'screen',
-                  },
-                ],
-              },
-            },
-            {
               type: 'custom',
-              custom: ({ formControl, values }) => {
-                const type = values.find((val) => val.name == 'type')?.value;
-
-                if (type == 'cube')
-                  return (
-                    <InputNumberComponent
-                      name="limit"
-                      {...formControl('limit')}
-                      label="Jumlah tampil per hari"
-                      placeholder="..."
-                    />
-                  );
-              },
+              custom: ({ formControl }) => (
+                <InputNumberComponent
+                  name="limit"
+                  {...formControl('limit')}
+                  label="Jumlah tampil per hari"
+                  placeholder="..."
+                />
+              ),
             },
           ],
         }}
