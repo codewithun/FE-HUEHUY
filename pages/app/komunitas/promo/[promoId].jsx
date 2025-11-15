@@ -322,7 +322,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   // ✅ Single source of truth untuk UI & tombol
   const canClaim = !timeFlags.expiredByDate && timeFlags.withinDailyTime && !outOfStock;
 
-  const [loading, setLoading] = useState(!initialPromo);
+  const [loading, setLoading] = useState(true);
 
   const [isClaimedLoading, setIsClaimedLoading] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1183,7 +1183,6 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     if (!router.isReady) return;
     if (!effectivePromoId) return;
     if (autoRegister) return;
-    if (initialPromo) return;
     fetchPromoDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, effectivePromoId, autoRegister]);
@@ -1512,7 +1511,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     if (!promoData) return;
 
     // Gunakan URL production yang benar (tanpa query parameters autoRegister)
-    const promoUrl = `https://v2.huehuy.com/app/komunitas/promo/${promoData.id}`;
+    const promoUrl = `https://app.huehuy.com/app/komunitas/promo/${promoData.id}`;
     const shareText =
       `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` +
       (promoData.discount ? ` Diskon ${promoData.discount}` : '');
@@ -1930,12 +1929,13 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   // Gunakan currentUrl dari SSR (sudah absolute), fallback ke window.location jika tidak ada
   const pageUrl = currentUrl || (typeof window !== 'undefined' ? window.location.href : '');
 
+  // Pastikan image URL absolute (gunakan https://app.huehuy.com)
   const getAbsoluteImageUrl = (imgUrl) => {
-    if (!imgUrl) return 'https://v2.huehuy.com/default-avatar.png';
+    if (!imgUrl) return 'https://app.huehuy.com/default-avatar.png';
     if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) return imgUrl;
     if (imgUrl.startsWith('/')) {
       // Gunakan production URL, bukan localhost
-      return `https://v2.huehuy.com${imgUrl}`;
+      return `https://app.huehuy.com${imgUrl}`;
     }
     return imgUrl;
   };
@@ -2554,7 +2554,7 @@ export async function getServerSideProps(context) {
 
   // Build absolute URL untuk halaman ini
   const protocol = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'v2.huehuy.com';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'app.huehuy.com';
   const currentUrl = `${protocol}://${host}${context.resolvedUrl}`;
 
   try {
