@@ -13,6 +13,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageCarousel } from '../../../../components/base.components';
@@ -1512,6 +1513,39 @@ export default function PromoDetailUnified() {
       `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` +
       (promoData.discount ? ` Diskon ${promoData.discount}` : '');
 
+    const fullShareText = `${shareText}\n\n🔗 Lihat detail: ${promoUrl}`;
+
+    // KHUSUS WHATSAPP: Langsung buka WhatsApp tanpa dialog
+    if (platform === 'whatsapp') {
+      try {
+        // Cek apakah di mobile (Android/iOS)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        if (isMobile) {
+          // Di mobile: Gunakan WhatsApp intent untuk langsung buka app
+          const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(fullShareText)}`;
+          window.location.href = whatsappUrl;
+
+          // Fallback jika WhatsApp app tidak terinstall
+          setTimeout(() => {
+            window.open(`https://wa.me/?text=${encodeURIComponent(fullShareText)}`, '_blank');
+          }, 1000);
+        } else {
+          // Di desktop: Buka WhatsApp Web
+          window.open(`https://wa.me/?text=${encodeURIComponent(fullShareText)}`, '_blank');
+        }
+
+        setShowShareModal(false);
+        return;
+      } catch (error) {
+        console.error('WhatsApp share failed:', error);
+        // Fallback ke URL biasa
+        window.open(`https://wa.me/?text=${encodeURIComponent(fullShareText)}`, '_blank');
+        setShowShareModal(false);
+        return;
+      }
+    }
+
     // Fungsi untuk mendapatkan gambar sebagai blob dengan multiple fallback methods
     const getImageBlob = async () => {
       try {
@@ -1578,13 +1612,13 @@ export default function PromoDetailUnified() {
       }
     };
 
-    // Coba gunakan Web Share API dulu (mendukung gambar di mobile)
+    // Untuk platform lain (Telegram, Facebook, Twitter): Gunakan Web Share API
     if (navigator.share && platform !== 'copy') {
       try {
         const imageBlob = await getImageBlob();
         const shareData = {
           title: promoData.title,
-          text: shareText,
+          text: fullShareText,
           url: promoUrl,
         };
 
@@ -1611,9 +1645,6 @@ export default function PromoDetailUnified() {
 
     // Fallback ke share URL biasa (tanpa gambar)
     switch (platform) {
-      case 'whatsapp':
-        window.open(`https://wa.me/?text=${encodeURIComponent(shareText + ' ' + promoUrl)}`, '_blank');
-        break;
       case 'telegram':
         window.open(
           `https://t.me/share/url?url=${encodeURIComponent(promoUrl)}&text=${encodeURIComponent(shareText)}`,
@@ -1887,534 +1918,567 @@ export default function PromoDetailUnified() {
   // compute a safe community primary color to use in inline styles (fallback to blue)
   const communityPrimary = getCommunityPrimaryColor() || '#2563eb';
 
+  // Prepare Open Graph data for social sharing
+  const pageTitle = promoData?.title || 'Promo Menarik';
+  const pageDescription = promoData?.description || `Cek promo menarik ini: ${promoData?.title} di ${promoData?.merchant}!`;
+  const pageImage = promoImages && promoImages.length > 0 ? promoImages[0] : '/default-avatar.png';
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+
   return (
-    <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
-      {/* Header */}
-      <div
-        className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
-        style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
-      >
-        <div className="absolute inset-0">
-          <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
-          <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
-          <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
-        </div>
-        <div className="flex items-center justify-between h-full relative z-10">
-          <button
-            onClick={handleBack}
-            className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-          >
-            <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
-          </button>
-          <div className="flex-1 text-center">
-            <h1 className="text-white font-bold text-sm">{promoData?.categoryLabel || 'Promo'}</h1>
+    <>
+      {/* Meta Tags untuk Open Graph (WhatsApp Preview) */}
+      <Head>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content={pageImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content={pageUrl} />
+        <meta property="twitter:title" content={pageTitle} />
+        <meta property="twitter:description" content={pageDescription} />
+        <meta property="twitter:image" content={pageImage} />
+
+        {/* WhatsApp specific */}
+        <meta property="og:site_name" content="HueHuy" />
+        <meta property="og:locale" content="id_ID" />
+      </Head>
+
+      <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
+        {/* Header */}
+        <div
+          className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
+          style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+        >
+          <div className="absolute inset-0">
+            <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
+            <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
+            <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
           </div>
-          <div className="flex space-x-1.5">
+          <div className="flex items-center justify-between h-full relative z-10">
             <button
-              onClick={handleShare}
+              onClick={handleBack}
               className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
             >
-              <FontAwesomeIcon icon={faShare} className="text-white text-sm" />
+              <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
             </button>
-            <button
-              onClick={handleReport}
-              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-            >
-              <FontAwesomeIcon icon={faExclamationTriangle} className="text-white text-sm" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
-        <div className="lg:mx-auto lg:max-w-md">
-          {/* Hero Image Carousel */}
-          <div className="mb-4">
-            <ImageCarousel
-              images={promoImages}
-              title={promoData?.title || 'Promo'}
-              className="w-full"
-            />
-          </div>
-
-          {/* Info cards */}
-          <div className="mb-4">
-            <div className="rounded-[20px] p-4 shadow-lg" style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}>
-              <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                <div className="flex items-center">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
-                  <span className="text-sm font-semibold text-white">{promoData.distance}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs text-white opacity-80">Jarak Promo:</span>
-                  <div className="text-xs text-white opacity-70">{promoData.coordinates || '-'}</div>
-                </div>
-              </div>
-
-              <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-semibold text-white">{promoData.schedule.day}</span>
-                    <div className="text-xs text-white opacity-80">{promoData.schedule.details}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="bg-yellow-400 text-slate-800 px-3 py-1 rounded-[8px] text-sm font-semibold">
-                      {promoData.schedule.time}
-                    </div>
-                    <div className="text-xs text-white opacity-70 mt-1">{promoData.schedule.timeDetails}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon
-                      icon={promoData.status.type === 'Online' ? faWifi : faWifiSlash}
-                      className="mr-2 text-white text-sm"
-                    />
-                    <span className="text-sm font-semibold text-white">{promoData.status.type}</span>
-                  </div>
-                  <span className="text-xs text-white opacity-70">{promoData.status.description}</span>
-                </div>
-              </div>
+            <div className="flex-1 text-center">
+              <h1 className="text-white font-bold text-sm">{promoData?.categoryLabel || 'Promo'}</h1>
             </div>
-          </div>
-
-          {/* Title + desc */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
-              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
-              <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
-
-              {/* Kotak Kategori - Sama seperti di home */}
-              <div className="mb-4">
-                <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                  <span className="text-slate-700 text-sm font-medium mr-2">Kategori:</span>
-                  <span className="bg-white text-slate-800 text-xs font-semibold px-3 py-1 rounded-md border border-slate-300 flex items-center gap-1">
-                    {getCategoryIcon(promoData.categoryLabel)}
-                    {promoData.categoryLabel}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-left">
-                <button
-                  onClick={() => setShowDetailExpanded(!showDetailExpanded)}
-                  className="text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all flex items-center"
-                  style={{ backgroundColor: getCommunityPrimaryColor() }}
-                >
-                  {showDetailExpanded ? 'Tutup Detail' : 'Selengkapnya'}
-                  <span className={`ml-2 transition-transform duration-300 ${showDetailExpanded ? 'rotate-180' : ''}`}>
-                    ▼
-                  </span>
-                </button>
-              </div>
-
-              {/* Expandable Detail Section */}
-              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
-                }`}>
-                <div className="border-t border-slate-200 pt-4">
-                  {promoData?.detail && (
-                    <div className="mb-4">
-                      <h5 className="font-semibold text-slate-900 mb-2 text-sm">Detail Lengkap:</h5>
-                      <div className="bg-slate-50 p-3 rounded-[12px]">
-                        <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
-                          {promoData.detail}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lokasi */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
-              <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
-              <button onClick={openRoute} className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center" style={{ backgroundColor: getCommunityPrimaryColor() }}>
-                <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
-                Rute
+            <div className="flex space-x-1.5">
+              <button
+                onClick={handleShare}
+                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+              >
+                <FontAwesomeIcon icon={faShare} className="text-white text-sm" />
+              </button>
+              <button
+                onClick={handleReport}
+                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+              >
+                <FontAwesomeIcon icon={faExclamationTriangle} className="text-white text-sm" />
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Kontak penjual */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">Penjual / Pemilik Iklan</h4>
-              <div className="space-y-2">
-                <p className="font-semibold text-slate-900 text-xs">Nama: {promoData.seller?.name}</p>
-                <p className="text-xs text-slate-500">No Hp/WA: {promoData.seller?.phone || '-'}</p>
-                {promoData?.seller?.phone && (
-                  <div className="mt-3">
-                    <button
-                      onClick={() => {
-                        const phone = String(promoData.seller.phone).replace(/\s+/g, '');
-                        let formattedPhone = phone.replace(/\D/g, '');
-                        if (formattedPhone.startsWith('0')) {
-                          formattedPhone = '62' + formattedPhone.substring(1);
-                        } else if (!formattedPhone.startsWith('62')) {
-                          formattedPhone = '62' + formattedPhone;
-                        }
-                        const message = encodeURIComponent(`Halo, saya tertarik dengan promo "${promoData.title || ''}". Bisa bantu info lebih lanjut?`);
-                        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
-                        window.open(whatsappUrl, '_blank');
-                      }}
-                      className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
-                      style={{ backgroundColor: communityPrimary }}
-                    >
-                      <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                        <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
-                      </svg>
-                    </button>
+        {/* Content */}
+        <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
+          <div className="lg:mx-auto lg:max-w-md">
+            {/* Hero Image Carousel */}
+            <div className="mb-4">
+              <ImageCarousel
+                images={promoImages}
+                title={promoData?.title || 'Promo'}
+                className="w-full"
+              />
+            </div>
+
+            {/* Info cards */}
+            <div className="mb-4">
+              <div className="rounded-[20px] p-4 shadow-lg" style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}>
+                <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                  <div className="flex items-center">
+                    <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
+                    <span className="text-sm font-semibold text-white">{promoData.distance}</span>
                   </div>
-                )}
+                  <div className="text-right">
+                    <span className="text-xs text-white opacity-80">Jarak Promo:</span>
+                    <div className="text-xs text-white opacity-70">{promoData.coordinates || '-'}</div>
+                  </div>
+                </div>
+
+                <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-semibold text-white">{promoData.schedule.day}</span>
+                      <div className="text-xs text-white opacity-80">{promoData.schedule.details}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="bg-yellow-400 text-slate-800 px-3 py-1 rounded-[8px] text-sm font-semibold">
+                        {promoData.schedule.time}
+                      </div>
+                      <div className="text-xs text-white opacity-70 mt-1">{promoData.schedule.timeDetails}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FontAwesomeIcon
+                        icon={promoData.status.type === 'Online' ? faWifi : faWifiSlash}
+                        className="mr-2 text-white text-sm"
+                      />
+                      <span className="text-sm font-semibold text-white">{promoData.status.type}</span>
+                    </div>
+                    <span className="text-xs text-white opacity-70">{promoData.status.description}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {promoData?.status?.type === 'Online' && promoData?.link_information && (
-              <div className="mb-4 mt-3">
-                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                  <div className="flex items-center mb-3">
-                    <FontAwesomeIcon icon={faWifi} className="mr-3 text-slate-600 text-sm" />
-                    <span className="font-semibold text-slate-900 text-sm">Promo Online</span>
-                  </div>
+            {/* Title + desc */}
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
+                <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{promoData.title}</h2>
+                <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{promoData.description}</p>
 
-                  {/* tampilkan link mentah (truncate) */}
-                  <div className="bg-slate-50 rounded-[12px] p-3 text-xs text-slate-700 mb-3">
-                    <span className="break-all">{promoData.link_information}</span>
+                {/* Kotak Kategori - Sama seperti di home */}
+                <div className="mb-4">
+                  <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <span className="text-slate-700 text-sm font-medium mr-2">Kategori:</span>
+                    <span className="bg-white text-slate-800 text-xs font-semibold px-3 py-1 rounded-md border border-slate-300 flex items-center gap-1">
+                      {getCategoryIcon(promoData.categoryLabel)}
+                      {promoData.categoryLabel}
+                    </span>
                   </div>
-
-                  {/* tombol buka link */}
-                  <a
-                    href={safeExternalUrl(promoData.link_information) || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full inline-flex items-center justify-center text-white py-3 px-4 rounded-[12px] font-semibold hover:opacity-90 transition-all"
-                    style={{ backgroundColor: communityPrimary }}
-                    onClick={(e) => {
-                      if (!safeExternalUrl(promoData.link_information)) e.preventDefault();
-                    }}
-                  >
-                    Buka Link Promo
-                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
-                    </svg>
-                  </a>
                 </div>
-              </div>
-            )}
 
-            {/* Video/Link Section - hanya untuk tipe Informasi */}
-            {promoData?.link_information && promoData?.categoryLabel === 'Informasi' && (
-              <div className="mb-4">
-                <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
-                  <div className="p-4">
-                    <div className="flex items-center mb-3">
-                      <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
-                      <span className="font-semibold text-slate-900 text-sm">
-                        {isYouTubeLink(promoData.link_information) ? 'Video Informasi' : 'Link Informasi'}
-                      </span>
-                    </div>
+                <div className="text-left">
+                  <button
+                    onClick={() => setShowDetailExpanded(!showDetailExpanded)}
+                    className="text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all flex items-center"
+                    style={{ backgroundColor: getCommunityPrimaryColor() }}
+                  >
+                    {showDetailExpanded ? 'Tutup Detail' : 'Selengkapnya'}
+                    <span className={`ml-2 transition-transform duration-300 ${showDetailExpanded ? 'rotate-180' : ''}`}>
+                      ▼
+                    </span>
+                  </button>
+                </div>
 
-                    {isYouTubeLink(promoData.link_information) && getYouTubeVideoId(promoData.link_information) ? (
-                      <div className="space-y-3">
-                        {/* YouTube Embed */}
-                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                          <iframe
-                            className="absolute top-0 left-0 w-full h-full rounded-lg"
-                            src={`https://www.youtube.com/embed/${getYouTubeVideoId(promoData.link_information)}`}
-                            title="Video Informasi"
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          />
+                {/* Expandable Detail Section */}
+                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
+                  }`}>
+                  <div className="border-t border-slate-200 pt-4">
+                    {promoData?.detail && (
+                      <div className="mb-4">
+                        <h5 className="font-semibold text-slate-900 mb-2 text-sm">Detail Lengkap:</h5>
+                        <div className="bg-slate-50 p-3 rounded-[12px]">
+                          <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
+                            {promoData.detail}
+                          </p>
                         </div>
-                        {/* Link to YouTube */}
-                        <a
-                          href={promoData.link_information}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-                        >
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                          </svg>
-                          Tonton di YouTube
-                        </a>
                       </div>
-                    ) : (
-                      /* Regular Link */
-                      <a
-                        href={promoData.link_information}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg transition-colors text-sm group"
-                      >
-                        <span className="truncate flex-1">{promoData.link_information}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </a>
                     )}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+            </div>
 
-      {/* Bottom bar - Conditional based on category */}
-      {promoData?.categoryLabel !== 'Informasi' && (
-        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
-          <div className="lg:max-w-sm lg:mx-auto">
-            {/* Jika Advertising/Iklan - Tampilkan tombol Chat */}
-            {promoData?.categoryLabel === 'Advertising' ? (
-              <a
-                href={`https://wa.me/${promoData?.seller?.phone?.replace(/[^0-9]/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white flex items-center justify-center"
-                style={{ backgroundColor: getCommunityPrimaryColor() }}
-              >
-                <FontAwesomeIcon icon={faPhone} className="mr-2" />
-                Hubungi Penjual
-              </a>
-            ) : (
-              /* Jika Promo/Voucher - Tampilkan tombol Rebut */
-              <button
-                onClick={handleClaimPromo}
-                disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
-                className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
-                  ? 'bg-gray-400 text-white cursor-not-allowed'
-                  : isAlreadyClaimed
-                    ? 'bg-gray-400 text-white cursor-not-allowed'
-                    : isClaimedLoading
-                      ? 'bg-slate-400 text-white cursor-not-allowed'
-                      : 'text-white focus:ring-4 focus:ring-opacity-50'
-                  }`}
-                style={
-                  !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
-                    ? { backgroundColor: getCommunityPrimaryColor(), '--tw-ring-color': `${getCommunityPrimaryColor()}50` }
-                    : {}
-                }
-              >
-                {timeFlags.expiredByDate ? (
-                  'Promo sudah kadaluwarsa'
-                ) : !timeFlags.withinDailyTime ? (
-                  'Di luar jam berlaku'
-                ) : isNotStarted ? (
-                  (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai')
-                ) : isAlreadyClaimed ? (
-                  <div className="flex items-center justify-center">
-                    <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                    Sudah Direbut
+            {/* Lokasi */}
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
+                <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
+                <button onClick={openRoute} className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center" style={{ backgroundColor: getCommunityPrimaryColor() }}>
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
+                  Rute
+                </button>
+              </div>
+            </div>
+
+            {/* Kontak penjual */}
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Penjual / Pemilik Iklan</h4>
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-900 text-xs">Nama: {promoData.seller?.name}</p>
+                  <p className="text-xs text-slate-500">No Hp/WA: {promoData.seller?.phone || '-'}</p>
+                  {promoData?.seller?.phone && (
+                    <div className="mt-3">
+                      <button
+                        onClick={() => {
+                          const phone = String(promoData.seller.phone).replace(/\s+/g, '');
+                          let formattedPhone = phone.replace(/\D/g, '');
+                          if (formattedPhone.startsWith('0')) {
+                            formattedPhone = '62' + formattedPhone.substring(1);
+                          } else if (!formattedPhone.startsWith('62')) {
+                            formattedPhone = '62' + formattedPhone;
+                          }
+                          const message = encodeURIComponent(`Halo, saya tertarik dengan promo "${promoData.title || ''}". Bisa bantu info lebih lanjut?`);
+                          const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                          window.open(whatsappUrl, '_blank');
+                        }}
+                        className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                        style={{ backgroundColor: communityPrimary }}
+                      >
+                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                          <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {promoData?.status?.type === 'Online' && promoData?.link_information && (
+                <div className="mb-4 mt-3">
+                  <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                    <div className="flex items-center mb-3">
+                      <FontAwesomeIcon icon={faWifi} className="mr-3 text-slate-600 text-sm" />
+                      <span className="font-semibold text-slate-900 text-sm">Promo Online</span>
+                    </div>
+
+                    {/* tampilkan link mentah (truncate) */}
+                    <div className="bg-slate-50 rounded-[12px] p-3 text-xs text-slate-700 mb-3">
+                      <span className="break-all">{promoData.link_information}</span>
+                    </div>
+
+                    {/* tombol buka link */}
+                    <a
+                      href={safeExternalUrl(promoData.link_information) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center text-white py-3 px-4 rounded-[12px] font-semibold hover:opacity-90 transition-all"
+                      style={{ backgroundColor: communityPrimary }}
+                      onClick={(e) => {
+                        if (!safeExternalUrl(promoData.link_information)) e.preventDefault();
+                      }}
+                    >
+                      Buka Link Promo
+                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
+                      </svg>
+                    </a>
                   </div>
-                ) : isClaimedLoading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Merebut Promo...
+                </div>
+              )}
+
+              {/* Video/Link Section - hanya untuk tipe Informasi */}
+              {promoData?.link_information && promoData?.categoryLabel === 'Informasi' && (
+                <div className="mb-4">
+                  <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
+                    <div className="p-4">
+                      <div className="flex items-center mb-3">
+                        <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
+                        <span className="font-semibold text-slate-900 text-sm">
+                          {isYouTubeLink(promoData.link_information) ? 'Video Informasi' : 'Link Informasi'}
+                        </span>
+                      </div>
+
+                      {isYouTubeLink(promoData.link_information) && getYouTubeVideoId(promoData.link_information) ? (
+                        <div className="space-y-3">
+                          {/* YouTube Embed */}
+                          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                            <iframe
+                              className="absolute top-0 left-0 w-full h-full rounded-lg"
+                              src={`https://www.youtube.com/embed/${getYouTubeVideoId(promoData.link_information)}`}
+                              title="Video Informasi"
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
+                          {/* Link to YouTube */}
+                          <a
+                            href={promoData.link_information}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+                          >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                            </svg>
+                            Tonton di YouTube
+                          </a>
+                        </div>
+                      ) : (
+                        /* Regular Link */
+                        <a
+                          href={promoData.link_information}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg transition-colors text-sm group"
+                        >
+                          <span className="truncate flex-1">{promoData.link_information}</span>
+                          <svg className="w-5 h-5 flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  'Rebut Promo Sekarang'
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
-              style={{ backgroundColor: `${getCommunityPrimaryColor()}20` }}
-            >
-              <FontAwesomeIcon
-                icon={faCheckCircle}
-                className="text-3xl"
-                style={{ color: getCommunityPrimaryColor() }}
-              />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">
-              Promo <span className="font-semibold" style={{ color: getCommunityPrimaryColor() }}>{promoData?.title}</span> berhasil direbut dan masuk ke Saku
-              Promo Anda!
-            </p>
-            {promoData?.validation_time_limit && (
-              <p className="text-slate-600 text-sm mb-4">
-                Batas waktu validasi: {toHM(promoData.validation_time_limit)}
-              </p>
-            )}
-            <div className="space-y-3">
-              <button
-                onClick={handleSuccessModalClose}
-                className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all"
-                style={{ backgroundColor: getCommunityPrimaryColor() }}
-              >
-                Lihat Saku Promo
-              </button>
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
-              >
-                Tetap di Halaman Ini
-              </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      )}
 
-      {/* Error Modal */}
-      {showErrorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
-            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 text-3xl" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Oops!</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">{errorMessage}</p>
-            <button
-              onClick={() => setShowErrorModal(false)}
-              className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
-            >
-              OK, Mengerti
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Bagikan Promo</h3>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleShareComplete('whatsapp')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] transition-all"
-                style={{
-                  ':hover': {
-                    backgroundColor: `${getCommunityPrimaryColor()}10`,
-                    borderColor: `${getCommunityPrimaryColor()}50`
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
-                  e.currentTarget.style.borderColor = `${getCommunityPrimaryColor()}50`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '';
-                  e.currentTarget.style.borderColor = '';
-                }}
-              >
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+        {/* Bottom bar - Conditional based on category */}
+        {promoData?.categoryLabel !== 'Informasi' && (
+          <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
+            <div className="lg:max-w-sm lg:mx-auto">
+              {/* Jika Advertising/Iklan - Tampilkan tombol Chat */}
+              {promoData?.categoryLabel === 'Advertising' ? (
+                <a
+                  href={`https://wa.me/${promoData?.seller?.phone?.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white flex items-center justify-center"
                   style={{ backgroundColor: getCommunityPrimaryColor() }}
                 >
-                  <span className="text-white font-bold text-sm">WA</span>
-                </div>
-                <span className="text-xs text-slate-600">WhatsApp</span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('telegram')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+                  <FontAwesomeIcon icon={faPhone} className="mr-2" />
+                  Hubungi Penjual
+                </a>
+              ) : (
+                /* Jika Promo/Voucher - Tampilkan tombol Rebut */
+                <button
+                  onClick={handleClaimPromo}
+                  disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
+                  className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
+                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                    : isAlreadyClaimed
+                      ? 'bg-gray-400 text-white cursor-not-allowed'
+                      : isClaimedLoading
+                        ? 'bg-slate-400 text-white cursor-not-allowed'
+                        : 'text-white focus:ring-4 focus:ring-opacity-50'
+                    }`}
+                  style={
+                    !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
+                      ? { backgroundColor: getCommunityPrimaryColor(), '--tw-ring-color': `${getCommunityPrimaryColor()}50` }
+                      : {}
+                  }
+                >
+                  {timeFlags.expiredByDate ? (
+                    'Promo sudah kadaluwarsa'
+                  ) : !timeFlags.withinDailyTime ? (
+                    'Di luar jam berlaku'
+                  ) : isNotStarted ? (
+                    (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai')
+                  ) : isAlreadyClaimed ? (
+                    <div className="flex items-center justify-center">
+                      <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                      Sudah Direbut
+                    </div>
+                  ) : isClaimedLoading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Merebut Promo...
+                    </div>
+                  ) : (
+                    'Rebut Promo Sekarang'
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: `${getCommunityPrimaryColor()}20` }}
               >
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">TG</span>
-                </div>
-                <span className="text-xs text-slate-600">Telegram</span>
-              </button>
+                <FontAwesomeIcon
+                  icon={faCheckCircle}
+                  className="text-3xl"
+                  style={{ color: getCommunityPrimaryColor() }}
+                />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
+              <p className="text-slate-600 mb-6 leading-relaxed">
+                Promo <span className="font-semibold" style={{ color: getCommunityPrimaryColor() }}>{promoData?.title}</span> berhasil direbut dan masuk ke Saku
+                Promo Anda!
+              </p>
+              {promoData?.validation_time_limit && (
+                <p className="text-slate-600 text-sm mb-4">
+                  Batas waktu validasi: {toHM(promoData.validation_time_limit)}
+                </p>
+              )}
+              <div className="space-y-3">
+                <button
+                  onClick={handleSuccessModalClose}
+                  className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all"
+                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+                >
+                  Lihat Saku Promo
+                </button>
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
+                >
+                  Tetap di Halaman Ini
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Modal */}
+        {showErrorModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 text-3xl" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Oops!</h3>
+              <p className="text-slate-600 mb-6 leading-relaxed">{errorMessage}</p>
               <button
-                onClick={() => handleShareComplete('facebook')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+                onClick={() => setShowErrorModal(false)}
+                className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
               >
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">FB</span>
-                </div>
-                <span className="text-xs text-slate-600">Facebook</span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('twitter')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
-              >
-                <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">TW</span>
-                </div>
-                <span className="text-xs text-slate-600">Twitter</span>
-              </button>
-              <button
-                id="copy-btn"
-                onClick={() => handleShareComplete('copy')}
-                className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">📋 Salin Link</span>
+                OK, Mengerti
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Laporkan Promo</h3>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <button
-                onClick={() => submitReport('Iklan tidak sesuai')}
-                className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
-              >
-                Iklan tidak sesuai
-              </button>
-              <button
-                onClick={() => submitReport('Penipuan / scam')}
-                className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
-              >
-                Penipuan / scam
-              </button>
-              <button
-                onClick={() => submitReport('Konten tidak pantas')}
-                className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
-              >
-                Konten tidak pantas
-              </button>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
-              >
-                Batal
-              </button>
+        {/* Share Modal */}
+        {showShareModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
+            <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Bagikan Promo</h3>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleShareComplete('whatsapp')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] transition-all"
+                  style={{
+                    ':hover': {
+                      backgroundColor: `${getCommunityPrimaryColor()}10`,
+                      borderColor: `${getCommunityPrimaryColor()}50`
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
+                    e.currentTarget.style.borderColor = `${getCommunityPrimaryColor()}50`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '';
+                    e.currentTarget.style.borderColor = '';
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+                    style={{ backgroundColor: getCommunityPrimaryColor() }}
+                  >
+                    <span className="text-white font-bold text-sm">WA</span>
+                  </div>
+                  <span className="text-xs text-slate-600">WhatsApp</span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('telegram')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+                >
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">TG</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Telegram</span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('facebook')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+                >
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">FB</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Facebook</span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('twitter')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
+                >
+                  <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">TW</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Twitter</span>
+                </button>
+                <button
+                  id="copy-btn"
+                  onClick={() => handleShareComplete('copy')}
+                  className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                >
+                  <span className="text-sm text-slate-700">📋 Salin Link</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <style jsx>{`
+        {/* Report Modal */}
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
+            <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Laporkan Promo</h3>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={() => submitReport('Iklan tidak sesuai')}
+                  className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
+                >
+                  Iklan tidak sesuai
+                </button>
+                <button
+                  onClick={() => submitReport('Penipuan / scam')}
+                  className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
+                >
+                  Penipuan / scam
+                </button>
+                <button
+                  onClick={() => submitReport('Konten tidak pantas')}
+                  className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
+                >
+                  Konten tidak pantas
+                </button>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <style jsx>{`
         @keyframes bounce-in {
           0% {
             transform: scale(0.3);
@@ -2459,6 +2523,7 @@ export default function PromoDetailUnified() {
           }
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }

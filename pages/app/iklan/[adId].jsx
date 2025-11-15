@@ -11,6 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageCarousel } from '../../../components/base.components';
@@ -405,6 +406,38 @@ export default function AdDetailUnified() {
         ? window.location.href
         : '';
     const shareText = `Lihat iklan: ${adData.title} dari ${adData.merchant || adData.seller?.name || 'Merchant'}`;
+    const fullShareText = `${shareText}\n\n🔗 Lihat detail: ${adUrl}`;
+
+    // KHUSUS WHATSAPP: Langsung buka WhatsApp tanpa dialog
+    if (platform === 'whatsapp') {
+      try {
+        // Cek apakah di mobile (Android/iOS)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        if (isMobile) {
+          // Di mobile: Gunakan WhatsApp intent untuk langsung buka app
+          const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(fullShareText)}`;
+          window.location.href = whatsappUrl;
+
+          // Fallback jika WhatsApp app tidak terinstall
+          setTimeout(() => {
+            window.open(`https://wa.me/?text=${encodeURIComponent(fullShareText)}`, '_blank');
+          }, 1000);
+        } else {
+          // Di desktop: Buka WhatsApp Web
+          window.open(`https://wa.me/?text=${encodeURIComponent(fullShareText)}`, '_blank');
+        }
+
+        setShowShareModal(false);
+        return;
+      } catch (error) {
+        console.error('WhatsApp share failed:', error);
+        // Fallback ke URL biasa
+        window.open(`https://wa.me/?text=${encodeURIComponent(fullShareText)}`, '_blank');
+        setShowShareModal(false);
+        return;
+      }
+    }
 
     // Fungsi untuk mendapatkan gambar sebagai blob dengan multiple fallback methods
     const getImageBlob = async () => {
@@ -473,13 +506,13 @@ export default function AdDetailUnified() {
       }
     };
 
-    // Coba gunakan Web Share API dulu (mendukung gambar di mobile)
+    // Untuk platform lain: Gunakan Web Share API
     if (navigator.share && platform !== 'copy') {
       try {
         const imageBlob = await getImageBlob();
         const shareData = {
           title: adData.title,
-          text: shareText,
+          text: fullShareText,
           url: adUrl,
         };
 
@@ -506,14 +539,6 @@ export default function AdDetailUnified() {
 
     // Fallback ke share URL biasa (tanpa gambar)
     switch (platform) {
-      case 'whatsapp':
-        window.open(
-          `https://wa.me/?text=${encodeURIComponent(
-            shareText + ' ' + adUrl
-          )}`,
-          '_blank'
-        );
-        break;
       case 'telegram':
         window.open(
           `https://t.me/share/url?url=${encodeURIComponent(
@@ -607,397 +632,432 @@ export default function AdDetailUnified() {
   // compute a safe community primary color to use in inline styles (fallback to blue)
   const communityPrimary = getCommunityPrimaryColor() || '#2563eb';
 
+  // Prepare Open Graph data for social sharing
+  const pageTitle = adData?.title || 'Iklan Menarik';
+  const pageDescription = adData?.description || `Lihat iklan: ${adData?.title} dari ${adData?.merchant || adData?.seller?.name || 'Merchant'}`;
+  const adImages = buildImagesArray(adData);
+  const pageImage = adImages && adImages.length > 0 ? adImages[0] : '/default-avatar.png';
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+
   return (
-    <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
-      {/* Header */}
-      <div
-        className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
-        style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
-      >
-        <div className="absolute inset-0">
-          <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
-          <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
-          <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
-        </div>
-        <div className="flex items-center justify-between h-full relative z-10">
-          <button
-            onClick={handleBack}
-            className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-          >
-            <FontAwesomeIcon
-              icon={faArrowLeft}
-              className="text-white text-sm"
-            />
-          </button>
-          <div className="flex-1 text-center">
-            <h1 className="text-white font-bold text-sm">
-              Iklan
-            </h1>
+    <>
+      {/* Meta Tags untuk Open Graph (WhatsApp Preview) */}
+      <Head>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content={pageImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content={pageUrl} />
+        <meta property="twitter:title" content={pageTitle} />
+        <meta property="twitter:description" content={pageDescription} />
+        <meta property="twitter:image" content={pageImage} />
+
+        {/* WhatsApp specific */}
+        <meta property="og:site_name" content="HueHuy" />
+        <meta property="og:locale" content="id_ID" />
+      </Head>
+
+      <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
+        {/* Header */}
+        <div
+          className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
+          style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+        >
+          <div className="absolute inset-0">
+            <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
+            <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
+            <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
           </div>
-          <div className="flex space-x-1.5">
+          <div className="flex items-center justify-between h-full relative z-10">
             <button
-              onClick={handleShare}
+              onClick={handleBack}
               className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
             >
               <FontAwesomeIcon
-                icon={faShare}
+                icon={faArrowLeft}
                 className="text-white text-sm"
               />
             </button>
-            <button
-              onClick={handleReport}
-              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-            >
-              <FontAwesomeIcon
-                icon={faExclamationTriangle}
-                className="text-white text-sm"
-              />
-            </button>
+            <div className="flex-1 text-center">
+              <h1 className="text-white font-bold text-sm">
+                Iklan
+              </h1>
+            </div>
+            <div className="flex space-x-1.5">
+              <button
+                onClick={handleShare}
+                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+              >
+                <FontAwesomeIcon
+                  icon={faShare}
+                  className="text-white text-sm"
+                />
+              </button>
+              <button
+                onClick={handleReport}
+                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+              >
+                <FontAwesomeIcon
+                  icon={faExclamationTriangle}
+                  className="text-white text-sm"
+                />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-24 lg:pb-6">
-        <div className="lg:mx-auto lg:max-w-md">
-          {/* Hero Image Carousel */}
-          <div className="mb-4">
-            <ImageCarousel
-              images={adData.images}
-              title={adData.title || 'Iklan'}
-              className="w-full"
-            />
-          </div>
+        {/* Content */}
+        <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-24 lg:pb-6">
+          <div className="lg:mx-auto lg:max-w-md">
+            {/* Hero Image Carousel */}
+            <div className="mb-4">
+              <ImageCarousel
+                images={adData.images}
+                title={adData.title || 'Iklan'}
+                className="w-full"
+              />
+            </div>
 
-          {/* Info card status type (online/offline) SISA SATU KARTU AJA */}
-          <div className="mb-4">
-            <div
-              className="rounded-[20px] p-4 shadow-lg"
-              style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
-            >
-              <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon
-                      icon={
-                        adData.promo_type === 'online'
-                          ? faWifi
-                          : faWifiSlash
-                      }
-                      className="mr-2 text-white text-sm"
-                    />
-                    <span className="text-sm font-semibold text-white">
-                      {adData.promo_type === 'online' ? 'Online' : 'Offline'}
+            {/* Info card status type (online/offline) SISA SATU KARTU AJA */}
+            <div className="mb-4">
+              <div
+                className="rounded-[20px] p-4 shadow-lg"
+                style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+              >
+                <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FontAwesomeIcon
+                        icon={
+                          adData.promo_type === 'online'
+                            ? faWifi
+                            : faWifiSlash
+                        }
+                        className="mr-2 text-white text-sm"
+                      />
+                      <span className="text-sm font-semibold text-white">
+                        {adData.promo_type === 'online' ? 'Online' : 'Offline'}
+                      </span>
+                    </div>
+                    <span className="text-xs text-white opacity-70">
+                      Tipe Iklan: {adData.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}
                     </span>
                   </div>
-                  <span className="text-xs text-white opacity-70">
-                    Tipe Iklan: {adData.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}
-                  </span>
                 </div>
-              </div>
 
-              {/* optional info masa berlaku */}
-              {adData.end_date && (
-                <div className="mt-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                  <div className="text-left">
-                    <div className="text-xs text-white opacity-80">
-                      Berlaku hingga
-                    </div>
-                    <div className="text-sm font-semibold text-white">
-                      {fmtDateID(adData.end_date)}
+                {/* optional info masa berlaku */}
+                {adData.end_date && (
+                  <div className="mt-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                    <div className="text-left">
+                      <div className="text-xs text-white opacity-80">
+                        Berlaku hingga
+                      </div>
+                      <div className="text-sm font-semibold text-white">
+                        {fmtDateID(adData.end_date)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Title + desc */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
-              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
-                {adData.title}
-              </h2>
-              <p className="text-slate-600 leading-relaxed text-sm text-left mb-4 whitespace-pre-line">
-                {adData.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Lokasi - Only show for offline ads */}
-          {adData?.promo_type !== 'online' && (
+            {/* Title + desc */}
             <div className="mb-4">
-              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                  Lokasi Iklan
-                </h4>
-                <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                  {adData.location || adData.coordinates || '-'}
+              <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
+                <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
+                  {adData.title}
+                </h2>
+                <p className="text-slate-600 leading-relaxed text-sm text-left mb-4 whitespace-pre-line">
+                  {adData.description}
                 </p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={openRoute}
-                    className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
-                    style={{ backgroundColor: getCommunityPrimaryColor() }}
-                  >
-                    <FontAwesomeIcon
-                      icon={faMapMarkerAlt}
-                      className="mr-2 text-sm"
-                    />
-                    Rute
-                  </button>
+              </div>
+            </div>
 
-                  {adData?.online_store_link && (
+            {/* Lokasi - Only show for offline ads */}
+            {adData?.promo_type !== 'online' && (
+              <div className="mb-4">
+                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                  <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                    Lokasi Iklan
+                  </h4>
+                  <p className="text-slate-600 text-xs leading-relaxed mb-3">
+                    {adData.location || adData.coordinates || '-'}
+                  </p>
+                  <div className="flex flex-col gap-2">
                     <button
-                      onClick={() => {
-                        const storeUrl = adData.online_store_link;
-                        if (storeUrl) {
-                          let url = storeUrl;
-                          if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                            url = 'https://' + url;
-                          }
-                          window.open(url, '_blank');
-                        }
-                      }}
+                      onClick={openRoute}
                       className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
                       style={{ backgroundColor: getCommunityPrimaryColor() }}
                     >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2 text-sm" />
-                      Kunjungi Toko
+                      <FontAwesomeIcon
+                        icon={faMapMarkerAlt}
+                        className="mr-2 text-sm"
+                      />
+                      Rute
                     </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Kontak pemilik */}
-          <div className="mb-20 lg:mb-8">
-            <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-              <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                Pemilik Iklan
-              </h4>
-              <div className="space-y-2">
-                <p className="font-semibold text-slate-900 text-xs">
-                  Nama: {adData.seller?.name || '-'}
-                </p>
-                <p className="text-xs text-slate-500">
-                  No Hp/WA:{' '}   {adData.seller?.phone || '-'}
-                  {adData?.seller?.phone && (
-                    <div className="mt-2">
+                    {adData?.online_store_link && (
                       <button
                         onClick={() => {
-                          const phone = String(adData.seller.phone).replace(/\s+/g, '');
-                          let formattedPhone = phone.replace(/\D/g, '');
-                          if (formattedPhone.startsWith('0')) {
-                            formattedPhone = '62' + formattedPhone.substring(1);
-                          } else if (!formattedPhone.startsWith('62')) {
-                            formattedPhone = '62' + formattedPhone;
+                          const storeUrl = adData.online_store_link;
+                          if (storeUrl) {
+                            let url = storeUrl;
+                            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                              url = 'https://' + url;
+                            }
+                            window.open(url, '_blank');
                           }
-                          const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title || ''}". Bisa bantu info lebih lanjut?`);
-                          const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
-                          window.open(whatsappUrl, '_blank');
                         }}
-                        className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                        className="w-full text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors text-sm font-semibold flex items-center justify-center"
                         style={{ backgroundColor: getCommunityPrimaryColor() }}
                       >
-                        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                          <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
-                        </svg>
+                        <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2 text-sm" />
+                        Kunjungi Toko
                       </button>
-                    </div>
-                  )}
-                </p>
-                {/* removed duplicate tel button to keep single WA button above */}
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* If ad is online, show external link similar to promo design */}
-          {adData?.promo_type === 'online' && (
-            <div className="mb-4">
+            {/* Kontak pemilik */}
+            <div className="mb-20 lg:mb-8">
               <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
                 <h4 className="font-semibold text-slate-900 mb-3 text-sm">
-                  Link Iklan
+                  Pemilik Iklan
                 </h4>
-                <div>
-                  <a
-                    href={safeExternalUrl(adData.link_information || adData.online_store_link) || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full inline-flex items-center justify-center text-white py-3 px-4 rounded-[12px] font-semibold hover:opacity-90 transition-all"
-                    style={{ backgroundColor: communityPrimary }}
-                    onClick={(e) => {
-                      if (!safeExternalUrl(adData.link_information || adData.online_store_link)) e.preventDefault();
-                    }}
-                  >
-                    Buka Link Iklan
-                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
-                    </svg>
-                  </a>
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-900 text-xs">
+                    Nama: {adData.seller?.name || '-'}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    No Hp/WA:{' '}   {adData.seller?.phone || '-'}
+                    {adData?.seller?.phone && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() => {
+                            const phone = String(adData.seller.phone).replace(/\s+/g, '');
+                            let formattedPhone = phone.replace(/\D/g, '');
+                            if (formattedPhone.startsWith('0')) {
+                              formattedPhone = '62' + formattedPhone.substring(1);
+                            } else if (!formattedPhone.startsWith('62')) {
+                              formattedPhone = '62' + formattedPhone;
+                            }
+                            const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title || ''}". Bisa bantu info lebih lanjut?`);
+                            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                            window.open(whatsappUrl, '_blank');
+                          }}
+                          className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
+                          style={{ backgroundColor: getCommunityPrimaryColor() }}
+                        >
+                          <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                            <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </p>
+                  {/* removed duplicate tel button to keep single WA button above */}
                 </div>
               </div>
             </div>
-          )}
+
+            {/* If ad is online, show external link similar to promo design */}
+            {adData?.promo_type === 'online' && (
+              <div className="mb-4">
+                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                  <h4 className="font-semibold text-slate-900 mb-3 text-sm">
+                    Link Iklan
+                  </h4>
+                  <div>
+                    <a
+                      href={safeExternalUrl(adData.link_information || adData.online_store_link) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center text-white py-3 px-4 rounded-[12px] font-semibold hover:opacity-90 transition-all"
+                      style={{ backgroundColor: communityPrimary }}
+                      onClick={(e) => {
+                        if (!safeExternalUrl(adData.link_information || adData.online_store_link)) e.preventDefault();
+                      }}
+                    >
+                      Buka Link Iklan
+                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
 
 
-      {/* Bottom bar - Chat WhatsApp Button */}
-      {adData?.seller?.phone && (
-        <div className="fixed left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30 bottom-0">
-          <div className="lg:max-w-sm lg:mx-auto">
-            <button
-              onClick={() => {
-                if (adData?.seller?.phone) {
-                  const phone = String(adData.seller.phone).replace(/\s+/g, '');
-                  // Format nomor untuk WhatsApp (hapus karakter non-digit, tambah 62 jika dimulai dengan 0)
-                  let formattedPhone = phone.replace(/\D/g, '');
-                  if (formattedPhone.startsWith('0')) {
-                    formattedPhone = '62' + formattedPhone.substring(1);
-                  } else if (!formattedPhone.startsWith('62')) {
-                    formattedPhone = '62' + formattedPhone;
+        {/* Bottom bar - Chat WhatsApp Button */}
+        {adData?.seller?.phone && (
+          <div className="fixed left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30 bottom-0">
+            <div className="lg:max-w-sm lg:mx-auto">
+              <button
+                onClick={() => {
+                  if (adData?.seller?.phone) {
+                    const phone = String(adData.seller.phone).replace(/\s+/g, '');
+                    // Format nomor untuk WhatsApp (hapus karakter non-digit, tambah 62 jika dimulai dengan 0)
+                    let formattedPhone = phone.replace(/\D/g, '');
+                    if (formattedPhone.startsWith('0')) {
+                      formattedPhone = '62' + formattedPhone.substring(1);
+                    } else if (!formattedPhone.startsWith('62')) {
+                      formattedPhone = '62' + formattedPhone;
+                    }
+
+                    const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title}". Bisakah Anda memberikan informasi lebih lanjut?`);
+                    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                    window.open(whatsappUrl, '_blank');
                   }
-
-                  const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title}". Bisakah Anda memberikan informasi lebih lanjut?`);
-                  const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
-                  window.open(whatsappUrl, '_blank');
-                }
-              }}
-              className="w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white focus:ring-4 focus:ring-opacity-50 flex items-center justify-center"
-              style={{
-                backgroundColor: getCommunityPrimaryColor(),
-                '--tw-ring-color': `${getCommunityPrimaryColor()}50`
-              }}
-            >
-              <span className="mr-2">💬</span>
-              Chat
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                Bagikan Iklan
-              </h3>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                }}
+                className="w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white focus:ring-4 focus:ring-opacity-50 flex items-center justify-center"
+                style={{
+                  backgroundColor: getCommunityPrimaryColor(),
+                  '--tw-ring-color': `${getCommunityPrimaryColor()}50`
+                }}
               >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleShareComplete('whatsapp')}
-                className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">
-                  💬 WhatsApp
-                </span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('telegram')}
-                className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">
-                  ✈️ Telegram
-                </span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('facebook')}
-                className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">
-                  📘 Facebook
-                </span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('twitter')}
-                className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">
-                  🐦 Twitter
-                </span>
-              </button>
-              <button
-                id="copy-btn"
-                onClick={() => handleShareComplete('copy')}
-                className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">
-                  📋 Salin Link
-                </span>
+                <span className="mr-2">💬</span>
+                Chat
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">
-                Laporkan Iklan
-              </h3>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              {[
-                'Konten tidak pantas',
-                'Spam atau penipuan',
-                'Informasi palsu',
-                'Melanggar hak cipta',
-                'Lainnya',
-              ].map((reason) => (
+        {/* Share Modal */}
+        {showShareModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
+            <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">
+                  Bagikan Iklan
+                </h3>
                 <button
-                  key={reason}
-                  onClick={() => submitReport(reason)}
-                  className="w-full text-left p-3 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  onClick={() => setShowShareModal(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleShareComplete('whatsapp')}
+                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
                 >
                   <span className="text-sm text-slate-700">
-                    {reason}
+                    💬 WhatsApp
                   </span>
                 </button>
-              ))}
+                <button
+                  onClick={() => handleShareComplete('telegram')}
+                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                >
+                  <span className="text-sm text-slate-700">
+                    ✈️ Telegram
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('facebook')}
+                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                >
+                  <span className="text-sm text-slate-700">
+                    📘 Facebook
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('twitter')}
+                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                >
+                  <span className="text-sm text-slate-700">
+                    🐦 Twitter
+                  </span>
+                </button>
+                <button
+                  id="copy-btn"
+                  onClick={() => handleShareComplete('copy')}
+                  className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                >
+                  <span className="text-sm text-slate-700">
+                    📋 Salin Link
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Info Modal */}
-      {showInfoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-[20px] w-full max-w-sm mx-4 p-6">
-            <div className="text-center">
-              <div className="text-2xl mb-3">ℹ️</div>
-              <p className="text-slate-700 mb-4">
-                {infoMessage}
-              </p>
-              <button
-                onClick={() => setShowInfoModal(false)}
-                className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors"
-              >
-                OK
-              </button>
+        {/* Report Modal */}
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
+            <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">
+                  Laporkan Iklan
+                </h3>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-3">
+                {[
+                  'Konten tidak pantas',
+                  'Spam atau penipuan',
+                  'Informasi palsu',
+                  'Melanggar hak cipta',
+                  'Lainnya',
+                ].map((reason) => (
+                  <button
+                    key={reason}
+                    onClick={() => submitReport(reason)}
+                    className="w-full text-left p-3 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  >
+                    <span className="text-sm text-slate-700">
+                      {reason}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Info Modal */}
+        {showInfoModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-[20px] w-full max-w-sm mx-4 p-6">
+              <div className="text-center">
+                <div className="text-2xl mb-3">ℹ️</div>
+                <p className="text-slate-700 mb-4">
+                  {infoMessage}
+                </p>
+                <button
+                  onClick={() => setShowInfoModal(false)}
+                  className="w-full bg-primary text-white py-2 px-6 rounded-[12px] hover:bg-opacity-90 transition-colors"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
