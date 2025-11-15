@@ -27,7 +27,7 @@ import { get } from '../../../helpers/api.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 
 // Halaman detail Iklan (tanpa klaim promo, tanpa jam berlaku, tanpa jarak)
-export default function AdDetailUnified() {
+export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
   const router = useRouter();
   const { adId, communityId } = router.query;
 
@@ -105,9 +105,9 @@ export default function AdDetailUnified() {
     [baseUrl]
   );
 
-  // Simpan data iklan
-  const [adData, setAdData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Simpan data iklan - gunakan initialAd dari SSR sebagai state awal
+  const [adData, setAdData] = useState(initialAd);
+  const [loading, setLoading] = useState(!initialAd); // Loading false jika sudah ada initialAd
 
   // State untuk community data (background colors)
   const [communityData, setCommunityData] = useState(null);
@@ -421,10 +421,9 @@ export default function AdDetailUnified() {
 
   const handleShareComplete = async (platform) => {
     if (!adData) return;
-    const adUrl =
-      typeof window !== 'undefined'
-        ? window.location.href
-        : '';
+
+    // Gunakan URL production yang benar
+    const adUrl = `https://app.huehuy.com/app/iklan/${adData.id}`;
     const shareText = `Lihat iklan: ${adData.title} dari ${adData.merchant || adData.seller?.name || 'Merchant'}`;
     const fullShareText = `${shareText}\n\n🔗 Lihat detail: ${adUrl}`;
 
@@ -635,12 +634,27 @@ export default function AdDetailUnified() {
     );
   }
 
-  // Prepare Open Graph data for social sharing
+  // Prepare Open Graph data for social sharing (gunakan data dari SSR)
   const pageTitle = adData?.title || 'Iklan Menarik';
-  const pageDescription = adData?.description || `Lihat iklan: ${adData?.title} dari ${adData?.merchant || adData?.seller?.name || 'Merchant'}`;
+  const pageDescription = adData?.description || (adData ? `Lihat iklan: ${adData.title} dari ${adData.merchant || adData.seller?.name || 'Merchant'}` : 'Lihat iklan menarik di HueHuy!');
   const adImages = buildImagesArray(adData);
   const pageImage = adImages && adImages.length > 0 ? adImages[0] : '/default-avatar.png';
-  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+  // Gunakan currentUrl dari SSR (sudah absolute), fallback ke window.location jika tidak ada
+  const pageUrl = currentUrl || (typeof window !== 'undefined' ? window.location.href : '');
+
+  // Pastikan image URL absolute (gunakan https://app.huehuy.com)
+  const getAbsoluteImageUrl = (imgUrl) => {
+    if (!imgUrl) return 'https://app.huehuy.com/default-avatar.png';
+    if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) return imgUrl;
+    if (imgUrl.startsWith('/')) {
+      // Gunakan production URL, bukan localhost
+      return `https://app.huehuy.com${imgUrl}`;
+    }
+    return imgUrl;
+  };
+
+  const absoluteImageUrl = getAbsoluteImageUrl(pageImage);
 
   return (
     <>
@@ -649,25 +663,27 @@ export default function AdDetailUnified() {
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
 
-        {/* Open Graph / Facebook */}
+        {/* Open Graph / Facebook / WhatsApp */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
-        <meta property="og:image" content={pageImage} />
+        <meta property="og:image" content={absoluteImageUrl} />
+        <meta property="og:image:secure_url" content={absoluteImageUrl} />
+        <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-
-        {/* Twitter */}
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content={pageUrl} />
-        <meta property="twitter:title" content={pageTitle} />
-        <meta property="twitter:description" content={pageDescription} />
-        <meta property="twitter:image" content={pageImage} />
-
-        {/* WhatsApp specific */}
+        <meta property="og:image:alt" content={pageTitle} />
         <meta property="og:site_name" content="HueHuy" />
         <meta property="og:locale" content="id_ID" />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content={pageUrl} />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content={absoluteImageUrl} />
+        <meta name="twitter:image:alt" content={pageTitle} />
       </Head>
 
       <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
@@ -1119,4 +1135,70 @@ export default function AdDetailUnified() {
       </div>
     </>
   );
+}
+
+// Server-Side Rendering untuk Open Graph meta tags
+export async function getServerSideProps(context) {
+  const { req } = context;
+
+  // Build absolute URL untuk halaman ini
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'app.huehuy.com';
+  const currentUrl = `${protocol}://${host}${context.resolvedUrl}`;
+
+  // Extract adId from query string since this is iklan.jsx (not dynamic route)
+  const adId = context.query.adId || context.query.id;
+
+  if (!adId) {
+    return {
+      props: {
+        initialAd: null,
+        currentUrl,
+      },
+    };
+  }
+
+  try {
+    // Ambil data iklan dari API publik (tanpa auth)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.huehuy.com/api';
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+
+    // Hit endpoint publik untuk mendapatkan data iklan
+    const response = await fetch(`${baseUrl}/api/ads/${adId}/public`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const json = await response.json();
+      const adData = json.data || json;
+
+      return {
+        props: {
+          initialAd: adData,
+          currentUrl,
+        },
+      };
+    } else {
+      // Jika endpoint publik gagal, return null (halaman akan fetch client-side)
+      console.warn(`Failed to fetch ad ${adId} for SSR:`, response.status);
+      return {
+        props: {
+          initialAd: null,
+          currentUrl,
+        },
+      };
+    }
+  } catch (error) {
+    console.error('Error in getServerSideProps:', error);
+    // Jika terjadi error, return null (halaman akan fetch client-side)
+    return {
+      props: {
+        initialAd: null,
+        currentUrl,
+      },
+    };
+  }
 }

@@ -168,7 +168,7 @@ const safeExternalUrl = (raw) => {
   }
 };
 
-export default function PromoDetailUnified() {
+export default function PromoDetailUnified({ initialPromo = null, currentUrl = '' }) {
   const router = useRouter();
   const { promoId, communityId: initialCommunityId, notificationId } = router.query;
 
@@ -217,7 +217,8 @@ export default function PromoDetailUnified() {
     return router.query.autoRegister || router.query.source;
   }, [router.query.autoRegister, router.query.source]);
 
-  const [promoData, setPromoData] = useState(null);
+  // Gunakan initialPromo dari SSR sebagai state awal
+  const [promoData, setPromoData] = useState(initialPromo);
   const [communityData, setCommunityData] = useState(null);
 
   console.log('🔥 promoData time fields', {
@@ -1508,7 +1509,9 @@ export default function PromoDetailUnified() {
 
   const handleShareComplete = async (platform) => {
     if (!promoData) return;
-    const promoUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+    // Gunakan URL production yang benar (tanpa query parameters autoRegister)
+    const promoUrl = `https://app.huehuy.com/app/komunitas/promo/${promoData.id}`;
     const shareText =
       `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` +
       (promoData.discount ? ` Diskon ${promoData.discount}` : '');
@@ -1918,11 +1921,26 @@ export default function PromoDetailUnified() {
   // compute a safe community primary color to use in inline styles (fallback to blue)
   const communityPrimary = getCommunityPrimaryColor() || '#2563eb';
 
-  // Prepare Open Graph data for social sharing
+  // Prepare Open Graph data for social sharing (gunakan data dari SSR)
   const pageTitle = promoData?.title || 'Promo Menarik';
-  const pageDescription = promoData?.description || `Cek promo menarik ini: ${promoData?.title} di ${promoData?.merchant}!`;
+  const pageDescription = promoData?.description || (promoData ? `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant || 'Merchant'}!` : 'Cek promo menarik di HueHuy!');
   const pageImage = promoImages && promoImages.length > 0 ? promoImages[0] : '/default-avatar.png';
-  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+  // Gunakan currentUrl dari SSR (sudah absolute), fallback ke window.location jika tidak ada
+  const pageUrl = currentUrl || (typeof window !== 'undefined' ? window.location.href : '');
+
+  // Pastikan image URL absolute (gunakan https://app.huehuy.com)
+  const getAbsoluteImageUrl = (imgUrl) => {
+    if (!imgUrl) return 'https://app.huehuy.com/default-avatar.png';
+    if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) return imgUrl;
+    if (imgUrl.startsWith('/')) {
+      // Gunakan production URL, bukan localhost
+      return `https://app.huehuy.com${imgUrl}`;
+    }
+    return imgUrl;
+  };
+
+  const absoluteImageUrl = getAbsoluteImageUrl(pageImage);
 
   return (
     <>
@@ -1931,25 +1949,27 @@ export default function PromoDetailUnified() {
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
 
-        {/* Open Graph / Facebook */}
+        {/* Open Graph / Facebook / WhatsApp */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
-        <meta property="og:image" content={pageImage} />
+        <meta property="og:image" content={absoluteImageUrl} />
+        <meta property="og:image:secure_url" content={absoluteImageUrl} />
+        <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-
-        {/* Twitter */}
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content={pageUrl} />
-        <meta property="twitter:title" content={pageTitle} />
-        <meta property="twitter:description" content={pageDescription} />
-        <meta property="twitter:image" content={pageImage} />
-
-        {/* WhatsApp specific */}
+        <meta property="og:image:alt" content={pageTitle} />
         <meta property="og:site_name" content="HueHuy" />
         <meta property="og:locale" content="id_ID" />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content={pageUrl} />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content={absoluteImageUrl} />
+        <meta name="twitter:image:alt" content={pageTitle} />
       </Head>
 
       <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
@@ -2526,4 +2546,58 @@ export default function PromoDetailUnified() {
       </div>
     </>
   );
+}
+// Server-Side Rendering untuk Open Graph meta tags
+export async function getServerSideProps(context) {
+  const { promoId } = context.params;
+  const { req } = context;
+
+  // Build absolute URL untuk halaman ini
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'app.huehuy.com';
+  const currentUrl = `${protocol}://${host}${context.resolvedUrl}`;
+
+  try {
+    // Ambil data promo dari API publik (tanpa auth)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.huehuy.com/api';
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+
+    // Hit endpoint publik untuk mendapatkan data promo
+    const response = await fetch(`${baseUrl}/api/promos/${promoId}/public`, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const json = await response.json();
+      const promoData = json.data || json;
+
+      return {
+        props: {
+          initialPromo: promoData,
+          currentUrl,
+        },
+      };
+    } else {
+      // Jika endpoint publik gagal, return null (halaman akan fetch client-side)
+      console.warn(`Failed to fetch promo ${promoId} for SSR:`, response.status);
+      return {
+        props: {
+          initialPromo: null,
+          currentUrl,
+        },
+      };
+    }
+  } catch (error) {
+    console.error('Error in getServerSideProps:', error);
+    // Jika terjadi error, return null (halaman akan fetch client-side)
+    return {
+      props: {
+        initialPromo: null,
+        currentUrl,
+      },
+    };
+  }
 }
