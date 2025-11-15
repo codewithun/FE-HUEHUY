@@ -418,7 +418,7 @@ export default function AdDetailUnified() {
   const handleShare = () => setShowShareModal(true);
   const handleReport = () => setShowReportModal(true);
 
-  const handleShareComplete = (platform) => {
+  const handleShareComplete = async (platform) => {
     if (!adData) return;
     const adUrl =
       typeof window !== 'undefined'
@@ -426,6 +426,105 @@ export default function AdDetailUnified() {
         : '';
     const shareText = `Lihat iklan: ${adData.title} dari ${adData.merchant || adData.seller?.name || 'Merchant'}`;
 
+    // Fungsi untuk mendapatkan gambar sebagai blob dengan multiple fallback methods
+    const getImageBlob = async () => {
+      try {
+        // Gunakan gambar pertama dari adData.images
+        const images = buildImagesArray(adData);
+        const imageUrl = images && images.length > 0 ? images[0] : null;
+        if (!imageUrl || imageUrl === '/default-avatar.png') return null;
+
+        // Skip jika gambar adalah data URL (sudah dalam format blob)
+        if (imageUrl.startsWith('data:')) {
+          const response = await fetch(imageUrl);
+          return await response.blob();
+        }
+
+        // Method 1: Try fetch with mode: 'no-cors' first
+        try {
+          const response = await fetch(imageUrl, {
+            mode: 'cors',
+            cache: 'no-cache'
+          });
+          if (response.ok) {
+            const blob = await response.blob();
+            if (blob.size > 0) return blob;
+          }
+        } catch (fetchError) {
+          console.log('Direct fetch failed, trying canvas method...', fetchError);
+        }
+
+        // Method 2: Use canvas as fallback for CORS issues
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+
+              canvas.toBlob((blob) => {
+                resolve(blob);
+              }, 'image/jpeg', 0.9);
+            } catch (canvasError) {
+              console.error('Canvas method failed:', canvasError);
+              resolve(null);
+            }
+          };
+
+          img.onerror = () => {
+            console.error('Image load failed');
+            resolve(null);
+          };
+
+          // Timeout after 5 seconds
+          setTimeout(() => resolve(null), 5000);
+
+          img.src = imageUrl;
+        });
+      } catch (error) {
+        console.error('Error fetching image:', error);
+        return null;
+      }
+    };
+
+    // Coba gunakan Web Share API dulu (mendukung gambar di mobile)
+    if (navigator.share && platform !== 'copy') {
+      try {
+        const imageBlob = await getImageBlob();
+        const shareData = {
+          title: adData.title,
+          text: shareText,
+          url: adUrl,
+        };
+
+        // Tambahkan gambar jika berhasil di-fetch
+        if (imageBlob && imageBlob.size > 0) {
+          const file = new File([imageBlob], 'ad-image.jpg', { type: 'image/jpeg' });
+          shareData.files = [file];
+        }
+
+        // Cek apakah browser bisa share dengan data ini
+        if (navigator.canShare && !navigator.canShare(shareData)) {
+          // Kalau tidak bisa share dengan gambar, coba tanpa gambar
+          delete shareData.files;
+        }
+
+        await navigator.share(shareData);
+        setShowShareModal(false);
+        return;
+      } catch (error) {
+        // Jika Web Share API gagal atau dibatalkan, lanjut ke fallback
+        console.log('Web Share API not available or cancelled, using fallback:', error);
+      }
+    }
+
+    // Fallback ke share URL biasa (tanpa gambar)
     switch (platform) {
       case 'whatsapp':
         window.open(
