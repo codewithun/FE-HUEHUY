@@ -2558,12 +2558,14 @@ export async function getServerSideProps(context) {
   const currentUrl = `${protocol}://${host}${context.resolvedUrl}`;
 
   try {
-    // Ambil data promo dari API publik (tanpa auth)
+    // Ambil data dari API publik (tanpa auth)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.huehuy.com/api';
     const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
-    // Hit endpoint publik untuk mendapatkan data promo
-    const response = await fetch(`${baseUrl}/api/promos/${promoId}/public`, {
+    let promoData = null;
+
+    // 1) Coba promos/public terlebih dahulu
+    let response = await fetch(`${baseUrl}/api/promos/${promoId}/public`, {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -2572,24 +2574,41 @@ export async function getServerSideProps(context) {
 
     if (response.ok) {
       const json = await response.json();
-      const promoData = json.data || json;
+      promoData = json.data || json;
+    } else if (response.status === 404) {
+      // 2) Jika 404, coba endpoint ads/public (mungkin ID ini adalah iklan)
+      const responseAd = await fetch(`${baseUrl}/api/ads/${promoId}/public`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
 
-      return {
-        props: {
-          initialPromo: promoData,
-          currentUrl,
-        },
-      };
-    } else {
-      // Jika endpoint publik gagal, return null (halaman akan fetch client-side)
-      console.warn(`Failed to fetch promo ${promoId} for SSR:`, response.status);
-      return {
-        props: {
-          initialPromo: null,
-          currentUrl,
-        },
-      };
+      if (responseAd.ok) {
+        const json = await responseAd.json();
+        promoData = json.data || json;
+      } else {
+        // 3) Jika masih 404, coba endpoint cubes/public (mungkin ID ini adalah kubus informasi)
+        const responseCube = await fetch(`${baseUrl}/api/cubes/${promoId}/public`, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (responseCube.ok) {
+          const json = await responseCube.json();
+          promoData = json.data || json;
+        }
+      }
     }
+
+    return {
+      props: {
+        initialPromo: promoData,
+        currentUrl,
+      },
+    };
   } catch (error) {
     console.error('Error in getServerSideProps:', error);
     // Jika terjadi error, return null (halaman akan fetch client-side)
@@ -2601,3 +2620,4 @@ export async function getServerSideProps(context) {
     };
   }
 }
+
