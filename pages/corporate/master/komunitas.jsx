@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import {
     ButtonComponent,
     TableSupervisionComponent,
 } from '../../../components/base.components';
+import { FloatingPageComponent } from '../../../components/base.components/modal/FloatingPage.component';
 import InputHexColor from '../../../components/construct.components/input/InputHexColor';
 import { CorporateLayout } from '../../../components/construct.components/layout/Corporate.layout';
 import { useUserContext } from '../../../context/user.context';
@@ -12,6 +13,14 @@ import { token_cookie_name } from '../../../helpers';
 
 export default function KomunitasCorporate() {
     const { profile: Profile } = useUserContext();
+
+    // Local states for modals
+    const [activeCommunity, setActiveCommunity] = useState(null);
+    const [modalMember, setModalMember] = useState(false);
+    const [modalCubes, setModalCubes] = useState(false);
+    const [cubeList, setCubeList] = useState([]);
+    const [cubeLoading, setCubeLoading] = useState(false);
+    const [cubeError, setCubeError] = useState('');
 
     // Ensure API/file URLs are correct across environments
     const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
@@ -172,8 +181,137 @@ export default function KomunitasCorporate() {
                 }}
                 actionControl={{
                     except: ['detail'],
+                    include: (row) => (
+                        <div className="flex items-center gap-2">
+                            <ButtonComponent
+                                label="Anggota"
+                                size="xs"
+                                paint="secondary"
+                                variant="solid"
+                                rounded
+                                onClick={() => {
+                                    setActiveCommunity(row);
+                                    setModalMember(true);
+                                }}
+                            />
+                            <ButtonComponent
+                                label="Lihat Kubus"
+                                size="xs"
+                                paint="info"
+                                variant="outline"
+                                rounded
+                                onClick={async () => {
+                                    setActiveCommunity(row);
+                                    setModalCubes(true);
+                                    setCubeLoading(true);
+                                    setCubeError('');
+                                    setCubeList([]);
+                                    try {
+                                        const res = await fetch(apiJoin(`admin/communities/${row?.id}/cubes`), {
+                                            headers: { Accept: 'application/json' }
+                                        });
+                                        const json = await res.json();
+                                        const items = json?.data || json || [];
+                                        setCubeList(Array.isArray(items) ? items : []);
+                                    } catch (e) {
+                                        setCubeError('Gagal memuat daftar kubus');
+                                    } finally {
+                                        setCubeLoading(false);
+                                    }
+                                }}
+                            />
+                        </div>
+                    ),
                 }}
             />
+
+            {/* Modal Anggota */}
+            <FloatingPageComponent
+                show={modalMember}
+                onClose={() => setModalMember(false)}
+                title={`Anggota: ${activeCommunity?.name || '-'}`}
+                size="lg"
+            >
+                <div className="p-6">
+                    {activeCommunity ? (
+                        <TableSupervisionComponent
+                            key={`member-table-${activeCommunity?.id}`}
+                            title={`Daftar Anggota`}
+                            fetchControl={{
+                                url: apiJoin(`admin/communities/${activeCommunity?.id}/members`)
+                            }}
+                            searchable
+                            noControlBar={false}
+                            unUrlPage
+                            columnControl={{
+                                custom: [
+                                    {
+                                        selector: 'name',
+                                        label: 'Nama',
+                                        item: (member) => (
+                                            <div className="flex items-center">
+                                                <div className="flex-shrink-0 h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                                                    <span className="text-xs font-medium text-white">
+                                                        {(member.name || member.full_name || '?').charAt(0).toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <div className="ml-3">
+                                                    <div className="text-sm font-medium text-gray-900">{member.name || member.full_name || '-'}</div>
+                                                    <div className="text-xs text-gray-500">{member.email || '-'}</div>
+                                                </div>
+                                            </div>
+                                        ),
+                                    },
+                                    { selector: 'email', label: 'Email', item: (m) => m.email || '-' },
+                                    { selector: 'phone', label: 'Telepon', item: (m) => m.phone || '-' },
+                                    { selector: 'role', label: 'Role', item: (m) => m.role?.name || m.role || '-' },
+                                ],
+                            }}
+                            actionControl={{ except: ['edit', 'detail', 'delete'] }}
+                        />
+                    ) : null}
+                </div>
+            </FloatingPageComponent>
+
+            {/* Modal Kubus */}
+            <FloatingPageComponent
+                show={modalCubes}
+                onClose={() => setModalCubes(false)}
+                title={`Daftar Kubus: ${activeCommunity?.name || '-'}`}
+                size="lg"
+            >
+                <div className="p-6">
+                    {cubeLoading ? (
+                        <div className="py-10 text-center text-gray-500 font-medium">Memuat kubus…</div>
+                    ) : cubeError ? (
+                        <div className="py-10 text-center text-red-600 font-semibold">{cubeError}</div>
+                    ) : (Array.isArray(cubeList) ? cubeList : []).length === 0 ? (
+                        <div className="py-10 text-center text-gray-500 font-medium">Tidak ada kubus dalam komunitas ini.</div>
+                    ) : (
+                        <TableSupervisionComponent
+                            key={`cube-table-${activeCommunity?.id}-${cubeList.length}`}
+                            title={`Daftar Kubus (${cubeList.length})`}
+                            data={cubeList}
+                            noControlBar={false}
+                            unUrlPage
+                            searchable={false}
+                            columnControl={{
+                                custom: [
+                                    { selector: 'name', label: 'Nama Kubus', item: (c) => c.name ?? '-' },
+                                    { selector: 'widget_name', label: 'Widget Asal', item: (c) => c.widget_name ?? '-' },
+                                    { selector: 'widget_type', label: 'Tipe', item: (c) => c.widget_type ?? '-' },
+                                    {
+                                        selector: 'created_at',
+                                        label: 'Dibuat Pada',
+                                        item: (c) => (c.created_at ? new Date(c.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'),
+                                    },
+                                ],
+                            }}
+                            actionControl={{ except: ['edit', 'delete'] }}
+                        />
+                    )}
+                </div>
+            </FloatingPageComponent>
         </>
     );
 }
