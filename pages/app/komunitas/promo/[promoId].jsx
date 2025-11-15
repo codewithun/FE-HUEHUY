@@ -1511,7 +1511,12 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     if (!promoData) return;
 
     // Gunakan URL production yang benar (tanpa query parameters autoRegister)
-    const promoUrl = `https://app.huehuy.com/app/komunitas/promo/${promoData.id}`;
+    // Sesuaikan dengan URL yang kamu share: v2.huehuy.com
+    const promoUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/app/komunitas/promo/${promoData.id}`
+        : `https://v2.huehuy.com/app/komunitas/promo/${promoData.id}`;
+
     const shareText =
       `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` +
       (promoData.discount ? ` Diskon ${promoData.discount}` : '');
@@ -1897,7 +1902,8 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   };
 
   // --- UI Loading / Not Found ---
-  if (loading) {
+  // Loading hanya kalau BELUM ada data sama sekali (SSR gagal / client fetch)
+  if (loading && !promoData) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
@@ -1908,7 +1914,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     );
   }
 
-  if (!promoData) {
+  if (!promoData && !loading) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
@@ -1917,6 +1923,15 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
       </div>
     );
   }
+
+  const schedule = promoData?.schedule || {
+    day: promoData?.always_available ? 'Setiap Hari' : 'Berlaku',
+    details: promoData?.end_date
+      ? `Berlaku hingga ${fmtDateID(promoData.end_date)}`
+      : 'Berlaku',
+    time: '00:00 - 23:59',
+    timeDetails: 'Jam Berlaku Promo',
+  };
 
   // compute a safe community primary color to use in inline styles (fallback to blue)
   const communityPrimary = getCommunityPrimaryColor() || '#2563eb';
@@ -1941,6 +1956,15 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   };
 
   const absoluteImageUrl = getAbsoluteImageUrl(pageImage);
+
+  const statusType =
+    promoData?.status?.type ||
+    (promoData?.promo_type === 'online' ? 'Online' : 'Offline');
+
+  const statusDescription =
+    promoData?.status?.description ||
+    `Tipe Promo: ${statusType === 'Online' ? '🌐 Online' : '📍 Offline'
+    }`;
 
   return (
     <>
@@ -2039,14 +2063,14 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                 <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-semibold text-white">{promoData.schedule.day}</span>
-                      <div className="text-xs text-white opacity-80">{promoData.schedule.details}</div>
+                      <span className="text-sm font-semibold text-white">{schedule.day}</span>
+                      <div className="text-xs text-white opacity-80">{schedule.details}</div>
                     </div>
                     <div className="text-right">
                       <div className="bg-yellow-400 text-slate-800 px-3 py-1 rounded-[8px] text-sm font-semibold">
-                        {promoData.schedule.time}
+                        {schedule.time}
                       </div>
-                      <div className="text-xs text-white opacity-70 mt-1">{promoData.schedule.timeDetails}</div>
+                      <div className="text-xs text-white opacity-70 mt-1">{schedule.timeDetails}</div>
                     </div>
                   </div>
                 </div>
@@ -2055,12 +2079,16 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <FontAwesomeIcon
-                        icon={promoData.status.type === 'Online' ? faWifi : faWifiSlash}
+                        icon={statusType === 'Online' ? faWifi : faWifiSlash}
                         className="mr-2 text-white text-sm"
                       />
-                      <span className="text-sm font-semibold text-white">{promoData.status.type}</span>
+                      <span className="text-sm font-semibold text-white">
+                        {statusType}
+                      </span>
                     </div>
-                    <span className="text-xs text-white opacity-70">{promoData.status.description}</span>
+                    <span className="text-xs text-white opacity-70">
+                      {statusDescription}
+                    </span>
                   </div>
                 </div>
               </div>
