@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  InputComponent, 
-  TextareaComponent, 
-  SelectComponent 
+import {
+  InputComponent,
+  TextareaComponent,
+  SelectComponent
 } from '../../../components/base.components';
 
 function IklanForm({ formControl, values, setValues }) {

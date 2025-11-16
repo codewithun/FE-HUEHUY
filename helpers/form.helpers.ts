@@ -91,7 +91,10 @@ export const useForm = (
       /(^|\/)admin\/cubes\/\d+($|\/)/.test(requestUrlFull);
 
     const isAnyUpdate = isAdUpdate || isCubeUpdate;
-    if (isAnyUpdate) formData.set('_method', 'PUT');
+    if (isAnyUpdate) {
+      console.log('🔧 FormData - Setting _method to PUT');
+      formData.set('_method', 'PUT');
+    }
 
     // field khusus cube—SKIP saat update ads
     const cubeOnly = new Set([
@@ -239,6 +242,9 @@ export const useForm = (
     for (const val of formValues) {
       const name = val.name;
       let v = val.value;
+
+      // Skip _method because it's already set above
+      if (name === '_method') continue;
 
       if (actualIsAdUpdate) {
         // ---------------------------
@@ -550,6 +556,12 @@ export const useForm = (
     }
 
     // === Request ===
+    // Debug: Log final FormData contents
+    console.log('📦 FormData - Final entries:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value);
+    }
+    
     const mutate = await post({
       url: submitControl.url,
       path: effectivePath, // <— PAKAI effectivePath
@@ -615,6 +627,10 @@ export const useForm = (
   const submit = async (e: any) => {
     e?.preventDefault();
     setFormErrors([]);
+
+    // Debug: Log formValues before submission
+    console.log('📤 Form Submit - formValues:', formValues);
+    console.log('📤 Form Submit - _method values:', formValues.filter(v => v.name === '_method'));
 
     const newErrors: { name: string; error?: any }[] = [];
 

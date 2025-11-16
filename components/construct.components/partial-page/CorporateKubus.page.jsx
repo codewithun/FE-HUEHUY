@@ -1301,7 +1301,10 @@ function CorporateKubusPage({ scope }) {
                 data={selected}
                 show={updateStatus}
                 setShow={setUpdateStatus}
-                onSuccess={() => { setRefresh(r => !r); }}
+                onSuccess={() => {
+                    setUpdateStatus(false);
+                    setRefresh(r => !r);
+                }}
             />
             <VoucherModal
                 data={selected}

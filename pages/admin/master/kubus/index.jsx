@@ -984,12 +984,14 @@ function KubusMain() {
                 const isInformation = values.find((i) => i.name === 'is_information')?.value?.at?.(0);
                 if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
 
+                const displayLabel = contentType === 'voucher' ? 'Voucher' : 'Promo';
+
                 return (
                   <div className="mt-6 space-y-4">
-                    <div className="font-semibold text-base text-slate-700">Pengaturan {contentType === 'promo' ? 'Promo' : 'Voucher'}</div>
+                    <div className="font-semibold text-base text-slate-700">Pengaturan {displayLabel}</div>
                     <div className="flex gap-4">
                       <CheckboxComponent
-                        label="Promo Tak Terbatas"
+                        label={`${displayLabel} Tak Terbatas`}
                         name="ads[unlimited_grab]"
                         onChange={() => {
                           setValues([
@@ -1000,7 +1002,7 @@ function KubusMain() {
                         checked={values?.find((i) => i.name == 'ads[unlimited_grab]')?.value || false}
                       />
                       <CheckboxComponent
-                        label="Promo Harian"
+                        label={`${displayLabel} Harian`}
                         name="ads[is_daily_grab]"
                         onChange={() => {
                           setValues([
@@ -1017,8 +1019,8 @@ function KubusMain() {
                         <InputNumberComponent
                           type="number"
                           name="ads[max_grab]"
-                          label={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? 'Jumlah Promo Per Hari' : 'Jumlah Promo'}
-                          placeholder={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? 'Promo yang bisa diambil dalam satu hari...' : 'Masukan Jumlah Promo...'}
+                          label={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? `Jumlah ${displayLabel} Per Hari` : `Jumlah ${displayLabel}`}
+                          placeholder={values?.find((i) => i.name == 'ads[is_daily_grab]')?.value ? `${displayLabel} yang bisa diambil dalam satu hari...` : `Masukan Jumlah ${displayLabel}...`}
                           validations={{
                             required: !values?.find((i) => i.name == 'ads[unlimited_grab]')?.value, // Wajib jika bukan unlimited
                             min: 1 // Minimal 1
@@ -1569,6 +1571,7 @@ function KubusMain() {
         show={updateStatus}
         setShow={setUpdateStatus}
         onSuccess={() => {
+          setUpdateStatus(false);
           setRefresh(r => !r);
         }}
       />
