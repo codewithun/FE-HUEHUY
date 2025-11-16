@@ -966,9 +966,26 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
                   onClick={() =>
                     handleShareComplete('whatsapp')
                   }
-                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-green-50 hover:border-green-300 transition-all"
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] transition-all"
+                  style={{
+                    ':hover': {
+                      backgroundColor: `${getCommunityPrimaryColor()}10`,
+                      borderColor: `${getCommunityPrimaryColor()}50`
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
+                    e.currentTarget.style.borderColor = `${getCommunityPrimaryColor()}50`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '';
+                    e.currentTarget.style.borderColor = '';
+                  }}
                 >
-                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+                    style={{ backgroundColor: getCommunityPrimaryColor() }}
+                  >
                     <span className="text-white font-bold text-sm">
                       WA
                     </span>
