@@ -17,9 +17,9 @@ const UpdateCubeStatusModal = ({ data, show, setShow, onSuccess, token }) => {
   );
 
   useEffect(() => {
-    if (data !== null)
-      setValues([
-        ...values.filter((i) => i.name != 'status' && i.name != '_method'),
+    if (data !== null && show) {
+      // Reset values completely to avoid duplicates
+      const newValues = [
         {
           name: 'status',
           value: data?.status === 'active' ? 'inactive' : 'active',
@@ -28,9 +28,18 @@ const UpdateCubeStatusModal = ({ data, show, setShow, onSuccess, token }) => {
           name: '_method',
           value: 'PUT',
         },
-      ]);
+      ];
+      // eslint-disable-next-line no-console
+      console.log('🔵 UpdateCubeStatusModal - Setting initial values:', newValues);
+      setValues(newValues);
+    } else if (!show) {
+      // Clear values when modal closes
+      // eslint-disable-next-line no-console
+      console.log('🔴 UpdateCubeStatusModal - Clearing values');
+      setValues([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, show]);
+  }, [data?.id, show]);
 
   return (
     <div>
@@ -57,13 +66,24 @@ const UpdateCubeStatusModal = ({ data, show, setShow, onSuccess, token }) => {
                 forceFormat="DD-MM-YYYY HH:mm:ss"
                 onChange={(e) => {
                   const dateArray = e.split('-');
-                  setValues([
-                    ...values.filter((i) => i.name != 'inactive_at'),
+                  // Completely rebuild values array to avoid duplicates
+                  const newValues = [
+                    {
+                      name: 'status',
+                      value: data?.status === 'active' ? 'inactive' : 'active',
+                    },
+                    {
+                      name: '_method',
+                      value: 'PUT',
+                    },
                     {
                       name: 'inactive_at',
                       value: `${dateArray[2]}-${dateArray[1]}-${dateArray[0]} 00:00:00`,
                     },
-                  ]);
+                  ];
+                  // eslint-disable-next-line no-console
+                  console.log('🟢 UpdateCubeStatusModal - Setting values with inactive_at:', newValues);
+                  setValues(newValues);
                 }}
                 value={
                   values.find((i) => i.name == 'inactive_at')?.value
@@ -71,8 +91,8 @@ const UpdateCubeStatusModal = ({ data, show, setShow, onSuccess, token }) => {
                     : ''
                 }
                 errors={errors.filter((i) => i.name == 'inactive_at')?.error}
-                // whenFocus={() => setIsFocus(true)}
-                // whenBlur={() => setIsFocus(false)}
+              // whenFocus={() => setIsFocus(true)}
+              // whenBlur={() => setIsFocus(false)}
               />
             )}
             <div className={`flex justify-center gap-4 px-4 mt-4`}>
