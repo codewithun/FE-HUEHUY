@@ -92,7 +92,6 @@ export const useForm = (
 
     const isAnyUpdate = isAdUpdate || isCubeUpdate;
     if (isAnyUpdate) {
-      console.log('🔧 FormData - Setting _method to PUT');
       formData.set('_method', 'PUT');
     }
 
@@ -557,10 +556,12 @@ export const useForm = (
 
     // === Request ===
     // Debug: Log final FormData contents
+    // eslint-disable-next-line no-console
     console.log('📦 FormData - Final entries:');
-    for (const [key, value] of formData.entries()) {
+    Array.from(formData.entries()).forEach(([key, value]) => {
+      // eslint-disable-next-line no-console
       console.log(`  ${key}:`, value);
-    }
+    });
     
     const mutate = await post({
       url: submitControl.url,
@@ -627,10 +628,6 @@ export const useForm = (
   const submit = async (e: any) => {
     e?.preventDefault();
     setFormErrors([]);
-
-    // Debug: Log formValues before submission
-    console.log('📤 Form Submit - formValues:', formValues);
-    console.log('📤 Form Submit - _method values:', formValues.filter(v => v.name === '_method'));
 
     const newErrors: { name: string; error?: any }[] = [];
 
