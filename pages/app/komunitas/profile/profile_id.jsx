@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+/* eslint-disable @next/next/no-img-element */
 import { faFacebook, faTelegram, faWhatsapp, faXTwitter } from '@fortawesome/free-brands-svg-icons';
 import {
   faCheck,
@@ -15,12 +16,12 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useState } from 'react';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
+import { resolveUserImageUrl } from '../../../../helpers/image.helpers';
 import CommunityBottomBar from '../dashboard/CommunityBottomBar';
 
 export default function CommunityProfile() {
@@ -46,7 +47,7 @@ export default function CommunityProfile() {
     if (router.isReady) setRouterReady(true);
   }, [router.isReady]);
 
- 
+
   const [communityData, setCommunityData] = useState(null);
   const [loadingCommunity, setLoadingCommunity] = useState(true);
 
@@ -85,16 +86,16 @@ export default function CommunityProfile() {
   useEffect(() => {
     const fetchCommunityData = async () => {
       if (!effectiveCommunityId || !routerReady) return;
-      
+
       try {
         setLoadingCommunity(true);
         const encryptedToken = Cookies.get(token_cookie_name);
         const token = encryptedToken ? Decrypt(encryptedToken) : '';
-        
+
         // Handle API URL properly - remove /api if it exists, then add it back
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
         const apiBase = baseUrl.replace(/\/api\/?$/, '');
-        
+
         const response = await fetch(`${apiBase}/api/communities/${effectiveCommunityId}`, {
           method: 'GET',
           headers: {
@@ -106,7 +107,7 @@ export default function CommunityProfile() {
         if (response.ok) {
           const result = await response.json();
           const community = result.data || result;
-          
+
           setCommunityData({
             id: community.id,
             name: community.name,
@@ -286,7 +287,7 @@ export default function CommunityProfile() {
       } else {
         window.open(shareLink, '_blank', 'noopener,noreferrer');
       }
-    } catch {}
+    } catch { }
   };
 
   const copyLink = async () => {
@@ -309,7 +310,7 @@ export default function CommunityProfile() {
         document.body.removeChild(el);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -351,7 +352,7 @@ export default function CommunityProfile() {
             at: Date.now()
           })
         );
-      } catch {}
+      } catch { }
 
       // tutup modal & pergi ke halaman komunitas
       setShowLeaveConfirm(false);
@@ -425,12 +426,8 @@ export default function CommunityProfile() {
                 </div>
               ) : (
                 <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
-                  <Image
-                    src={
-                      userData.avatar && userData.avatar !== '/api/placeholder/80/80'
-                        ? userData.avatar
-                        : '/avatar.jpg'
-                    }
+                  <img
+                    src={resolveUserImageUrl({ picture_source: userData.avatar }) || '/avatar.jpg'}
                     width={64}
                     height={64}
                     alt={userData.name}
