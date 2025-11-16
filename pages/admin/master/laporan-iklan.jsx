@@ -35,7 +35,7 @@ export default function ReportContent() {
             },
             {
               selector: 'ad',
-              label: 'Iklan',
+              label: 'Kubus',
               sortable: true,
               width: '180px',
               item: ({ ad }) => (
@@ -187,10 +187,8 @@ export default function ReportContent() {
             <div>
               <p className="mb-2">Dengan menyetujui laporan ini, sistem akan:</p>
               <ul className="list-disc ml-5 space-y-1">
-                <li>Mengubah status iklan menjadi <strong>Nonaktif</strong></li>
                 <li>Mengubah status kubus menjadi <strong>Nonaktif</strong></li>
-                <li>Mengirim notifikasi ke pemilik kubus</li>
-                <li>Iklan tidak akan tampil lagi untuk pengguna</li>
+                <li>Kubus tidak akan tampil lagi untuk pengguna</li>
               </ul>
             </div>
           ) : (
