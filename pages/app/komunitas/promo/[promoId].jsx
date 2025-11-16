@@ -1682,13 +1682,50 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     setShowShareModal(false);
   };
 
-  const submitReport = () => {
-    // For now, just show success message - in production this should send to API
-    setShowReportModal(false);
-    setTimeout(() => {
-      setErrorMessage('Laporan Anda telah dikirim. Terima kasih atas perhatiannya!');
-      setShowErrorModal(true);
-    }, 300);
+  const submitReport = async (reason) => {
+    try {
+      setShowReportModal(false);
+
+      // Kirim laporan ke API
+      const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...authHeader()
+      };
+
+      const reportData = {
+        ad_id: promoData?.id,
+        message: reason || 'Konten tidak pantas'
+      };
+
+      const response = await fetch(`${apiUrl.replace(/\/api$/, '')}/api/report-content-ticket`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(reportData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok || response.status === 201) {
+        // Sukses - tampilkan pesan berhasil
+        setTimeout(() => {
+          setErrorMessage('Laporan Anda telah dikirim. Terima kasih atas perhatiannya!');
+          setShowErrorModal(true);
+        }, 300);
+      } else {
+        // Gagal - tampilkan pesan error
+        setTimeout(() => {
+          setErrorMessage('Gagal mengirim laporan. Silakan coba lagi.');
+          setShowErrorModal(true);
+        }, 300);
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      setTimeout(() => {
+        setErrorMessage('Terjadi kesalahan saat mengirim laporan. Silakan coba lagi.');
+        setShowErrorModal(true);
+      }, 300);
+    }
   };
 
   // --- Claim promo manual ---
