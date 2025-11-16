@@ -959,12 +959,10 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
             <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">
-                  Bagikan Iklan
-                </h3>
+                <h3 className="text-lg font-bold text-slate-900">Bagikan Iklan</h3>
                 <button
                   onClick={() => setShowShareModal(false)}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
                 >
                   ✕
                 </button>
@@ -972,44 +970,63 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => handleShareComplete('whatsapp')}
-                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] transition-all"
+                  style={{
+                    ':hover': {
+                      backgroundColor: `${getCommunityPrimaryColor()}10`,
+                      borderColor: `${getCommunityPrimaryColor()}50`
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
+                    e.currentTarget.style.borderColor = `${getCommunityPrimaryColor()}50`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '';
+                    e.currentTarget.style.borderColor = '';
+                  }}
                 >
-                  <span className="text-sm text-slate-700">
-                    💬 WhatsApp
-                  </span>
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+                    style={{ backgroundColor: getCommunityPrimaryColor() }}
+                  >
+                    <span className="text-white font-bold text-sm">WA</span>
+                  </div>
+                  <span className="text-xs text-slate-600">WhatsApp</span>
                 </button>
                 <button
                   onClick={() => handleShareComplete('telegram')}
-                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
                 >
-                  <span className="text-sm text-slate-700">
-                    ✈️ Telegram
-                  </span>
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">TG</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Telegram</span>
                 </button>
                 <button
                   onClick={() => handleShareComplete('facebook')}
-                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
                 >
-                  <span className="text-sm text-slate-700">
-                    📘 Facebook
-                  </span>
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">FB</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Facebook</span>
                 </button>
                 <button
                   onClick={() => handleShareComplete('twitter')}
-                  className="flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
                 >
-                  <span className="text-sm text-slate-700">
-                    🐦 Twitter
-                  </span>
+                  <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">TW</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Twitter</span>
                 </button>
                 <button
                   id="copy-btn"
                   onClick={() => handleShareComplete('copy')}
                   className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
                 >
-                  <span className="text-sm text-slate-700">
-                    📋 Salin Link
-                  </span>
+                  <span className="text-sm text-slate-700">📋 Salin Link</span>
                 </button>
               </div>
             </div>
@@ -1021,34 +1038,39 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
             <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">
-                  Laporkan Iklan
-                </h3>
+                <h3 className="text-lg font-bold text-slate-900">Laporkan Iklan</h3>
                 <button
                   onClick={() => setShowReportModal(false)}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
                 >
                   ✕
                 </button>
               </div>
               <div className="space-y-3">
-                {[
-                  'Konten tidak pantas',
-                  'Spam atau penipuan',
-                  'Informasi palsu',
-                  'Melanggar hak cipta',
-                  'Lainnya',
-                ].map((reason) => (
-                  <button
-                    key={reason}
-                    onClick={() => submitReport(reason)}
-                    className="w-full text-left p-3 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-                  >
-                    <span className="text-sm text-slate-700">
-                      {reason}
-                    </span>
-                  </button>
-                ))}
+                <button
+                  onClick={() => submitReport('Iklan tidak sesuai')}
+                  className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
+                >
+                  Iklan tidak sesuai
+                </button>
+                <button
+                  onClick={() => submitReport('Penipuan / scam')}
+                  className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
+                >
+                  Penipuan / scam
+                </button>
+                <button
+                  onClick={() => submitReport('Konten tidak pantas')}
+                  className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
+                >
+                  Konten tidak pantas
+                </button>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
+                >
+                  Batal
+                </button>
               </div>
             </div>
           </div>

@@ -175,6 +175,22 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   // State untuk communityId yang bisa diupdate
   const [communityId, setCommunityId] = useState(initialCommunityId);
 
+  const getTypeLabel = useCallback((data) => {
+    if (!data) return 'Promo';
+
+    // kalau sudah ada categoryLabel (Voucher / Informasi / Advertising / Promo)
+    if (data.categoryLabel) {
+      return data.categoryLabel;
+    }
+
+    const t = getNormalizedType(data);
+
+    if (t === 'voucher') return 'Voucher';
+    if (t === 'information') return 'Informasi';
+    if (t === 'iklan') return 'Advertising';
+    return 'Promo';
+  }, []);
+
   // --- Resolve ID promo dari QR lama ---
   // helper aman ambil query string dari URL sebenarnya
   const getFromSearch = useCallback((key) => {
@@ -704,7 +720,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     day: labelDayType(ad),
     details: ad?.finish_validate ? `Berlaku hingga ${fmtDateID(ad.finish_validate)}` : 'Berlaku',
     time: buildTimeRange(ad),
-    timeDetails: 'Jam Berlaku Promo',
+    timeDetails: `Jam Berlaku ${getCategoryLabel(ad)}`, // <- di sini
   }), [fmtDateID, buildTimeRange, labelDayType]);
 
   // Function untuk menentukan gradient berdasarkan bg_color dari community
@@ -795,18 +811,19 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                 day: promo.always_available ? 'Setiap Hari' : 'Weekday',
                 details: promo.end_date ? `Berlaku hingga ${fmtDateID(promo.end_date)}` : 'Berlaku',
                 time: '00:00 - 23:59',
-                timeDetails: 'Jam Berlaku Promo',
+                timeDetails: `Jam Berlaku ${getCategoryLabel(promo, promo.cube)}`,
               },
               status: {
                 type: promo.promo_type === 'online' ? 'Online' : 'Offline',
-                description: `Tipe Promo: ${promo.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+                description: `Tipe ${getCategoryLabel(promo, promo.cube)}: ${promo.promo_type === 'online' ? '🌐 Online' : '📍 Offline'
+                  }`,
               },
               seller: {
                 name: promo.owner_name || 'Admin',
                 phone: promo.owner_contact || ''
               },
               terms: 'TERM & CONDITIONS APPLY',
-              categoryLabel: 'Promo',
+              categoryLabel: getCategoryLabel(promo, promo.cube),
               link_information: promo.online_store_link || null,
               rawAd: null,
               rawPromo: promo,
@@ -866,7 +883,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
               day: data.always_available ? 'Setiap Hari' : 'Weekday',
               details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
               time: '00:00 - 23:59',
-              timeDetails: 'Jam Berlaku Promo',
+              timeDetails: `Jam Berlaku ${getCategoryLabel(data, data.cube || null)}`,
             },
             status: {
               type: data.promo_type === 'online' ? 'Online' : 'Offline',
@@ -877,7 +894,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
               phone: data.owner_contact || ''
             },
             terms: 'TERM & CONDITIONS APPLY',
-            categoryLabel: 'Promo',
+            categoryLabel: getCategoryLabel(promo, promo.cube),
             link_information: data.online_store_link || null,
             rawAd: null,
             rawPromo: data,
@@ -961,7 +978,8 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
           schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+            description: `Tipe ${getCategoryLabel(ad)}: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'
+              }`,
           },
           seller: {
             name: cube?.user?.name || cube?.corporate?.name || 'Admin',
@@ -1077,7 +1095,8 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
           schedule: buildScheduleFromAd(ad || {}),
           status: {
             type: ad?.promo_type === 'online' ? 'Online' : 'Offline',
-            description: `Tipe Promo: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'}`,
+            description: `Tipe ${getCategoryLabel(ad)}: ${ad?.promo_type === 'online' ? '🌐 Online' : '📍 Offline'
+              }`,
           },
           seller: {
             name: cubeInfo.sellerName || ad?.owner_name || 'Admin',
@@ -1144,7 +1163,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
             day: data.always_available ? 'Setiap Hari' : 'Weekday',
             details: data.end_date ? `Berlaku hingga ${fmtDateID(data.end_date)}` : 'Berlaku',
             time: '00:00 - 23:59',
-            timeDetails: 'Jam Berlaku Promo',
+            timeDetails: `Jam Berlaku ${getCategoryLabel(data, data.cube || null)}`,
           },
           status: {
             type: data.promo_type === 'online' ? 'Online' : 'Offline',
@@ -1826,14 +1845,14 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
       if (!savedItem) {
         const low = String(lastError || '').toLowerCase();
         if (low.includes('habis') || low.includes('stok') || low.includes('stock')) {
-          setErrorMessage('Maaf, stok promo sudah habis.');
+          setErrorMessage(`Maaf, stok ${getTypeLabel(promoData).toLowerCase()} sudah habis.`);
           setShowErrorModal(true);
           setIsAlreadyClaimed(false);
           return;
         }
         if (low.includes('sudah') || low.includes('already') || low.includes('claimed') || low.includes('duplicate')) {
           setIsAlreadyClaimed(true);
-          setErrorMessage('Promo ini sudah pernah direbut (mungkin di akun lain).');
+          setErrorMessage(`${getTypeLabel(promoData)} ini sudah pernah direbut (mungkin di akun lain).`);
           setShowErrorModal(true);
           return;
         }
@@ -1843,7 +1862,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
           return;
         }
 
-        setErrorMessage(lastError || 'Gagal merebut promo. Silakan coba lagi.');
+        setErrorMessage(lastError || `Gagal merebut ${getTypeLabel(promoData).toLowerCase()}. Silakan coba lagi.`);
         setShowErrorModal(true);
         return;
       }
@@ -1908,7 +1927,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-slate-600">Memuat detail promo...</p>
+          <p className="text-slate-600">Memuat detail {promoData ? getTypeLabel(promoData).toLowerCase() : 'promo'}...</p>
         </div>
       </div>
     );
@@ -1918,7 +1937,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
-          <p className="text-slate-600">Promo tidak ditemukan</p>
+          <p className="text-slate-600">Konten tidak ditemukan</p>
         </div>
       </div>
     );
@@ -1930,15 +1949,15 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
       ? `Berlaku hingga ${fmtDateID(promoData.end_date)}`
       : 'Berlaku',
     time: '00:00 - 23:59',
-    timeDetails: 'Jam Berlaku Promo',
+    timeDetails: `Jam Berlaku ${getTypeLabel(promoData)}`,
   };
 
   // compute a safe community primary color to use in inline styles (fallback to blue)
   const communityPrimary = getCommunityPrimaryColor() || '#2563eb';
 
   // Prepare Open Graph data for social sharing (gunakan data dari SSR)
-  const pageTitle = promoData?.title || 'Promo Menarik';
-  const pageDescription = promoData?.description || (promoData ? `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant || 'Merchant'}!` : 'Cek promo menarik di HueHuy!');
+  const pageTitle = promoData?.title || `${getTypeLabel(promoData)} Menarik`;
+  const pageDescription = promoData?.description || (promoData ? `Cek ${getTypeLabel(promoData).toLowerCase()} menarik ini: ${promoData.title} di ${promoData.merchant || 'Merchant'}!` : 'Cek promo menarik di HueHuy!');
   const pageImage = promoImages && promoImages.length > 0 ? promoImages[0] : '/default-avatar.png';
 
   // Gunakan currentUrl dari SSR (sudah absolute), fallback ke window.location jika tidak ada
@@ -1963,7 +1982,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
 
   const statusDescription =
     promoData?.status?.description ||
-    `Tipe Promo: ${statusType === 'Online' ? '🌐 Online' : '📍 Offline'
+    `Tipe ${getTypeLabel(promoData)}: ${statusType === 'Online' ? '🌐 Online' : '📍 Offline'
     }`;
 
   return (
@@ -2015,7 +2034,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
               <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
             </button>
             <div className="flex-1 text-center">
-              <h1 className="text-white font-bold text-sm">{promoData?.categoryLabel || 'Promo'}</h1>
+              <h1 className="text-white font-bold text-sm">{promoData?.categoryLabel || getTypeLabel(promoData)}</h1>
             </div>
             <div className="flex space-x-1.5">
               <button
@@ -2041,7 +2060,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
             <div className="mb-4">
               <ImageCarousel
                 images={promoImages}
-                title={promoData?.title || 'Promo'}
+                title={promoData?.title || getTypeLabel(promoData)}
                 className="w-full"
               />
             </div>
@@ -2055,7 +2074,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                     <span className="text-sm font-semibold text-white">{promoData.distance}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs text-white opacity-80">Jarak Promo:</span>
+                    <span className="text-xs text-white opacity-80">Jarak {getTypeLabel(promoData)}:</span>
                     <div className="text-xs text-white opacity-70">{promoData.coordinates || '-'}</div>
                   </div>
                 </div>
@@ -2146,7 +2165,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
             {/* Lokasi */}
             <div className="mb-4">
               <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo / Iklan</h4>
+                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi {getTypeLabel(promoData)}</h4>
                 <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
                 <button onClick={openRoute} className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center" style={{ backgroundColor: getCommunityPrimaryColor() }}>
                   <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
@@ -2173,7 +2192,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                           } else if (!formattedPhone.startsWith('62')) {
                             formattedPhone = '62' + formattedPhone;
                           }
-                          const message = encodeURIComponent(`Halo, saya tertarik dengan promo "${promoData.title || ''}". Bisa bantu info lebih lanjut?`);
+                          const message = encodeURIComponent(`Halo, saya tertarik dengan ${getTypeLabel(promoData).toLowerCase()} "${promoData.title || ''}". Bisa bantu info lebih lanjut?`);
                           const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
                           window.open(whatsappUrl, '_blank');
                         }}
@@ -2194,7 +2213,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                   <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
                     <div className="flex items-center mb-3">
                       <FontAwesomeIcon icon={faWifi} className="mr-3 text-slate-600 text-sm" />
-                      <span className="font-semibold text-slate-900 text-sm">Promo Online</span>
+                      <span className="font-semibold text-slate-900 text-sm">{getTypeLabel(promoData)} Online</span>
                     </div>
 
                     {/* tampilkan link mentah (truncate) */}
@@ -2213,7 +2232,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                         if (!safeExternalUrl(promoData.link_information)) e.preventDefault();
                       }}
                     >
-                      Buka Link Promo
+                      Buka Link {getTypeLabel(promoData)}
                       <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14" />
                       </svg>
@@ -2318,11 +2337,11 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                   }
                 >
                   {timeFlags.expiredByDate ? (
-                    'Promo sudah kadaluwarsa'
+                    `${getTypeLabel(promoData)} sudah kadaluwarsa`
                   ) : !timeFlags.withinDailyTime ? (
                     'Di luar jam berlaku'
                   ) : isNotStarted ? (
-                    (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai')
+                    (isStartTomorrow ? `${getTypeLabel(promoData)} mulai besok` : `${getTypeLabel(promoData)} belum dimulai`)
                   ) : isAlreadyClaimed ? (
                     <div className="flex items-center justify-center">
                       <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
@@ -2331,10 +2350,10 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                   ) : isClaimedLoading ? (
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Merebut Promo...
+                      Merebut {getTypeLabel(promoData)}...
                     </div>
                   ) : (
-                    'Rebut Promo Sekarang'
+                    `Rebut ${getTypeLabel(promoData)} Sekarang`
                   )}
                 </button>
               )}
@@ -2358,8 +2377,8 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
               <p className="text-slate-600 mb-6 leading-relaxed">
-                Promo <span className="font-semibold" style={{ color: getCommunityPrimaryColor() }}>{promoData?.title}</span> berhasil direbut dan masuk ke Saku
-                Promo Anda!
+                {getTypeLabel(promoData)} <span className="font-semibold" style={{ color: getCommunityPrimaryColor() }}>{promoData?.title}</span> berhasil direbut dan masuk ke Saku
+                {getTypeLabel(promoData)} Anda!
               </p>
               {promoData?.validation_time_limit && (
                 <p className="text-slate-600 text-sm mb-4">
@@ -2372,7 +2391,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                   className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all"
                   style={{ backgroundColor: getCommunityPrimaryColor() }}
                 >
-                  Lihat Saku Promo
+                  Lihat Saku {getTypeLabel(promoData)}
                 </button>
                 <button
                   onClick={() => setShowSuccessModal(false)}
@@ -2409,7 +2428,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
             <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">Bagikan Promo</h3>
+                <h3 className="text-lg font-bold text-slate-900">Bagikan {getTypeLabel(promoData)}</h3>
                 <button
                   onClick={() => setShowShareModal(false)}
                   className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
@@ -2488,7 +2507,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
             <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">Laporkan Promo</h3>
+                <h3 className="text-lg font-bold text-slate-900">Laporkan {getTypeLabel(promoData)}</h3>
                 <button
                   onClick={() => setShowReportModal(false)}
                   className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
