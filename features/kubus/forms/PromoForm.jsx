@@ -1,20 +1,25 @@
 import React from 'react';
-import { 
-  InputComponent, 
-  TextareaComponent, 
-  SelectComponent, 
-  InputNumberComponent 
+import {
+  InputComponent,
+  TextareaComponent,
+  SelectComponent,
+  InputNumberComponent
 } from '../../../components/base.components';
 
 const PromoForm = ({ formControl, values, setValues }) => {
+  // Get content type from values to determine if this is promo or voucher
+  const contentType = values?.find(v => v.name === 'content_type')?.value || 'promo';
+  const isVoucher = contentType === 'voucher';
+  const label = isVoucher ? 'Voucher' : 'Promo';
+
   return (
     <div className="mt-6 space-y-4">
-      <div className="font-semibold text-lg text-slate-700 border-b pb-2">Promo</div>
+      <div className="font-semibold text-lg text-slate-700 border-b pb-2">{label}</div>
 
       <InputComponent
         name="ads[title]"
-        label="Judul Promo"
-        placeholder="Masukan Judul Promo..."
+        label={`Judul ${label}`}
+        placeholder={`Masukan Judul ${label}...`}
         {...formControl('ads[title]')}
         validations={{ required: true }}
       />
@@ -22,8 +27,8 @@ const PromoForm = ({ formControl, values, setValues }) => {
       {TextareaComponent && (
         <TextareaComponent
           name="ads[description]"
-          label="Deskripsi Promo"
-          placeholder="Masukan deskripsi singkat promo..."
+          label={`Deskripsi ${label}`}
+          placeholder={`Masukan deskripsi singkat ${label.toLowerCase()}...`}
           {...formControl('ads[description]')}
           rows={4}
           validations={{ required: true }}
@@ -33,8 +38,8 @@ const PromoForm = ({ formControl, values, setValues }) => {
       {TextareaComponent && (
         <TextareaComponent
           name="ads[detail]"
-          label="Detail Promo"
-          placeholder="Masukan detail lengkap promo untuk disimpan di manajemen promo..."
+          label={`Detail ${label}`}
+          placeholder={`Masukan detail lengkap ${label.toLowerCase()} untuk disimpan di manajemen ${label.toLowerCase()}...`}
           {...formControl('ads[detail]')}
           rows={6}
           validations={{ required: false }}
@@ -77,8 +82,8 @@ const PromoForm = ({ formControl, values, setValues }) => {
         />
         <SelectComponent
           name="ads[promo_type]"
-          label="Tipe Promo"
-          placeholder="Pilih Tipe Promo..."
+          label={`Tipe ${label}`}
+          placeholder={`Pilih Tipe ${label}...`}
           {...formControl('ads[promo_type]')}
           options={[
             { label: 'Online', value: 'online' },
@@ -131,7 +136,7 @@ const PromoForm = ({ formControl, values, setValues }) => {
           type="url"
           name="cube_tags[0][link]"
           label="Tautan/Link"
-          placeholder="Masukkan tautan/link promo online..."
+          placeholder={`Masukkan tautan/link ${label.toLowerCase()} online...`}
           onChange={(value) => {
             const linkIndex = values.findIndex(v => v.name === 'cube_tags[0][link]');
             const newValues = [...values];
