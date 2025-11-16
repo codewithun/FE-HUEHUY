@@ -576,13 +576,49 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
     setShowShareModal(false);
   };
 
-  const submitReport = (reason) => {
-    // di versi iklan ini kita cuma tampilkan notifikasi info
-    setShowReportModal(false);
-    setInfoMessage(
-      `Terima kasih. Laporan "${reason}" sudah dicatat.`
-    );
-    setShowInfoModal(true);
+  const submitReport = async (reason) => {
+    try {
+      setShowReportModal(false);
+
+      // Helper untuk auth header
+      const authHeader = () => {
+        const enc = Cookies.get(token_cookie_name);
+        const token = enc ? Decrypt(enc) : '';
+        return token ? { Authorization: `Bearer ${token}` } : {};
+      };
+
+      // Kirim laporan ke API
+      const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...authHeader()
+      };
+
+      const reportData = {
+        ad_id: adData?.id,
+        message: reason || 'Konten tidak pantas'
+      };
+
+      const response = await fetch(`${apiUrl.replace(/\/api$/, '')}/api/report-content-ticket`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(reportData)
+      });
+
+      if (response.ok || response.status === 201) {
+        // Sukses - tampilkan pesan berhasil
+        setInfoMessage('Laporan Anda telah dikirim. Terima kasih atas perhatiannya!');
+        setShowInfoModal(true);
+      } else {
+        // Gagal - tampilkan pesan error
+        setInfoMessage('Gagal mengirim laporan. Silakan coba lagi.');
+        setShowInfoModal(true);
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      setInfoMessage('Terjadi kesalahan saat mengirim laporan. Silakan coba lagi.');
+      setShowInfoModal(true);
+    }
   };
 
   // Safe external URL helper (same behavior as promo page)

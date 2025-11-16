@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
-    ButtonComponent,
-    DateFormatComponent,
-    ModalConfirmComponent,
-    TableSupervisionComponent,
+  ButtonComponent,
+  DateFormatComponent,
+  ModalConfirmComponent,
+  TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { post } from '../../../helpers';
@@ -30,20 +30,57 @@ export default function ReportContent() {
               selector: 'ticket_number',
               label: 'No Laporan',
               sortable: true,
-              width: '150px',
+              width: '120px',
               item: ({ ticket_number }) => ticket_number,
             },
             {
               selector: 'ad',
-              label: 'Iklan',
+              label: 'Kubus',
               sortable: true,
+              width: '180px',
+              item: ({ ad }) => (
+                <div className="text-sm">
+                  <p className="font-medium">{ad?.title || ad?.name || '-'}</p>
+                  <p className="text-xs text-gray-500">
+                    Status: <span className={`font-medium ${ad?.status === 'active' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                      {ad?.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </p>
+                </div>
+              ),
+            },
+            {
+              selector: 'status',
+              label: 'Status Laporan',
+              sortable: true,
+              width: '120px',
+              item: ({ status }) => (
+                <span className={`px-2 py-1 text-xs rounded-full font-medium ${status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  status === 'accepted' ? 'bg-green-100 text-green-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                  {status === 'pending' ? 'Menunggu' :
+                    status === 'accepted' ? 'Disetujui' : 'Ditolak'}
+                </span>
+              ),
+            },
+            {
+              selector: 'message',
+              label: 'Pesan Laporan',
               width: '250px',
-              item: ({ ad }) => ad.name,
+              item: ({ message }) => (
+                <div className="text-sm">
+                  <p className="text-gray-800 line-clamp-2">
+                    {message || 'Tidak ada pesan'}
+                  </p>
+                </div>
+              ),
             },
             {
               selector: 'user_reporter',
               label: 'User',
-              width: '250px',
+              width: '180px',
               item: ({ user_reporter }) => (
                 <>
                   <b className="font-semibold">
@@ -59,7 +96,7 @@ export default function ReportContent() {
               selector: 'created_at',
               label: 'Tanggal/Waktu',
               sortable: true,
-              width: '250px',
+              width: '180px',
               item: ({ created_at }) => (
                 <DateFormatComponent
                   date={created_at}
@@ -106,9 +143,9 @@ export default function ReportContent() {
 
       <ModalConfirmComponent
         title={
-          'Yakin Ingin ' + updateStatus == 'accepted'
-            ? 'Menyetujui Laporan'
-            : 'Membatalkan Laporan'
+          updateStatus == 'accepted'
+            ? 'Setujui Laporan Iklan'
+            : 'Tolak Laporan Iklan'
         }
         show={updateStatus}
         onClose={() => {
@@ -141,10 +178,24 @@ export default function ReportContent() {
           }
         }}
         submitButton={{
-          label: 'Ya',
+          label: updateStatus == 'accepted' ? 'Ya, Setujui' : 'Ya, Tolak',
           loading: loadingUpdateStatus,
         }}
-      />
+      >
+        <div className="text-sm text-gray-600 mb-4">
+          {updateStatus == 'accepted' ? (
+            <div>
+              <p className="mb-2">Dengan menyetujui laporan ini, sistem akan:</p>
+              <ul className="list-disc ml-5 space-y-1">
+                <li>Mengubah status kubus menjadi <strong>Nonaktif</strong></li>
+                <li>Kubus tidak akan tampil lagi untuk pengguna</li>
+              </ul>
+            </div>
+          ) : (
+            <p>Laporan ini akan ditandai sebagai tidak valid dan tidak ada tindakan yang diambil terhadap iklan.</p>
+          )}
+        </div>
+      </ModalConfirmComponent>
     </div>
   );
 }
