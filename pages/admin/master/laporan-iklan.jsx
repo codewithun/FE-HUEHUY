@@ -37,13 +37,25 @@ export default function ReportContent() {
               selector: 'ad',
               label: 'Iklan',
               sortable: true,
-              width: '250px',
-              item: ({ ad }) => ad.name,
+              width: '200px',
+              item: ({ ad }) => ad?.title || ad?.name || '-',
+            },
+            {
+              selector: 'message',
+              label: 'Pesan Laporan',
+              width: '300px',
+              item: ({ message, description }) => (
+                <div className="text-sm">
+                  <p className="text-gray-800 line-clamp-2">
+                    {message || description || 'Tidak ada pesan'}
+                  </p>
+                </div>
+              ),
             },
             {
               selector: 'user_reporter',
               label: 'User',
-              width: '250px',
+              width: '200px',
               item: ({ user_reporter }) => (
                 <>
                   <b className="font-semibold">
@@ -59,7 +71,7 @@ export default function ReportContent() {
               selector: 'created_at',
               label: 'Tanggal/Waktu',
               sortable: true,
-              width: '250px',
+              width: '200px',
               item: ({ created_at }) => (
                 <DateFormatComponent
                   date={created_at}
