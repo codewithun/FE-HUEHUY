@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
-    ButtonComponent,
-    DateFormatComponent,
-    ModalConfirmComponent,
-    TableSupervisionComponent,
+  ButtonComponent,
+  DateFormatComponent,
+  ModalConfirmComponent,
+  TableSupervisionComponent,
 } from '../../../components/base.components';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import { post } from '../../../helpers';
@@ -106,9 +106,9 @@ export default function ReportContent() {
 
       <ModalConfirmComponent
         title={
-          'Yakin Ingin ' + updateStatus == 'accepted'
+          'Yakin Ingin ' + (updateStatus == 'accepted'
             ? 'Menyetujui Laporan'
-            : 'Membatalkan Laporan'
+            : 'Membatalkan Laporan')
         }
         show={updateStatus}
         onClose={() => {
