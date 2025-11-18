@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
+import { resolveUserImageUrl } from '../../../../helpers/image.helpers';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const apiJoin = (path = "") => {
@@ -56,13 +57,13 @@ export default function CommunityMitraChatList() {
         // Pastikan bentuk datanya array
         const users = Array.isArray(jsonCorporateUsers.data)
           ? jsonCorporateUsers.data.map((item) => ({
-              id: item.user?.id || item.id,
-              name: item.user?.name || item.name,
-              email: item.user?.email || item.email,
-              phone: item.user?.phone || item.phone,
-              avatar: item.user?.picture_source || item.picture_source,
-              role: item.role?.name || 'Anggota Mitra',
-            }))
+            id: item.user?.id || item.id,
+            name: item.user?.name || item.name,
+            email: item.user?.email || item.email,
+            phone: item.user?.phone || item.phone,
+            avatar: item.user?.picture_source || item.picture_source,
+            role: item.role?.name || 'Anggota Mitra',
+          }))
           : [];
 
         // 🔹 Hapus diri sendiri biar gak chat ke diri sendiri
@@ -120,7 +121,7 @@ export default function CommunityMitraChatList() {
                   {user.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={user.avatar}
+                      src={resolveUserImageUrl({ picture_source: user.avatar }) || '/avatar.jpg'}
                       alt={user.name}
                       className="w-full h-full object-cover"
                     />

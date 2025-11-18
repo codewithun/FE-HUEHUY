@@ -18,7 +18,7 @@ const apiJoin = (path = "") => {
 export default function ChatUniversal() {
   const router = useRouter();
   const isReady = router.isReady;
-  const { communityId, targetName } = router.query;
+  const { communityId, targetName, sellerPhone } = router.query;
   const rawId = router.query.id; // ini bisa userId / chatId
 
   const [chatId, setChatId] = useState(null);
@@ -101,25 +101,39 @@ export default function ChatUniversal() {
   /** ===============================
    *  Resolve / buat chat room baru
    *  =============================== */
-  const resolveChat = async (targetId) => {
-    if (!targetId) return null;
+  const resolveChatSmart = async (maybeId) => {
     try {
+      const payload = {
+        community_id: communityId || null,
+        receiver_type: 'user',
+      };
+      if (maybeId && /^\d+$/.test(String(maybeId)) && Number(maybeId) > 0) {
+        payload.receiver_id = Number(maybeId);
+      } else {
+        if (sellerPhone) payload.receiver_phone = String(sellerPhone);
+        if (targetName) payload.receiver_name = String(targetName);
+      }
+
       const res = await fetch(apiJoin('chat/resolve'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          receiver_id: Number(targetId),
-          community_id: communityId || null,
-        }),
+        body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.warn('Resolve chat HTTP error:', res.status, text);
+        return null;
+      }
       const json = await res.json();
       const id = json?.chat?.id || json?.data?.id;
       if (id) {
         setChatId(id);
-        setReceiverId(Number(targetId));
+        if (payload.receiver_id) setReceiverId(payload.receiver_id);
+      } else {
+        console.warn('Resolve chat gagal:', json);
       }
       return id || null;
     } catch (e) {
@@ -148,15 +162,18 @@ export default function ChatUniversal() {
         } else {
           // bukan chatId, treat sebagai receiverId dan resolve
           setReceiverId(numeric);
-          resolveChat(numeric).then((id) => {
+          resolveChatSmart(numeric).then((id) => {
             if (id) fetchMessages(id);
             else setLoading(false);
           });
         }
       });
     } else {
-      // bukan angka -> kemungkinan slug / special id -> stop loading
-      setLoading(false);
+      // bukan angka -> coba resolve berdasarkan phone/nama
+      resolveChatSmart(null).then((id) => {
+        if (id) fetchMessages(id);
+        else setLoading(false);
+      });
     }
   }, [isReady, rawId, token]);
 
@@ -189,6 +206,8 @@ export default function ChatUniversal() {
       // prefer receiver_id jika tersedia, else sertakan chat_id jika ada
       if (receiverId) payload.receiver_id = Number(receiverId);
       else if (chatId) payload.chat_id = Number(chatId);
+      else if (sellerPhone) payload.receiver_phone = String(sellerPhone);
+      else if (targetName) payload.receiver_name = String(targetName);
 
       const res = await fetch(apiJoin('chat/send'), {
         method: 'POST',
@@ -198,6 +217,11 @@ export default function ChatUniversal() {
         },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('Gagal kirim pesan (HTTP):', res.status, text);
+        return;
+      }
       const json = await res.json();
 
       if (json.success) {

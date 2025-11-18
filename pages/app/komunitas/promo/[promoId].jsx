@@ -10,6 +10,7 @@ import {
   faShare,
   faWifi,
   faWifiSlash,
+  faComments,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
@@ -1957,6 +1958,34 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     setTimeout(() => router.push('/app/saku'), 300);
   };
 
+  // --- Message / Chat handler (Pesan) ---
+  const handleMessage = () => {
+    if (!promoData) return;
+
+    const seller = promoData.seller || {};
+
+    // Debug: lihat struktur data untuk mencari seller ID
+    console.log('🔍 Debug handleMessage:', {
+      promoData: promoData,
+      seller: seller,
+      merchant: promoData.merchant,
+      owner_name: promoData.owner_name,
+      user_id: promoData.user_id,
+      merchant_id: promoData.merchant_id,
+      created_by: promoData.created_by
+    });
+
+    // Coba berbagai kemungkinan field untuk seller ID
+    const sellerId = seller.id || seller.user_id || promoData.user_id || promoData.merchant_id || promoData.created_by || 'unknown';
+    const sellerName = seller.name || promoData.merchant || promoData.owner_name || 'Penjual';
+    const sellerPhone = seller.phone || promoData.phone || promoData.seller_phone || '';
+
+    console.log('🚀 Navigating to chat with:', { sellerId, sellerName, communityId, sellerPhone });
+
+    // Redirect ke chat system yang sudah ada di /app/pesan/[id]
+    router.push(`/app/pesan/${sellerId}?targetName=${encodeURIComponent(sellerName)}&communityId=${communityId || ''}&sellerPhone=${encodeURIComponent(sellerPhone)}`);
+  };
+
   // --- UI Loading / Not Found ---
   // Loading hanya kalau BELUM ada data sama sekali (SSR gagal / client fetch)
   if (loading && !promoData) {
@@ -2191,6 +2220,8 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                           <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
                             {promoData.detail}
                           </p>
+
+
                         </div>
                       </div>
                     )}
@@ -2355,44 +2386,54 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
                   Hubungi Penjual
                 </a>
               ) : (
-                /* Jika Promo/Voucher - Tampilkan tombol Rebut */
-                <button
-                  onClick={handleClaimPromo}
-                  disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
-                  className={`claim-button w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
-                    ? 'bg-gray-400 text-white cursor-not-allowed'
-                    : isAlreadyClaimed
+                /* Jika Promo/Voucher - Tampilkan tombol Pesan + Rebut */
+                <div className="flex flex-col lg:flex-row gap-3">
+                  <button
+                    onClick={handleMessage}
+                    className="w-full lg:w-1/2 py-3.5 rounded-[12px] lg:rounded-xl font-semibold text-sm border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center"
+                  >
+                    <FontAwesomeIcon icon={faComments} className="mr-2" />
+                    Pesan
+                  </button>
+
+                  <button
+                    onClick={handleClaimPromo}
+                    disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
+                    className={`w-full lg:w-1/2 py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
                       ? 'bg-gray-400 text-white cursor-not-allowed'
-                      : isClaimedLoading
-                        ? 'bg-slate-400 text-white cursor-not-allowed'
-                        : 'text-white focus:ring-4 focus:ring-opacity-50'
-                    }`}
-                  style={
-                    !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
-                      ? { backgroundColor: getCommunityPrimaryColor(), '--tw-ring-color': `${getCommunityPrimaryColor()}50` }
-                      : {}
-                  }
-                >
-                  {timeFlags.expiredByDate ? (
-                    `${getTypeLabel(promoData)} sudah kadaluwarsa`
-                  ) : !timeFlags.withinDailyTime ? (
-                    'Di luar jam berlaku'
-                  ) : isNotStarted ? (
-                    (isStartTomorrow ? `${getTypeLabel(promoData)} mulai besok` : `${getTypeLabel(promoData)} belum dimulai`)
-                  ) : isAlreadyClaimed ? (
-                    <div className="flex items-center justify-center">
-                      <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                      Sudah Direbut
-                    </div>
-                  ) : isClaimedLoading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Merebut {getTypeLabel(promoData)}...
-                    </div>
-                  ) : (
-                    `Rebut ${getTypeLabel(promoData)} Sekarang`
-                  )}
-                </button>
+                      : isAlreadyClaimed
+                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                        : isClaimedLoading
+                          ? 'bg-slate-400 text-white cursor-not-allowed'
+                          : 'text-white focus:ring-4 focus:ring-opacity-50'
+                      }`}
+                    style={
+                      !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted && !isClaimedLoading && !isAlreadyClaimed
+                        ? { backgroundColor: getCommunityPrimaryColor(), '--tw-ring-color': `${getCommunityPrimaryColor()}50` }
+                        : {}
+                    }
+                  >
+                    {timeFlags.expiredByDate ? (
+                      `${getTypeLabel(promoData)} sudah kadaluwarsa`
+                    ) : !timeFlags.withinDailyTime ? (
+                      'Di luar jam berlaku'
+                    ) : isNotStarted ? (
+                      (isStartTomorrow ? `${getTypeLabel(promoData)} mulai besok` : `${getTypeLabel(promoData)} belum dimulai`)
+                    ) : isAlreadyClaimed ? (
+                      <div className="flex items-center justify-center">
+                        <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
+                        Sudah Direbut
+                      </div>
+                    ) : isClaimedLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Merebut {getTypeLabel(promoData)}...
+                      </div>
+                    ) : (
+                      `Rebut ${getTypeLabel(promoData)} Sekarang`
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>
