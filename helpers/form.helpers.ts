@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { post, postProps } from './api.helpers';
 import { validationHelper, validationRules } from './validation.helpers';
 import { prepareKubusVoucherData } from './voucher.helpers';
@@ -90,7 +90,12 @@ export const useForm = (
       /(^|\/)admin\/cubes\/\d+($|\/)/.test(effectivePath) ||
       /(^|\/)admin\/cubes\/\d+($|\/)/.test(requestUrlFull);
 
-    const isAnyUpdate = isAdUpdate || isCubeUpdate;
+    // NEW: Detect dynamic-content update so we spoof PUT correctly
+    const isDynamicContentUpdate =
+      /(^|\/)admin\/dynamic-content\/\d+($|\/)/.test(effectivePath) ||
+      /(^|\/)admin\/dynamic-content\/\d+($|\/)/.test(requestUrlFull);
+
+    const isAnyUpdate = isAdUpdate || isCubeUpdate || isDynamicContentUpdate;
     if (isAnyUpdate) {
       formData.set('_method', 'PUT');
     }
