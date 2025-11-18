@@ -11,6 +11,7 @@ import { distanceConvert } from '../../../helpers/distanceConvert.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import CommunityBottomBar from './dashboard/CommunityBottomBar';
 import KomunitasCard from '../../../components/construct.components/card/Komunitas.card';
+import PromoCardIcons from '../../../components/base.components/card-icons/PromoCardIcons';
 
 const CommunityPromoPage = () => {
   const router = useRouter();
@@ -118,9 +119,6 @@ const CommunityPromoPage = () => {
 
   // === Helper functions untuk label (sama seperti di home.jsx) ===
 
-  const getAdImage = (ad) =>
-    ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
-
   const normalizeBoolLike = (val) => {
     if (val === true || val === 1) return true;
     if (typeof val === 'number') return val === 1;
@@ -180,28 +178,6 @@ const CommunityPromoPage = () => {
     return 'promo';
   };
 
-  const getCategoryLabel = (ad, cube = null) => {
-    const t = getNormalizedType(ad, cube);
-    if (t === 'information') return 'Informasi';
-    if (t === 'voucher') return 'Voucher';
-    if (t === 'iklan') return 'Advertising';
-    return 'Promo';
-  };
-
-  // Helper function to get category with icon and additional info
-  const getCategoryWithIcon = (ad, cube = null, communityData = null) => {
-    const label = getCategoryLabel(ad, cube);
-    const icon = getCategoryIcon(label);
-    const additionalInfo = getAdditionalInfo(ad, cube, communityData);
-
-    return {
-      label,
-      icon,
-      additionalInfo,
-      display: label // Remove emoji from display since we're using SVG
-    };
-  };
-
   // Build consistent link to appropriate detail page (sama seperti di home.jsx)
   const buildPromoLink = (ad, cube = null, communityId = null) => {
     const id = ad?.id || ad?.ad_id;
@@ -259,93 +235,6 @@ const CommunityPromoPage = () => {
       return `/app/kubus-informasi/kubus-infor?${params.toString()}`;
     }
     return '#';
-  };
-
-  // Professional SVG icons for categories
-  const CategoryIcons = {
-    advertising: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z" />
-      </svg>
-    ),
-    information: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
-      </svg>
-    ),
-    voucher: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M4,4A2,2 0 0,0 2,6V10C3.11,10 4,10.9 4,12A2,2 0 0,1 2,14V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V14C20.89,14 20,13.1 20,12A2,2 0 0,1 22,10V6A2,2 0 0,0 20,4H4M4,6H20V8.54C18.81,9.23 18,10.53 18,12C18,13.47 18.81,14.77 20,15.46V18H4V15.46C5.19,14.77 6,13.47 6,12C6,10.53 5.19,9.23 4,8.54V6Z" />
-      </svg>
-    ),
-    promo: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
-      </svg>
-    ),
-    default: (
-      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
-      </svg>
-    )
-  };
-
-  // Helper function to get appropriate icon for each category type
-  const getCategoryIcon = (category) => {
-    const categoryLower = String(category || '').toLowerCase();
-
-    switch (categoryLower) {
-      case 'advertising':
-        return CategoryIcons.advertising;
-      case 'informasi':
-      case 'information':
-        return CategoryIcons.information;
-      case 'voucher':
-        return CategoryIcons.voucher;
-      case 'promo':
-        return CategoryIcons.promo;
-      default:
-        return CategoryIcons.default;
-    }
-  };
-
-  // Helper function to get additional informational data
-  const getAdditionalInfo = (ad, cube, communityData) => {
-    const info = {};
-
-    // Get creation date
-    const createdAt = ad?.created_at || cube?.created_at;
-    if (createdAt) {
-      const date = new Date(createdAt);
-      info.createdDate = date.toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short'
-      });
-    }
-
-    // Get status information
-    if (ad) {
-      info.status = ad.status || 'active';
-      info.type = ad.type || 'general';
-
-      // Get grab information for vouchers/promos
-      if (ad.max_grab) {
-        info.maxGrab = ad.unlimited_grab ? 'Unlimited' : `${ad.max_grab} tersisa`;
-      }
-
-      // Get validation type
-      if (ad.validation_type) {
-        info.validationType = ad.validation_type === 'auto' ? 'Auto Validasi' : 'Manual Validasi';
-      }
-    }
-
-    // Get community info
-    if (communityData) {
-      info.communityName = communityData.name;
-      info.memberCount = communityData.members || 0;
-    }
-
-    return info;
   };
 
   // Fungsi untuk mengidentifikasi iklan/advertising
@@ -1001,56 +890,13 @@ const CommunityPromoPage = () => {
 
               if (!ad && !cube) return null;
 
-              // Debug: cek getAdImage result
-              const adImageRaw = ad ? getAdImage(ad) : '';
-
-              const imageUrl = adImageRaw || cube?.image || '/default-avatar.png';
-              const title = ad?.title || cube?.label || 'Promo';
-              const address = ad?.cube?.address || cube?.address || '';
-
-              const href = buildPromoLink(ad, cube, communityId);
-
-              // Card rekomendasi dengan ukuran sama seperti di index.jsx (330px, landscape image)
-              const categoryInfo = getCategoryWithIcon(ad, cube, communityData);
-
               return (
-                <Link href={href} key={index}>
-                  <div
-                    className="relative snap-center w-[330px] shadow-lg bg-white/20 backdrop-blur-md rounded-[14px] overflow-hidden p-3 border border-white/30 hover:bg-white/25 transition-all duration-300"
-                    style={{ minWidth: '330px', maxWidth: '330px', width: '330px' }}
-                  >
-                    <div className="aspect-[6/3] bg-white/10 rounded-[14px] overflow-hidden">
-                      <Image
-                        src={normalizeImageSrc(imageUrl)}
-                        alt={title}
-                        width={600}
-                        height={200}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
-                    <div className="px-1 mt-2">
-                      <p className="font-semibold text-white text-base line-clamp-1 mb-1 drop-shadow-sm" style={{ minHeight: '1.5em' }}>
-                        {title}
-                      </p>
-                      <div className="flex justify-between items-start gap-2">
-                        <p className="text-white/90 text-xs line-clamp-2 flex-1 drop-shadow-sm" style={{ minWidth: 0, minHeight: '3em' }}>
-                          {address || '\u00A0'}
-                        </p>
-                        {(ad?.total_remaining || ad?.max_grab) && (
-                          <p className="text-white bg-red-500/80 text-xs whitespace-nowrap px-2 py-1 rounded-md font-semibold flex-shrink-0">
-                            Sisa {ad?.total_remaining || ad?.max_grab}
-                          </p>
-                        )}
-                      </div>
-                      <div className="mt-2">
-                        <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-1 rounded-md border border-white/40 inline-flex items-center gap-1">
-                          {categoryInfo.icon}
-                          {categoryInfo.label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                <KomunitasCard
+                  key={index}
+                  item={{ ad, cube }}
+                  size="XL"
+                  onClick={() => router.push(buildPromoLink(ad, cube, communityId))}
+                />
               );
             })}
           </div>

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import KomunitasCard from '../../../../components/construct.components/card/Komunitas.card';
+import PromoCardIcons from '../../../../components/base.components/card-icons/PromoCardIcons';
 import { token_cookie_name } from '../../../../helpers';
 import { distanceConvert } from '../../../../helpers/distanceConvert.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
@@ -1020,53 +1021,21 @@ export default function CommunityDashboard({ communityId }) {
 
                 if (!ad && !cube) return null;
 
-                const imageUrl = ad ? getAdImage(ad) : (cube?.image || '/default-avatar.png');
-                const title = ad?.title || cube?.label || 'Promo';
-                const address = ad?.cube?.address || cube?.address || '';
-
-                const href = buildPromoLink(ad, cube, communityId);
-
                 // Card rekomendasi dengan ukuran sama seperti di index.jsx (330px, landscape image)
-                const categoryInfo = getCategoryWithIcon(ad, cube, communityData);
+
+                const handleClick = () => {
+                  const link = buildPromoLink(ad, cube, communityId);
+                  console.log(`  🔗 Click link for recommendation ${index}:`, link);
+                  router.push(link);
+                };
 
                 return (
-                  <Link href={href} key={index}>
-                    <div
-                      className="relative snap-center w-[330px] shadow-lg bg-white/20 backdrop-blur-md rounded-[14px] overflow-hidden p-3 border border-white/30 hover:bg-white/25 transition-all duration-300"
-                      style={{ minWidth: '330px', maxWidth: '330px', width: '330px' }}
-                    >
-                      <div className="aspect-[6/3] bg-white/10 rounded-[14px] overflow-hidden">
-                        <Image
-                          src={normalizeImageSrc(imageUrl)}
-                          alt={title}
-                          width={600}
-                          height={200}
-                          className="object-cover w-full h-full"
-                        />
-                      </div>
-                      <div className="px-1 mt-2">
-                        <p className="font-semibold text-white text-base line-clamp-1 mb-1 drop-shadow-sm" style={{ minHeight: '1.5em' }}>
-                          {title}
-                        </p>
-                        <div className="flex justify-between items-start gap-2">
-                          <p className="text-white/90 text-xs line-clamp-2 flex-1 drop-shadow-sm" style={{ minWidth: 0, minHeight: '3em' }}>
-                            {address || '\u00A0'}
-                          </p>
-                          {(ad?.total_remaining || ad?.max_grab) && (
-                            <p className="text-white bg-red-500/80 text-xs whitespace-nowrap px-2 py-1 rounded-md font-semibold flex-shrink-0">
-                              Sisa {ad?.total_remaining || ad?.max_grab}
-                            </p>
-                          )}
-                        </div>
-                        <div className="mt-2">
-                          <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-1 rounded-md border border-white/40 inline-flex items-center gap-1">
-                            {categoryInfo.icon}
-                            {categoryInfo.label}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+                  <KomunitasCard
+                    key={index}
+                    item={{ ad, cube }}
+                    size='XL'
+                    onClick={handleClick}
+                  />
                 );
               })}
             </div>
