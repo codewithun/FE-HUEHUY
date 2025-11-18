@@ -1980,10 +1980,31 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     const sellerName = seller.name || promoData.merchant || promoData.owner_name || 'Penjual';
     const sellerPhone = seller.phone || promoData.phone || promoData.seller_phone || '';
 
-    console.log('🚀 Navigating to chat with:', { sellerId, sellerName, communityId, sellerPhone });
+    // siapkan informasi produk untuk kartu di chat
+    const title = promoData.title || '';
+    const image = Array.isArray(promoImages) && promoImages.length ? promoImages[0] : (promoData.image || '');
+    // Harga: coba berbagai kemungkinan field
+    const price = promoData.price || promoData.discount_price || promoData.promo_price || promoData.final_price || '';
+    const priceOriginal = promoData.original_price || promoData.price_before || promoData.strike_price || '';
+    // URL produk (gunakan URL halaman ini)
+    const productUrl = typeof window !== 'undefined' ? window.location.href : '';
 
-    // Redirect ke chat system yang sudah ada di /app/pesan/[id]
-    router.push(`/app/pesan/${sellerId}?targetName=${encodeURIComponent(sellerName)}&communityId=${communityId || ''}&sellerPhone=${encodeURIComponent(sellerPhone)}`);
+    console.log('🚀 Navigating to chat with:', { sellerId, sellerName, communityId, sellerPhone, title, image, price, priceOriginal });
+
+    // Redirect ke chat system yang sudah ada di /app/pesan/[id] + kirim product card
+    const q = new URLSearchParams({
+      targetName: sellerName || 'Penjual',
+      communityId: String(communityId || ''),
+      sellerPhone: sellerPhone || '',
+      productCard: '1',
+      productTitle: title,
+      productImage: image,
+      productPrice: String(price || ''),
+      productPriceOriginal: String(priceOriginal || ''),
+      productUrl: productUrl,
+      promoId: String(promoData.id || ''),
+    });
+    router.push(`/app/pesan/${sellerId}?${q.toString()}`);
   };
 
   // --- UI Loading / Not Found ---

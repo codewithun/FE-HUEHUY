@@ -64,7 +64,16 @@ export default function Pesan() {
             ) : list.length ? (
               list.map((item, key) => {
                 const partner = item.partner || {};
-                const last = item.last_message || '(belum ada pesan)';
+                const rawLast = item.last_message || '(belum ada pesan)';
+                let last = rawLast;
+                if (typeof rawLast === 'string' && rawLast.trim().startsWith('{')) {
+                  try {
+                    const parsed = JSON.parse(rawLast);
+                    if (parsed && parsed.type === 'product_card') {
+                      last = parsed.title ? `Produk: ${parsed.title}` : 'Produk';
+                    }
+                  } catch { }
+                }
                 const time = item.created_at ? formatTime(item.created_at) : '';
 
                 // unread_count dikirim dari backend (>=0)
