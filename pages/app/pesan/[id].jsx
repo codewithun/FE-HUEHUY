@@ -18,7 +18,7 @@ const apiJoin = (path = "") => {
 export default function ChatUniversal() {
   const router = useRouter();
   const isReady = router.isReady;
-  const { communityId, targetName, sellerPhone } = router.query;
+  const { communityId, targetName, sellerPhone, productCard, productTitle, productImage, productPrice, productPriceOriginal, productUrl, promoId: productPromoId } = router.query;
   const rawId = router.query.id; // ini bisa userId / chatId
 
   const [chatId, setChatId] = useState(null);
@@ -28,6 +28,7 @@ export default function ChatUniversal() {
   const [loading, setLoading] = useState(true);
 
   const bottomRef = useRef(null);
+  const productCardSentRef = useRef(false);
 
   const token = useMemo(() => {
     const enc = Cookies.get(token_cookie_name);
@@ -51,6 +52,94 @@ export default function ChatUniversal() {
   const isMine = (m) => {
     if (!currentUser) return false;
     return Number(m.sender_id) === Number(currentUser.id);
+  };
+  const formatRupiah = (n) => {
+    if (n === null || n === undefined || n === '') return '';
+    const num = typeof n === 'string' ? Number(n) : n;
+    if (!isFinite(num)) return '';
+    try {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
+    } catch {
+      return `Rp${String(num).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+    }
+  };
+
+  const ensureAbsoluteUrl = (src) => {
+    if (!src) return '';
+    const raw = String(src).trim();
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+    const storageBase = base.replace(/\/api\/?$/, '');
+    const clean = raw.replace(/^\/+/, '');
+    // If points to backend storage
+    if (/^\/storage\//i.test(raw) || /^storage\//i.test(clean)) return `${storageBase}/${clean}`;
+    // If it's a frontend absolute asset (e.g., /default-avatar.png), keep as-is
+    if (raw.startsWith('/')) return raw;
+    // Otherwise treat as file in storage
+    return `${storageBase}/storage/${clean}`;
+  };
+
+  const buildProductCardMessage = () => {
+    if (!productTitle && !productImage) return null;
+    const payload = {
+      type: 'product_card',
+      title: String(productTitle || '').slice(0, 200),
+      image: ensureAbsoluteUrl(productImage || ''),
+      price: productPrice ? Number(productPrice) : undefined,
+      price_original: productPriceOriginal ? Number(productPriceOriginal) : undefined,
+      url: productUrl ? String(productUrl) : undefined,
+      promo_id: productPromoId ? String(productPromoId) : undefined,
+    };
+    return JSON.stringify(payload);
+  };
+
+  const sendProductCardIfAny = async (cid) => {
+    if (productCardSentRef.current) return;
+    if (!productCard && !productTitle && !productImage) return;
+    const storageKey = `productCardSent:${cid}:${productPromoId || productTitle || ''}`;
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem(storageKey)) {
+        productCardSentRef.current = true;
+        return;
+      }
+    } catch { }
+
+    const content = buildProductCardMessage();
+    if (!content) return;
+    try {
+      const res = await fetch(apiJoin('chat/send'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          chat_id: Number(cid),
+          message: content,
+          community_id: communityId || null,
+          receiver_type: 'user',
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.warn('Kirim product card gagal:', res.status, text);
+        return;
+      }
+      const json = await res.json();
+      if (json?.success) {
+        productCardSentRef.current = true;
+        try { if (typeof window !== 'undefined') sessionStorage.setItem(storageKey, '1'); } catch { }
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...json.message,
+            created_at: json.message?.created_at ?? new Date().toISOString(),
+          },
+        ]);
+      }
+    } catch (e) {
+      console.error('Gagal kirim product card:', e);
+    }
   };
   // ======= END CHANGED =======
 
@@ -159,6 +248,8 @@ export default function ChatUniversal() {
       fetchMessages(numeric).then((ok) => {
         if (ok) {
           setChatId(numeric);
+          // coba kirim product card jika ada
+          sendProductCardIfAny(numeric);
         } else {
           // bukan chatId, treat sebagai receiverId dan resolve
           setReceiverId(numeric);
@@ -171,7 +262,9 @@ export default function ChatUniversal() {
     } else {
       // bukan angka -> coba resolve berdasarkan phone/nama
       resolveChatSmart(null).then((id) => {
-        if (id) fetchMessages(id);
+        if (id) {
+          fetchMessages(id).then(() => sendProductCardIfAny(id));
+        }
         else setLoading(false);
       });
     }
@@ -275,6 +368,54 @@ export default function ChatUniversal() {
           messages.map((m) => {
             const mine = isMine(m);
             const time = formatTime(m.created_at || m.createdAt || m.timestamp || m.sent_at);
+            let parsed = null;
+            if (m && typeof m.message === 'string' && m.message.trim().startsWith('{')) {
+              try { parsed = JSON.parse(m.message); } catch { }
+            }
+            if (parsed && parsed.type === 'product_card') {
+              return (
+                <div
+                  key={m.id ?? m._id ?? `${m.message}-${time}`}
+                  className={`mb-3 flex ${mine ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-xs px-4 py-3 rounded-2xl ${mine ? 'bg-green-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-900 rounded-bl-none'}`}>
+                    <div className={`text-xs mb-2 ${mine ? 'opacity-90' : 'text-slate-600'}`}>
+                      {mine ? 'Kamu bertanya tentang produk ini' : 'Pengguna bertanya tentang produk ini'}
+                    </div>
+                    <div className={`w-full bg-white ${mine ? 'text-gray-900' : 'text-gray-900'} rounded-xl p-2 flex gap-2 items-center`} style={{ overflow: 'hidden' }}>
+                      {parsed.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={ensureAbsoluteUrl(parsed.image)}
+                          alt={parsed.title || 'Produk'}
+                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = '/default-avatar.png';
+                          }}
+                        />
+                      ) : null}
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate max-w-[220px]">{parsed.title || 'Produk'}</div>
+                        {(parsed.price || parsed.price_original) && (
+                          <div className="mt-1">
+                            {parsed.price ? (
+                              <span className={`text-sm font-bold ${mine ? 'text-white' : 'text-red-600'}`}>{formatRupiah(parsed.price)}</span>
+                            ) : null}
+                            {parsed.price_original ? (
+                              <span className="text-xs text-gray-400 line-through ml-2">{formatRupiah(parsed.price_original)}</span>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {time ? (
+                      <div className={`mt-1 text-[10px] opacity-80 ${mine ? 'text-right' : 'text-left'}`}>{time}</div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            }
             return (
               <div
                 key={m.id ?? m._id ?? `${m.message}-${time}`}
