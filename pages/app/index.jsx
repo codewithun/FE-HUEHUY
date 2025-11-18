@@ -22,6 +22,7 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import {
   ButtonComponent,
   FormSupervisionComponent,
+  PromoCardIcons,
 } from '../../components/base.components';
 import BottomBarComponent from '../../components/construct.components/BottomBarComponent';
 import FloatingOriginButton from '../../components/construct.components/FloatingOriginButton';
@@ -166,6 +167,54 @@ export default function Index() {
     if (t === 'voucher') return 'Voucher';
     if (t === 'iklan') return 'Advertising';
     return 'Promo'; // <- default wajib Promo
+  };
+
+  // Professional SVG icons for categories
+  const CategoryIcons = {
+    advertising: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1H5C3.89 1 3 1.89 3 3V21C3 22.11 3.89 23 5 23H19C20.11 23 21 22.11 21 21V9M19 9H14V4H19V9Z" />
+      </svg>
+    ),
+    information: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+      </svg>
+    ),
+    voucher: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M4,4A2,2 0 0,0 2,6V10C3.11,10 4,10.9 4,12A2,2 0 0,1 2,14V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V14C20.89,14 20,13.1 20,12A2,2 0 0,1 22,10V6A2,2 0 0,0 20,4H4M4,6H20V8.54C18.81,9.23 18,10.53 18,12C18,13.47 18.81,14.77 20,15.46V18H4V15.46C5.19,14.77 6,13.47 6,12C6,10.53 5.19,9.23 4,8.54V6Z" />
+      </svg>
+    ),
+    promo: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+      </svg>
+    ),
+    default: (
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.77,14.05 22,13.55 22,13C22,12.45 21.77,11.95 21.41,11.58Z" />
+      </svg>
+    )
+  };
+
+  // Helper function to get appropriate icon for each category type
+  const getCategoryIcon = (category) => {
+    const categoryLower = String(category || '').toLowerCase();
+
+    switch (categoryLower) {
+      case 'advertising':
+        return CategoryIcons.advertising;
+      case 'informasi':
+      case 'information':
+        return CategoryIcons.information;
+      case 'voucher':
+        return CategoryIcons.voucher;
+      case 'promo':
+        return CategoryIcons.promo;
+      default:
+        return CategoryIcons.default;
+    }
   };
 
   const isPromoOnly = (ad) => {
@@ -422,18 +471,27 @@ export default function Index() {
 
     const address = ad?.cube?.address;
     if (size === 'XL-Ads') {
+      const categoryLabel = getCategoryLabel(ad);
+      const icon = getCategoryIcon(categoryLabel);
       return (
-        <div className="relative rounded-[18px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/30 shadow-sm flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
-          style={{ minWidth: 320, maxWidth: 360 }}>
-          <div className="relative w-full h-[290px] bg-white flex items-center justify-center">
-            <img src={img} alt={title} className="object-contain w-full h-full p-2" />
+        <div className="relative rounded-[18px] overflow-hidden border border-white/20 bg-[#e1e8e1] flex-shrink-0 hover:scale-[1.01] hover:bg-[#d1d8d1] transition-all duration-300"
+          style={{ minWidth: 320, maxWidth: 360, height: 400 }}>
+          <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0" style={{ height: '100%' }}>
+            <img src={img} alt={title} className="object-cover w-full h-full rounded-[18px] p-2" />
           </div>
-          {/* glassy overlay: semi-transparent with backdrop blur for frosted glass effect */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-[#ACB8A5]/50 backdrop-blur-md border-t border-[#d9e0d4]">
-            <h3 title={title} className="text-[15px] font-bold text-slate-900 leading-snug mb-2 line-clamp-1">{title}</h3>
-            <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">
-              {category}
-            </span>
+          <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4 border-t border-[#d9e0d4]"
+            style={{ background: 'rgba(172, 184, 165, 0.5)' }}>
+            <h3 title={title} className="text-[15px] font-bold text-slate-900 leading-snug mb-2 line-clamp-1">
+              {title}
+            </h3>
+            <div className="flex flex-col gap-1.5">
+              <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md w-fit">
+                {categoryLabel}
+              </span>
+              <div className="w-full" style={{ minHeight: 32 }}>
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -442,26 +500,29 @@ export default function Index() {
     if (size === 'XL') {
       return (
         <div className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
-          style={{ minWidth: 320, maxWidth: 360 }}>
-          <div className="relative w-full h-[180px] bg-white flex items-center justify-center">
-            <img src={img} alt={title} className="object-contain w-full h-full p-2" />
+          style={{ minWidth: 320, maxWidth: 360, height: 330 }}>
+          <div className="relative w-full h-[180px] bg-[#e1e8e1] p-2">
+            <img src={img} alt={title} className="object-cover w-full h-full rounded-[10px]" />
           </div>
           <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3] overflow-hidden"
-            style={{ height: 120 }}>
+            style={{ height: 150 }}>
             {/* Make content area fixed height and distribute space so category stays at bottom */}
             <div className="flex flex-col h-full justify-between">
               <div>
                 <h3 title={title} className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">{title}</h3>
                 {address ? (
-                  <p className="text-[13px] text-slate-700 line-clamp-2 mb-3">{address}</p>
+                  <p className="text-[13px] text-slate-700 line-clamp-1 mb-2">{address}</p>
                 ) : (
                   // reserve the vertical space when address missing
-                  <div className="h-5 mb-3" />
+                  <div className="h-5 mb-2" />
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+              <div className="flex flex-col gap-1.5">
+                <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md w-fit">{category}</span>
+                <div className="w-full" style={{ minHeight: 32 }}>
+                  <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+                </div>
               </div>
             </div>
           </div>
@@ -471,18 +532,21 @@ export default function Index() {
 
     if (size === 'L') {
       return (
-        <div className="flex items-center rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
-          style={{ minWidth: 280, maxWidth: 320, height: 130 }}>
-          <div className="relative w-[40%] h-full bg-white flex items-center justify-center overflow-hidden">
-            <img src={img} alt={title} className="object-contain w-[90%] h-[90%] rounded-[10px]" />
+        <div className="flex items-stretch rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+          style={{ minWidth: 280, maxWidth: 325, height: 150 }}>
+          <div className="relative w-[40%] bg-white flex items-center justify-center overflow-hidden p-2">
+            <img src={img} alt={title} className="object-cover w-full h-full rounded-[14px]" />
           </div>
-          <div className="flex-1 h-full p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
+          <div className="flex-1 p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
             <div>
-              <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug mb-1">{title}</h3>
-              {address && <p className="text-[13px] text-slate-700 line-clamp-2">{address}</p>}
+              <h3 className="text-[14px] font-bold text-slate-900 line-clamp-1 leading-snug mb-1">{title}</h3>
+              {address && <p className="text-[12px] text-slate-700 line-clamp-1 mb-1">{address}</p>}
             </div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md">{category}</span>
+            <div className="flex flex-col gap-1.5">
+              <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md w-fit">{category}</span>
+              <div className="w-full" style={{ minHeight: 30 }}>
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              </div>
             </div>
           </div>
         </div>
@@ -494,20 +558,23 @@ export default function Index() {
     return (
       <div className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
         style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160 }}>
-        <div className="relative w-full bg-white flex items-center justify-center overflow-hidden" style={{ height: isM ? 150 : 120 }}>
-          <img src={img} alt={title} className="object-contain w-[90%] h-[90%] rounded-[8px]" />
+        <div className="relative w-full bg-white flex items-center justify-center overflow-hidden p-2" style={{ height: isM ? 150 : 120 }}>
+          <img src={img} alt={title} className="object-cover w-full h-full rounded-[12px]" />
         </div>
         {/* Force a fixed height for the text/content area so cards keep consistent height */}
-        <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3] overflow-hidden" style={{ height: isM ? 82 : 72 }}>
+        <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]" style={{ minHeight: isM ? 130 : 110 }}>
           <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-slate-900 line-clamp-1 mb-0.5`}>{title}</h3>
           {/* Reserve address space even when empty so card heights remain identical */}
           {address ? (
-            <p className={`${isM ? 'text-[12px]' : 'text-[11px]'} text-slate-700 line-clamp-1`}>{address}</p>
+            <p className={`${isM ? 'text-[12px]' : 'text-[11px]'} text-slate-700 line-clamp-1 mb-1`}>{address}</p>
           ) : (
-            <div className={`${isM ? 'h-4' : 'h-3'}`} />
+            <div className={`${isM ? 'h-4' : 'h-3'} mb-1`} />
           )}
-          <div className="mt-1 flex items-center justify-between">
-            <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md">{category}</span>
+          <div className="flex flex-col gap-1.5">
+            <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md w-fit">{category}</span>
+            <div className="w-full" style={{ minHeight: 32 }}>
+              <PromoCardIcons ad={ad} variant={isM ? 'sm' : 'xs'} layout="horizontal" />
+            </div>
           </div>
         </div>
       </div>
@@ -871,38 +938,7 @@ export default function Index() {
                           {dataRecommendation?.data?.map((item, key) => {
                             return (
                               <Link href={buildPromoLink(item)} key={key}>
-                                <div className="relative snap-center w-[330px] shadow-sm bg-[#d9e0d4]/60 backdrop-blur-md rounded-[14px] overflow-hidden p-3">
-                                  <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90">
-                                    <img
-                                      src={getAdImage(item)}
-                                      height={1200}
-                                      width={600}
-                                      alt=""
-                                    />
-                                  </div>
-                                  <div className="px-1 h-[80px] flex flex-col justify-between">
-                                    <p className="font-semibold mt-2 limit__line__1">
-                                      {item?.title}
-                                    </p>
-                                    <div className="flex justify-between items-end gap-4">
-                                      <p className="text-slate-600 text-xs my-1 limit__line__2 flex-1">
-                                        {item?.cube?.address}
-                                        {item?.cube?.is_information && (
-                                          <p className="text-primary bg-green-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                            Informasi
-                                          </p>
-                                        )}
-                                      </p>
-
-                                      {((item?.total_remaining ?? item?.max_grab) != null) && (
-                                        <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                          Sisa{' '}
-                                          {item?.total_remaining ?? item?.max_grab}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
+                                <AdCardBySize ad={item} size='XL' />
                               </Link>
                             );
                           })}

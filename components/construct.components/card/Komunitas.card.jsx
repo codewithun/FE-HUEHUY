@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import Image from 'next/image';
+import PromoCardIcons from '../../base.components/card-icons/PromoCardIcons';
 
 // Util: normalisasi boolean dari berbagai bentuk
 const normalizeBoolLike = (val) => {
@@ -163,15 +163,14 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
     return (
       <div
         className={`relative rounded-[18px] overflow-hidden shadow-lg ${borderGlass} ${wrapperBase} ${hoverGlass}`}
-        style={{ minWidth: 320, maxWidth: 360 }}
+        style={{ minWidth: 320, maxWidth: 340, height: 400 }}
         onClick={onClick}
       >
-        <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0" style={{ height: '290px' }}>
-          {/* Gunakan img tag biasa untuk testing - Next.js Image mungkin block localhost:8000 */}
+        <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0" style={{ height: '100%' }}>
           <img
             src={img}
             alt={title}
-            className="w-full h-full object-contain p-2"
+            className="object-cover w-full h-full rounded-[18px] p-2"
           />
         </div>
         <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4 border-t border-white/20"
@@ -179,10 +178,15 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
           <h3 title={title} className="text-[15px] font-bold text-white leading-snug mb-2 line-clamp-1 drop-shadow-sm">
             {title}
           </h3>
-          <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 flex items-center gap-1 w-fit">
-            {icon}
-            {categoryLabel}
-          </span>
+          <div className="flex flex-col gap-1.5">
+            <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 flex items-center gap-1 w-fit">
+              {icon}
+              {categoryLabel}
+            </span>
+            <div className="w-full" style={{ minHeight: 32 }}>
+              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -191,28 +195,27 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
   if (size === 'XL') {
     return (
       <div
-        className={`rounded-[16px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
-        style={{ minWidth: 320, maxWidth: 360 }}
+        className={`rounded-[12px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
+        style={{ minWidth: 330, maxWidth: 330, width: 330 }}
         onClick={onClick}
       >
-        <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0" style={{ height: '180px' }}>
-          <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 360px" className="object-contain p-2" />
+        <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0 p-2" style={{ height: '200px' }}>
+          <img src={img} alt={title} className="object-cover w-full h-full rounded-[12px]" />
         </div>
-        <div className="p-4 bg-white/5 border-t border-white/20" style={{ height: 120 }}>
-          <div className="flex flex-col h-full justify-between">
-            <div>
-              <h3 title={title} className="text-[15px] font-bold text-white leading-snug mb-1 line-clamp-2 drop-shadow-sm">{title}</h3>
-              {address ? (
-                <p className="text-[13px] text-white/90 line-clamp-2 mb-3 drop-shadow-sm">{address}</p>
-              ) : (
-                <div className="h-5 mb-3" />
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 flex items-center gap-1">
-                {icon}
-                {categoryLabel}
-              </span>
+        <div className="p-2 bg-white/5 border-t border-white/20" style={{ minHeight: 130 }}>
+          <h3 title={title} className="text-[14px] font-bold text-white line-clamp-1 mb-0.5 drop-shadow-sm">{title}</h3>
+          {address ? (
+            <p className="text-[12px] text-white/90 line-clamp-1 mb-1 drop-shadow-sm">{address}</p>
+          ) : (
+            <div className="h-4 mb-1" />
+          )}
+          <div className="flex flex-col gap-1.5">
+            <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1 w-fit">
+              {icon}
+              {categoryLabel}
+            </span>
+            <div className="w-full" style={{ minHeight: 32 }}>
+              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
             </div>
           </div>
         </div>
@@ -223,27 +226,28 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
   if (size === 'L') {
     return (
       <div
-        className={`flex items-center rounded-[14px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
-        style={{ minWidth: 280, maxWidth: 320, height: 130 }}
+        className={`flex items-stretch rounded-[14px] overflow-hidden shadow-xl ${borderGlass} ${wrapperBase} ${hoverGlass}`}
+        style={{ minWidth: 280, maxWidth: 325, height: 150 }}
         onClick={onClick}
       >
-        <div className="relative bg-transparent flex items-center justify-center overflow-hidden flex-shrink-0" style={{ width: '120px', height: '130px' }}>
-          <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 120px" className="object-contain p-1 rounded-[10px]" />
+        <div className="relative w-[40%] bg-transparent flex items-center justify-center overflow-hidden p-2">
+          <img src={img} alt={title} className="object-cover w-full h-full rounded-[14px]" />
         </div>
-        <div className="flex-1 p-3 flex flex-col justify-between bg-white/5 border-l border-white/20 overflow-hidden" style={{ height: '130px' }}>
-          <div className="flex-grow overflow-hidden">
-            <h3 title={title} className="text-[15px] font-bold text-white line-clamp-2 leading-snug mb-1 drop-shadow-sm">{title}</h3>
+        <div className="flex-1 p-3 flex flex-col justify-between bg-white/5 border-l border-white/20">
+          <div>
+            <h3 className="text-[14px] font-bold text-white line-clamp-1 leading-snug mb-1 drop-shadow-sm">{title}</h3>
             {address ? (
-              <p className="text-[13px] text-white/90 line-clamp-2 drop-shadow-sm">{address}</p>
-            ) : (
-              <div className="h-10" />
-            )}
+              <p className="text-[12px] text-white/90 line-clamp-1 mb-1 drop-shadow-sm">{address}</p>
+            ) : null}
           </div>
-          <div className="mt-1 flex items-center justify-between flex-shrink-0">
-            <span className="bg-white/30 text-white text-[11px] font-semibold px-3 py-[3px] rounded-md border border-white/40 flex items-center gap-1">
+          <div className="flex flex-col gap-1.5">
+            <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1 w-fit">
               {icon}
               {categoryLabel}
             </span>
+            <div className="w-full" style={{ minHeight: 30 }}>
+              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+            </div>
           </div>
         </div>
       </div>
@@ -257,21 +261,24 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
         style={{ minWidth: 180, maxWidth: 200 }}
         onClick={onClick}
       >
-        <div className="relative w-full bg-transparent flex items-center justify-center overflow-hidden flex-shrink-0" style={{ height: '150px' }}>
-          <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 180px" className="object-contain p-1 rounded-[8px]" />
+        <div className="relative w-full bg-transparent flex items-center justify-center overflow-hidden p-2" style={{ height: '150px' }}>
+          <img src={img} alt={title} className="object-cover w-full h-full rounded-[12px]" />
         </div>
-        <div className="p-2 bg-white/5 border-t border-white/20 flex flex-col" style={{ minHeight: '82px' }}>
-          <h3 title={title} className="text-[14px] font-bold text-white line-clamp-2 mb-0.5 drop-shadow-sm">{title}</h3>
+        <div className="p-2 bg-white/5 border-t border-white/20" style={{ minHeight: 130 }}>
+          <h3 title={title} className="text-[14px] font-bold text-white line-clamp-1 mb-0.5 drop-shadow-sm">{title}</h3>
           {address ? (
-            <p className="text-[12px] text-white/90 line-clamp-1 drop-shadow-sm truncate">{address}</p>
+            <p className="text-[12px] text-white/90 line-clamp-1 drop-shadow-sm">{address}</p>
           ) : (
-            <div className="h-4" />
+            <div className="h-4 mb-1" />
           )}
-          <div className="mt-auto flex items-center justify-between flex-shrink-0">
-            <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1">
+          <div className="flex flex-col gap-1.5">
+            <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1 w-fit">
               {icon}
               {categoryLabel}
             </span>
+            <div className="w-full" style={{ minHeight: 32 }}>
+              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+            </div>
           </div>
         </div>
       </div>
@@ -285,21 +292,24 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
       style={{ minWidth: 140, maxWidth: 160 }}
       onClick={onClick}
     >
-      <div className="relative w-full bg-transparent flex items-center justify-center overflow-hidden flex-shrink-0" style={{ height: '120px' }}>
-        <Image src={img} alt={title} fill sizes="(max-width: 640px) 100vw, 140px" className="object-contain p-1 rounded-[8px]" />
+      <div className="relative w-full bg-transparent flex items-center justify-center overflow-hidden p-2" style={{ height: '120px' }}>
+        <img src={img} alt={title} className="object-cover w-full h-full rounded-[12px]" />
       </div>
-      <div className="p-2 bg-white/5 border-t border-white/20 flex flex-col" style={{ height: '72px' }}>
-        <h3 title={title} className="text-[13px] font-bold text-white line-clamp-1 mb-0.5 flex-grow overflow-hidden drop-shadow-sm">{title}</h3>
+      <div className="p-2 bg-white/5 border-t border-white/20" style={{ minHeight: 110 }}>
+        <h3 title={title} className="text-[13px] font-bold text-white line-clamp-1 mb-0.5 drop-shadow-sm">{title}</h3>
         {address ? (
           <p className="text-[11px] text-white/90 line-clamp-1 drop-shadow-sm">{address}</p>
         ) : (
-          <div className="h-3" />
+          <div className="h-3 mb-1" />
         )}
-        <div className="mt-1 flex items-center justify-between flex-shrink-0">
-          <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1">
+        <div className="flex flex-col gap-1.5">
+          <span className="bg-white/30 text-white text-[10px] font-semibold px-2 py-[2px] rounded-md border border-white/40 flex items-center gap-1 w-fit">
             {icon}
             {categoryLabel}
           </span>
+          <div className="w-full" style={{ minHeight: 28 }}>
+            <PromoCardIcons ad={ad} variant="xs" layout="horizontal" />
+          </div>
         </div>
       </div>
     </div>

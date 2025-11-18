@@ -1,6 +1,7 @@
 export * from './breadcumb';
 export * from './button';
 export * from './card';
+export * from './card-icons';
 export * from './carousel';
 export * from './chart';
 export * from './format';
