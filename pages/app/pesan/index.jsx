@@ -7,6 +7,7 @@ import BottomBarComponent from '../../../components/construct.components/BottomB
 import { useGet } from '../../../helpers';
 import moment from 'moment';
 import { useRouter } from 'next/router';
+import { resolveUserImageUrl } from '../../../helpers/image.helpers';
 
 export default function Pesan() {
   const { query } = useRouter();
@@ -95,7 +96,7 @@ export default function Pesan() {
                       <div className={"w-full aspect-square overflow-hidden rounded-full bg-slate-200 flex justify-center items-center " + (isRead ? 'filter grayscale' : '')}>
                         {partner.picture ? (
                           <img
-                            src={partner.picture}
+                            src={resolveUserImageUrl({ picture_source: partner.picture }) || '/avatar.jpg'}
                             alt={partner.name || 'User'}
                             className="object-cover w-full h-full"
                           />
