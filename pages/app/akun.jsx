@@ -71,7 +71,7 @@ export default function Akun() {
                 <FontAwesomeIcon icon={faChevronRight} />
               </div>
             </Link>
-            
+
             {/* Menu Scan QR untuk Manager Tenant */}
             {data?.data?.profile?.role_id === 6 && (
               <Link href="/app/scan-validasi">
@@ -81,7 +81,7 @@ export default function Akun() {
                 </div>
               </Link>
             )}
-            
+
             <Link href="/app/riwayat-validasi">
               <div className="flex justify-between items-center bg-white rounded-xl shadow-neuro-in px-5 py-4 hover:scale-[1.01] transition cursor-pointer">
                 <p className="font-medium">Riwayat Validasi</p>
@@ -160,7 +160,7 @@ export default function Akun() {
               <p className="text-xs text-slate-500 mt-1 text-center">
                 Kode: {data?.data?.profile?.code || `HUEHUY-${String(data?.data?.profile?.id).padStart(6, '0')}`}
               </p>
-              
+
               {/* Preview Data */}
               <div className="mt-4 p-3 bg-slate-50 rounded-lg w-full">
                 <p className="text-xs font-medium text-slate-600 mb-2">Informasi yang akan ditampilkan di profil publik:</p>
@@ -179,7 +179,7 @@ export default function Akun() {
                   </p>
                 </div>
                 <p className="text-xs text-slate-400 mt-2 italic">
-                  *Email dan nomor HP tidak akan ditampilkan untuk keamanan
+                  *Email dan nomor HP akan ditampilkan saat QR code di-scan
                 </p>
               </div>
             </div>
