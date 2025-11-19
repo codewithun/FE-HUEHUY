@@ -85,7 +85,8 @@ export default function CommunityMitraChatList() {
   }, [id, token]);
 
   const handleChat = (targetId, targetName) => {
-    router.push(`/app/pesan/${targetId}?communityId=${id}&targetName=${encodeURIComponent(targetName)}`);
+    // Langsung ke chat dengan komunitas context (sebagai admin chat)
+    router.push(`/app/pesan/${targetId}?communityId=${id}&targetName=${encodeURIComponent(targetName)}&adminChat=1`);
   };
 
   if (loading)

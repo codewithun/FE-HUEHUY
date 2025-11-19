@@ -18,7 +18,7 @@ const apiJoin = (path = "") => {
 export default function ChatUniversal() {
   const router = useRouter();
   const isReady = router.isReady;
-  const { communityId, targetName, sellerPhone, productCard, productTitle, productImage, productPrice, productPriceOriginal, productUrl, promoId: productPromoId } = router.query;
+  const { communityId, corporateId, targetName, sellerPhone, productCard, productTitle, productImage, productPrice, productPriceOriginal, productUrl, promoId: productPromoId } = router.query;
   const rawId = router.query.id; // ini bisa userId / chatId
 
   const [chatId, setChatId] = useState(null);
@@ -183,6 +183,7 @@ export default function ChatUniversal() {
     try {
       const payload = {
         community_id: communityId || null,
+        corporate_id: corporateId || null,
         receiver_type: 'user',
       };
       if (maybeId && /^\d+$/.test(String(maybeId)) && Number(maybeId) > 0) {
@@ -218,7 +219,7 @@ export default function ChatUniversal() {
       console.error('Gagal resolve chat:', e);
       return null;
     }
-  }, [communityId, sellerPhone, targetName, token]);
+  }, [communityId, corporateId, sellerPhone, targetName, token]);
 
   /** ===============================
    *  Tentukan apakah URL itu chatId atau receiverId
@@ -283,11 +284,22 @@ export default function ChatUniversal() {
         const payload = {
           message: content,
           community_id: communityId || null,
+          corporate_id: corporateId || null,
         };
-        if (receiverId) payload.receiver_id = Number(receiverId);
-        else if (chatId) payload.chat_id = Number(chatId);
-        else if (sellerPhone) payload.receiver_phone = String(sellerPhone);
-        else if (targetName) payload.receiver_name = String(targetName);
+
+        // Priority: receiver_id > phone > name > chat_id (hanya jika tidak ada komunitas konteks)
+        if (receiverId) {
+          payload.receiver_id = Number(receiverId);
+        } else if (sellerPhone) {
+          payload.receiver_phone = String(sellerPhone);
+        } else if (targetName) {
+          payload.receiver_name = String(targetName);
+        } else if (chatId && !communityId && !corporateId) {
+          // Gunakan chat_id hanya jika TIDAK ada komunitas ATAU corporate konteks
+          payload.chat_id = Number(chatId);
+        }
+
+        console.log('📤 Sending message payload:', payload);
 
         const res = await fetch(apiJoin('chat/send'), {
           method: 'POST',
@@ -299,10 +311,13 @@ export default function ChatUniversal() {
         });
         if (!res.ok) {
           const txt = await res.text().catch(() => '');
-          console.error('Gagal kirim pesan (HTTP):', res.status, txt);
+          console.error('❌ Gagal kirim pesan (HTTP):', res.status, txt);
+          console.error('❌ Request payload was:', payload);
           return null;
         }
         const json = await res.json();
+        console.log('📨 Message response:', json);
+
         if (json?.success) {
           setMessages((prev) => [
             ...prev,
@@ -311,8 +326,16 @@ export default function ChatUniversal() {
               created_at: json.message?.created_at ?? new Date().toISOString(),
             },
           ]);
-          if (json.chat?.id) setChatId(json.chat.id);
-          if (json.chat?.id) fetchMessages(json.chat.id, true);
+          // Update chatId dari respons
+          const newChatId = json.chat?.id || json.message?.chat_id;
+          if (newChatId && newChatId !== chatId) {
+            console.log('🔄 Updating chatId from', chatId, 'to', newChatId);
+            setChatId(newChatId);
+          }
+          // Refresh messages dengan chat ID yang tepat
+          if (newChatId) fetchMessages(newChatId, true);
+        } else {
+          console.error('❌ Message send failed:', json);
         }
         return json;
       };

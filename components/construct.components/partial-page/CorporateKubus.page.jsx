@@ -227,7 +227,7 @@ function CorporateKubusPage({ scope }) {
             <TableSupervisionComponent
                 setToRefresh={refresh}
                 title="Kubus"
-                fetchControl={{ path: 'corporate/cubes' }}
+                fetchControl={{ path: 'admin/cubes' }}
                 includeFilters={scope?.corporate_id ? [{ column: 'corporate_id', type: 'equal', value: scope.corporate_id }] : []}
                 columnControl={{
                     custom: [

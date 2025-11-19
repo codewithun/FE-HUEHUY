@@ -1994,7 +1994,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     // Redirect ke chat system yang sudah ada di /app/pesan/[id] + kirim product card
     const q = new URLSearchParams({
       targetName: sellerName || 'Penjual',
-      communityId: String(communityId || ''),
+      corporateId: String(promoData?.cube?.corporate_id || promoData?.corporate_id || ''), // Gunakan corporate_id untuk tenant context
       sellerPhone: sellerPhone || '',
       productCard: '1',
       productTitle: title,
