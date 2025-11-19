@@ -2,7 +2,7 @@
 import { faArrowLeft, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
@@ -29,6 +29,8 @@ export default function ChatUniversal() {
 
   const bottomRef = useRef(null);
   const productCardSentRef = useRef(false);
+  const [productCardPending, setProductCardPending] = useState(false);
+  const productStorageKeyRef = useRef(null);
 
   const token = useMemo(() => {
     const enc = Cookies.get(token_cookie_name);
@@ -39,6 +41,7 @@ export default function ChatUniversal() {
   const [currentUser, setCurrentUser] = useState(null);
 
   // ambil data user login
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!token) return;
     fetch(apiJoin('me'), {
@@ -93,60 +96,46 @@ export default function ChatUniversal() {
     return JSON.stringify(payload);
   };
 
-  const sendProductCardIfAny = async (cid) => {
-    if (productCardSentRef.current) return;
-    if (!productCard && !productTitle && !productImage) return;
-    const storageKey = `productCardSent:${cid}:${productPromoId || productTitle || ''}`;
-    try {
-      if (typeof window !== 'undefined' && sessionStorage.getItem(storageKey)) {
-        productCardSentRef.current = true;
-        return;
+  const goToProduct = (card) => {
+    if (!card) return;
+    const url = (card.url || '').trim();
+    if (url) {
+      if (/^https?:\/\//i.test(url)) {
+        if (typeof window !== 'undefined') window.location.href = url;
+      } else {
+        router.push(url);
       }
-    } catch { }
-
-    const content = buildProductCardMessage();
-    if (!content) return;
-    try {
-      const res = await fetch(apiJoin('chat/send'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          chat_id: Number(cid),
-          message: content,
-          community_id: communityId || null,
-          receiver_type: 'user',
-        }),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        console.warn('Kirim product card gagal:', res.status, text);
-        return;
-      }
-      const json = await res.json();
-      if (json?.success) {
-        productCardSentRef.current = true;
-        try { if (typeof window !== 'undefined') sessionStorage.setItem(storageKey, '1'); } catch { }
-        setMessages((prev) => [
-          ...prev,
-          {
-            ...json.message,
-            created_at: json.message?.created_at ?? new Date().toISOString(),
-          },
-        ]);
-      }
-    } catch (e) {
-      console.error('Gagal kirim product card:', e);
+      return;
+    }
+    if (card.promo_id) {
+      const q = communityId ? `?communityId=${encodeURIComponent(communityId)}` : '';
+      router.push(`/app/komunitas/promo/${card.promo_id}${q}`);
     }
   };
+
+  // Tandai apakah product card perlu dikirim saat user menekan tombol kirim
+  useEffect(() => {
+    const hasCard = !!(productCard || productTitle || productImage);
+    if (!hasCard) {
+      setProductCardPending(false);
+      return;
+    }
+    const key = `productCardSent:${chatId || 'pending'}:${productPromoId || productTitle || ''}`;
+    productStorageKeyRef.current = key;
+    try {
+      const already = typeof window !== 'undefined' && sessionStorage.getItem(key);
+      productCardSentRef.current = !!already;
+      setProductCardPending(!already);
+    } catch {
+      setProductCardPending(true);
+    }
+  }, [chatId, productCard, productTitle, productImage, productPromoId]);
   // ======= END CHANGED =======
 
   /** ===============================
    *  Fetch pesan dalam room chat
    *  =============================== */
-  const fetchMessages = async (idToUse = chatId, silent = false) => {
+  const fetchMessages = useCallback(async (idToUse = chatId, silent = false) => {
     if (!idToUse) return false;
     try {
       if (!silent) setLoading(true);
@@ -166,12 +155,12 @@ export default function ChatUniversal() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [chatId, token]);
 
   /** ===============================
  *  Tandai pesan sudah dibaca
  *  =============================== */
-  const markMessagesAsRead = async (chatIdToMark) => {
+  const markMessagesAsRead = useCallback(async (chatIdToMark) => {
     try {
       const res = await fetch(apiJoin(`chat/${chatIdToMark}/read`), {
         method: 'POST',
@@ -184,13 +173,13 @@ export default function ChatUniversal() {
     } catch (err) {
       console.error('Gagal mark as read:', err);
     }
-  };
+  }, [token]);
 
 
   /** ===============================
    *  Resolve / buat chat room baru
    *  =============================== */
-  const resolveChatSmart = async (maybeId) => {
+  const resolveChatSmart = useCallback(async (maybeId) => {
     try {
       const payload = {
         community_id: communityId || null,
@@ -229,7 +218,7 @@ export default function ChatUniversal() {
       console.error('Gagal resolve chat:', e);
       return null;
     }
-  };
+  }, [communityId, sellerPhone, targetName, token]);
 
   /** ===============================
    *  Tentukan apakah URL itu chatId atau receiverId
@@ -248,8 +237,7 @@ export default function ChatUniversal() {
       fetchMessages(numeric).then((ok) => {
         if (ok) {
           setChatId(numeric);
-          // coba kirim product card jika ada
-          sendProductCardIfAny(numeric);
+          // tidak auto-kirim product card; tunggu user tekan kirim
         } else {
           // bukan chatId, treat sebagai receiverId dan resolve
           setReceiverId(numeric);
@@ -262,13 +250,11 @@ export default function ChatUniversal() {
     } else {
       // bukan angka -> coba resolve berdasarkan phone/nama
       resolveChatSmart(null).then((id) => {
-        if (id) {
-          fetchMessages(id).then(() => sendProductCardIfAny(id));
-        }
+        if (id) fetchMessages(id);
         else setLoading(false);
       });
     }
-  }, [isReady, rawId, token]);
+  }, [isReady, rawId, token, fetchMessages, resolveChatSmart]);
 
   /** ===============================
    *  Polling pesan setiap 5 detik
@@ -279,7 +265,7 @@ export default function ChatUniversal() {
     fetchMessages(chatId).then(() => markMessagesAsRead(chatId));
     const itv = setInterval(() => fetchMessages(chatId, true), 5000);
     return () => clearInterval(itv);
-  }, [chatId, token]);
+  }, [chatId, token, fetchMessages, markMessagesAsRead]);
 
   // auto scroll ke bawah saat messages berubah
   useEffect(() => {
@@ -290,49 +276,67 @@ export default function ChatUniversal() {
    *  Kirim pesan
    *  =============================== */
   const sendMessage = async () => {
-    if (!message.trim()) return;
+    const text = message.trim();
+    if (!text && !productCardPending) return; // nothing to send
     try {
-      const payload = {
-        message: message.trim(),
-        community_id: communityId || null,
-      };
-      // prefer receiver_id jika tersedia, else sertakan chat_id jika ada
-      if (receiverId) payload.receiver_id = Number(receiverId);
-      else if (chatId) payload.chat_id = Number(chatId);
-      else if (sellerPhone) payload.receiver_phone = String(sellerPhone);
-      else if (targetName) payload.receiver_name = String(targetName);
+      const post = async (content) => {
+        const payload = {
+          message: content,
+          community_id: communityId || null,
+        };
+        if (receiverId) payload.receiver_id = Number(receiverId);
+        else if (chatId) payload.chat_id = Number(chatId);
+        else if (sellerPhone) payload.receiver_phone = String(sellerPhone);
+        else if (targetName) payload.receiver_name = String(targetName);
 
-      const res = await fetch(apiJoin('chat/send'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        console.error('Gagal kirim pesan (HTTP):', res.status, text);
-        return;
-      }
-      const json = await res.json();
-
-      if (json.success) {
-        // langsung push pesan tanpa reload
-        setMessages((prev) => [
-          ...prev,
-          {
-            ...json.message,
-            created_at: json.message?.created_at ?? new Date().toISOString(),
+        const res = await fetch(apiJoin('chat/send'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
           },
-        ]);
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          console.error('Gagal kirim pesan (HTTP):', res.status, txt);
+          return null;
+        }
+        const json = await res.json();
+        if (json?.success) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              ...json.message,
+              created_at: json.message?.created_at ?? new Date().toISOString(),
+            },
+          ]);
+          if (json.chat?.id) setChatId(json.chat.id);
+          if (json.chat?.id) fetchMessages(json.chat.id, true);
+        }
+        return json;
+      };
+
+      // 1) Jika ada product card pending, kirim lebih dulu saat tombol diklik
+      if (productCardPending) {
+        const content = buildProductCardMessage();
+        if (content) {
+          const sent = await post(content);
+          if (sent?.success) {
+            productCardSentRef.current = true;
+            setProductCardPending(false);
+            try {
+              const k = productStorageKeyRef.current || `productCardSent:${chatId || 'pending'}:${productPromoId || productTitle || ''}`;
+              if (typeof window !== 'undefined') sessionStorage.setItem(k, '1');
+            } catch { }
+          }
+        }
+      }
+
+      // 2) Kirim text jika ada
+      if (text) {
+        await post(text);
         setMessage('');
-        // set chatId jika backend mengembalikannya
-        if (json.chat?.id) setChatId(json.chat.id);
-        // sinkronkan fetch singkat
-        if (json.chat?.id) fetchMessages(json.chat.id, true);
-      } else {
-        console.error('Gagal kirim pesan, respon:', json);
       }
     } catch (err) {
       console.error('Gagal kirim pesan:', err);
@@ -378,11 +382,19 @@ export default function ChatUniversal() {
                   key={m.id ?? m._id ?? `${m.message}-${time}`}
                   className={`mb-3 flex ${mine ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`max-w-xs px-4 py-3 rounded-2xl ${mine ? 'bg-green-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-900 rounded-bl-none'}`}>
+                  <div
+                    className={`max-w-xs px-4 py-3 rounded-2xl ${mine ? 'bg-green-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-900 rounded-bl-none'} cursor-pointer`}
+                    onClick={() => goToProduct(parsed)}
+                  >
                     <div className={`text-xs mb-2 ${mine ? 'opacity-90' : 'text-slate-600'}`}>
                       {mine ? 'Kamu bertanya tentang produk ini' : 'Pengguna bertanya tentang produk ini'}
                     </div>
-                    <div className={`w-full bg-white ${mine ? 'text-gray-900' : 'text-gray-900'} rounded-xl p-2 flex gap-2 items-center`} style={{ overflow: 'hidden' }}>
+                    <div
+                      className={`w-full bg-white ${mine ? 'text-gray-900' : 'text-gray-900'} rounded-xl p-2 flex gap-2 items-center cursor-pointer hover:bg-gray-50 active:opacity-90 transition`}
+                      style={{ overflow: 'hidden' }}
+                      onClick={() => goToProduct(parsed)}
+                      title="Lihat detail produk"
+                    >
                       {parsed.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

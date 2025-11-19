@@ -326,15 +326,7 @@ export default function NotificationPage() {
     } catch { }
   }
 
-  // Reset data saat ganti tab
-  const resetData = useCallback(() => {
-    console.log('🔄 Resetting data for tab:', type);
-    setLocalItems([]);
-    setCursor(null);
-    setHasMore(true);
-    setInitialLoad(true);
-    setVersion(v => v + 1);
-  }, [type]);
+  // Single-tab (merchant) mode: no tab reset logic needed
 
   // Load notifications dengan cursor-based pagination
   const loadNotifications = useCallback(async (reset = false) => {
@@ -440,13 +432,7 @@ export default function NotificationPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
-  // Tab change handler
-  const handleTabChange = (newType) => {
-    if (newType === type) return;
-    console.log('🔄 Changing tab from', type, 'to', newType);
-    setType(newType);
-    resetData();
-  };
+  // Single-tab (merchant) mode: no tab switching
 
   // Debug logging
   useEffect(() => {
@@ -806,31 +792,10 @@ export default function NotificationPage() {
 
         {/* Body */}
         <div className="bg-gray-50 min-h-screen w-full relative z-20 pb-28">
-          {/* Tabs */}
+          {/* Single tab: Merchant only */}
           <div className="-mt-12 mx-4 mb-6">
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${type === 'hunter'
-                  ? 'bg-white text-primary border-b-2 border-primary'
-                  : 'bg-white/80 text-gray-600'
-                  }`}
-                onClick={() => handleTabChange('hunter')}
-                disabled={loading && initialLoad}
-              >
-                Hunter
-              </button>
-              <button
-                type="button"
-                className={`text-center py-4 font-medium rounded-t-xl transition-colors duration-200 ${type === 'merchant'
-                  ? 'bg-white text-primary border-b-2 border-primary'
-                  : 'bg-white/80 text-gray-600'
-                  }`}
-                onClick={() => handleTabChange('merchant')}
-                disabled={loading && initialLoad}
-              >
-                Merchant
-              </button>
+            <div className="bg-white rounded-t-xl px-4 py-3 font-medium text-primary border-b-2 border-primary w-full text-center">
+              Merchant
             </div>
           </div>
 
