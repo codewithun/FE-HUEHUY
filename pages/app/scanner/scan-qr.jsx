@@ -12,6 +12,8 @@ export default function ScanQR() {
   const [isScanning, setIsScanning] = useState(true);
   const [flashOn, setFlashOn] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showContactConfirm, setShowContactConfirm] = useState(false);
+  const [contactData, setContactData] = useState(null);
 
   const handleScanResult = async (result) => {
     if (!result || loading) return;
@@ -20,6 +22,53 @@ export default function ScanQR() {
     setIsScanning(false);
 
     try {
+      // Jika hasil scan adalah URL profile, ambil data kontak
+      if (
+        typeof result === 'string' &&
+        (result.startsWith('http://') || result.startsWith('https://')) &&
+        result.includes('/profile/')
+      ) {
+        // Extract profile ID dari URL
+        const profileMatch = result.match(/\/profile\/(\d+)/);
+        if (profileMatch) {
+          const profileId = profileMatch[1];
+          try {
+            // Ambil data profil dari API
+            const profileResponse = await get({
+              path: `users/${profileId}/public`
+            });
+
+            if (profileResponse?.status === 200 && profileResponse?.data) {
+              const profile = profileResponse?.data?.data || null;
+              if (!profile) {
+                setScanResult('Profil publik tidak ditemukan atau respons tidak valid');
+                setLoading(false);
+                setIsScanning(true);
+                return;
+              }
+              setContactData({
+                id: profile.id,
+                name: profile.name || 'Nama tidak tersedia',
+                email: profile.email || null,
+                phone: profile.phone || profile.handphone || null,
+                code: profile.code || `HUEHUY-${String(profile.id).padStart(6, '0')}`,
+                verified: profile.verified_at ? true : false,
+                avatar: profile.picture_source || '/avatar.jpg'
+              });
+              setShowContactConfirm(true);
+              setIsScanning(false);
+              setLoading(false);
+              return;
+            }
+          } catch (error) {
+            setScanResult(`Error mengambil data profil: ${error.message}`);
+            setLoading(false);
+            setIsScanning(true);
+            return;
+          }
+        }
+      }
+
       // Jika hasil scan adalah URL promo/voucher, langsung redirect
       if (
         typeof result === 'string' &&
@@ -63,14 +112,13 @@ export default function ScanQR() {
       if (voucherCode || voucherId) {
         try {
           // Cari voucher berdasarkan code atau ID
-          const searchParam = voucherCode ? `code=${voucherCode}` : '';
           const voucherResponse = await get({
             path: voucherId ? `admin/vouchers/${voucherId}` : `admin/vouchers?search=${voucherCode}&paginate=1`
           });
 
           if (voucherResponse?.status === 200 && voucherResponse?.data) {
             let voucher = null;
-            
+
             if (voucherId) {
               voucher = voucherResponse.data.data;
             } else {
@@ -85,7 +133,7 @@ export default function ScanQR() {
               return;
             }
           }
-          
+
           // Jika voucher tidak ditemukan
           setScanResult(`Voucher dengan kode "${voucherCode || voucherId}" tidak ditemukan`);
           setLoading(false);
@@ -142,6 +190,117 @@ export default function ScanQR() {
     }
   };
 
+  const downloadContactCard = () => {
+    if (!contactData) return;
+
+    // Create canvas untuk menggambar contact card
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Polyfill untuk roundRect jika tidak tersedia
+    if (!ctx.roundRect) {
+      ctx.roundRect = function (x, y, width, height, radius) {
+        this.beginPath();
+        this.moveTo(x + radius, y);
+        this.arcTo(x + width, y, x + width, y + height, radius);
+        this.arcTo(x + width, y + height, x, y + height, radius);
+        this.arcTo(x, y + height, x, y, radius);
+        this.arcTo(x, y, x + width, y, radius);
+        this.closePath();
+      };
+    }
+
+    // Set ukuran canvas
+    canvas.width = 600;
+    canvas.height = 400;
+
+    // Background gradient
+    const gradient = ctx.createLinearGradient(0, 0, 600, 400);
+    gradient.addColorStop(0, '#10b981'); // Green
+    gradient.addColorStop(1, '#059669'); // Darker green
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 600, 400);
+
+    // White card background
+    ctx.fillStyle = 'white';
+    ctx.roundRect(30, 30, 540, 340, 20);
+    ctx.fill();
+
+    // Header background
+    ctx.fillStyle = '#059669';
+    ctx.roundRect(50, 50, 500, 80, 15);
+    ctx.fill();
+
+    // Logo/Avatar circle
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath();
+    ctx.arc(90, 90, 25, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Logo initial
+    ctx.fillStyle = '#059669';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('H', 90, 96);
+
+    // Title "HUEHUY CONTACT"
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('HUEHUY CONTACT', 130, 85);
+
+    ctx.font = '14px Arial';
+    ctx.fillText('Digital Business Card', 130, 105);
+
+    // Contact info section
+    ctx.fillStyle = '#1f2937';
+    ctx.textAlign = 'left';
+
+    // Nama
+    ctx.font = 'bold 28px Arial';
+    ctx.fillText(contactData.name, 70, 180);
+
+    // Status
+    ctx.font = '16px Arial';
+    ctx.fillStyle = contactData.verified ? '#10b981' : '#6b7280';
+    ctx.fillText(contactData.verified ? '✓ Verified Member' : 'Member', 70, 205);
+
+    // Contact details
+    ctx.fillStyle = '#1f2937';
+    ctx.font = 'bold 18px Arial';
+
+    // Email dengan icon
+    ctx.fillText('Email: ' + (contactData.email || 'Tidak tersedia'), 70, 245);
+
+    // Phone dengan icon  
+    ctx.fillText('Phone: ' + (contactData.phone || 'Tidak tersedia'), 70, 275);
+
+    // User Code dengan icon
+    ctx.fillText('Code: ' + contactData.code, 70, 305);
+
+    // Footer
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Generated by HUEHUY Platform', 300, 350);
+    ctx.fillText(new Date().toLocaleDateString('id-ID'), 300, 365);
+
+    // Convert canvas to blob dan download
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `contact-${contactData.name.replace(/\s+/g, '-')}-${contactData.code}.png`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+
+    // Reset scanner
+    setShowContactConfirm(false);
+    setContactData(null);
+    resetScanner();
+  };
+
   const parseQRCode = (qrText) => {
     try {
       const data = JSON.parse(qrText);
@@ -158,10 +317,10 @@ export default function ScanQR() {
           tenantId: extractTenantId(qrText) || 'FOODCOURT01'
         };
       }
-      return { 
-        type: 'event_booth', 
+      return {
+        type: 'event_booth',
         boothId: 'CURIOSITY2024',
-        data: qrText 
+        data: qrText
       };
     }
   };
@@ -244,16 +403,15 @@ export default function ScanQR() {
           <div className="flex gap-3">
             <button
               onClick={() => setFlashOn(!flashOn)}
-              className={`flex-1 py-3 px-3 rounded-[15px] flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${
-                flashOn 
-                  ? 'bg-yellow-500 text-white' 
-                  : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`flex-1 py-3 px-3 rounded-[15px] flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${flashOn
+                ? 'bg-yellow-500 text-white'
+                : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
             >
               <FontAwesomeIcon icon={flashOn ? faFlashlightSlash : faFlashlight} className="text-base" />
               <span>{flashOn ? 'Matikan Flash' : 'Flash'}</span>
             </button>
-            
+
             {!isScanning && (
               <button
                 onClick={resetScanner}
@@ -276,6 +434,86 @@ export default function ScanQR() {
               </h3>
               <div className="bg-gray-50 p-3 rounded-[12px]">
                 <p className="text-xs text-gray-700 font-mono break-all">{scanResult}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Contact Confirmation Modal */}
+        {showContactConfirm && contactData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+              {/* Header */}
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <FontAwesomeIcon icon={faQrcode} className="text-2xl text-green-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Kontak Ditemukan!</h3>
+                <p className="text-sm text-gray-600 mt-1">Apakah Anda ingin mengunduh contact card?</p>
+              </div>
+
+              {/* Contact Preview */}
+              <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-4 mb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                    <span className="text-green-600 font-bold text-lg">{contactData.name.charAt(0)}</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-white text-base">{contactData.name}</h4>
+                    {contactData.verified && (
+                      <span className="text-xs text-green-100 flex items-center gap-1">
+                        <FontAwesomeIcon icon={faShieldCheck} className="text-xs" />
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-white text-sm">
+                  {contactData.email && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-200">Email</span>
+                      <span className="break-all">{contactData.email}</span>
+                    </div>
+                  )}
+                  {contactData.phone && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-200">Phone</span>
+                      <span>{contactData.phone}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-200">Code</span>
+                    <span>{contactData.code}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info */}
+              <div className="bg-green-50 rounded-lg p-3 mb-4">
+                <p className="text-xs text-green-700 text-center">
+                  Contact card akan diunduh sebagai file gambar PNG yang dapat Anda simpan di galeri atau bagikan.
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowContactConfirm(false);
+                    setContactData(null);
+                    resetScanner();
+                  }}
+                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={downloadContactCard}
+                  className="flex-1 py-3 px-4 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors"
+                >
+                  Unduh
+                </button>
               </div>
             </div>
           </div>
