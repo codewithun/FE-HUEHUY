@@ -11,8 +11,11 @@ import {
 import { CorporateLayout } from '../../../components/construct.components/layout/Corporate.layout';
 import { post } from '../../../helpers';
 import { faArrowDown, faArrowUp, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { useUserContext } from '../../../context/user.context';
 
 export default function CorporateWidget() {
+    const { profile: Profile } = useUserContext();
+    const corporateId = Profile?.corporate_user?.corporate_id || null;
     // Only two types allowed here
     const [type, setType] = useState('hunting'); // 'hunting' | 'information'
     const [communityId, setCommunityId] = useState(null);
@@ -21,7 +24,7 @@ export default function CorporateWidget() {
     const [selected, setSelected] = useState(null);
     const [loadingUpdateStatus, setLoadingUpdateStatus] = useState(false);
 
-    const tableKey = `${type}-${communityId ?? 'all'}`;
+    const tableKey = `${type}-${communityId ?? 'all'}-${corporateId ?? 'noCorp'}`;
 
     return (
         <div className="p-2 md:p-6 rounded-2xl bg-slate-50 min-h-screen">
@@ -34,6 +37,7 @@ export default function CorporateWidget() {
                     path: 'admin/dynamic-content', // assuming corporate uses same endpoint
                     includeParams: {
                         community_id: communityId ? communityId : undefined,
+                        corporate_id: corporateId || undefined,
                     },
                 }}
                 setToRefresh={refresh}
@@ -75,7 +79,8 @@ export default function CorporateWidget() {
                         <SelectComponent
                             placeholder="Filter Komunitas"
                             serverOptionControl={{
-                                path: 'admin/communities',
+                                // Limit choices to communities owned by this corporate
+                                path: 'corporate/communities',
                                 mapOptions: (data) =>
                                     Array.isArray(data)
                                         ? data.map((item) => ({ label: item.name, value: item.id }))
@@ -91,6 +96,11 @@ export default function CorporateWidget() {
                         column: 'type',
                         type: 'equal',
                         value: type,
+                    },
+                    {
+                        column: 'corporate_id',
+                        type: 'equal',
+                        value: corporateId || undefined,
                     },
                 ]}
                 columnControl={{
@@ -138,6 +148,7 @@ export default function CorporateWidget() {
                     customDefaultValue: {
                         type,
                         community_id: communityId ?? undefined,
+                        corporate_id: corporateId ?? undefined,
                     },
                     custom: [
                         {
@@ -164,7 +175,8 @@ export default function CorporateWidget() {
                                     placeholder="Pilih komunitas..."
                                     required={true}
                                     serverOptionControl={{
-                                        path: 'admin/communities',
+                                        // Only communities under this corporate
+                                        path: 'corporate/communities',
                                         mapOptions: (data) =>
                                             Array.isArray(data)
                                                 ? data.map((item) => ({ label: item.name, value: item.id }))
