@@ -237,6 +237,12 @@ export default function Index() {
       ad?.advertising === true
     ) return false;
 
+    // Tambahkan filter offline: hanya tampilkan promo yang offline
+    const isOnline = normalizeBoolLike(ad?.is_online) || ad?.is_online === 'online' || ad?.type === 'online' || ad?.location_type === 'online' || ad?.promo_type === 'online' || ad?.category === 'online' ||
+      normalizeBoolLike(ad?.cube?.is_online) || ad?.cube?.is_online === 'online' || ad?.cube?.type === 'online' || ad?.cube?.location_type === 'online' || ad?.cube?.promo_type === 'online' || ad?.cube?.category === 'online';
+    const isOffline = !isOnline;
+    if (!isOffline) return false;
+
     return true;
   };
 
