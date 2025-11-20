@@ -11,6 +11,8 @@ import { CorporateLayout } from '../../../components/construct.components/layout
 import { useUserContext } from '../../../context/user.context';
 import Cookies from 'js-cookie';
 import { token_cookie_name } from '../../../helpers';
+import { Decrypt } from '../../../helpers/encryption.helpers';
+import { admin_token_cookie_name } from '../../../helpers/api.helpers';
 
 export default function KomunitasCorporate() {
     const { profile: Profile } = useUserContext();
@@ -23,6 +25,7 @@ export default function KomunitasCorporate() {
     const [modalMemberHistory, setModalMemberHistory] = useState(false);
     const [modalAddMember, setModalAddMember] = useState(false);
     const [refreshRequestsToggle, setRefreshRequestsToggle] = useState(false);
+    const [refreshMembersToggle, setRefreshMembersToggle] = useState(false);
     const [memberHistoryError, setMemberHistoryError] = useState('');
     const [cubeList, setCubeList] = useState([]);
     const [cubeLoading, setCubeLoading] = useState(false);
@@ -44,6 +47,33 @@ export default function KomunitasCorporate() {
         }
         // Default: absolute URL to storage
         return `${FILE_ORIGIN}/${toStoragePath(relativePath)}`;
+    };
+
+    // Auth headers helper (decrypt token from cookie/localStorage)
+    const authHeaders = (method = 'GET') => {
+        try {
+            const isBrowser = typeof window !== 'undefined';
+            // Prioritaskan token user; fallback ke admin bila ada
+            const names = [token_cookie_name, admin_token_cookie_name];
+            let enc;
+            for (const name of names) {
+                enc = Cookies.get(name);
+                if (!enc && isBrowser) {
+                    const ls = localStorage.getItem(name);
+                    enc = ls === null ? undefined : ls;
+                }
+                if (enc) break;
+            }
+            const token = enc ? Decrypt(enc) : '';
+            const base = { Accept: 'application/json' };
+            if (token) base['Authorization'] = `Bearer ${token}`;
+            if (["POST", "PUT", "PATCH", "DELETE"].includes(String(method).toUpperCase())) {
+                base['Content-Type'] = 'application/json';
+            }
+            return base;
+        } catch {
+            return { Accept: 'application/json' };
+        }
     };
 
     useEffect(() => {
@@ -69,12 +99,9 @@ export default function KomunitasCorporate() {
 
     const handleMemberRequest = async (requestId, action) => {
         try {
-            const res = await fetch(apiJoin(`admin/member-requests/${requestId}/${action}`), {
+            const res = await fetch(apiJoin(`corporate/member-requests/${requestId}/${action}`), {
                 method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get(token_cookie_name)}`
-                },
+                headers: authHeaders('POST'),
             });
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}`);
@@ -83,6 +110,22 @@ export default function KomunitasCorporate() {
         } catch (err) {
             // Log error for debugging
             alert(`Gagal ${action === 'approve' ? 'menyetujui' : 'menolak'} permintaan`);
+        }
+    };
+
+    const handleRemoveMember = async (userId) => {
+        if (!activeCommunity?.id || !userId) return;
+        const ok = confirm('Yakin ingin menghapus anggota ini dari komunitas?');
+        if (!ok) return;
+        try {
+            const res = await fetch(
+                apiJoin(`corporate/communities/${activeCommunity.id}/members/${userId}`),
+                { method: 'DELETE', headers: authHeaders('DELETE') }
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setRefreshMembersToggle((s) => !s);
+        } catch (e) {
+            alert('Gagal menghapus anggota');
         }
     };
 
@@ -275,8 +318,10 @@ export default function KomunitasCorporate() {
                             key={`member-table-${activeCommunity?.id}`}
                             title={`Daftar Anggota`}
                             fetchControl={{
-                                url: apiJoin(`admin/communities/${activeCommunity?.id}/members`)
+                                url: apiJoin(`corporate/communities/${activeCommunity?.id}/members`),
+                                headers: () => authHeaders('GET')
                             }}
+                            setToRefresh={refreshMembersToggle}
                             searchable
                             noControlBar={false}
                             unUrlPage
@@ -335,7 +380,9 @@ export default function KomunitasCorporate() {
                                     { selector: 'role', label: 'Role', item: (m) => m.role?.name || m.role || '-' },
                                 ],
                             }}
-                            actionControl={{ except: ['edit', 'detail', 'delete'] }}
+                            actionControl={{
+                                except: ['edit', 'detail'],
+                            }}
                         />
                     ) : null}
                 </div>
@@ -397,7 +444,8 @@ export default function KomunitasCorporate() {
                         unUrlPage
                         setToRefresh={refreshRequestsToggle}
                         fetchControl={{
-                            url: apiJoin(`admin/communities/${activeCommunity?.id}/member-requests`)
+                            url: apiJoin(`corporate/communities/${activeCommunity?.id}/member-requests`),
+                            headers: () => authHeaders('GET')
                         }}
                         customTopBar={<div />}
                         columnControl={{
@@ -504,7 +552,8 @@ export default function KomunitasCorporate() {
                             noControlBar={false}
                             unUrlPage
                             fetchControl={{
-                                url: apiJoin(`admin/communities/${activeCommunity?.id}/member-history`)
+                                url: apiJoin(`corporate/communities/${activeCommunity?.id}/member-history`),
+                                headers: () => authHeaders('GET')
                             }}
                             customTopBar={<div />}
                             columnControl={{
@@ -587,12 +636,9 @@ export default function KomunitasCorporate() {
                             const email = formData.get('user_id');
 
                             try {
-                                const res = await fetch(apiJoin(`admin/communities/${activeCommunity?.id}/members`), {
+                                const res = await fetch(apiJoin(`corporate/communities/${activeCommunity?.id}/members`), {
                                     method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${Cookies.get(token_cookie_name)}`
-                                    },
+                                    headers: authHeaders('POST'),
                                     body: JSON.stringify({ user_id: email }),
                                 });
 

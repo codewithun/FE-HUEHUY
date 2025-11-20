@@ -34,7 +34,7 @@ export default function Berburu() {
             lng: pos.coords.longitude,
           });
         },
-        () => {},
+        () => { },
         { enableHighAccuracy: true }
       );
     }
@@ -57,18 +57,16 @@ export default function Berburu() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingAds, codeAds, dataAds] = useGet({
     path: map
-      ? `ads/${map?.lat}/${map?.lng}${
-          selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
-        }`
+      ? `ads/${map?.lat}/${map?.lng}${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
+      }`
       : null,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingChildCategories, codeChildCategories, dataChildCategories] =
     useGet({
-      path: `categories${
-        selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
-      }`,
+      path: `categories${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
+        }`,
     });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -79,9 +77,8 @@ export default function Berburu() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingNear, codeNear, dataNear] = useGet({
     path: map
-      ? `ads/promo-nearest/${map?.lat}/${map?.lng}${
-          selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
-        }`
+      ? `ads/promo-nearest/${map?.lat}/${map?.lng}${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
+      }`
       : '',
   });
 
@@ -110,31 +107,36 @@ export default function Berburu() {
           keyboardShortcuts: false,
         }}
       >
-        {dataAds?.map((ad, key) => (
-          <InfoBox
-            position={{
-              lat: ad?.cube?.map_lat,
-              lng: ad?.cube?.map_lng,
-            }}
-            options={{ closeBoxURL: '', enableEventPropagation: true }}
-            key={key}
-          >
-            <Link href={`/app/${ad?.cube?.code}`}>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
-                  {ad?.cube?.picture_source ? (
-                    <img src={ad?.cube?.picture_source} className="w-12" />
-                  ) : (
-                    <CubeComponent
-                      size={18}
-                      color={`${ad?.cube?.cube_type?.color}`}
-                    />
-                  )}
+        {dataAds?.map((ad, key) => {
+          // Pastikan koordinat valid sebelum render InfoBox
+          if (!ad?.cube?.map_lat || !ad?.cube?.map_lng) return null;
+
+          return (
+            <InfoBox
+              position={{
+                lat: parseFloat(ad?.cube?.map_lat),
+                lng: parseFloat(ad?.cube?.map_lng),
+              }}
+              options={{ closeBoxURL: '', enableEventPropagation: true }}
+              key={key}
+            >
+              <Link href={`/app/${ad?.cube?.code}`}>
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
+                    {ad?.cube?.picture_source ? (
+                      <img src={ad?.cube?.picture_source} className="w-12" />
+                    ) : (
+                      <CubeComponent
+                        size={18}
+                        color={`${ad?.cube?.cube_type?.color}`}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          </InfoBox>
-        ))}
+              </Link>
+            </InfoBox>
+          );
+        })}
       </GoogleMap>
     );
   }

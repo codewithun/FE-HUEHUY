@@ -41,27 +41,32 @@ function MapWithAMarker({ position, dataAds }) {
         keyboardShortcuts: false,
       }}
     >
-      {dataAds?.map((ad, key) => (
-        <Marker
-          key={key}
-          position={{ lat: ad?.map_lat, lng: ad?.map_lng }}
-          icon={{
-            url: '/cube-icon.png',
-            scaledSize: { width: 32, height: 32 },
-          }}
-        >
-          <InfoWindow position={{ lat: ad?.map_lat, lng: ad?.map_lng }}>
-            <div className="flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
-                <CubeComponent
-                  size={18}
-                  color={`#${ad?.cube?.cube_type?.color}`}
-                />
+      {dataAds?.map((ad, key) => {
+        // Pastikan koordinat valid sebelum render Marker
+        if (!ad?.map_lat || !ad?.map_lng) return null;
+
+        return (
+          <Marker
+            key={key}
+            position={{ lat: parseFloat(ad?.map_lat), lng: parseFloat(ad?.map_lng) }}
+            icon={{
+              url: '/cube-icon.png',
+              scaledSize: { width: 32, height: 32 },
+            }}
+          >
+            <InfoWindow>
+              <div className="flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
+                  <CubeComponent
+                    size={18}
+                    color={`#${ad?.cube?.cube_type?.color}`}
+                  />
+                </div>
               </div>
-            </div>
-          </InfoWindow>
-        </Marker>
-      ))}
+            </InfoWindow>
+          </Marker>
+        );
+      })}
     </GoogleMap>
   );
 }
@@ -121,7 +126,7 @@ export default function Index() {
             lng: pos.coords.longitude,
           });
         },
-        () => {},
+        () => { },
         { enableHighAccuracy: true }
       );
     }
