@@ -42,23 +42,28 @@ function MapWithAMarker({ position, dataAds }) {
         keyboardShortcuts: false,
       }}
     >
-      {dataAds?.map((ad, key) => (
-        <Marker
-          key={key}
-          position={{ lat: ad?.map_lat, lng: ad?.map_lng }}
-          icon={{
-            url: '/cube-icon.png', // Ganti dengan icon cube jika ada
-            scaledSize: { width: 32, height: 32 },
-          }}
-        >
-          {/* InfoWindow jika ingin popup detail */}
-          {/* <InfoWindow position={{ lat: ad?.map_lat, lng: ad?.map_lng }}>
-            <div>
-              <CubeComponent size={18} color={`#${ad?.cube?.cube_type?.color}`} />
-            </div>
-          </InfoWindow> */}
-        </Marker>
-      ))}
+      {dataAds?.map((ad, key) => {
+        // Pastikan koordinat valid sebelum render Marker
+        if (!ad?.map_lat || !ad?.map_lng) return null;
+
+        return (
+          <Marker
+            key={key}
+            position={{ lat: parseFloat(ad?.map_lat), lng: parseFloat(ad?.map_lng) }}
+            icon={{
+              url: '/cube-icon.png', // Ganti dengan icon cube jika ada
+              scaledSize: { width: 32, height: 32 },
+            }}
+          >
+            {/* InfoWindow jika ingin popup detail */}
+            {/* <InfoWindow position={{ lat: ad?.map_lat, lng: ad?.map_lng }}>
+              <div>
+                <CubeComponent size={18} color={`#${ad?.cube?.cube_type?.color}`} />
+              </div>
+            </InfoWindow> */}
+          </Marker>
+        );
+      })}
     </GoogleMap>
   );
 }
