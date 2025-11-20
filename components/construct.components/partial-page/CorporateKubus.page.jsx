@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* Corporate admin-like Kubus management page: mirrors admin UI but filtered to corporate scope */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import moment from 'moment';
@@ -33,6 +34,7 @@ import CropperDialog from '../../crop.components/CropperDialog';
 // helpers used in admin transform
 import { standIn } from '../../../helpers/standIn.helpers';
 import { prepareKubusVoucherData, validateVoucherData } from '../../../helpers/voucher.helpers';
+import { get } from '../../../helpers/api.helpers';
 // using local getCT/isInfo helpers declared below
 import MultiSelectDropdown from '../../form/MultiSelectDropdown';
 import ToggleComponent from '../input/TogleComponet';
@@ -51,6 +53,7 @@ function CorporateKubusPage({ scope }) {
     const [isAdsEditMode, setIsAdsEditMode] = useState(false);
     const [, setIsFormEdit] = useState(false);
     const formValuesRef = useRef([]);
+    const [corporateCommunityId, setCorporateCommunityId] = useState(null);
     // const [tableCtx, setTableCtx] = useState(null); // removed, unused
 
     useUserContext(); // reserved for future guards
@@ -70,6 +73,30 @@ function CorporateKubusPage({ scope }) {
         resetCropState,
         withVersion,
     } = useCropFunctionality();
+
+    // Load corporate community ID on mount
+    useEffect(() => {
+        if (scope?.corporate_id) {
+            const fetchCorporateCommunity = async () => {
+                try {
+                    const response = await get({ path: 'corporate/communities' });
+                    if (response?.data?.length > 0) {
+                        // Take the first community for this corporate (or find specific one)
+                        const community = response.data[0]; // Since all communities returned are for this corporate
+                        if (community) {
+                            setCorporateCommunityId(community.id);
+                            console.log('Corporate community ID set:', community.id, 'for corporate:', scope.corporate_id);
+                        }
+                    } else {
+                        console.warn('No communities found for corporate_id:', scope.corporate_id);
+                    }
+                } catch (error) {
+                    console.warn('Failed to fetch corporate community:', error);
+                }
+            };
+            fetchCorporateCommunity();
+        }
+    }, [scope?.corporate_id]);
 
     // Stable preview refs
     const previewUrlRef = useRef(previewUrl);
@@ -129,7 +156,7 @@ function CorporateKubusPage({ scope }) {
     );
 
     // Mapping default values (disamakan dengan versi admin agar struktur field konsisten)
-    const mapUpdateDefault = (data) => {
+    const mapUpdateDefault = useCallback((data) => {
         const ad = data?.ads?.[0] || {};
 
         const contentType = data?.is_information
@@ -181,7 +208,7 @@ function CorporateKubusPage({ scope }) {
             'cube_tags[0][address]': data?.tags?.at(0)?.address || data?.address || '',
             target_type: ad?.target_type || 'all',
             target_user_ids: ad?.target_user_ids || [],
-            community_id: ad?.community_id || '',
+            community_id: ad?.community_id || corporateCommunityId || null,
             image: data?.image || data?.picture_source || '',
             'ads[image]': ad?.image || ad?.picture_source || '',
             'ads[image_1]': ad?.image_1 || '',
@@ -191,6 +218,7 @@ function CorporateKubusPage({ scope }) {
             'ads[description]': ad?.description || '',
             'ads[detail]': ad?.detail || ad?.description || '',
             'ads[ad_category_id]': ad?.ad_category_id || '',
+            'ads[community_id]': ad?.community_id || corporateCommunityId || null,
             'ads[level_umkm]': ad?.level_umkm || '',
             'ads[max_production_per_day]': ad?.max_production_per_day || '',
             'ads[sell_per_day]': ad?.sell_per_day || '',
@@ -216,7 +244,7 @@ function CorporateKubusPage({ scope }) {
             ...(data?.corporate_id ? { corporate_id: data.corporate_id } : {}),
             map_distance: 0,
         };
-    };
+    }, [corporateCommunityId]);
 
     // Helpers
     const getCT = (values) => values.find((i) => i.name === 'content_type')?.value || 'promo';
