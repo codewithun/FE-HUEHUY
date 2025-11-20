@@ -901,7 +901,10 @@ export default function CommunityDashboard({ communityId }) {
               .filter(({ ad, cube }) => {
                 // Gunakan getNormalizedType untuk cek tipe
                 const type = getNormalizedType(ad, cube);
-                return type === 'promo'; // Hanya tampilkan yang bertipe 'promo'
+                const isOnline = normalizeBoolLike(ad?.is_online) || ad?.is_online === 'online' || ad?.type === 'online' || ad?.location_type === 'online' || ad?.promo_type === 'online' || ad?.category === 'online' ||
+                  normalizeBoolLike(cube?.is_online) || cube?.is_online === 'online' || cube?.type === 'online' || cube?.location_type === 'online' || cube?.promo_type === 'online' || cube?.category === 'online';
+                const isOffline = !isOnline;
+                return type === 'promo' && isOffline; // Hanya tampilkan yang bertipe 'promo' dan offline
               });
 
             setItems(normalized);

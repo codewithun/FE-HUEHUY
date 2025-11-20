@@ -105,88 +105,88 @@ export default function InformasiAkun() {
             forms={
               edit == 'profil'
                 ? [
-                    {
-                      type: 'custom',
-                      custom: () => {
-                        return (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            class="h-44 aspect-square rounded-full border-4 border-slate-300 dark:border-gray-800 mx-auto my-4 object-cover"
-                            src={
-                              data?.data?.profile?.picture_source
-                                ? data?.data?.profile?.picture_source
-                                : '/default-avatar.png'
-                            }
-                            alt="Foto Profil"
-                          />
-                        );
-                      },
+                  {
+                    type: 'custom',
+                    custom: () => {
+                      return (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          class="h-44 aspect-square rounded-full border-4 border-slate-300 dark:border-gray-800 mx-auto my-4 object-cover"
+                          src={
+                            data?.data?.profile?.picture_source
+                              ? data?.data?.profile?.picture_source
+                              : '/default-avatar.png'
+                          }
+                          alt="Foto Profil"
+                        />
+                      );
                     },
-                    {
-                      construction: {
-                        name: 'name',
-                        label: 'Nama',
-                        validations: { requred: true },
-                      },
+                  },
+                  {
+                    construction: {
+                      name: 'name',
+                      label: 'Nama',
+                      validations: { requred: true },
                     },
-                    {
-                      construction: {
-                        name: 'phone',
-                        label: 'No Hp/WA',
-                        validations: { min: 10 },
-                      },
+                  },
+                  {
+                    construction: {
+                      name: 'phone',
+                      label: 'No Hp/WA',
+                      validations: { min: 10 },
                     },
+                  },
 
-                    {
-                      type: 'custom',
-                      custom: ({ formControl }) => (
-                        <>
-                          <label className="mb-2">Foto Profil Baru</label>
-                          <div className="pt-4 px-12">
-                            <InputImageComponent
-                              name="image"
-                              label=""
-                              {...formControl('image')}
-                            />
-                          </div>
-                        </>
-                      ),
-                    },
-                  ]
+                  {
+                    type: 'custom',
+                    custom: ({ formControl }) => (
+                      <>
+                        <label className="mb-2">Foto Profil Baru</label>
+                        <div className="pt-4 px-12">
+                          <InputImageComponent
+                            name="image"
+                            label=""
+                            {...formControl('image')}
+                          />
+                        </div>
+                      </>
+                    ),
+                  },
+                ]
                 : [
-                    {
-                      type: 'custom',
-                      custom: ({ formControl }) => {
-                        return (
+                  {
+                    type: 'custom',
+                    custom: ({ formControl }) => {
+                      return (
+                        <InputComponent
+                          type="password"
+                          name="old_password"
+                          label="Kata Sandi"
+                          size="lg"
+                          placeholder="kata sandi saat ini..."
+                          {...formControl('old_password')}
+                        />
+                      );
+                    },
+                  },
+                  {
+                    type: 'custom',
+                    custom: ({ formControl }) => {
+                      return (
+                        <div className="mt-4">
                           <InputComponent
                             type="password"
-                            name="old_password"
-                            label="Kata Sandi"
+                            name="password"
+                            label="Kata Sandi Baru"
                             size="lg"
-                            placeholder="kata sandi saat ini..."
-                            {...formControl('old_password')}
+                            placeholder="kata sandi baru..."
+                            {...formControl('password')}
                           />
-                        );
-                      },
+                        </div>
+                      );
                     },
-                    {
-                      type: 'custom',
-                      custom: ({ formControl }) => {
-                        return (
-                          <div className="mt-4">
-                            <InputComponent
-                              type="password"
-                              name="password"
-                              label="Kata Sandi Baru"
-                              size="lg"
-                              placeholder="kata sandi baru..."
-                              {...formControl('password')}
-                            />
-                          </div>
-                        );
-                      },
-                    },
-                  ]
+                  },
+                ]
             }
           />
         </div>
