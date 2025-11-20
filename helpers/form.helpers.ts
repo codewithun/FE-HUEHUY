@@ -95,7 +95,12 @@ export const useForm = (
       /(^|\/)admin\/dynamic-content\/\d+($|\/)/.test(effectivePath) ||
       /(^|\/)admin\/dynamic-content\/\d+($|\/)/.test(requestUrlFull);
 
-    const isAnyUpdate = isAdUpdate || isCubeUpdate || isDynamicContentUpdate;
+    // NEW: Detect user update so we spoof PUT correctly (admin/users/{id})
+    const isUserUpdate =
+      /(^|\/)admin\/users\/\d+($|\/)/.test(effectivePath) ||
+      /(^|\/)admin\/users\/\d+($|\/)/.test(requestUrlFull);
+
+    const isAnyUpdate = isAdUpdate || isCubeUpdate || isDynamicContentUpdate || isUserUpdate;
     if (isAnyUpdate) {
       formData.set('_method', 'PUT');
     }
