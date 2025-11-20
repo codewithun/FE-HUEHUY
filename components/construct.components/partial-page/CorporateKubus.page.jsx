@@ -128,7 +128,7 @@ function CorporateKubusPage({ scope }) {
         [selected, formSessionId, getServerImageUrl, withVersion, handleFileInput, handleRecrop, handleClearImage]
     );
 
-    // Admin mapping for update defaults
+    // Mapping default values (disamakan dengan versi admin agar struktur field konsisten)
     const mapUpdateDefault = (data) => {
         const ad = data?.ads?.[0] || {};
 
@@ -140,21 +140,23 @@ function CorporateKubusPage({ scope }) {
                     ? 'iklan'
                     : 'promo';
 
+        // Admin version menggunakan key hari langsung, bukan array index objek
         const mapCustomDays = (customDays) => {
             if (!customDays || typeof customDays !== 'object') return {};
             const result = {};
-            Object.entries(customDays).forEach(([, v], idx) => {
-                result[`ads[custom_days][${idx}][day]`] = v?.day || '';
-                result[`ads[custom_days][${idx}][start]`] = v?.start || '';
-                result[`ads[custom_days][${idx}][finish]`] = v?.finish || '';
+            Object.entries(customDays).forEach(([day, value]) => {
+                result[`ads[custom_days][${day}]`] = value;
             });
             return result;
         };
 
         const formatDateForInput = (dateStr) => {
             if (!dateStr) return '';
-            const d = moment(dateStr);
-            return d.isValid() ? d.format('YYYY-MM-DD') : '';
+            try {
+                return moment(dateStr).format('YYYY-MM-DD');
+            } catch (e) {
+                return '';
+            }
         };
 
         const mappedData = {
@@ -194,8 +196,8 @@ function CorporateKubusPage({ scope }) {
             'ads[sell_per_day]': ad?.sell_per_day || '',
         };
 
-        const stockSource = ad?.stock_source || (ad?.max_grab != null ? 'ad' : 'promo');
-        const maxGrabForForm = stockSource === 'promo' ? ad?.remaining_stock ?? '' : ad?.max_grab ?? '';
+        // Gunakan langsung ad.max_grab seperti versi admin (tanpa logic stock_source yg membingungkan)
+        const maxGrabForForm = ad?.max_grab ?? '';
 
         return {
             ...mappedData,
@@ -585,11 +587,17 @@ function CorporateKubusPage({ scope }) {
                                                                 'cube_tags[0][map_lat]',
                                                                 'cube_tags[0][map_lng]',
                                                                 'cube_tags[0][address]',
+                                                                'map_lat',
+                                                                'map_lng',
+                                                                'address',
                                                             ].includes(i.name)
                                                         ),
                                                         { name: 'cube_tags[0][map_lat]', value: e?.lat },
                                                         { name: 'cube_tags[0][map_lng]', value: e?.lng },
                                                         { name: 'cube_tags[0][address]', value: e?.address },
+                                                        { name: 'map_lat', value: e?.lat },
+                                                        { name: 'map_lng', value: e?.lng },
+                                                        { name: 'address', value: e?.address },
                                                     ]);
                                                 }}
                                             />
@@ -643,11 +651,17 @@ function CorporateKubusPage({ scope }) {
                                                                 'cube_tags[0][map_lat]',
                                                                 'cube_tags[0][map_lng]',
                                                                 'cube_tags[0][address]',
+                                                                'map_lat',
+                                                                'map_lng',
+                                                                'address',
                                                             ].includes(i.name)
                                                         ),
                                                         { name: 'cube_tags[0][map_lat]', value: e?.lat },
                                                         { name: 'cube_tags[0][map_lng]', value: e?.lng },
                                                         { name: 'cube_tags[0][address]', value: e?.address },
+                                                        { name: 'map_lat', value: e?.lat },
+                                                        { name: 'map_lng', value: e?.lng },
+                                                        { name: 'address', value: e?.address },
                                                     ]);
                                                 }}
                                             />
