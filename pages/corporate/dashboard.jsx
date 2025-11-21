@@ -54,7 +54,11 @@ function MapWithAMarker({ position, dataAds }) {
               scaledSize: { width: 32, height: 32 },
             }}
           >
-            <InfoWindow>
+            {/* Tambahkan position agar InfoWindow tidak error (harus anchor atau position) */}
+            <InfoWindow
+              position={{ lat: parseFloat(ad?.map_lat), lng: parseFloat(ad?.map_lng) }}
+              options={{ pixelOffset: new google.maps.Size(0, -30) }}
+            >
               <div className="flex flex-col items-center">
                 <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
                   <CubeComponent
