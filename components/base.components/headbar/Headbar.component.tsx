@@ -12,9 +12,13 @@ import Cookies from 'js-cookie';
 import { useRouter } from 'next/router';
 import { useUserContext } from '../../../context/user.context';
 import { token_cookie_name, useGet } from '../../../helpers';
+import {
+  admin_token_cookie_name,
+  corporate_token_cookie_name,
+} from '../../../helpers/api.helpers';
 import { HeadbarProps } from './headbar.props';
 
-export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
+export function HeadbarComponent({ onMenuClick, panel }: HeadbarProps) {
   const router = useRouter();
   const [profile, setProfile] = useState(false);
 
@@ -57,7 +61,9 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
                 ? 'PANEL SUPER ADMIN'
                 : 'PANEL MITRA'}
             </h1>
-            <p className="text-xs whitespace-nowrap text-white font-medium">HUEHUY</p>
+            <p className="text-xs whitespace-nowrap text-white font-medium">
+              HUEHUY
+            </p>
           </div>
         </div>
       </div>
@@ -131,12 +137,35 @@ export function HeadbarComponent({ onMenuClick }: HeadbarProps) {
             <div
               className="px-8 py-4 flex items-center gap-5 hover:bg-red-50 cursor-pointer text-danger transition-colors duration-200"
               onClick={() => {
-                Cookies.remove(token_cookie_name);
-                dataProfile?.data?.profile?.id == 1
-                  ? router.push('/admin')
-                  : dataProfile?.data?.profile?.id == 3 || 4
-                  ? router.push('/corporate')
-                  : router.push('/');
+                // Tentukan cookie dan redirect berdasarkan panel/scope
+                const isAdmin =
+                  panel === 'admin' || router.pathname.startsWith('/admin');
+                const isCorporate =
+                  panel === 'corporate' ||
+                  router.pathname.startsWith('/corporate');
+
+                if (isAdmin) {
+                  // Logout admin - hapus cookie admin dan redirect ke /admin
+                  Cookies.remove(admin_token_cookie_name);
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem(admin_token_cookie_name);
+                  }
+                  router.push('/admin');
+                } else if (isCorporate) {
+                  // Logout corporate - hapus cookie corporate dan redirect ke /corporate
+                  Cookies.remove(corporate_token_cookie_name);
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem(corporate_token_cookie_name);
+                  }
+                  router.push('/corporate');
+                } else {
+                  // Logout user - hapus cookie user dan redirect ke /
+                  Cookies.remove(token_cookie_name);
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem(token_cookie_name);
+                  }
+                  router.push('/');
+                }
               }}
             >
               <FontAwesomeIcon icon={faPowerOff} />

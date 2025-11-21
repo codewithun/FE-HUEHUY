@@ -1,22 +1,22 @@
 import {
-    faCubes,
-    faNetworkWired,
-    faUsers,
+  faCubes,
+  faNetworkWired,
+  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
 import { useEffect, useState } from 'react';
 import {
-    ButtonComponent,
-    FloatingPageComponent,
-    SelectComponent,
-    TableSupervisionComponent,
+  ButtonComponent,
+  FloatingPageComponent,
+  SelectComponent,
+  TableSupervisionComponent,
 } from '../../../components/base.components';
 import InputHexColor from '../../../components/construct.components/input/InputHexColor';
 import { AdminLayout } from '../../../components/construct.components/layout/Admin.layout';
 import ManageCubePage from '../../../components/construct.components/partial-page/ManageCube.page';
 import WorldMemberPage from '../../../components/construct.components/partial-page/WorldMember.page';
 import { useUserContext } from '../../../context/user.context';
-import { token_cookie_name } from '../../../helpers';
+import { admin_token_cookie_name } from '../../../helpers/api.helpers';
 // import { useGet } from '../../../helpers';
 // import { useAccessContext } from '../../../context';
 
@@ -30,9 +30,9 @@ export default function ManageWorld() {
   const { profile: Profile } = useUserContext();
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
+    if (Cookies.get(admin_token_cookie_name) && Profile) {
       if (Profile?.role_id != 1) {
-        Cookies.remove(token_cookie_name);
+        Cookies.remove(admin_token_cookie_name);
         window.location.href = '/admin';
       }
     }
