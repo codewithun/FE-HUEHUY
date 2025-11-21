@@ -4,16 +4,16 @@ import CorporateKubusPage from '../../../components/construct.components/partial
 import { useUserContext } from '../../../context/user.context';
 // import { useAccessContext } from '../../../context';
 import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../../helpers';
+import { corporate_token_cookie_name } from '../../../helpers/api.helpers';
 
 export default function KubusCorporate() {
   // const { accessActive, loading } = useAccessContext();
   const { profile: Profile } = useUserContext();
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
+    if (Cookies.get(corporate_token_cookie_name) && Profile) {
       if (!Profile?.corporate_user?.corporate_id) {
-        Cookies.remove(token_cookie_name);
+        Cookies.remove(corporate_token_cookie_name);
         window.location.href = '/corporate';
       }
     }

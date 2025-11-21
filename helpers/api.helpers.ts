@@ -8,8 +8,9 @@ import fileDownload from 'js-file-download';
 import { Decrypt } from './encryption.helpers';
 import { standIn } from './standIn.helpers';
 
-// Gunakan cookie terpisah untuk admin agar tidak tabrakan dengan user biasa
+// Gunakan cookie terpisah untuk admin dan corporate agar tidak tabrakan dengan user biasa
 export const admin_token_cookie_name = `${token_cookie_name}_admin`;
+export const corporate_token_cookie_name = `${token_cookie_name}_corporate`;
 
 // =========================>
 // ## Utils ss
@@ -26,25 +27,31 @@ const getAuthHeader = () => {
     const isAdminScope = isBrowser && typeof window.location?.pathname === 'string'
       ? window.location.pathname.startsWith('/admin')
       : false;
+    const isCorporateScope = isBrowser && typeof window.location?.pathname === 'string'
+      ? window.location.pathname.startsWith('/corporate')
+      : false;
 
-    // Prioritaskan token sesuai scope (admin atau user), tapi tetap fallback ke yang lain
-    const names = isAdminScope
-      ? [admin_token_cookie_name, token_cookie_name]
-      : [token_cookie_name, admin_token_cookie_name];
+    // STRICT MODE: Gunakan token sesuai scope TANPA fallback ke scope lain
+    // Ini mencegah token corporate/admin mempengaruhi halaman user
+    let cookieName: string;
+    if (isAdminScope) {
+      cookieName = admin_token_cookie_name;
+    } else if (isCorporateScope) {
+      cookieName = corporate_token_cookie_name;
+    } else {
+      cookieName = token_cookie_name;
+    }
 
     let enc: string | undefined = undefined;
-    for (const name of names) {
-      enc = Cookies.get(name);
-      if (!enc && isBrowser) {
-        const ls = localStorage.getItem(name);
-        enc = ls === null ? undefined : ls;
-      }
-      if (enc) break;
+    enc = Cookies.get(cookieName);
+    if (!enc && isBrowser) {
+      const ls = localStorage.getItem(cookieName);
+      enc = ls === null ? undefined : ls;
     }
 
     if (!enc) {
       // eslint-disable-next-line no-console
-      console.debug('No encrypted token found (cookies/localStorage) for user/admin');
+      console.debug(`No encrypted token found for scope: ${isAdminScope ? 'admin' : isCorporateScope ? 'corporate' : 'user'}`);
       return {};
     }
 
@@ -55,9 +62,11 @@ const getAuthHeader = () => {
       try {
         Cookies.remove(token_cookie_name);
         Cookies.remove(admin_token_cookie_name);
+        Cookies.remove(corporate_token_cookie_name);
         if (isBrowser) {
           localStorage.removeItem(token_cookie_name);
           localStorage.removeItem(admin_token_cookie_name);
+          localStorage.removeItem(corporate_token_cookie_name);
         }
       } catch {}
       return {};
@@ -70,9 +79,11 @@ const getAuthHeader = () => {
     try {
       Cookies.remove(token_cookie_name);
       Cookies.remove(admin_token_cookie_name);
+      Cookies.remove(corporate_token_cookie_name);
       if (typeof window !== 'undefined') {
         localStorage.removeItem(token_cookie_name);
         localStorage.removeItem(admin_token_cookie_name);
+        localStorage.removeItem(corporate_token_cookie_name);
       }
     } catch {}
     return {};

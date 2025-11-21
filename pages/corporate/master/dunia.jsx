@@ -12,7 +12,7 @@ import ManageCubePage from '../../../components/construct.components/partial-pag
 import { useUserContext } from '../../../context/user.context';
 // import { useAccessContext } from '../../../context';
 import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../../helpers';
+import { corporate_token_cookie_name } from '../../../helpers/api.helpers';
 
 export default function CManageWorld({ token, scope }) {
   // const { accessActive, loading } = useAccessContext();
@@ -23,9 +23,9 @@ export default function CManageWorld({ token, scope }) {
   const [refresh, setRefresh] = useState(false);
 
   useEffect(() => {
-    if (Cookies.get(token_cookie_name) && Profile) {
+    if (Cookies.get(corporate_token_cookie_name) && Profile) {
       if (!Profile?.corporate_user?.corporate_id) {
-        Cookies.remove(token_cookie_name);
+        Cookies.remove(corporate_token_cookie_name);
         window.location.href = '/corporate';
       }
     }
@@ -64,8 +64,8 @@ export default function CManageWorld({ token, scope }) {
               width: '200px',
               item: ({ corporate_id }) =>
                 corporate_id ==
-                (scope?.corporate_id ||
-                  Profile?.corporate_user?.corporate_id) ? (
+                  (scope?.corporate_id ||
+                    Profile?.corporate_user?.corporate_id) ? (
                   <span className="uppercase border border-green-600 font-medium text-green-600 py-1 px-2.5 rounded-md text-sm bg-green-100">
                     Pribadi
                   </span>
@@ -156,8 +156,8 @@ export default function CManageWorld({ token, scope }) {
             return (
               <>
                 {data?.corporate_id ==
-                (scope?.corporate_id ||
-                  Profile?.corporate_user?.corporate_id) ? (
+                  (scope?.corporate_id ||
+                    Profile?.corporate_user?.corporate_id) ? (
                   <>
                     {role != 5 ? (
                       <ButtonComponent

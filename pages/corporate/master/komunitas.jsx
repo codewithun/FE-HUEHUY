@@ -10,9 +10,8 @@ import InputHexColor from '../../../components/construct.components/input/InputH
 import { CorporateLayout } from '../../../components/construct.components/layout/Corporate.layout';
 import { useUserContext } from '../../../context/user.context';
 import Cookies from 'js-cookie';
-import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
-import { admin_token_cookie_name } from '../../../helpers/api.helpers';
+import { corporate_token_cookie_name, admin_token_cookie_name } from '../../../helpers/api.helpers';
 
 export default function KomunitasCorporate() {
     const { profile: Profile } = useUserContext();
@@ -53,8 +52,8 @@ export default function KomunitasCorporate() {
     const authHeaders = (method = 'GET') => {
         try {
             const isBrowser = typeof window !== 'undefined';
-            // Prioritaskan token user; fallback ke admin bila ada
-            const names = [token_cookie_name, admin_token_cookie_name];
+            // Prioritaskan token corporate; fallback ke admin bila ada
+            const names = [corporate_token_cookie_name, admin_token_cookie_name];
             let enc;
             for (const name of names) {
                 enc = Cookies.get(name);
@@ -77,9 +76,9 @@ export default function KomunitasCorporate() {
     };
 
     useEffect(() => {
-        if (Cookies.get(token_cookie_name) && Profile) {
+        if (Cookies.get(corporate_token_cookie_name) && Profile) {
             if (!Profile?.corporate_user?.corporate_id) {
-                Cookies.remove(token_cookie_name);
+                Cookies.remove(corporate_token_cookie_name);
                 if (typeof window !== 'undefined') window.location.href = '/corporate';
             }
         }

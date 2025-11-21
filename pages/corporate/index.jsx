@@ -12,6 +12,7 @@ import {
 } from '../../components/base.components';
 import { Encrypt } from '../../helpers/encryption.helpers';
 import { get, token_cookie_name, useForm } from '../../helpers';
+import { corporate_token_cookie_name } from '../../helpers/api.helpers';
 import { faDoorOpen } from '@fortawesome/free-solid-svg-icons';
 import { useRouter } from 'next/router';
 
@@ -20,12 +21,18 @@ export default function Login() {
   const [loadingScreen, setLoadingScreen] = useState(true);
 
   const onSuccess = async (data) => {
+    // GUNAKAN COOKIE KHUSUS CORPORATE
     Cookies.set(
-      token_cookie_name,
+      corporate_token_cookie_name,
       Encrypt(data.data?.token),
-      { expires: 365 },
-      { secure: true }
+      { expires: 365, secure: process.env.NODE_ENV === 'production' }
     );
+    // Safari fallback: simpan juga ke localStorage
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(corporate_token_cookie_name, Encrypt(data.data?.token));
+      }
+    } catch { }
     // Prefer scope-based redirect from login response
     if (data?.data?.scope === 'corporate') {
       router.push('/corporate/dashboard');
