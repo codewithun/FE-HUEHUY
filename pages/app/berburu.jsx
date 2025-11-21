@@ -23,6 +23,7 @@ import { useGet } from '../../helpers';
 import {
   ButtonComponent,
   FloatingPageComponent,
+  PromoCardIcons,
 } from '../../components/base.components';
 import Link from 'next/link';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
@@ -122,20 +123,41 @@ export default function Berburu() {
 
   const isPromoOnly = (ad) => {
     if (getIsInformation(ad)) return false;
+
     const typeStr = String(ad?.type || '').toLowerCase();
     const cat = String(ad?.ad_category?.name || '').toLowerCase();
+
     if (
       typeStr === 'voucher' ||
       cat === 'voucher' ||
       ad?.is_voucher === true ||
       ad?.voucher === true
     ) return false;
+
     if (
       typeStr === 'iklan' ||
       cat === 'advertising' ||
       ad?.is_advertising === true ||
       ad?.advertising === true
     ) return false;
+
+    // Tambahkan filter offline: hanya tampilkan promo yang offline
+    const isOnline =
+      normalizeBoolLike(ad?.is_online) ||
+      ad?.is_online === 'online' ||
+      ad?.type === 'online' ||
+      ad?.location_type === 'online' ||
+      ad?.promo_type === 'online' ||
+      ad?.category === 'online' ||
+      normalizeBoolLike(ad?.cube?.is_online) ||
+      ad?.cube?.is_online === 'online' ||
+      ad?.cube?.type === 'online' ||
+      ad?.cube?.location_type === 'online' ||
+      ad?.cube?.promo_type === 'online' ||
+      ad?.cube?.category === 'online';
+    const isOffline = !isOnline;
+    if (!isOffline) return false;
+
     return true;
   };
 
@@ -215,6 +237,127 @@ export default function Berburu() {
       path: `ads/promo-recommendation${selectedWorld ? `?world_id=${selectedWorld?.id}` : ''
         }`,
     });
+
+  const AdCardBySize = ({ ad, size = 'M' }) => {
+    const img = getAdImage(ad);
+    const title = ad?.title || 'Promo';
+
+    // Gunakan helper yang sudah kamu buat di atas file
+    const isInformation = getIsInformation(ad);
+
+    const category = getCategoryLabel(ad);
+
+    const address = ad?.cube?.address;
+    if (size === 'XL-Ads') {
+      const categoryLabel = getCategoryLabel(ad);
+      const icon = getCategoryIcon(categoryLabel);
+      return (
+        <div className="relative rounded-[18px] overflow-hidden border border-white/20 bg-[#e1e8e1] flex-shrink-0 hover:scale-[1.01] hover:bg-[#d1d8d1] transition-all duration-300"
+          style={{ minWidth: 320, maxWidth: 360, height: 400 }}>
+          <div className="relative w-full bg-transparent flex items-center justify-center flex-shrink-0" style={{ height: '100%' }}>
+            <img src={img} alt={title} className="object-cover w-full h-full rounded-[18px] p-2" />
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 backdrop-blur-sm p-4 border-t border-[#d9e0d4]"
+            style={{ background: 'rgba(172, 184, 165, 0.5)' }}>
+            <h3 title={title} className="text-[15px] font-bold text-slate-900 leading-snug mb-2 line-clamp-1">
+              {title}
+            </h3>
+            <div className="flex flex-col gap-1.5">
+              <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md w-fit">
+                {categoryLabel}
+              </span>
+              <div className="w-full" style={{ minHeight: 32 }}>
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (size === 'XL') {
+      return (
+        <div className="rounded-[16px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.01] hover:shadow-lg transition-all duration-300"
+          style={{ minWidth: 320, maxWidth: 340, height: 330 }}>
+          <div className="relative w-full h-[180px] bg-[#e1e8e1] p-2">
+            <img src={img} alt={title} className="object-cover w-full h-full rounded-[10px]" />
+          </div>
+          <div className="p-4 bg-[#5a6e1d]/5 border-t border-[#cdd0b3] overflow-hidden"
+            style={{ height: 150 }}>
+            {/* Make content area fixed height and distribute space so category stays at bottom */}
+            <div className="flex flex-col h-full justify-between">
+              <div>
+                <h3 title={title} className="text-[15px] font-bold text-slate-900 leading-snug mb-1 line-clamp-2">{title}</h3>
+                {address ? (
+                  <p className="text-[13px] text-slate-700 line-clamp-1 mb-2">{address}</p>
+                ) : (
+                  // reserve the vertical space when address missing
+                  <div className="h-5 mb-2" />
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="bg-[#e0e4c9] text-[#3f4820] text-[11px] font-semibold px-3 py-[3px] rounded-md w-fit">{category}</span>
+                <div className="w-full" style={{ minHeight: 32 }}>
+                  <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (size === 'L') {
+      return (
+        <div className="flex items-stretch rounded-[14px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-md flex-shrink-0 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+          style={{ minWidth: 280, maxWidth: 325, height: 150 }}>
+          <div className="relative w-[40%] bg-white flex items-center justify-center overflow-hidden p-2">
+            <img src={img} alt={title} className="object-cover w-full h-full rounded-[14px]" />
+          </div>
+          <div className="flex-1 p-3 flex flex-col justify-between bg-[#5a6e1d]/5 border-l border-[#cdd0b3]">
+            <div>
+              <h3 className="text-[14px] font-bold text-slate-900 line-clamp-1 leading-snug mb-1">{title}</h3>
+              {address && <p className="text-[12px] text-slate-700 line-clamp-1 mb-1">{address}</p>}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md w-fit">{category}</span>
+              <div className="w-full" style={{ minHeight: 30 }}>
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // S / M
+    const isM = size === 'M';
+    return (
+      <div className="flex flex-col rounded-[12px] overflow-hidden border border-[#d8d8d8] bg-[#5a6e1d]/10 shadow-sm flex-shrink-0 hover:scale-[1.02] transition-all duration-300"
+        style={{ minWidth: isM ? 180 : 140, maxWidth: isM ? 200 : 160 }}>
+        <div className="relative w-full bg-white flex items-center justify-center overflow-hidden p-2" style={{ height: isM ? 150 : 120 }}>
+          <img src={img} alt={title} className="object-cover w-full h-full rounded-[12px]" />
+        </div>
+        {/* Force a fixed height for the text/content area so cards keep consistent height */}
+        <div className="p-2 bg-[#5a6e1d]/5 border-t border-[#cdd0b3]" style={{ minHeight: isM ? 130 : 110 }}>
+          <h3 className={`${isM ? 'text-[14px]' : 'text-[13px]'} font-bold text-slate-900 line-clamp-1 mb-0.5`}>{title}</h3>
+          {/* Reserve address space even when empty so card heights remain identical */}
+          {address ? (
+            <p className={`${isM ? 'text-[12px]' : 'text-[11px]'} text-slate-700 line-clamp-1 mb-1`}>{address}</p>
+          ) : (
+            <div className={`${isM ? 'h-4' : 'h-3'} mb-1`} />
+          )}
+          <div className="flex flex-col gap-1.5">
+            <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md w-fit">{category}</span>
+            <div className="w-full" style={{ minHeight: 32 }}>
+              <PromoCardIcons ad={ad} variant={isM ? 'sm' : 'xs'} layout="horizontal" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -371,43 +514,44 @@ export default function Berburu() {
                   </div>
 
                   <div className="flex flex-col gap-3 mt-4">
-                    {dataNear?.data?.filter(item => isPromoOnly(item)).map((item, key) => {
-                      const img = getAdImage(item);
+                    {dataNear?.data?.filter(isPromoOnly)?.map((item, key) => {
                       return (
                         <Link href={buildPromoLink(item)} key={key}>
-                          <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
-                            <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
-                              <img
-                                src={img}
-                                height={700}
-                                width={700}
-                                alt=""
-                                className="object-cover w-full h-full"
-                              />
-                            </div>
-                            <div className="col-span-3">
-                              <p className="font-semibold">{item?.title}</p>
-                              <p className="text-slate-600 text-xs my-1 limit__line__2">
-                                {item?.cube?.address}
-                              </p>
-                              <div className="flex gap-2 mt-2 items-center">
-                                <p className="text-xs text-slate-600 limit__line__1">
-                                  <FontAwesomeIcon icon={faLocationDot} />.{' '}
-                                  {distanceConvert(item?.distance)}
+                          <div className="relative rounded-[15px] overflow-hidden shadow-sm">
+                            {/* Background depan lebih terang dengan blur */}
+                            <div className="grid grid-cols-4 gap-3 p-3 relative bg-[#d9e0d4]/60 backdrop-blur-md rounded-[15px]">
+                              <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
+                                <img
+                                  src={getAdImage(item)}
+                                  height={700}
+                                  width={700}
+                                  alt=""
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <p className="font-semibold">{item?.title}</p>
+                                <p className="text-slate-600 text-xs my-1 limit__line__2">
+                                  {item?.cube?.address}
                                 </p>
-                                <p className="text-xs"> | </p>
-                                <p className="text-xs text-slate-600 font-semibold limit__line__1 p-1">
-                                  <FontAwesomeIcon icon={faGlobe} />.{' '}
-                                  {item?.cube?.world?.name || 'General'}
-                                </p>
-                                {item?.cube?.world_affiliate_id && (
-                                  <>
-                                    <p className="text-xs"> | </p>
-                                    <p className="text-xs text-slate-600 font-semibold limit__line__1 p-1">
-                                      Affiliate
-                                    </p>
-                                  </>
-                                )}
+                                <div className="flex gap-2 mt-2 items-center">
+                                  <p className="text-xs text-slate-600 limit__line__1">
+                                    <FontAwesomeIcon icon={faLocationDot} />.{' '}
+                                    {distanceConvert(item?.distance)}
+                                  </p>
+                                  <p className="text-xs"> | </p>
+                                  <p className="text-xs text-slate-600 font-semibold limit__line__1 p-1">
+                                    <FontAwesomeIcon icon={faGlobe} />.{' '}
+                                    {item?.cube?.world?.name || 'General'}
+                                  </p>
+                                  {item?.cube?.world_affiliate_id && (
+                                    <>
+                                      <p className="text-xs"> | </p>
+                                      <p className="text-xs text-slate-600 font-semibold limit__line__1 p-1">
+                                        Affiliate
+                                      </p>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -423,7 +567,7 @@ export default function Berburu() {
             ) {
               return (
                 <>
-                  <div className="mt-6" key={key}>
+                  <div className="px-4 mt-8">
                     <div className="flex justify-between items-center gap-2">
                       <div>
                         <p className="font-semibold">{menu.name}</p>
@@ -433,46 +577,12 @@ export default function Berburu() {
                       </div>
                     </div>
                   </div>
-                  <div className="w-full overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2 pb-20">
+                  <div className="w-full px-4 pb-2 overflow-x-auto relative scroll__hidden snap-mandatory snap-x mt-2 mb-24">
                     <div className="flex flex-nowrap gap-4 w-max">
-                      {dataRecommendation?.data?.filter(item => isPromoOnly(item)).map((item, key) => {
-                        const img = getAdImage(item);
+                      {dataRecommendation?.data?.map((item, key) => {
                         return (
                           <Link href={buildPromoLink(item)} key={key}>
-                            <div className="relative snap-center w-[330px] shadow-sm bg-white bg-opacity-40 backdrop-blur-sm rounded-[14px] overflow-hidden p-3">
-                              <div className="aspect-[6/3] bg-slate-400 rounded-[14px] overflow-hidden brightness-90 flex items-center justify-center">
-                                <img
-                                  src={img}
-                                  height={1200}
-                                  width={600}
-                                  alt=""
-                                  className="object-cover w-full h-full"
-                                />
-                              </div>
-                              <div className="px-1">
-                                <p className="font-semibold mt-2 limit__line__1">
-                                  {item?.title}
-                                </p>
-                                <div className="flex justify-between items-start gap-4">
-                                  <p className="text-slate-600 text-xs my-1 limit__line__2">
-                                    {item?.cube?.address}
-                                    {item?.cube?.is_information && (
-                                      <p className="text-primary bg-green-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                        Informasi
-                                      </p>
-                                    )}
-                                  </p>
-
-                                  {(item?.total_remaining ||
-                                    item?.max_grab) && (
-                                      <p className="text-danger bg-red-200 text-sm whitespace-nowrap px-1 rounded-md mt-1">
-                                        Sisa{' '}
-                                        {item?.total_remaining || item?.max_grab}
-                                      </p>
-                                    )}
-                                </div>
-                              </div>
-                            </div>
+                            <AdCardBySize ad={item} size='XL' />
                           </Link>
                         );
                       })}

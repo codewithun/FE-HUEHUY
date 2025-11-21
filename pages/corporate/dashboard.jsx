@@ -8,7 +8,7 @@ import {
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { GoogleMap, InfoWindow, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, InfoBox, useJsApiLoader } from '@react-google-maps/api';
 import { useEffect, useState } from 'react';
 import DashboardCard from '../../components/construct.components/card/Dashboard.card';
 import CubeComponent from '../../components/construct.components/CubeComponent';
@@ -21,13 +21,22 @@ const mapContainerStyle = {
   height: '500px',
 };
 
+const INFOBOX_MIN_WIDTH = 220;
+
 function MapWithAMarker({ position, dataAds }) {
+  const [selectedCube, setSelectedCube] = useState(null);
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: 'AIzaSyD74gvRdtA7NAo4j8ENoOsdy3QGXU6Oklc',
     libraries: ['places'],
   });
 
   if (!isLoaded) return <div style={{ height: '500px' }}>Loading...</div>;
+
+  const getCubeName = (cube) => {
+    // Prioritas: ads title > address > code
+    const firstAdTitle = cube?.ads?.[0]?.title;
+    return firstAdTitle || cube?.address || cube?.code || 'Tanpa Nama';
+  };
 
   return (
     <GoogleMap
@@ -39,36 +48,69 @@ function MapWithAMarker({ position, dataAds }) {
         fullscreenControl: false,
         disableDefaultUI: true,
         keyboardShortcuts: false,
+        gestureHandling: 'greedy',
+        scrollwheel: true,
       }}
     >
       {dataAds?.map((ad, key) => {
-        // Pastikan koordinat valid sebelum render Marker
+        // Pastikan koordinat valid sebelum render InfoBox
         if (!ad?.map_lat || !ad?.map_lng) return null;
 
         return (
-          <Marker
-            key={key}
-            position={{ lat: parseFloat(ad?.map_lat), lng: parseFloat(ad?.map_lng) }}
-            icon={{
-              url: '/cube-icon.png',
-              scaledSize: { width: 32, height: 32 },
+          <InfoBox
+            position={{
+              lat: parseFloat(ad?.map_lat),
+              lng: parseFloat(ad?.map_lng),
             }}
+            options={{
+              closeBoxURL: '',
+              enableEventPropagation: true,
+              boxStyle: {
+                overflow: 'visible',
+                background: 'transparent',
+                border: 'none',
+              },
+            }}
+            key={key}
           >
-            {/* Tambahkan position agar InfoWindow tidak error (harus anchor atau position) */}
-            <InfoWindow
-              position={{ lat: parseFloat(ad?.map_lat), lng: parseFloat(ad?.map_lng) }}
-              options={{ pixelOffset: new google.maps.Size(0, -30) }}
+            <div
+              className="relative flex flex-col items-center cursor-pointer"
+              // 👉 bikin konten “menggantung” di titik peta, tapi anchor-nya tetap
+              style={{ transform: 'translate(-50%, -100%)' }}
+              onClick={() =>
+                setSelectedCube(selectedCube?.id === ad?.id ? null : ad)
+              }
             >
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
+              {selectedCube?.id === ad?.id && (
+                <div
+                  className="mb-1 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-200"
+                  style={{
+                    minWidth: `${INFOBOX_MIN_WIDTH}px`,
+                    maxWidth: '600px',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    zIndex: 9999,
+                    boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  <p className="text-sm font-semibold text-gray-800 text-center">
+                    {getCubeName(ad)}
+                  </p>
+                </div>
+              )}
+
+              <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
+                {ad?.picture_source ? (
+                  <img src={ad?.picture_source} className="w-12" alt="" />
+                ) : (
                   <CubeComponent
                     size={18}
-                    color={`#${ad?.cube?.cube_type?.color}`}
+                    color={`${ad?.cube_type?.color}`}
                   />
-                </div>
+                )}
               </div>
-            </InfoWindow>
-          </Marker>
+            </div>
+          </InfoBox>
         );
       })}
     </GoogleMap>
