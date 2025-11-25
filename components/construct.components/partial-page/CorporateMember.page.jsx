@@ -44,21 +44,6 @@ const CorporateMemberPage = ({ data }) => {
         );
       },
     },
-    {
-      type: 'select',
-      construction: {
-        // multiple: true,
-        name: 'corporate_role_id', // ✅ BENAR! Hanya role corporate
-        label: 'Role (Mitra)',
-        placeholder: 'Pilih role..',
-        validations: {
-          required: true,
-        },
-        serverOptionControl: {
-          path: 'admin/options/role?isCorporate=true',
-        },
-      },
-    },
   ];
 
   const formAddNewUser = [
@@ -136,18 +121,6 @@ const CorporateMemberPage = ({ data }) => {
             validations={{ required: true, min: 8 }}
           />
         );
-      },
-    },
-    {
-      type: 'select',
-      construction: {
-        // multiple: true,
-        name: 'corporate_role_id', // ✅ BENAR! Hanya role corporate
-        label: 'Role',
-        placeholder: 'Pilih role..',
-        serverOptionControl: {
-          path: 'admin/options/role?isCorporate=true',
-        },
       },
     },
     {
@@ -246,7 +219,7 @@ const CorporateMemberPage = ({ data }) => {
             />
           );
         }}
-        // actionControl={{ except: 'edit' }}
+      // actionControl={{ except: 'edit' }}
       />
 
       <FloatingPageComponent
@@ -274,7 +247,7 @@ const CorporateMemberPage = ({ data }) => {
         <div className="px-6 pt-4 pb-20 h-full overflow-scroll scroll_control">
           <FormSupervisionComponent
             forms={isNew ? formAddNewUser : formAddByEmail}
-            defaultValue={isNew && { email: inputEmail.current }}
+            defaultValue={isNew ? { email: inputEmail.current, corporate_role_id: 4 } : { corporate_role_id: 4 }}
             submitControl={{
               path: isNew
                 ? `admin/corporates/${data?.id}/user-new`

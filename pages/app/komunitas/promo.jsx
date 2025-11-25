@@ -1286,7 +1286,7 @@ const CommunityPromoPage = () => {
             </div>
           )}
 
-          {promoData.length > 0 && (
+          {/* {promoData.length > 0 && (
             <div className="mb-6">
               <div className="mb-2">
                 <h2 className="text-lg font-bold text-white">Promo Terbaru</h2>
@@ -1299,7 +1299,7 @@ const CommunityPromoPage = () => {
                 ))}
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
 
