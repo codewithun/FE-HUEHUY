@@ -178,13 +178,6 @@ const CorporateMemberPage = ({ data }) => {
               width: '320px',
               item: ({ user }) => user?.email,
             },
-            {
-              selector: 'role',
-              label: 'Role',
-              sortable: true,
-              width: '200px',
-              item: ({ role }) => role?.name,
-            },
           ],
         }}
         formUpdateControl={{
