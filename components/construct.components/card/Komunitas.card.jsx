@@ -184,7 +184,9 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
               {categoryLabel}
             </span>
             <div className="w-full" style={{ minHeight: 32 }}>
-              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              {categoryLabel !== 'Informasi' && categoryLabel !== 'Advertising' && (
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              )}
             </div>
           </div>
         </div>
@@ -215,7 +217,9 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
               {categoryLabel}
             </span>
             <div className="w-full" style={{ minHeight: 32 }}>
-              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              {categoryLabel !== 'Informasi' && categoryLabel !== 'Advertising' && (
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              )}
             </div>
           </div>
         </div>
@@ -246,7 +250,9 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
               {categoryLabel}
             </span>
             <div className="w-full" style={{ minHeight: 30 }}>
-              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              {categoryLabel !== 'Informasi' && categoryLabel !== 'Advertising' && (
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              )}
             </div>
           </div>
         </div>
@@ -277,7 +283,9 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
               {categoryLabel}
             </span>
             <div className="w-full" style={{ minHeight: 32 }}>
-              <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              {categoryLabel !== 'Informasi' && categoryLabel !== 'Advertising' && (
+                <PromoCardIcons ad={ad} variant="sm" layout="horizontal" />
+              )}
             </div>
           </div>
         </div>
@@ -308,7 +316,9 @@ export default function KomunitasCard({ item, size = 'M', onClick }) {
             {categoryLabel}
           </span>
           <div className="w-full" style={{ minHeight: 28 }}>
-            <PromoCardIcons ad={ad} variant="xs" layout="horizontal" />
+            {categoryLabel !== 'Informasi' && categoryLabel !== 'Advertising' && (
+              <PromoCardIcons ad={ad} variant="xs" layout="horizontal" />
+            )}
           </div>
         </div>
       </div>
