@@ -223,9 +223,9 @@ export default function Index() {
         <DashboardCard
           label="Iklan"
           // loading={dashboardLoading}
-          value={data?.data?.ads}
+          value={data?.data?.huehuy_ads ?? 0}
           icon={faNewspaper}
-          linkPath=""
+          linkPath="/admin/master/iklan"
         />
       </div>
 
