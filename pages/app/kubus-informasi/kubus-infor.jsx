@@ -13,16 +13,17 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
+import Head from 'next/head';
 import { ImageCarousel } from '../../../components/base.components';
 import { get } from '../../../helpers/api.helpers';
 import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 
-export default function KubusInformasiPage() {
+export default function KubusInformasiPage({ initialCube = null, currentUrl = '' }) {
   const router = useRouter();
   const { code, cubeCode, cube_code, communityId } = router.query;
 
-  const [cube, setCube] = useState(null);
+  const [cube, setCube] = useState(initialCube);
   const [loading, setLoading] = useState(true);
   const [communityData, setCommunityData] = useState(null);
   const [expandedSections, setExpandedSections] = useState({
@@ -324,7 +325,7 @@ export default function KubusInformasiPage() {
 
     const cubeUrl = typeof window !== 'undefined'
       ? `${window.location.origin}/app/kubus-informasi/kubus-infor?code=${code || cubeCode || cube_code}&communityId=${communityId || ''}`
-      : '';
+      : `https://v2.huehuy.com/app/kubus-informasi/kubus-infor?code=${code || cubeCode || cube_code}&communityId=${communityId || ''}`;
 
     const shareText = `Cek informasi menarik ini: ${cube?.title || cube?.name || 'Kubus Informasi'}!`;
     const fullShareText = `${shareText}\n\n🔗 Lihat detail: ${cubeUrl}`;
@@ -417,6 +418,22 @@ export default function KubusInformasiPage() {
   const fullSchedule = buildFullSchedule(cube?.opening_hours);
   const description = buildDescription(cube);
 
+  // Prepare Open Graph data for social sharing
+  const pageTitle = cube?.title || cube?.name || 'Kubus Informasi';
+  const pageDescription = description || `Cek informasi menarik: ${cube?.title || cube?.name || 'Kubus Informasi'}!`;
+  const pageImage = images && images.length > 0 ? images[0] : '/default-avatar.png';
+  const pageUrl = currentUrl || (typeof window !== 'undefined' ? window.location.href : '');
+
+  // Helper untuk membuat URL gambar absolut
+  const getAbsoluteImageUrl = (imgUrl) => {
+    if (!imgUrl) return 'https://v2.huehuy.com/default-avatar.png';
+    if (imgUrl.startsWith('http')) return imgUrl;
+    if (imgUrl.startsWith('/')) return `https://v2.huehuy.com${imgUrl}`;
+    return `https://v2.huehuy.com/${imgUrl}`;
+  };
+
+  const absoluteImageUrl = getAbsoluteImageUrl(pageImage);
+
   // Extract link information
   const linkInformation = cube?.link_information || cube?.tags?.[0]?.link;
   const youtubeVideoId = getYouTubeVideoId(linkInformation);
@@ -448,403 +465,436 @@ export default function KubusInformasiPage() {
   }
 
   return (
-    <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
-      {/* Header */}
-      <div
-        className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
-        style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
-      >
-        <div className="absolute inset-0">
-          <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
-          <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
-          <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
-        </div>
-        <div className="flex items-center justify-between h-full relative z-10">
-          <button
-            onClick={handleBack}
-            className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-          >
-            <FontAwesomeIcon
-              icon={faArrowLeft}
-              className="text-white text-sm"
-            />
-          </button>
-          <div className="flex-1 text-center">
-            <h1 className="text-white font-bold text-sm">
-              {communityData ? `${communityData.name} - Kubus Informasi` : 'Kubus Informasi'}
-            </h1>
-            {communityData && (
-              <p className="text-white text-xs opacity-80 mt-0.5">
-                Informasi dari komunitas
-              </p>
-            )}
+    <>
+      <Head>
+        <title>{pageTitle} - HueHuy</title>
+        <meta name="description" content={pageDescription} />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content={absoluteImageUrl} />
+        <meta property="og:image:secure_url" content={absoluteImageUrl} />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content={pageTitle} />
+        <meta property="og:site_name" content="HueHuy" />
+        <meta property="og:locale" content="id_ID" />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content={pageUrl} />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content={absoluteImageUrl} />
+        <meta name="twitter:image:alt" content={pageTitle} />
+
+        {/* WhatsApp specific */}
+        <meta property="og:image:width" content="400" />
+        <meta property="og:image:height" content="400" />
+      </Head>
+
+      <div className="desktop-container lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen lg:min-h-0 lg:my-4 lg:rounded-2xl lg:shadow-xl lg:border lg:border-slate-200 lg:overflow-hidden">
+        {/* Header */}
+        <div
+          className="w-full h-[60px] px-4 relative overflow-hidden lg:rounded-t-2xl"
+          style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+        >
+          <div className="absolute inset-0">
+            <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
+            <div className="absolute bottom-2 left-3 w-4 h-4 bg-white rounded-full opacity-10"></div>
+            <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
           </div>
-          <div className="flex space-x-1.5">
+          <div className="flex items-center justify-between h-full relative z-10">
             <button
-              onClick={handleShare}
+              onClick={handleBack}
               className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
             >
-              <FontAwesomeIcon icon={faShare} className="text-white text-sm" />
+              <FontAwesomeIcon
+                icon={faArrowLeft}
+                className="text-white text-sm"
+              />
             </button>
-            <button
-              onClick={handleReport}
-              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-            >
-              <FontAwesomeIcon icon={faExclamationTriangle} className="text-white text-sm" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-24 lg:pb-6">
-        <div className="lg:mx-auto lg:max-w-md">
-          {/* Hero Image Carousel */}
-          <div className="mb-4">
-            <ImageCarousel
-              images={images}
-              title={cube?.title || cube?.name || 'Kubus Informasi'}
-              className="w-full"
-            />
-          </div>
-
-          {/* Status Card - Selalu Tersedia */}
-          <div className="mb-4">
-            <div
-              className="rounded-[20px] p-4 shadow-lg"
-              style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
-            >
-              <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon
-                      icon={faInfoCircle}
-                      className="mr-2 text-white text-sm"
-                    />
-                    <span className="text-sm font-semibold text-white">
-                      Selalu Tersedia
-                    </span>
-                  </div>
-                  <span className="text-xs text-white opacity-70">
-                    📋 Informasi
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Info Section Judul bang*/}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
-              <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
-                {cube?.title || cube?.name || 'Kubus Informasi'}
-              </h2>
+            <div className="flex-1 text-center">
+              <h1 className="text-white font-bold text-sm">
+                {communityData ? `${communityData.name} - Kubus Informasi` : 'Kubus Informasi'}
+              </h1>
               {communityData && (
-                <div className="bg-slate-50 rounded-lg p-3 mb-2">
-                  <p className="text-slate-700 text-sm">
-                    <span className="font-medium">Dari komunitas:</span> {communityData.name}
-                  </p>
-                  {communityData.description && (
-                    <p className="text-slate-600 text-xs mt-1">
-                      {communityData.description}
-                    </p>
-                  )}
-                </div>
+                <p className="text-white text-xs opacity-80 mt-0.5">
+                  Informasi dari komunitas
+                </p>
               )}
             </div>
-          </div>
-
-          {/* Jadwal Ketersediaan */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
+            <div className="flex space-x-1.5">
               <button
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                onClick={() => toggleSection('schedule')}
+                onClick={handleShare}
+                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
               >
-                <div className="flex items-center">
-                  <FontAwesomeIcon icon={faClock} className="mr-3 text-slate-600 text-sm" />
-                  <span className="font-semibold text-slate-900 text-sm">Jadwal Ketersediaan</span>
-                </div>
-                <FontAwesomeIcon
-                  icon={expandedSections.schedule ? faChevronUp : faChevronDown}
-                  className="text-slate-400 text-sm"
-                />
+                <FontAwesomeIcon icon={faShare} className="text-white text-sm" />
               </button>
-              {expandedSections.schedule && (
-                <div className="border-t border-slate-100 p-4">
-                  {fullSchedule.map((schedule, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-b-0">
-                      <span className="font-medium text-slate-900 text-xs flex-1">{schedule.day}</span>
-                      <span className="text-slate-600 text-xs flex-1 text-center">{schedule.time}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium min-w-[80px] text-center ${schedule.status.toLowerCase() === 'tersedia'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                        }`}>
-                        {schedule.status}
+              <button
+                onClick={handleReport}
+                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
+              >
+                <FontAwesomeIcon icon={faExclamationTriangle} className="text-white text-sm" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-24 lg:pb-6">
+          <div className="lg:mx-auto lg:max-w-md">
+            {/* Hero Image Carousel */}
+            <div className="mb-4">
+              <ImageCarousel
+                images={images}
+                title={cube?.title || cube?.name || 'Kubus Informasi'}
+                className="w-full"
+              />
+            </div>
+
+            {/* Status Card - Selalu Tersedia */}
+            <div className="mb-4">
+              <div
+                className="rounded-[20px] p-4 shadow-lg"
+                style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}
+              >
+                <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FontAwesomeIcon
+                        icon={faInfoCircle}
+                        className="mr-2 text-white text-sm"
+                      />
+                      <span className="text-sm font-semibold text-white">
+                        Selalu Tersedia
                       </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Detail Informasi */}
-          <div className="mb-4">
-            <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
-              <button
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                onClick={() => toggleSection('description')}
-              >
-                <div className="flex items-center">
-                  <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
-                  <span className="font-semibold text-slate-900 text-sm">Detail Informasi</span>
-                </div>
-                <FontAwesomeIcon
-                  icon={expandedSections.description ? faChevronUp : faChevronDown}
-                  className="text-slate-400 text-sm"
-                />
-              </button>
-              {expandedSections.description && (
-                <div className="border-t border-slate-100 p-4">
-                  <div className="text-slate-600 leading-relaxed text-sm whitespace-pre-line">
-                    {description || 'Tidak ada deskripsi tersedia.'}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Video/Link Section */}
-          {linkInformation && (
-            <div className="mb-4">
-              <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center mb-3">
-                    <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
-                    <span className="font-semibold text-slate-900 text-sm">
-                      {hasYouTubeLink ? 'Video Informasi' : 'Link Informasi'}
+                    <span className="text-xs text-white opacity-70">
+                      📋 Informasi
                     </span>
                   </div>
-
-                  {hasYouTubeLink && youtubeVideoId ? (
-                    <div className="space-y-3">
-                      {/* YouTube Embed */}
-                      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                        <iframe
-                          className="absolute top-0 left-0 w-full h-full rounded-lg"
-                          src={`https://www.youtube.com/embed/${youtubeVideoId}`}
-                          title="Video Informasi"
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      </div>
-                      {/* Link to YouTube */}
-                      <a
-                        href={linkInformation}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                        </svg>
-                        Tonton di YouTube
-                      </a>
-                    </div>
-                  ) : (
-                    /* Regular Link */
-                    <a
-                      href={linkInformation}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg transition-colors text-sm group"
-                    >
-                      <span className="truncate flex-1">{linkInformation}</span>
-                      <svg className="w-5 h-5 flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </a>
-                  )}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Lokasi (jika ada data lokasi) */}
-          {cube?.location && (
-            <div className="mb-20 lg:mb-8">
+            {/* Info Section Judul bang*/}
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
+                <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
+                  {cube?.title || cube?.name || 'Kubus Informasi'}
+                </h2>
+                {communityData && (
+                  <div className="bg-slate-50 rounded-lg p-3 mb-2">
+                    <p className="text-slate-700 text-sm">
+                      <span className="font-medium">Dari komunitas:</span> {communityData.name}
+                    </p>
+                    {communityData.description && (
+                      <p className="text-slate-600 text-xs mt-1">
+                        {communityData.description}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Jadwal Ketersediaan */}
+            <div className="mb-4">
               <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
                 <button
                   className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                  onClick={() => toggleSection('location')}
+                  onClick={() => toggleSection('schedule')}
                 >
                   <div className="flex items-center">
-                    <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-3 text-slate-600 text-sm" />
-                    <span className="font-semibold text-slate-900 text-sm">Lokasi</span>
+                    <FontAwesomeIcon icon={faClock} className="mr-3 text-slate-600 text-sm" />
+                    <span className="font-semibold text-slate-900 text-sm">Jadwal Ketersediaan</span>
                   </div>
                   <FontAwesomeIcon
-                    icon={expandedSections.location ? faChevronUp : faChevronDown}
+                    icon={expandedSections.schedule ? faChevronUp : faChevronDown}
                     className="text-slate-400 text-sm"
                   />
                 </button>
-                {expandedSections.location && (
+                {expandedSections.schedule && (
                   <div className="border-t border-slate-100 p-4">
-                    <div className="text-slate-600 leading-relaxed text-sm">
-                      {cube.location}
+                    {fullSchedule.map((schedule, index) => (
+                      <div key={index} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-b-0">
+                        <span className="font-medium text-slate-900 text-xs flex-1">{schedule.day}</span>
+                        <span className="text-slate-600 text-xs flex-1 text-center">{schedule.time}</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium min-w-[80px] text-center ${schedule.status.toLowerCase() === 'tersedia'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}>
+                          {schedule.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Detail Informasi */}
+            <div className="mb-4">
+              <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
+                <button
+                  className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  onClick={() => toggleSection('description')}
+                >
+                  <div className="flex items-center">
+                    <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
+                    <span className="font-semibold text-slate-900 text-sm">Detail Informasi</span>
+                  </div>
+                  <FontAwesomeIcon
+                    icon={expandedSections.description ? faChevronUp : faChevronDown}
+                    className="text-slate-400 text-sm"
+                  />
+                </button>
+                {expandedSections.description && (
+                  <div className="border-t border-slate-100 p-4">
+                    <div className="text-slate-600 leading-relaxed text-sm whitespace-pre-line">
+                      {description || 'Tidak ada deskripsi tersedia.'}
                     </div>
                   </div>
                 )}
               </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Bagikan Informasi</h3>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleShareComplete('whatsapp')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] transition-all"
-                style={{
-                  ':hover': {
-                    backgroundColor: `${getCommunityPrimaryColor()}10`,
-                    borderColor: `${getCommunityPrimaryColor()}50`
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
-                  e.currentTarget.style.borderColor = `${getCommunityPrimaryColor()}50`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '';
-                  e.currentTarget.style.borderColor = '';
-                }}
-              >
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
-                  style={{ backgroundColor: getCommunityPrimaryColor() }}
+            {/* Video/Link Section */}
+            {linkInformation && (
+              <div className="mb-4">
+                <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
+                  <div className="p-4">
+                    <div className="flex items-center mb-3">
+                      <FontAwesomeIcon icon={faInfoCircle} className="mr-3 text-slate-600 text-sm" />
+                      <span className="font-semibold text-slate-900 text-sm">
+                        {hasYouTubeLink ? 'Video Informasi' : 'Link Informasi'}
+                      </span>
+                    </div>
+
+                    {hasYouTubeLink && youtubeVideoId ? (
+                      <div className="space-y-3">
+                        {/* YouTube Embed */}
+                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                          <iframe
+                            className="absolute top-0 left-0 w-full h-full rounded-lg"
+                            src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+                            title="Video Informasi"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                        {/* Link to YouTube */}
+                        <a
+                          href={linkInformation}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                          </svg>
+                          Tonton di YouTube
+                        </a>
+                      </div>
+                    ) : (
+                      /* Regular Link */
+                      <a
+                        href={linkInformation}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-3 px-4 rounded-lg transition-colors text-sm group"
+                      >
+                        <span className="truncate flex-1">{linkInformation}</span>
+                        <svg className="w-5 h-5 flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lokasi (jika ada data lokasi) */}
+            {cube?.location && (
+              <div className="mb-20 lg:mb-8">
+                <div className="bg-white rounded-[20px] shadow-lg border border-slate-100 overflow-hidden">
+                  <button
+                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                    onClick={() => toggleSection('location')}
+                  >
+                    <div className="flex items-center">
+                      <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-3 text-slate-600 text-sm" />
+                      <span className="font-semibold text-slate-900 text-sm">Lokasi</span>
+                    </div>
+                    <FontAwesomeIcon
+                      icon={expandedSections.location ? faChevronUp : faChevronDown}
+                      className="text-slate-400 text-sm"
+                    />
+                  </button>
+                  {expandedSections.location && (
+                    <div className="border-t border-slate-100 p-4">
+                      <div className="text-slate-600 leading-relaxed text-sm">
+                        {cube.location}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Share Modal */}
+        {showShareModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
+            <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Bagikan Informasi</h3>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
                 >
-                  <span className="text-white font-bold text-sm">WA</span>
-                </div>
-                <span className="text-xs text-slate-600">WhatsApp</span>
-              </button>
+                  ✕
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleShareComplete('whatsapp')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] transition-all"
+                  style={{
+                    ':hover': {
+                      backgroundColor: `${getCommunityPrimaryColor()}10`,
+                      borderColor: `${getCommunityPrimaryColor()}50`
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${getCommunityPrimaryColor()}10`;
+                    e.currentTarget.style.borderColor = `${getCommunityPrimaryColor()}50`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '';
+                    e.currentTarget.style.borderColor = '';
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+                    style={{ backgroundColor: getCommunityPrimaryColor() }}
+                  >
+                    <span className="text-white font-bold text-sm">WA</span>
+                  </div>
+                  <span className="text-xs text-slate-600">WhatsApp</span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('telegram')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+                >
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">TG</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Telegram</span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('facebook')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+                >
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">FB</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Facebook</span>
+                </button>
+                <button
+                  onClick={() => handleShareComplete('twitter')}
+                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
+                >
+                  <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
+                    <span className="text-white font-bold text-sm">TW</span>
+                  </div>
+                  <span className="text-xs text-slate-600">Twitter</span>
+                </button>
+                <button
+                  id="copy-btn"
+                  onClick={() => handleShareComplete('copy')}
+                  className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
+                >
+                  <span className="text-sm text-slate-700">📋 Salin Link</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Report Modal */}
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
+            <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Laporkan Informasi</h3>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={() => submitReport('Iklan tidak sesuai')}
+                  className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
+                >
+                  Iklan tidak sesuai
+                </button>
+                <button
+                  onClick={() => submitReport('Penipuan / scam')}
+                  className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
+                >
+                  Penipuan / scam
+                </button>
+                <button
+                  onClick={() => submitReport('Konten tidak pantas')}
+                  className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
+                >
+                  Konten tidak pantas
+                </button>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Modal */}
+        {showErrorModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FontAwesomeIcon icon={faInfoCircle} className="text-green-500 text-3xl" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Informasi</h3>
+              <p className="text-slate-600 mb-6 leading-relaxed">{errorMessage}</p>
               <button
-                onClick={() => handleShareComplete('telegram')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
+                onClick={() => setShowErrorModal(false)}
+                className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all"
+                style={{ backgroundColor: getCommunityPrimaryColor() || '#10b981' }}
               >
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">TG</span>
-                </div>
-                <span className="text-xs text-slate-600">Telegram</span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('facebook')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
-              >
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">FB</span>
-                </div>
-                <span className="text-xs text-slate-600">Facebook</span>
-              </button>
-              <button
-                onClick={() => handleShareComplete('twitter')}
-                className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
-              >
-                <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-white font-bold text-sm">TW</span>
-                </div>
-                <span className="text-xs text-slate-600">Twitter</span>
-              </button>
-              <button
-                id="copy-btn"
-                onClick={() => handleShareComplete('copy')}
-                className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-              >
-                <span className="text-sm text-slate-700">📋 Salin Link</span>
+                OK, Mengerti
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
-          <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Laporkan Informasi</h3>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <button
-                onClick={() => submitReport('Iklan tidak sesuai')}
-                className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
-              >
-                Iklan tidak sesuai
-              </button>
-              <button
-                onClick={() => submitReport('Penipuan / scam')}
-                className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
-              >
-                Penipuan / scam
-              </button>
-              <button
-                onClick={() => submitReport('Konten tidak pantas')}
-                className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
-              >
-                Konten tidak pantas
-              </button>
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
-              >
-                Batal
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Modal */}
-      {showErrorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faInfoCircle} className="text-green-500 text-3xl" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Informasi</h3>
-            <p className="text-slate-600 mb-6 leading-relaxed">{errorMessage}</p>
-            <button
-              onClick={() => setShowErrorModal(false)}
-              className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all"
-              style={{ backgroundColor: getCommunityPrimaryColor() || '#10b981' }}
-            >
-              OK, Mengerti
-            </button>
-          </div>
-        </div>
-      )}
-
-      <style jsx>{`
+        <style jsx>{`
         @keyframes bounce-in {
           0% {
             transform: scale(0.3);
@@ -878,6 +928,66 @@ export default function KubusInformasiPage() {
           animation: slide-up 0.3s ease-out;
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
+}
+
+// Server-Side Rendering untuk Open Graph meta tags
+export async function getServerSideProps(context) {
+  const { code, cubeCode, cube_code } = context.query;
+  const { req } = context;
+
+  // Build absolute URL untuk halaman ini
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'app.huehuy.com';
+  const currentUrl = `${protocol}://${host}${context.resolvedUrl}`;
+
+  const effectiveCode = code || cubeCode || cube_code;
+
+  try {
+    // Ambil data dari API publik
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.huehuy.com/api';
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+
+    let cubeData = null;
+
+    if (effectiveCode) {
+      // Coba fetch cube by code
+      const response = await fetch(`${baseUrl}/api/get-cube-by-code-general/${effectiveCode}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        cubeData = json.data || json;
+
+        // Ambil title dari ads jika cube tidak punya title
+        if (cubeData && !cubeData.title && cubeData.ads && cubeData.ads.length > 0) {
+          const infoAd = cubeData.ads.find(ad => ad.is_information || ad.content_type === 'information');
+          const selectedAd = infoAd || cubeData.ads[0];
+          cubeData.title = selectedAd.title;
+          cubeData.link_information = selectedAd.link_information || cubeData.link_information;
+        }
+      }
+    }
+
+    return {
+      props: {
+        initialCube: cubeData,
+        currentUrl,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching cube data for SSR:', error);
+    return {
+      props: {
+        initialCube: null,
+        currentUrl,
+      },
+    };
+  }
 }
