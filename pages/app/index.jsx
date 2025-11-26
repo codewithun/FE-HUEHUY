@@ -579,7 +579,9 @@ export default function Index() {
           <div className="flex flex-col gap-1.5">
             <span className="bg-[#e0e4c9] text-[#3f4820] text-[10px] font-semibold px-2 py-[2px] rounded-md w-fit">{category}</span>
             <div className="w-full" style={{ minHeight: 32 }}>
-              <PromoCardIcons ad={ad} variant={isM ? 'sm' : 'xs'} layout="horizontal" />
+              {category !== 'Informasi' && category !== 'Advertising' && (
+                <PromoCardIcons ad={ad} variant={isM ? 'sm' : 'xs'} layout="horizontal" />
+              )}
             </div>
           </div>
         </div>

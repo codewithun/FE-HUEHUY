@@ -866,6 +866,8 @@ export default function CommunityDashboard({ communityId }) {
       const [items, setItems] = useState([]);
       // eslint-disable-next-line react-hooks/rules-of-hooks
       const [loading, setLoading] = useState(true);
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const [visibleCount, setVisibleCount] = useState(12);
 
       // eslint-disable-next-line react-hooks/rules-of-hooks
       useEffect(() => {
@@ -926,7 +928,7 @@ export default function CommunityDashboard({ communityId }) {
           )}
           {/* LIST VERTIKAL – biarkan seperti ini */}
           <div className="flex flex-col gap-3 mt-4">
-            {items.map((itemData, key) => {
+            {items.slice(0, visibleCount).map((itemData, key) => {
               const ad = itemData?.ad;
               const cube = itemData?.cube;
 
@@ -964,6 +966,16 @@ export default function CommunityDashboard({ communityId }) {
               );
             })}
           </div>
+
+          {/* Tombol Load More */}
+          {items.length > visibleCount && (
+            <button
+              onClick={() => setVisibleCount(prev => prev + 12)}
+              className="w-full mt-4 py-3 bg-white/20 backdrop-blur-md text-white font-semibold rounded-xl border border-white/30 hover:bg-white/30 transition-all"
+            >
+              Lihat Lebih Banyak ({items.length - visibleCount} lagi)
+            </button>
+          )}
         </div>
       );
     }

@@ -32,12 +32,6 @@ export default function CorporateManageUser() {
     );
   }
 
-  // Handle corporate assignment
-  const handleAssignCorporate = (data) => {
-    console.log('Assign corporate to user:', data);
-    // Implementation would go here
-  };
-
   // Handle corporate removal
   const handleRemoveCorporate = (data) => {
     console.log('Remove corporate from user:', data);
@@ -72,15 +66,6 @@ export default function CorporateManageUser() {
               label: 'Role Global', // ✅ Hanya menampilkan role sistem
               width: '180px',
               item: ({ role }) => role?.name,
-            },
-            {
-              selector: 'corporate_user', 
-              label: 'Corporate Assignment', // ✅ Info corporate terpisah
-              width: '250px',
-              item: ({ corporate_user }) => 
-                corporate_user 
-                  ? `${corporate_user.corporate_name} (${corporate_user.corporate_role_name})` 
-                  : '- Tidak di Corporate -',
             },
           ],
         }}
@@ -151,7 +136,7 @@ export default function CorporateManageUser() {
             },
             // ✅ HANYA corporate_role_id untuk Corporate form
             {
-              type: 'select', 
+              type: 'select',
               construction: {
                 name: 'corporate_role_id', // ✅ BENAR! Hanya role corporate
                 label: 'Role di Corporate',
@@ -271,7 +256,7 @@ export default function CorporateManageUser() {
                   rounded
                   onClick={() => handleGiveCube(data)}
                 /> */}
-                
+
                 {/* New Corporate Management */}
                 {!data.corporate_user ? (
                   <ButtonComponent
