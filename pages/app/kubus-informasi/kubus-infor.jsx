@@ -10,11 +10,27 @@ import {
   faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Cookies from 'js-cookie';
-import { ImageCarousel } from '../../../components/base.components';
 import { get } from '../../../helpers/api.helpers';
+
+// Lazy load ImageCarousel - hanya dimuat saat halaman detail dibuka
+const ImageCarousel = dynamic(
+  () => import('../../../components/base.components/carousel/ImageCarousel.component'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full aspect-video bg-slate-200 animate-pulse rounded-xl flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-3 border-gray-300 border-t-primary mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">Loading images...</p>
+        </div>
+      </div>
+    )
+  }
+);
 import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 

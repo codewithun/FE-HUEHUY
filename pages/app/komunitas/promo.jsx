@@ -508,6 +508,7 @@ const CommunityPromoPage = () => {
   const NearbyWidget = ({ widget, communityId }) => {
     const [items, setItems] = useState([]);
     const [loadingNearby, setLoadingNearby] = useState(true);
+    const [visibleCount, setVisibleCount] = useState(12); // Batasi render awal
 
     useEffect(() => {
       let mounted = true;
@@ -566,7 +567,7 @@ const CommunityPromoPage = () => {
         )}
         {/* LIST VERTIKAL – biarkan seperti ini */}
         <div className="flex flex-col gap-3 mt-4">
-          {items.map((itemData, key) => {
+          {items.slice(0, visibleCount).map((itemData, key) => {
             const ad = itemData?.ad;
             const cube = itemData?.cube;
 
@@ -607,6 +608,16 @@ const CommunityPromoPage = () => {
             );
           })}
         </div>
+
+        {/* Tombol Load More */}
+        {items.length > visibleCount && (
+          <button
+            onClick={() => setVisibleCount(prev => prev + 12)}
+            className="w-full mt-4 py-3 bg-white/20 backdrop-blur-md text-white font-semibold rounded-xl border border-white/30 hover:bg-white/30 transition-all"
+          >
+            Lihat Lebih Banyak ({items.length - visibleCount} lagi)
+          </button>
+        )}
       </div>
     );
   };
