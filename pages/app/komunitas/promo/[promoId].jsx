@@ -1553,9 +1553,22 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
         ? `${window.location.origin}/app/komunitas/promo/${promoData.id}`
         : `https://v2.huehuy.com/app/komunitas/promo/${promoData.id}`;
 
-    const shareText =
-      `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!` +
-      (promoData.discount ? ` Diskon ${promoData.discount}` : '');
+    // Tentukan tipe konten berdasarkan label
+    const contentType = getCategoryLabel(promoData);
+    const isVoucher = contentType === 'Voucher';
+    const isInformation = contentType === 'Informasi';
+
+    // Buat teks share yang dinamis berdasarkan tipe
+    let shareText = '';
+    if (isVoucher) {
+      shareText = `Cek voucher menarik ini: ${promoData.title} di ${promoData.merchant}!`;
+    } else if (isInformation) {
+      shareText = `Cek informasi menarik ini: ${promoData.title} di ${promoData.merchant}!`;
+    } else {
+      shareText = `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!`;
+    }
+
+    shareText += (promoData.discount ? ` Diskon ${promoData.discount}` : '');
 
     const fullShareText = `${shareText}\n\n🔗 Lihat detail: ${promoUrl}`;
 

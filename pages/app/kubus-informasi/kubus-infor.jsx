@@ -40,7 +40,7 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
   const { code, cubeCode, cube_code, communityId } = router.query;
 
   const [cube, setCube] = useState(initialCube);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialCube);
   const [communityData, setCommunityData] = useState(null);
   const [expandedSections, setExpandedSections] = useState({
     schedule: false,
@@ -436,25 +436,20 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
   const pageDescription = description || `Cek informasi menarik: ${cube?.title || cube?.name || 'Kubus Informasi'}!`;
 
   // ✅ Prioritize _resolvedImageUrl from SSR, fallback to client-side images
-  const pageImage = cube?._resolvedImageUrl || (images && images.length > 0 ? images[0] : '/default-avatar.png');
+  const pageImage =
+    (images && images.length > 0 ? images[0] : cube?._resolvedImageUrl) ||
+    'https://api.huehuy.com/storage/default-avatar.png';
   const pageUrl = currentUrl || (typeof window !== 'undefined' ? window.location.href : '');
 
-  // Helper untuk membuat URL gambar absolut
-  const getAbsoluteImageUrl = (imgUrl) => {
-    if (!imgUrl) return 'https://v2.huehuy.com/default-avatar.png';
-    if (imgUrl.startsWith('http')) return imgUrl;
-    if (imgUrl.startsWith('/')) return `https://v2.huehuy.com${imgUrl}`;
-    return `https://v2.huehuy.com/${imgUrl}`;
-  };
-
-  const absoluteImageUrl = getAbsoluteImageUrl(pageImage);
+  const absoluteImageUrl = pageImage;
 
   // Extract link information
   const linkInformation = cube?.link_information || cube?.tags?.[0]?.link;
   const youtubeVideoId = getYouTubeVideoId(linkInformation);
   const hasYouTubeLink = isYouTubeLink(linkInformation);
 
-  if (loading) {
+  // 1. Kalau loading dan belum ada data → tampilkan skeleton loading
+  if (loading && !cube) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
@@ -467,7 +462,8 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
     );
   }
 
-  if (!cube) {
+  // 2. Kalau tidak loading tapi data tetap tidak ada → “tidak ditemukan”
+  if (!loading && !cube) {
     return (
       <div className="lg:mx-auto lg:relative lg:max-w-md bg-white min-h-screen flex items-center justify-center px-2 py-2">
         <div className="text-center p-8">
@@ -1011,8 +1007,20 @@ export async function getServerSideProps(context) {
             }
           }
 
-          // Store the resolved image URL for SSR meta tags
-          cubeData._resolvedImageUrl = imageUrl || '/default-avatar.png';
+          const resolveImageUrl = (raw, baseUrl) => {
+            if (!raw) return `${baseUrl}/storage/default-avatar.png`;
+            if (/^https?:\/\//i.test(raw)) return raw;
+
+            let path = raw.trim().replace(/^\/+/, '');
+            path = path.replace(/^api\/storage\//i, 'storage/');
+            if (!path.startsWith('storage/')) {
+              path = `storage/${path}`;
+            }
+            return `${baseUrl}/${path}`.replace(/([^:]\/)\/+/g, '$1');
+          };
+
+          cubeData._resolvedImageUrl = resolveImageUrl(imageUrl || '/default-avatar.png', baseUrl);
+
         }
       }
     }
