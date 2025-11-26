@@ -336,9 +336,19 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
   const handleShareComplete = async (platform) => {
     if (!cube) return;
 
-    const cubeUrl = typeof window !== 'undefined'
+    // URL dasar tanpa cache-buster
+    const baseCubeUrl = typeof window !== 'undefined'
       ? `${window.location.origin}/app/kubus-informasi/kubus-infor?code=${code || cubeCode || cube_code}&communityId=${communityId || ''}`
       : `https://v2.huehuy.com/app/kubus-informasi/kubus-infor?code=${code || cubeCode || cube_code}&communityId=${communityId || ''}`;
+
+    // Tambah parameter khusus untuk pecahin cache WA
+    const addWaCache = (url) =>
+      `${url}${url.includes('?') ? '&' : '?'}wa_cache=${Date.now()}`;
+
+    // Kalau WhatsApp → pakai URL + wa_cache
+    const cubeUrl = platform === 'whatsapp'
+      ? addWaCache(baseCubeUrl)
+      : baseCubeUrl;
 
     const shareText = `Cek informasi menarik ini: ${cube?.title || cube?.name || 'Kubus Informasi'}!`;
     const fullShareText = `${shareText}\n\n🔗 Lihat detail: ${cubeUrl}`;

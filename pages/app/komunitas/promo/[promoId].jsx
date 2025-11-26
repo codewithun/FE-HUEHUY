@@ -1553,17 +1553,19 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
         ? `${window.location.origin}/app/komunitas/promo/${promoData.id}`
         : `https://v2.huehuy.com/app/komunitas/promo/${promoData.id}`;
 
-    // Tentukan tipe konten berdasarkan label
-    const contentType = getCategoryLabel(promoData);
-    const isVoucher = contentType === 'Voucher';
-    const isInformation = contentType === 'Informasi';
+    // Tentukan tipe konten berdasarkan label yang ditampilkan di UI
+    const typeLabel = getTypeLabel(promoData); // Voucher / Informasi / Advertising / Promo
 
-    // Buat teks share yang dinamis berdasarkan tipe
+    console.log('🔍 Share Debug - typeLabel:', typeLabel);
+
+    // Buat teks share yang dinamis berdasarkan tipe label
     let shareText = '';
-    if (isVoucher) {
+    if (typeLabel === 'Voucher') {
       shareText = `Cek voucher menarik ini: ${promoData.title} di ${promoData.merchant}!`;
-    } else if (isInformation) {
+    } else if (typeLabel === 'Informasi') {
       shareText = `Cek informasi menarik ini: ${promoData.title} di ${promoData.merchant}!`;
+    } else if (typeLabel === 'Advertising') {
+      shareText = `Cek iklan menarik ini: ${promoData.title} di ${promoData.merchant}!`;
     } else {
       shareText = `Cek promo menarik ini: ${promoData.title} di ${promoData.merchant}!`;
     }
