@@ -120,9 +120,6 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
       if (cubeData.picture_source) {
         imgs.push(buildImageUrl(cubeData.picture_source));
       }
-      if (cubeData.image) {
-        imgs.push(buildImageUrl(cubeData.image));
-      }
 
       // Prioritas 2: Gambar dari ads yang aktif
       const ads = Array.isArray(cubeData?.ads) ? cubeData.ads : [];
@@ -130,9 +127,9 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
 
       activeAds.forEach(ad => {
         // Untuk kubus informasi, prioritaskan picture_source dari ad
-        const imageFields = [ad.picture_source, ad.image_1, ad.image_2, ad.image_3, ad.image];
+        const imageFields = [ad.picture_source, ad.image_1, ad.image_2, ad.image_3];
         imageFields.forEach((raw) => {
-          if (raw && raw.trim()) {
+          if (raw && typeof raw === 'string' && raw.trim()) {
             const imageUrl = buildImageUrl(raw);
             // Hindari duplikasi gambar
             if (!imgs.includes(imageUrl)) {
@@ -437,7 +434,9 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
   // Prepare Open Graph data for social sharing
   const pageTitle = cube?.title || cube?.name || 'Kubus Informasi';
   const pageDescription = description || `Cek informasi menarik: ${cube?.title || cube?.name || 'Kubus Informasi'}!`;
-  const pageImage = images && images.length > 0 ? images[0] : '/default-avatar.png';
+
+  // ✅ Prioritize _resolvedImageUrl from SSR, fallback to client-side images
+  const pageImage = cube?._resolvedImageUrl || (images && images.length > 0 ? images[0] : '/default-avatar.png');
   const pageUrl = currentUrl || (typeof window !== 'undefined' ? window.location.href : '');
 
   // Helper untuk membuat URL gambar absolut
@@ -987,6 +986,33 @@ export async function getServerSideProps(context) {
           const selectedAd = infoAd || cubeData.ads[0];
           cubeData.title = selectedAd.title;
           cubeData.link_information = selectedAd.link_information || cubeData.link_information;
+        }
+
+        // ✅ IMPORTANT: Build proper image URL for Open Graph meta tags
+        // Backend already returns full URLs via asset() helper, but we need to ensure they're valid
+        if (cubeData) {
+          // Try to get image from cube first
+          let imageUrl = cubeData.picture_source;
+
+          // If no cube image, try to get from ads
+          if (!imageUrl || imageUrl === '/default-avatar.png') {
+            const ads = cubeData.ads || [];
+            const activeAds = ads.filter(ad => ad && ad.status === 'active');
+
+            for (const ad of activeAds) {
+              if (ad.picture_source && ad.picture_source !== '/default-avatar.png') {
+                imageUrl = ad.picture_source;
+                break;
+              }
+              if (ad.image_1 && ad.image_1 !== '/default-avatar.png') {
+                imageUrl = ad.image_1;
+                break;
+              }
+            }
+          }
+
+          // Store the resolved image URL for SSR meta tags
+          cubeData._resolvedImageUrl = imageUrl || '/default-avatar.png';
         }
       }
     }
