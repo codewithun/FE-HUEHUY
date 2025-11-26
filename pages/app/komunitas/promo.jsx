@@ -294,7 +294,7 @@ const CommunityPromoPage = () => {
     return promos;
   };
 
-  // Fungsi handle klik promo - PERSIS seperti di home.jsx
+  // Fungsi handle klik promo - menggunakan buildPromoLink untuk konsistensi
   const handlePromoClick = (promo) => {
     const promoId = promo?.id;
     if (!promoId) {
@@ -306,37 +306,9 @@ const CommunityPromoPage = () => {
     const ad = promo?.rawCube?.ads?.[0] || promo;
     const cube = promo?.rawCube || promo?.cube;
 
-    // Cek apakah ini kubus informasi (prioritas tertinggi)
-    const isInformationCube = getIsInformation(cube) || getIsInformation(ad);
-
-    if (isInformationCube) {
-      // Untuk kubus informasi, prioritaskan code dari cube
-      const code = cube?.code || ad?.cube?.code || ad?.code;
-      if (code) {
-        const targetUrl = communityId
-          ? `/app/kubus-informasi/kubus-infor?code=${code}&communityId=${communityId}`
-          : `/app/kubus-informasi/kubus-infor?code=${code}`;
-        router.push(targetUrl);
-      } else {
-        console.warn('Kubus informasi tidak memiliki code yang valid:', { cube, ad });
-      }
-      return;
-    }
-
-    // Cek apakah ini iklan/advertising
-    if (getIsAdvertising(ad, cube)) {
-      const targetUrl = communityId
-        ? `/app/iklan/${promoId}?communityId=${communityId}`
-        : `/app/iklan/${promoId}`;
-      router.push(targetUrl);
-      return;
-    }
-
-    // Default: promo/voucher
-    const targetUrl = communityId
-      ? `/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`
-      : `/app/promo/detail_promo?promoId=${promoId}`;
-    router.push(targetUrl);
+    // Gunakan buildPromoLink untuk routing yang konsisten
+    const link = buildPromoLink(ad, cube, communityId);
+    router.push(link);
   };
 
   // We intentionally call top-level async helpers when communityId changes.
@@ -533,7 +505,7 @@ const CommunityPromoPage = () => {
 
   // ======== SUB-COMPONENTS FOR WIDGET TYPES (Hooks at top-level) ========
 
-  const NearbyWidget = ({ widget, communityId, getIsInformation, getIsAdvertising }) => {
+  const NearbyWidget = ({ widget, communityId }) => {
     const [items, setItems] = useState([]);
     const [loadingNearby, setLoadingNearby] = useState(true);
 
@@ -607,16 +579,8 @@ const CommunityPromoPage = () => {
             const worldName = ad?.cube?.world?.name || cube?.world?.name || 'General';
 
             const handleClick = () => {
-              const isInfo = getIsInformation(cube) || getIsInformation(ad);
-              if (isInfo) {
-                const code = cube?.code || ad?.cube?.code || ad?.code;
-                if (code) router.push(`/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(code)}${communityId ? `&communityId=${communityId}` : ''}`);
-              } else if (ad?.id) {
-                const targetUrl = getIsAdvertising(ad, cube)
-                  ? `/app/iklan/${ad.id}${communityId ? `?communityId=${communityId}` : ''}`
-                  : `/app/komunitas/promo/detail_promo?promoId=${ad.id}${communityId ? `&communityId=${communityId}` : ''}`;
-                router.push(targetUrl);
-              }
+              const link = buildPromoLink(ad, cube, communityId);
+              router.push(link);
             };
 
             return (
@@ -1009,8 +973,10 @@ const CommunityPromoPage = () => {
               size={widget.size || 'M'}
               onClick={() => {
                 const ad = item;
+                const cube = item?.cube;
                 if (ad?.id) {
-                  router.push(`/app/iklan/${ad.id}?communityId=${communityId}`);
+                  const link = buildPromoLink(ad, cube, communityId);
+                  router.push(link);
                 }
               }}
             />
@@ -1091,8 +1057,6 @@ const CommunityPromoPage = () => {
         <NearbyWidget
           widget={widget}
           communityId={communityId}
-          getIsInformation={getIsInformation}
-          getIsAdvertising={getIsAdvertising}
         />
       );
     }
