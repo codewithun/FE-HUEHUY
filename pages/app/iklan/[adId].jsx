@@ -402,8 +402,11 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
   const handleShareComplete = async (platform) => {
     if (!adData) return;
 
-    // Gunakan URL production yang benar
-    const adUrl = `https://app.huehuy.com/app/iklan/${adData.id}`;
+    // Gunakan URL production yang benar (sesuai dengan promo/voucher: v2.huehuy.com)
+    const adUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/app/iklan/${adData.id}`
+        : `https://v2.huehuy.com/app/iklan/${adData.id}`;
     const shareText = `Lihat iklan: ${adData.title} dari ${adData.merchant || adData.seller?.name || 'Merchant'}`;
     const fullShareText = `${shareText}\n\n🔗 Lihat detail: ${adUrl}`;
 
@@ -676,13 +679,13 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
   // Gunakan currentUrl dari SSR (sudah absolute), fallback ke window.location jika tidak ada
   const pageUrl = currentUrl || (typeof window !== 'undefined' ? window.location.href : '');
 
-  // Pastikan image URL absolute (gunakan https://app.huehuy.com)
+  // Pastikan image URL absolute (gunakan https://v2.huehuy.com)
   const getAbsoluteImageUrl = (imgUrl) => {
-    if (!imgUrl) return 'https://app.huehuy.com/default-avatar.png';
+    if (!imgUrl) return 'https://v2.huehuy.com/default-avatar.png';
     if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) return imgUrl;
     if (imgUrl.startsWith('/')) {
       // Gunakan production URL, bukan localhost
-      return `https://app.huehuy.com${imgUrl}`;
+      return `https://v2.huehuy.com${imgUrl}`;
     }
     return imgUrl;
   };
