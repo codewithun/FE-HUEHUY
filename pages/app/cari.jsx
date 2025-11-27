@@ -21,7 +21,7 @@ export default function Cari() {
   const [keywordSearch, setKeywordSearch] = useState('');
   const [search] = useLazySearch(keywordSearch);
   const [map, setMap] = useState(null);
-  const [sort, setSort] = useState('created_at');
+  const [sort, setSort] = useState('distance');
   const router = useRouter();
   const { cari, berdasarkan } = router.query;
 
@@ -77,7 +77,7 @@ export default function Cari() {
   }, [cari]);
 
   useEffect(() => {
-    setSort(berdasarkan == 'Terdekat' ? 'distance' : 'created_at');
+    setSort(berdasarkan == 'Terbaru' ? 'created_at' : 'distance');
   }, [berdasarkan]);
 
   const normalizeBoolLike = (val) => {
