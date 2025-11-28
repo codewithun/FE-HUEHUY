@@ -100,7 +100,12 @@ export const useForm = (
       /(^|\/)admin\/users\/\d+($|\/)/.test(effectivePath) ||
       /(^|\/)admin\/users\/\d+($|\/)/.test(requestUrlFull);
 
-    const isAnyUpdate = isAdUpdate || isCubeUpdate || isDynamicContentUpdate || isUserUpdate;
+    // NEW: Detect community update so we spoof PUT correctly (admin/communities/{id})
+    const isCommunityUpdate =
+      /(^|\/)admin\/communities\/\d+($|\/)/.test(effectivePath) ||
+      /(^|\/)admin\/communities\/\d+($|\/)/.test(requestUrlFull);
+
+    const isAnyUpdate = isAdUpdate || isCubeUpdate || isDynamicContentUpdate || isUserUpdate || isCommunityUpdate;
     if (isAnyUpdate) {
       formData.set('_method', 'PUT');
     }
@@ -578,7 +583,8 @@ export const useForm = (
       path: effectivePath, // <— PAKAI effectivePath
       bearer: submitControl.bearer,
       includeHeaders: submitControl.includeHeaders,
-      contentType: submitControl.contentType,
+      // Always send multipart headers since body is FormData
+      contentType: 'multipart/form-data',
       body: formData,
     });
 
