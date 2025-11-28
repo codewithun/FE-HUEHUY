@@ -2186,16 +2186,18 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
             {/* Info cards */}
             <div className="mb-4">
               <div className="rounded-[20px] p-4 shadow-lg" style={getCommunityGradient(communityData?.bg_color_1, communityData?.bg_color_2)}>
-                <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
-                  <div className="flex items-center">
-                    <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
-                    <span className="text-sm font-semibold text-white">{promoData.distance}</span>
+                {statusType !== 'Online' && (
+                  <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
+                    <div className="flex items-center">
+                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
+                      <span className="text-sm font-semibold text-white">{promoData.distance}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-white opacity-80">Jarak {getTypeLabel(promoData)}:</span>
+                      <div className="text-xs text-white opacity-70">{promoData.coordinates || '-'}</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs text-white opacity-80">Jarak {getTypeLabel(promoData)}:</span>
-                    <div className="text-xs text-white opacity-70">{promoData.coordinates || '-'}</div>
-                  </div>
-                </div>
+                )}
 
                 <div className="mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                   <div className="flex items-center justify-between">
@@ -2283,16 +2285,18 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
             </div>
 
             {/* Lokasi */}
-            <div className="mb-4">
-              <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi {getTypeLabel(promoData)}</h4>
-                <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
-                <button onClick={openRoute} className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center" style={{ backgroundColor: getCommunityPrimaryColor() }}>
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
-                  Rute
-                </button>
+            {statusType !== 'Online' && (
+              <div className="mb-4">
+                <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
+                  <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi {getTypeLabel(promoData)}</h4>
+                  <p className="text-slate-600 text-xs leading-relaxed mb-3">{promoData.location}</p>
+                  <button onClick={openRoute} className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center" style={{ backgroundColor: getCommunityPrimaryColor() }}>
+                    <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
+                    Rute
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Kontak penjual */}
             <div className="mb-4">
