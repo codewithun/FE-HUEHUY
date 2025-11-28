@@ -581,136 +581,233 @@ export default function KomunitasDashboard() {
           ],
           submit: async ({ payload, isUpdate, row }) => {
             try {
-              const form = new FormData();
-
-              // Debug setiap field yang di-append
-              const appendField = (key, value) => {
-                console.log(`Appending ${key}:`, value, typeof value);
-                form.append(key, value);
-              };
-
-              appendField("name", payload.name || "");
-              appendField("description", payload.description || "");
-
-              if (payload.corporate_id) {
-                appendField("corporate_id", String(payload.corporate_id));
-              }
-
-              if (payload.bg_color_1) appendField("bg_color_1", payload.bg_color_1);
-              if (payload.bg_color_2) appendField("bg_color_2", payload.bg_color_2);
-
-              if (payload.world_type) {
-                appendField("world_type", payload.world_type);
-                appendField("type", payload.world_type);
-              }
-
-              if (!("is_active" in payload)) {
-                payload.is_active = []; // default empty kalau gak dikirim
-              }
-
-              let isActiveBool = false;
-
-              if (Array.isArray(payload.is_active)) {
-                // untuk bentuk [1], ['1'], [], dll
-                isActiveBool =
-                  payload.is_active.includes(1) ||
-                  payload.is_active.includes("1") ||
-                  payload.is_active.includes(true);
-              } else if (typeof payload.is_active === "string") {
-                // untuk bentuk "1", "0", "true", "false"
-                isActiveBool = ["1", "true", "on", "yes"].includes(payload.is_active.toLowerCase());
-              } else if (typeof payload.is_active === "boolean" || typeof payload.is_active === "number") {
-                // boolean atau angka
-                isActiveBool = Boolean(payload.is_active);
-              }
-
-              // SELALU kirim
-              appendField("is_active", isActiveBool ? "1" : "0");
-
-              console.log("[FIX] Appended is_active:", isActiveBool ? "1" : "0");
-
-              // ===== FIX FINAL: Logo Handling (robust) =====
-              console.log("Logo payload:", payload.logo);
-
-              const dataUrlToFile = async (dataUrl, filename = "logo.png") => {
-                try {
-                  const res = await fetch(dataUrl);
-                  const blob = await res.blob();
-                  const ext = (blob.type && blob.type.split("/")[1]) || "png";
-                  const safeName = filename.includes(".") ? filename : `logo.${ext}`;
-                  return new File([blob], safeName, { type: blob.type || "image/png" });
-                } catch (e) {
-                  console.warn("Failed convert dataURL to File:", e);
-                  return null;
-                }
-              };
-
+              // ===== SMART CONTENT-TYPE HANDLING =====
+              // Check if we need to upload a file (new logo)
+              let hasFileUpload = false;
               let logoFile = null;
 
-              // Detect various shapes coming from different upload components
+              // Logo file detection logic
               if (payload.logo instanceof File) {
                 logoFile = payload.logo;
+                hasFileUpload = true;
               } else if (payload.logo?.file instanceof File) {
                 logoFile = payload.logo.file;
+                hasFileUpload = true;
               } else if (payload.logo?.originFileObj instanceof File) {
                 logoFile = payload.logo.originFileObj;
+                hasFileUpload = true;
               } else if (Array.isArray(payload.logo) && payload.logo[0] instanceof File) {
                 logoFile = payload.logo[0];
+                hasFileUpload = true;
               } else if (payload.logo instanceof Blob) {
-                // If we only have a Blob, wrap it as File for Laravel validator "file|image"
                 const name = payload.logo?.name || "logo.png";
                 logoFile = new File([payload.logo], name, { type: payload.logo.type || "image/png" });
+                hasFileUpload = true;
               } else if (typeof payload.logo === "string" && payload.logo.startsWith("data:image")) {
-                // Convert data URL to File
+                const dataUrlToFile = async (dataUrl, filename = "logo.png") => {
+                  try {
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    const ext = (blob.type && blob.type.split("/")[1]) || "png";
+                    const safeName = filename.includes(".") ? filename : `logo.${ext}`;
+                    return new File([blob], safeName, { type: blob.type || "image/png" });
+                  } catch (e) {
+                    console.warn("Failed convert dataURL to File:", e);
+                    return null;
+                  }
+                };
                 logoFile = await dataUrlToFile(payload.logo, "logo.png");
+                if (logoFile) hasFileUpload = true;
               }
 
-              // Append if we have a valid File
-              if (logoFile instanceof File) {
-                const safeName = logoFile.name || "logo";
-                console.log("✅ Appending logo file:", safeName, logoFile.type, logoFile.size);
-                form.append("logo", logoFile, safeName);
-              } else if (isUpdate && typeof payload.logo === "string" && payload.logo.trim() !== "" && !payload.logo.startsWith("data:")) {
-                // On update, allow keeping existing string path
-                console.log("✅ Keeping old logo path (update):", payload.logo);
-                form.append("logo", payload.logo);
-              } else {
-                // On create without valid file, ensure we do not send string to pass validator
-                console.log("🚫 No valid logo file to upload; not including 'logo' in FormData");
-                form.delete("logo");
-              }
+              console.log('Has file upload:', hasFileUpload, 'Logo file:', logoFile);
 
-              // Safety: remove obviously invalid logo values
-              for (let [key, val] of form.entries()) {
-                if (key === "logo" && (val === "" || val === "null")) {
-                  console.warn("🚨 Invalid logo detected, deleting before submit");
-                  form.delete("logo");
+              let requestBody, requestHeaders;
+
+              if (hasFileUpload) {
+                // USE MULTIPART for file uploads
+                const form = new FormData();
+
+                // Laravel doesn't parse multipart for PUT method, so use POST with _method override
+                if (isUpdate) {
+                  form.append('_method', 'PUT');
                 }
-              }
 
-              // Debug FormData contents
-              console.log('FormData entries:');
-              for (let [key, value] of form.entries()) {
-                console.log(`  ${key}:`, value);
+                // Debug setiap field yang di-append
+                const appendField = (key, value) => {
+                  console.log(`Appending ${key}:`, value, typeof value);
+                  form.append(key, value);
+                };
+
+                appendField("name", payload.name || "");
+                appendField("description", payload.description || "");
+
+                if (payload.corporate_id) {
+                  appendField("corporate_id", String(payload.corporate_id));
+                }
+
+                if (payload.bg_color_1) appendField("bg_color_1", payload.bg_color_1);
+                if (payload.bg_color_2) appendField("bg_color_2", payload.bg_color_2);
+
+                if (payload.world_type) {
+                  appendField("world_type", payload.world_type);
+                  appendField("type", payload.world_type);
+                }
+
+                // Handle is_active
+                if (!("is_active" in payload)) {
+                  payload.is_active = [];
+                }
+
+                let isActiveBool = false;
+                if (Array.isArray(payload.is_active)) {
+                  isActiveBool =
+                    payload.is_active.includes(1) ||
+                    payload.is_active.includes("1") ||
+                    payload.is_active.includes(true);
+                } else if (typeof payload.is_active === "string") {
+                  isActiveBool = ["1", "true", "on", "yes"].includes(payload.is_active.toLowerCase());
+                } else if (typeof payload.is_active === "boolean" || typeof payload.is_active === "number") {
+                  isActiveBool = Boolean(payload.is_active);
+                }
+                appendField("is_active", isActiveBool ? "1" : "0");
+
+                // Append logo file
+                if (logoFile instanceof File) {
+                  const safeName = logoFile.name || "logo";
+                  console.log("✅ Appending logo file:", safeName, logoFile.type, logoFile.size);
+                  form.append("logo", logoFile, safeName);
+                }
+
+                // Debug FormData contents
+                console.log('FormData entries:');
+                for (let [key, value] of form.entries()) {
+                  console.log(`  ${key}:`, value);
+                }
+
+                requestBody = form;
+                requestHeaders = authHeadersMultipart();
+              } else {
+                // USE JSON for simple text updates (no file upload)
+                const jsonPayload = {
+                  name: payload.name || "",
+                  description: payload.description || "",
+                };
+
+                if (payload.corporate_id) {
+                  jsonPayload.corporate_id = payload.corporate_id;
+                }
+                if (payload.bg_color_1) jsonPayload.bg_color_1 = payload.bg_color_1;
+                if (payload.bg_color_2) jsonPayload.bg_color_2 = payload.bg_color_2;
+                if (payload.world_type) {
+                  jsonPayload.world_type = payload.world_type;
+                  jsonPayload.type = payload.world_type;
+                }
+
+                // Handle is_active
+                let isActiveBool = false;
+                if (!("is_active" in payload)) {
+                  payload.is_active = [];
+                }
+                if (Array.isArray(payload.is_active)) {
+                  isActiveBool =
+                    payload.is_active.includes(1) ||
+                    payload.is_active.includes("1") ||
+                    payload.is_active.includes(true);
+                } else if (typeof payload.is_active === "string") {
+                  isActiveBool = ["1", "true", "on", "yes"].includes(payload.is_active.toLowerCase());
+                } else if (typeof payload.is_active === "boolean" || typeof payload.is_active === "number") {
+                  isActiveBool = Boolean(payload.is_active);
+                }
+                jsonPayload.is_active = isActiveBool;
+
+                // For update, include existing logo if keeping it
+                if (isUpdate && typeof payload.logo === "string" && payload.logo.trim() !== "" && !payload.logo.startsWith("data:")) {
+                  jsonPayload.logo = payload.logo;
+                }
+
+                console.log('JSON payload:', jsonPayload);
+
+                requestBody = JSON.stringify(jsonPayload);
+                requestHeaders = {
+                  ...authHeaders("PUT"),
+                  'Content-Type': 'application/json'
+                };
               }
 
               const url = isUpdate
                 ? apiJoin(`admin/communities/${row.id}`)
                 : apiJoin("admin/communities");
-              const method = isUpdate ? "PUT" : "POST";
+
+              // For file uploads, always use POST (with _method=PUT for updates)
+              // because Laravel doesn't parse multipart data for PUT method
+              const method = (hasFileUpload || !isUpdate) ? "POST" : "PUT";
 
               console.log('Request URL:', url);
               console.log('Request method:', method);
+              console.log('Content-Type:', hasFileUpload ? 'multipart/form-data' : 'application/json');
+              console.log('Has file upload:', hasFileUpload);
+              console.log('Using method override:', hasFileUpload && isUpdate ? 'yes (_method=PUT)' : 'no');
 
               const response = await fetch(url, {
                 method,
-                headers: authHeadersMultipart(),
-                body: form,
+                headers: requestHeaders,
+                body: requestBody,
               });
 
               console.log('Response status:', response.status);
 
               if (!response.ok) {
+                // Fallback: some environments reject PUT; retry with POST + _method=PUT
+                if (response.status === 405 && isUpdate) {
+                  try {
+                    console.warn('Received 405; retrying with POST + _method=PUT');
+                    const fd = new FormData();
+                    fd.append('_method', 'PUT');
+                    fd.append('name', payload.name || '');
+                    fd.append('description', payload.description || '');
+                    if (payload.corporate_id) fd.append('corporate_id', String(payload.corporate_id));
+                    if (payload.bg_color_1) fd.append('bg_color_1', payload.bg_color_1);
+                    if (payload.bg_color_2) fd.append('bg_color_2', payload.bg_color_2);
+                    if (payload.world_type) {
+                      fd.append('world_type', payload.world_type);
+                      fd.append('type', payload.world_type);
+                    }
+                    let isActiveBool = false;
+                    if (!('is_active' in payload)) {
+                      payload.is_active = [];
+                    }
+                    if (Array.isArray(payload.is_active)) {
+                      isActiveBool = payload.is_active.includes(1) || payload.is_active.includes('1') || payload.is_active.includes(true);
+                    } else if (typeof payload.is_active === 'string') {
+                      isActiveBool = ['1', 'true', 'on', 'yes'].includes(payload.is_active.toLowerCase());
+                    } else if (typeof payload.is_active === 'boolean' || typeof payload.is_active === 'number') {
+                      isActiveBool = Boolean(payload.is_active);
+                    }
+                    fd.append('is_active', isActiveBool ? '1' : '0');
+
+                    const retry = await fetch(url, {
+                      method: 'POST',
+                      headers: authHeadersMultipart(),
+                      body: fd,
+                    });
+
+                    if (retry.ok) {
+                      const okResult = await retry.json().catch(() => ({}));
+                      console.log('Retry success (POST + _method=PUT):', okResult);
+                      setRefreshToggle((s) => !s);
+                      return true;
+                    }
+
+                    const retryText = await retry.text();
+                    console.log('Retry failed:', retry.status, retryText);
+                    throw new Error(`HTTP ${retry.status}: ${retryText}`);
+                  } catch (e) {
+                    console.error('Fallback update failed:', e);
+                    throw e;
+                  }
+                }
+
                 const errorText = await response.text();
                 console.log('Error response:', errorText);
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
