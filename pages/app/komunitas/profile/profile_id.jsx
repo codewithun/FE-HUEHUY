@@ -181,13 +181,6 @@ export default function CommunityProfile() {
 
   const menuItems = [
     {
-      id: 'member-request',
-      title: 'Minta Menjadi Member (Bisa Memiliki Kubus)',
-      icon: faUsers,
-      action: () => setShowMembershipModal(true),
-      hasChevron: true
-    },
-    {
       id: 'chat-admin',
       title: 'Chat Admin Komunitas',
       icon: faComments,

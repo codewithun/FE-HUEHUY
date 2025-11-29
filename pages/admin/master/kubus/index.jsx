@@ -16,6 +16,7 @@ import CropperDialog from '../../../../components/crop.components/CropperDialog'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfinity, faFilePen } from '@fortawesome/free-solid-svg-icons';
 import moment from 'moment';
+import axios from 'axios';
 
 // Extra project components
 import MultiSelectDropdown from '../../../../components/form/MultiSelectDropdown';
@@ -150,6 +151,38 @@ function KubusMain() {
     ImageFieldWrapper.displayName = `ImageFieldWrapper(${fieldName})`;
     return ImageFieldWrapper;
   }, [selected, formSessionId, getServerImageUrl, withVersion, handleFileInput, handleRecrop, handleClearImage]);
+
+  // Timer ref untuk debounce geocode alamat manual
+  const geocodeTimerRef = useRef(null);
+
+  // Forward geocoding: alamat -> koordinat
+  const geocodeAddress = useCallback((rawAddress, applyValues) => {
+    const address = String(rawAddress || '').trim();
+    // Minimal panjang agar tidak geocode setiap huruf (dinaikkan jadi 10 karakter)
+    if (address.length < 10) return;
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+    geocodeTimerRef.current = setTimeout(async () => {
+      try {
+        const resp = await axios.get('https://api.geoapify.com/v1/geocode/search', {
+          params: {
+            text: address,
+            apiKey: '2761145afb6a43e5ade77d5e825c9474',
+            limit: 1,
+          },
+        });
+        const feature = resp.data?.features?.[0];
+        const props = feature?.properties;
+        const lat = feature?.geometry?.coordinates?.[1];
+        const lng = feature?.geometry?.coordinates?.[0];
+        if (lat && lng) {
+          const formatted = props?.formatted || props?.address_line1 || address;
+          applyValues({ lat, lng, address: formatted });
+        }
+      } catch (err) {
+        console.warn('[GEOCODE] gagal mendapatkan koordinat alamat:', err?.message);
+      }
+    }, 1200); // debounce 1200ms (1.2 detik) - lebih lama agar user punya waktu lebih untuk mengetik
+  }, []);
 
   // Mapper default value untuk mode update (dipakai untuk Ubah Kubus maupun Ubah Iklan)
   const mapUpdateDefault = (data) => {
@@ -749,6 +782,11 @@ function KubusMain() {
                     <div className="mx-10 hover:mx-8 hover:border-4 border-green-500 rounded-lg">
                       <InputMapComponent
                         name="map-tag"
+                        value={{
+                          lat: values.find((i) => i.name === 'cube_tags[0][map_lat]')?.value || null,
+                          lng: values.find((i) => i.name === 'cube_tags[0][map_lng]')?.value || null,
+                          address: values.find((i) => i.name === 'cube_tags[0][address]')?.value || undefined,
+                        }}
                         onChange={(e) => {
                           setValues([
                             ...values.filter(
@@ -781,6 +819,26 @@ function KubusMain() {
                           { name: 'cube_tags[0][address]', value: e },
                           { name: 'address', value: e },
                         ]);
+                        geocodeAddress(e, ({ lat, lng, address }) => {
+                          setValues((curr) => [
+                            ...curr.filter(
+                              (i) => ![
+                                'cube_tags[0][map_lat]',
+                                'cube_tags[0][map_lng]',
+                                'cube_tags[0][address]',
+                                'map_lat',
+                                'map_lng',
+                                'address',
+                              ].includes(i.name)
+                            ),
+                            { name: 'cube_tags[0][map_lat]', value: lat },
+                            { name: 'cube_tags[0][map_lng]', value: lng },
+                            { name: 'cube_tags[0][address]', value: address },
+                            { name: 'map_lat', value: lat },
+                            { name: 'map_lng', value: lng },
+                            { name: 'address', value: address },
+                          ]);
+                        });
                       }}
                       value={values.find((i) => i.name == 'cube_tags[0][address]')?.value || ''}
                       errors={errors.filter((i) => i.name == 'cube_tags[0][address]')?.error}
@@ -822,6 +880,11 @@ function KubusMain() {
                     <div className="mx-10 hover:mx-8 hover:border-4 border-green-500 rounded-lg transition">
                       <InputMapComponent
                         name="iklan-map"
+                        value={{
+                          lat: values.find((i) => i.name === 'cube_tags[0][map_lat]')?.value || null,
+                          lng: values.find((i) => i.name === 'cube_tags[0][map_lng]')?.value || null,
+                          address: values.find((i) => i.name === 'cube_tags[0][address]')?.value || undefined,
+                        }}
                         onChange={(e) => {
                           setValues([
                             ...values.filter(
@@ -856,6 +919,27 @@ function KubusMain() {
                           { name: 'cube_tags[0][address]', value: e },
                           { name: 'address', value: e },
                         ]);
+                        geocodeAddress(e, ({ lat, lng, address }) => {
+                          setValues((curr) => [
+                            ...curr.filter(
+                              (i) =>
+                                ![
+                                  'cube_tags[0][map_lat]',
+                                  'cube_tags[0][map_lng]',
+                                  'cube_tags[0][address]',
+                                  'map_lat',
+                                  'map_lng',
+                                  'address',
+                                ].includes(i.name)
+                            ),
+                            { name: 'cube_tags[0][map_lat]', value: lat },
+                            { name: 'cube_tags[0][map_lng]', value: lng },
+                            { name: 'cube_tags[0][address]', value: address },
+                            { name: 'map_lat', value: lat },
+                            { name: 'map_lng', value: lng },
+                            { name: 'address', value: address },
+                          ]);
+                        });
                       }}
                       value={values.find((i) => i.name == 'cube_tags[0][address]')?.value || ''}
                     />
