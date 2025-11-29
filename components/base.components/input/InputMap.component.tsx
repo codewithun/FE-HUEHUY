@@ -29,6 +29,11 @@ export function InputMapComponent({
   const [stateAddress, setStateAddress] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [subDistrict, setSubDistrict] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     register?.(name, validations);
@@ -111,12 +116,185 @@ export function InputMapComponent({
 
   useEffect(() => {
     if (value && value.lng && value.lat) {
-      setInputValue(value);
+      // Hanya update jika koordinat berbeda untuk menghindari loop
+      if (inputValue.lat !== value.lat || inputValue.lng !== value.lng) {
+        setInputValue({
+          lat: value.lat,
+          lng: value.lng,
+        });
+      }
     }
   }, [value]);
 
+  const fetchSuggestions = async (query: string) => {
+    if (query.length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      const response = await axios.get(
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(query)}&apiKey=2761145afb6a43e5ade77d5e825c9474&limit=5`
+      );
+
+      if (response?.status === 200 && response.data.features?.length > 0) {
+        setSuggestions(response.data.features);
+        setShowSuggestions(true);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout for autocomplete
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchSuggestions(value);
+    }, 500);
+  };
+
+  const handleSelectSuggestion = (feature: any) => {
+    const { lat, lon } = feature.properties;
+    const address = feature.properties.formatted || feature.properties.address_line1;
+    
+    setSearchQuery(address);
+    setInputValue({
+      lat: lat,
+      lng: lon,
+    });
+    setShowSuggestions(false);
+    setSuggestions([]);
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const response = await axios.get(
+        `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(searchQuery)}&apiKey=2761145afb6a43e5ade77d5e825c9474`
+      );
+
+      if (response?.status === 200 && response.data.features?.length > 0) {
+        const result = response.data.features[0];
+        const { lat, lon } = result.properties;
+        
+        setInputValue({
+          lat: lat,
+          lng: lon,
+        });
+      }
+    } catch (error) {
+      console.error('Error searching address:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+      setShowSuggestions(false);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Close suggestions when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.search-container')) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
     <div>
+      {/* Search Bar with Autocomplete */}
+      <div className="relative search-container">
+        <div className="flex gap-2 mb-3">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="Cari alamat..."
+              value={searchQuery}
+              onChange={handleSearchInputChange}
+              onKeyPress={handleKeyPress}
+              onFocus={() => {
+                if (suggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            
+            {/* Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {suggestions.map((feature, index) => {
+                  const props = feature.properties;
+                  const displayText = props.formatted || props.address_line1 || 'Unknown location';
+                  
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => handleSelectSuggestion(feature)}
+                      className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition"
+                    >
+                      <div className="flex items-start gap-2">
+                        <FontAwesomeIcon 
+                          icon={faLocationDot} 
+                          className="text-blue-500 mt-1 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {props.name || props.street || 'Location'}
+                          </p>
+                          <p className="text-xs text-gray-500 line-clamp-2">
+                            {displayText}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          
+          <button
+            type="button"
+            onClick={handleSearch}
+            disabled={isSearching}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+          >
+            {isSearching ? 'Mencari...' : 'Cari'}
+          </button>
+        </div>
+      </div>
+
       <div
         className={`w-full h-[300px] bg-gray-300 rounded-xl overflow-hidden mt-4 relative`}
       >
