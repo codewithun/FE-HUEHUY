@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import { faUserPlus, faHistory, faPlus } from "@fortawesome/free-solid-svg-icons";
 import {
     ButtonComponent,
     TableSupervisionComponent,
+    InputComponent,
+    SelectComponent,
 } from '../../../components/base.components';
 import { FloatingPageComponent } from '../../../components/base.components/modal/FloatingPage.component';
 import InputHexColor from '../../../components/construct.components/input/InputHexColor';
@@ -29,6 +31,9 @@ export default function KomunitasCorporate() {
     const [cubeList, setCubeList] = useState([]);
     const [cubeLoading, setCubeLoading] = useState(false);
     const [cubeError, setCubeError] = useState('');
+    // Search & filter untuk Cube table (Widget Asal)
+    const [cubeTypeFilter, setCubeTypeFilter] = useState([]); // ['home','hunting','information']
+    const [cubeWidgetSearch, setCubeWidgetSearch] = useState('');
 
     // Ensure API/file URLs are correct across environments
     const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
@@ -127,6 +132,28 @@ export default function KomunitasCorporate() {
             alert('Gagal menghapus anggota');
         }
     };
+
+    // Client-side filtered cube list by widget type (dropdown) + search (widget name/type/cube name)
+    const filteredCubeList = useMemo(() => {
+        const q = String(cubeWidgetSearch || '').toLowerCase().trim();
+        const types = Array.isArray(cubeTypeFilter)
+            ? cubeTypeFilter.map((t) => String(t).toLowerCase())
+            : [];
+        return (Array.isArray(cubeList) ? cubeList : []).filter((c) => {
+            // Filter by widget type (dropdown)
+            if (types.length > 0 && !types.includes(String(c.widget_type || '').toLowerCase())) {
+                return false;
+            }
+            // Filter by search query (widget name, widget type, cube name)
+            if (q) {
+                const name = String(c.name || '').toLowerCase();
+                const widgetName = String(c.widget_name || '').toLowerCase();
+                const widgetType = String(c.widget_type || '').toLowerCase();
+                return name.includes(q) || widgetName.includes(q) || widgetType.includes(q);
+            }
+            return true;
+        });
+    }, [cubeList, cubeWidgetSearch, cubeTypeFilter]);
 
     return (
         <>
@@ -286,9 +313,10 @@ export default function KomunitasCorporate() {
                                     setCubeError('');
                                     setCubeList([]);
                                     try {
-                                        const res = await fetch(apiJoin(`admin/communities/${row?.id}/cubes`), {
-                                            headers: { Accept: 'application/json' }
+                                        const res = await fetch(apiJoin(`corporate/communities/${row?.id}/cubes`), {
+                                            headers: authHeaders('GET')
                                         });
+                                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
                                         const json = await res.json();
                                         const items = json?.data || json || [];
                                         setCubeList(Array.isArray(items) ? items : []);
@@ -368,7 +396,9 @@ export default function KomunitasCorporate() {
                                                     </span>
                                                 </div>
                                                 <div className="ml-3">
-                                                    <div className="text-sm font-medium text-gray-900">{member.name || member.full_name || '-'}</div>
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        {member.name || member.full_name || '-'}
+                                                    </div>
                                                     <div className="text-xs text-gray-500">{member.email || '-'}</div>
                                                 </div>
                                             </div>
@@ -390,7 +420,11 @@ export default function KomunitasCorporate() {
             {/* Modal Kubus */}
             <FloatingPageComponent
                 show={modalCubes}
-                onClose={() => setModalCubes(false)}
+                onClose={() => {
+                    setModalCubes(false);
+                    setCubeTypeFilter([]);
+                    setCubeWidgetSearch('');
+                }}
                 title={`Daftar Kubus: ${activeCommunity?.name || '-'}`}
                 size="lg"
             >
@@ -399,29 +433,104 @@ export default function KomunitasCorporate() {
                         <div className="py-10 text-center text-gray-500 font-medium">Memuat kubus…</div>
                     ) : cubeError ? (
                         <div className="py-10 text-center text-red-600 font-semibold">{cubeError}</div>
-                    ) : (Array.isArray(cubeList) ? cubeList : []).length === 0 ? (
+                    ) : cubeList.length === 0 ? (
                         <div className="py-10 text-center text-gray-500 font-medium">Tidak ada kubus dalam komunitas ini.</div>
                     ) : (
                         <TableSupervisionComponent
                             key={`cube-table-${activeCommunity?.id}-${cubeList.length}`}
                             title={`Daftar Kubus (${cubeList.length})`}
-                            data={cubeList}
+                            data={filteredCubeList}
+                            customTopBar={
+                                <div className="flex items-center gap-3 w-full">
+                                    <div className="w-64">
+                                        <SelectComponent
+                                            name="widgetTypeFilter"
+                                            label="Tipe Widget"
+                                            placeholder="Pilih tipe..."
+                                            multiple
+                                            searchable={false}
+                                            options={[
+                                                { label: 'Home', value: 'home' },
+                                                { label: 'Hunting', value: 'hunting' },
+                                                { label: 'Information', value: 'information' },
+                                            ]}
+                                            value={cubeTypeFilter}
+                                            onChange={(val) => setCubeTypeFilter(Array.isArray(val) ? val : [])}
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <InputComponent
+                                            name="widgetSearch"
+                                            label="Cari Widget/Tipe/Nama Kubus"
+                                            placeholder="Contoh: home / hunting / information / nama widget"
+                                            size="md"
+                                            value={cubeWidgetSearch}
+                                            onChange={(e) => setCubeWidgetSearch(String(e || ''))}
+                                        />
+                                    </div>
+                                </div>
+                            }
                             noControlBar={false}
                             unUrlPage
                             searchable={false}
                             columnControl={{
                                 custom: [
-                                    { selector: 'name', label: 'Nama Kubus', item: (c) => c.name ?? '-' },
-                                    { selector: 'widget_name', label: 'Widget Asal', item: (c) => c.widget_name ?? '-' },
-                                    { selector: 'widget_type', label: 'Tipe', item: (c) => c.widget_type ?? '-' },
+                                    {
+                                        selector: 'name',
+                                        label: 'Nama Kubus',
+                                        item: (cube) => cube.name ?? '-',
+                                    },
+                                    {
+                                        selector: 'widget_name',
+                                        label: 'Widget Asal',
+                                        item: (cube) => (
+                                            <div>
+                                                <span className="font-medium text-gray-800">{cube.widget_name ?? '-'}</span>
+                                                <div className="text-xs text-gray-500 italic">({cube.widget_type ?? 'unknown'})</div>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        selector: 'widget_type',
+                                        label: 'Tipe',
+                                        width: '120px',
+                                        item: (cube) => (
+                                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200">
+                                                {(cube.widget_type || '-').toString().charAt(0).toUpperCase() + (cube.widget_type || '-').toString().slice(1)}
+                                            </span>
+                                        ),
+                                    },
+                                    {
+                                        selector: 'type',
+                                        label: 'Status',
+                                        item: (cube) => (
+                                            <span
+                                                className={`inline-flex px-2 py-0.5 rounded-full text-xs ${cube.type === 'active'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-gray-100 text-gray-600'
+                                                    }`}
+                                            >
+                                                {cube.type === 'active' ? 'Aktif' : 'Nonaktif'}
+                                            </span>
+                                        ),
+                                    },
                                     {
                                         selector: 'created_at',
                                         label: 'Dibuat Pada',
-                                        item: (c) => (c.created_at ? new Date(c.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'),
+                                        item: (cube) =>
+                                            cube.created_at
+                                                ? new Date(cube.created_at).toLocaleDateString('id-ID', {
+                                                    year: 'numeric',
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                })
+                                                : '-',
                                     },
                                 ],
                             }}
-                            actionControl={{ except: ['edit', 'delete'] }}
+                            actionControl={{
+                                except: ['edit', 'delete'],
+                            }}
                         />
                     )}
                 </div>
