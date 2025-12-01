@@ -300,6 +300,7 @@ export default function CorporateWidget() {
                             custom: ({ formControl, values }) => {
                                 const source_type = values.find(val => val.name === 'source_type')?.value;
                                 if (source_type === 'cube') {
+                                    const selected_community_id = values.find(val => val.name === 'community_id')?.value;
                                     return (
                                         <SelectComponent
                                             name="dynamic_content_cubes"
@@ -307,7 +308,7 @@ export default function CorporateWidget() {
                                             label="Kubus"
                                             placeholder="Pilih kubus..."
                                             serverOptionControl={{
-                                                path: 'admin/options/cube?paginate=all',
+                                                path: `corporate/options/cube?paginate=all${selected_community_id ? `&community_id=${selected_community_id}` : ''}`,
                                                 mapOptions: (resp) => {
                                                     const list = Array.isArray(resp?.data) ? resp.data : Array.isArray(resp) ? resp : [];
                                                     return list.map(item => ({
