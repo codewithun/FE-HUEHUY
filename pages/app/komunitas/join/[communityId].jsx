@@ -1,12 +1,12 @@
 /* eslint-disable no-console */
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { faCheckCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import Cookies from 'js-cookie';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
+import JoinRequestPopup from '../../../../components/construct.components/modal/JoinRequestPopup';
 import { token_cookie_name } from '../../../../helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
-import JoinRequestPopup from '../../../../components/construct.components/modal/JoinRequestPopup';
 
 export default function JoinCommunity() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export default function JoinCommunity() {
   const [done, setDone] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [communityName, setCommunityName] = useState('');
+  const fromQR = router.query.from === 'qr';
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -46,9 +47,10 @@ export default function JoinCommunity() {
         const isJoined = Boolean(community?.isJoined ?? community?.is_joined);
         const hasRequested = Boolean(community?.hasRequested ?? community?.has_requested);
 
-        // 1a) Sudah member → langsung ke profile
+        // 1a) Sudah member → untuk semua yang sudah joined masuk ke dashboard
         if (isJoined) {
-          router.replace(`/app/komunitas/profile/${communityId}`);
+          // Untuk semua member yang sudah joined (baik public maupun private), masuk ke dashboard
+          router.replace(`/app/komunitas/dashboard/${communityId}`);
           return;
         }
 
@@ -110,7 +112,8 @@ export default function JoinCommunity() {
             );
           } catch { }
 
-          router.replace(`/app/komunitas/profile/${communityId}`);
+          // Untuk public community yang berhasil join, langsung ke dashboard
+          router.replace(`/app/komunitas/dashboard/${communityId}`);
           return;
         }
 
@@ -118,7 +121,8 @@ export default function JoinCommunity() {
         let body = {};
         try { body = await joinRes.json(); } catch { }
         if (joinRes.status === 422 && (body?.already_joined || body?.message?.includes('sudah'))) {
-          router.replace(`/app/komunitas/profile/${communityId}`);
+          // Jika sudah joined, langsung ke dashboard
+          router.replace(`/app/komunitas/dashboard/${communityId}`);
           return;
         }
         if (joinRes.status === 403 && body?.need_request) {
@@ -163,7 +167,9 @@ export default function JoinCommunity() {
                 })
               );
             } catch { }
-            router.replace(`/app/komunitas/profile/${communityId}`);
+            
+            // Jika berhasil join, langsung ke dashboard
+            router.replace(`/app/komunitas/dashboard/${communityId}`);
             return;
           }
 
@@ -199,10 +205,10 @@ export default function JoinCommunity() {
           <FontAwesomeIcon icon={faCheckCircle} className="text-green-500 text-3xl mb-3" />
           <p className="text-gray-700">{message}</p>
           <button
-            onClick={() => router.replace(`/app/komunitas/profile/${communityId}`)}
+            onClick={() => router.replace('/app/komunitas/komunitas')}
             className="mt-4 px-4 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all"
           >
-            Kembali ke Komunitas
+            Kembali ke Daftar Komunitas
           </button>
         </>
       ) : (

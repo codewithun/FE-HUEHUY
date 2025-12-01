@@ -108,6 +108,20 @@ export default function CommunityProfile() {
           const result = await response.json();
           const community = result.data || result;
 
+          // Check if user came from QR scan and community is public
+          const fromQR = router.query.from === 'qr' || document.referrer.includes('/qr-entry');
+          const rawPrivacy = String(
+            community?.privacy ?? community?.world_type ?? community?.type ?? ''
+          ).toLowerCase();
+          const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
+          const isPublic = privacy === 'public';
+          
+          // If from QR scan and community is public, redirect to dashboard
+          if (fromQR && isPublic && community?.isJoined) {
+            router.replace(`/app/komunitas/dashboard/${effectiveCommunityId}`);
+            return;
+          }
+
           setCommunityData({
             id: community.id,
             name: community.name,
@@ -567,7 +581,7 @@ export default function CommunityProfile() {
 
               <div className="bg-gray-50 rounded-xl p-4 mb-4 flex justify-center">
                 <QRCodeSVG
-                  value={`${window.location.origin}/app/komunitas/join/${communityData?.id || effectiveCommunityId || 'NO_CODE'}`}
+                  value={`${window.location.origin}/app/komunitas/join/${communityData?.id || effectiveCommunityId || 'NO_CODE'}?from=qr`}
                   size={180}
                   level="H"
                   bgColor="#f8fafc"

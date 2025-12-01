@@ -20,7 +20,7 @@ export default function QrEntry() {
   const [userEmail, setUserEmail] = useState('');
   const [didSubmitRegister, setDidSubmitRegister] = useState(false);
 
-  const onRegisterSuccess = (data) => {
+  const onRegisterSuccess = async (data) => {
     if (!didSubmitRegister) return;
     setDidSubmitRegister(false);
     
@@ -37,13 +37,76 @@ export default function QrEntry() {
         } catch (e) {
           console.error('Failed to save token:', e);
         }
+        
+        // ✅ HANDLE KOMUNITAS QR SCAN - Check if user can skip verification for public communities
+        const qrData = router.query.qr_data;
+        if (qrData && data?.data?.user?.email_verified_at) {
+          try {
+            // If email is already verified and it's a community QR, handle it immediately
+            const joinMatch = qrData.match(/\/app\/komunitas\/join\/(\d+)/);
+            if (joinMatch) {
+              const communityId = joinMatch[1];
+              const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+              const apiBase = baseUrl.replace(/\/api\/?$/, '');
+              
+              const communityRes = await fetch(`${apiBase}/api/communities/${communityId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              
+              if (communityRes.ok) {
+                const communityJson = await communityRes.json();
+                const community = communityJson.data || communityJson;
+                
+                const rawPrivacy = String(
+                  community?.privacy ?? community?.world_type ?? community?.type ?? ''
+                ).toLowerCase();
+                const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
+                const isPublic = privacy === 'public';
+                
+                if (isPublic) {
+                  try {
+                    const joinRes = await fetch(`${apiBase}/api/communities/${communityId}/join`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                      },
+                    });
+                    
+                    if (joinRes.ok || joinRes.status === 422) {
+                      try {
+                        localStorage.setItem(
+                          'community:membership',
+                          JSON.stringify({
+                            id: Number(communityId),
+                            action: 'join',
+                            delta: +1,
+                            at: Date.now()
+                          })
+                        );
+                      } catch {}
+                      
+                      console.log('🔐 QR Register Success - Redirecting to community dashboard:', communityId);
+                      window.location.href = `/app/komunitas/dashboard/${communityId}`;
+                      return;
+                    }
+                  } catch (joinError) {
+                    console.error('Failed to auto-join during registration:', joinError);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Failed to handle community QR during registration:', error);
+          }
+        }
       }
       
       setStep('verify');
     }
   };
 
-  const onVerifySuccess = (data) => {
+  const onVerifySuccess = async (data) => {
     // ✅ SIMPAN TOKEN SETELAH VERIFIKASI
     const token = data?.data?.token || data?.data?.user_token;
     if (token) {
@@ -56,7 +119,80 @@ export default function QrEntry() {
       }
     }
 
-    // ✅ REDIRECT KE URL YANG AMAN
+    // ✅ HANDLE KOMUNITAS QR SCAN
+    const qrData = router.query.qr_data;
+    if (qrData && token) {
+      try {
+        // Extract community ID from QR data if it's a community join URL
+        const joinMatch = qrData.match(/\/app\/komunitas\/join\/(\d+)/);
+        if (joinMatch) {
+          const communityId = joinMatch[1];
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+          const apiBase = baseUrl.replace(/\/api\/?$/, '');
+          
+          // Check community privacy before redirecting
+          const communityRes = await fetch(`${apiBase}/api/communities/${communityId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          
+          if (communityRes.ok) {
+            const communityJson = await communityRes.json();
+            const community = communityJson.data || communityJson;
+            
+            // Check if it's public community
+            const rawPrivacy = String(
+              community?.privacy ?? community?.world_type ?? community?.type ?? ''
+            ).toLowerCase();
+            const privacy = rawPrivacy === 'pribadi' ? 'private' : (rawPrivacy || 'public');
+            const isPublic = privacy === 'public';
+            
+            if (isPublic) {
+              // For public communities, try to join first, then redirect to dashboard
+              try {
+                const joinRes = await fetch(`${apiBase}/api/communities/${communityId}/join`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                });
+                
+                if (joinRes.ok || joinRes.status === 422) { // 422 = already joined
+                  // Update localStorage for community membership sync
+                  try {
+                    localStorage.setItem(
+                      'community:membership',
+                      JSON.stringify({
+                        id: Number(communityId),
+                        action: 'join',
+                        delta: +1,
+                        at: Date.now()
+                      })
+                    );
+                  } catch {}
+                  
+                  // Redirect to community dashboard for public communities
+                  console.log('🔐 QR Entry Success - Redirecting to community dashboard:', communityId);
+                  window.location.href = `/app/komunitas/dashboard/${communityId}`;
+                  return;
+                }
+              } catch (joinError) {
+                console.error('Failed to auto-join public community:', joinError);
+              }
+            }
+            
+            // For private communities or join failed, redirect to join page
+            console.log('🔐 QR Entry Success - Redirecting to join page:', communityId);
+            window.location.href = `/app/komunitas/join/${communityId}`;
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to handle community QR scan:', error);
+      }
+    }
+
+    // ✅ FALLBACK: REDIRECT KE URL YANG AMAN
     const redirectUrl = data?.data?.redirect_url;
     const target = (redirectUrl && isSafeInternal(redirectUrl)) ? redirectUrl : '/app';
     
