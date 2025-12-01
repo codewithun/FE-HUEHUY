@@ -820,12 +820,13 @@ function CorporateKubusPage({ scope }) {
                                 if (isInformation || !['promo', 'voucher'].includes(contentType)) return null;
                                 const unlimited = values.find(i => i.name === 'ads[unlimited_grab]')?.value;
                                 const daily = values.find(i => i.name === 'ads[is_daily_grab]')?.value;
+                                const contentLabel = contentType === 'promo' ? 'Promo' : 'Voucher';
                                 return (
                                     <div className="mt-6 space-y-4">
-                                        <div className="font-semibold text-base text-slate-700">Pengaturan {contentType === 'promo' ? 'Promo' : 'Voucher'}</div>
+                                        <div className="font-semibold text-base text-slate-700">Pengaturan {contentLabel}</div>
                                         <div className="flex gap-4">
                                             <CheckboxComponent
-                                                label="Promo Tak Terbatas"
+                                                label={`${contentLabel} Tak Terbatas`}
                                                 name="ads[unlimited_grab]"
                                                 onChange={() => setValues([
                                                     ...values.filter(i => i.name !== 'ads[unlimited_grab]'),
@@ -834,7 +835,7 @@ function CorporateKubusPage({ scope }) {
                                                 checked={!!unlimited}
                                             />
                                             <CheckboxComponent
-                                                label="Promo Harian"
+                                                label={`${contentLabel} Harian`}
                                                 name="ads[is_daily_grab]"
                                                 onChange={() => setValues([
                                                     ...values.filter(i => i.name !== 'ads[is_daily_grab]'),
@@ -849,8 +850,8 @@ function CorporateKubusPage({ scope }) {
                                                 <InputNumberComponent
                                                     type="number"
                                                     name="ads[max_grab]"
-                                                    label={daily ? 'Jumlah Promo Per Hari' : 'Jumlah Promo'}
-                                                    placeholder={daily ? 'Promo yang bisa diambil per hari...' : 'Masukan Jumlah Promo...'}
+                                                    label={daily ? `Jumlah ${contentLabel} Per Hari` : `Jumlah ${contentLabel}`}
+                                                    placeholder={daily ? `${contentLabel} yang bisa diambil per hari...` : `Masukan Jumlah ${contentLabel}...`}
                                                     validations={{ required: !unlimited, min: 1 }}
                                                     onChange={(e) => setValues([
                                                         ...values.filter(i => i.name !== 'ads[max_grab]'),
