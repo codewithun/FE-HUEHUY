@@ -32,8 +32,21 @@ export default function ViewCounter({
     const getAuthToken = () => {
         try {
             const enc = Cookies.get(token_cookie_name);
+            console.log('🔑 Token Debug:', {
+                cookie_name: token_cookie_name,
+                has_encrypted: !!enc,
+                enc_preview: enc ? enc.substring(0, 30) + '...' : null
+            });
+
             if (!enc) return null;
-            return Decrypt(enc);
+
+            const decrypted = Decrypt(enc);
+            console.log('🔓 Decrypted:', {
+                has_decrypted: !!decrypted,
+                token_preview: decrypted ? decrypted.substring(0, 20) + '...' : null
+            });
+
+            return decrypted;
         } catch (error) {
             console.error('Failed to get auth token:', error);
             return null;
@@ -96,6 +109,14 @@ export default function ViewCounter({
             const token = getAuthToken();
             const sessionId = getSessionId();
 
+            console.log('🔍 ViewCounter Debug:', {
+                has_token: !!token,
+                token_preview: token ? token.substring(0, 20) + '...' : null,
+                session_id: sessionId,
+                type,
+                id
+            });
+
             const headers = {
                 'Content-Type': 'application/json',
             };
@@ -110,11 +131,14 @@ export default function ViewCounter({
                 headers['X-Session-ID'] = sessionId;
             }
 
-            await fetch(`${API_BASE}/track/${type}/${id}`, {
+            const response = await fetch(`${API_BASE}/track/${type}/${id}`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ session_id: sessionId }),
             });
+
+            const result = await response.json();
+            console.log('✅ Track Response:', result);
 
             // Refresh count after tracking
             fetchViewCount();
