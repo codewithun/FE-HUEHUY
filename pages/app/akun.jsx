@@ -211,6 +211,10 @@ export default function Akun() {
             rounded
             onClick={() => {
               Cookies.remove(token_cookie_name);
+              // Clear view tracking session untuk force regenerate saat user baru login
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('view_session_id');
+              }
               router.push('/');
             }}
           />

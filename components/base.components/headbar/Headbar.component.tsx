@@ -163,6 +163,8 @@ export function HeadbarComponent({ onMenuClick, panel }: HeadbarProps) {
                   Cookies.remove(token_cookie_name);
                   if (typeof window !== 'undefined') {
                     localStorage.removeItem(token_cookie_name);
+                    // Clear view tracking session untuk force regenerate saat user baru login
+                    localStorage.removeItem('view_session_id');
                   }
                   router.push('/');
                 }

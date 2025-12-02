@@ -12,4 +12,5 @@ export * from './scanner';
 export * from './sidebar';
 export * from './supervision';
 export * from './table';
+export { default as ViewCounter } from './ViewCounter.component';
 
