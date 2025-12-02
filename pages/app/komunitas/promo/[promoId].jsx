@@ -37,6 +37,7 @@ const ImageCarousel = dynamic(
 );
 import { get } from '../../../../helpers/api.helpers';
 import { Decrypt } from '../../../../helpers/encryption.helpers';
+import ViewCounter from '../../../../components/base.components/ViewCounter.component';
 
 const authHeader = () => {
   const enc = Cookies.get(token_cookie_name);
@@ -2154,7 +2155,14 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
             <div className="flex-1 text-center">
               <h1 className="text-white font-bold text-sm">{promoData?.categoryLabel || getTypeLabel(promoData)}</h1>
             </div>
-            <div className="flex space-x-1.5">
+            <div className="flex space-x-1.5 items-center">
+              <ViewCounter
+                type="ad"
+                id={promoData?.id}
+                autoTrack={true}
+                size="sm"
+                className="text-white bg-white bg-opacity-20 backdrop-blur-sm px-2.5 py-1.5 rounded-[10px]"
+              />
               <button
                 onClick={handleShare}
                 className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"

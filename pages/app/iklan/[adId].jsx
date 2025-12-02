@@ -18,6 +18,7 @@ import { ImageCarousel } from '../../../components/base.components';
 import { token_cookie_name } from '../../../helpers';
 import { get } from '../../../helpers/api.helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
+import ViewCounter from '../../../components/base.components/ViewCounter.component';
 
 // Halaman detail Iklan (tanpa klaim promo, tanpa jam berlaku, tanpa jarak)
 export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
@@ -748,7 +749,14 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
                 Iklan
               </h1>
             </div>
-            <div className="flex space-x-1.5">
+            <div className="flex space-x-1.5 items-center">
+              <ViewCounter
+                type="ad"
+                id={adData?.id}
+                autoTrack={true}
+                size="sm"
+                className="text-white bg-white bg-opacity-20 backdrop-blur-sm px-2.5 py-1.5 rounded-[10px]"
+              />
               <button
                 onClick={handleShare}
                 className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"

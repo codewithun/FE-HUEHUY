@@ -34,6 +34,7 @@ const ImageCarousel = dynamic(
 );
 import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
+import ViewCounter from '../../../components/base.components/ViewCounter.component';
 
 export default function KubusInformasiPage({ initialCube = null, currentUrl = '' }) {
   const router = useRouter();
@@ -550,7 +551,14 @@ export default function KubusInformasiPage({ initialCube = null, currentUrl = ''
                 </p>
               )}
             </div>
-            <div className="flex space-x-1.5">
+            <div className="flex space-x-1.5 items-center">
+              <ViewCounter
+                type="cube"
+                id={cube?.id}
+                autoTrack={true}
+                size="sm"
+                className="text-white bg-white bg-opacity-20 backdrop-blur-sm px-2.5 py-1.5 rounded-[10px]"
+              />
               <button
                 onClick={handleShare}
                 className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
