@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import React, { useEffect, useState } from 'react';
-import GoogleMapReact from 'google-map-react';
+import dynamic from 'next/dynamic';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faLocationCrosshairs,
@@ -8,6 +8,10 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { inputMapProps, valueMapProps } from './props/input-map.props';
 import axios from 'axios';
+
+const InputMapLeaflet = dynamic(() => import('./InputMap.leaflet'), {
+  ssr: false,
+});
 
 export function InputMapComponent({
   onChange,
@@ -17,6 +21,7 @@ export function InputMapComponent({
   register,
 }: inputMapProps) {
   const [addressLoading, setAddressLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const [inputValue, setInputValue] = useState<valueMapProps>({
     lng: null,
@@ -41,6 +46,7 @@ export function InputMapComponent({
   }, [register, name, validations]);
 
   useEffect(() => {
+    setMounted(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -80,7 +86,12 @@ export function InputMapComponent({
         setAddressLoading(false);
       }
     }
-    if (inputValue.lat) {
+    if (
+      typeof inputValue.lat === 'number' &&
+      Number.isFinite(inputValue.lat) &&
+      typeof inputValue.lng === 'number' &&
+      Number.isFinite(inputValue.lng)
+    ) {
       navigator?.onLine && fetch();
     }
   }, [inputValue]);
@@ -116,16 +127,18 @@ export function InputMapComponent({
   };
 
   useEffect(() => {
-    if (value && value.lng && value.lat) {
-      // Hanya update jika koordinat berbeda untuk menghindari loop
-      if (inputValue.lat !== value.lat || inputValue.lng !== value.lng) {
-        setInputValue({
-          lat: value.lat,
-          lng: value.lng,
-        });
-      }
+    if (
+      typeof value?.lat === 'number' &&
+      Number.isFinite(value.lat) &&
+      typeof value?.lng === 'number' &&
+      Number.isFinite(value.lng)
+    ) {
+      setInputValue((prev) => {
+        if (prev.lat === value.lat && prev.lng === value.lng) return prev;
+        return { lat: value.lat, lng: value.lng };
+      });
     }
-  }, [value]);
+  }, [value?.lat, value?.lng]);
 
   const fetchSuggestions = async (query: string) => {
     if (query.length < 3) {
@@ -310,38 +323,57 @@ export function InputMapComponent({
           value={inputValue?.lng || ''}
         />
 
-        <GoogleMapReact
-          bootstrapURLKeys={{
-            key: 'AIzaSyBLjp3NfOdkLbKJ85DFBg3CCQuIoKEzVZc',
-          }}
-          options={{
-            fullscreenControl: false,
-            zoomControl: false,
-          }}
-          defaultCenter={{
-            lat: inputValue.lat ? inputValue.lat : -6.208,
-            lng: inputValue.lng ? inputValue.lng : 106.689,
-          }}
-          center={{
-            lat: inputValue.lat ? inputValue.lat : -6.208,
-            lng: inputValue.lng ? inputValue.lng : 106.689,
-          }}
-          onDrag={() => {
-            setAddressLoading(true);
-            setAddress('');
-            setDrag(true);
-          }}
-          onDragEnd={(e: any) => {
-            if (e.center.lat && e.center.lng) {
-              setInputValue({
-                lat: e.center.lat(),
-                lng: e.center.lng(),
-              });
-            }
-            setDrag(false);
-          }}
-          defaultZoom={18}
-        ></GoogleMapReact>
+        {mounted && (
+          <InputMapLeaflet
+            center={{
+              lat:
+                typeof inputValue.lat === 'number' &&
+                Number.isFinite(inputValue.lat)
+                  ? inputValue.lat
+                  : -6.208,
+              lng:
+                typeof inputValue.lng === 'number' &&
+                Number.isFinite(inputValue.lng)
+                  ? inputValue.lng
+                  : 106.689,
+            }}
+            zoom={18}
+            onMoveStart={() => {
+              setAddressLoading(true);
+              setAddress('');
+              setDrag(true);
+            }}
+            onMoveEnd={(c: { lat: number; lng: number }) => {
+              if (
+                typeof c?.lat === 'number' &&
+                Number.isFinite(c.lat) &&
+                typeof c?.lng === 'number' &&
+                Number.isFinite(c.lng)
+              ) {
+                setInputValue({
+                  lat: c.lat,
+                  lng: c.lng,
+                });
+              }
+              setDrag(false);
+            }}
+            onMapClick={(c: { lat: number; lng: number }) => {
+              if (
+                typeof c?.lat === 'number' &&
+                Number.isFinite(c.lat) &&
+                typeof c?.lng === 'number' &&
+                Number.isFinite(c.lng)
+              ) {
+                setAddressLoading(true);
+                setAddress('');
+                setInputValue({
+                  lat: c.lat,
+                  lng: c.lng,
+                });
+              }
+            }}
+          />
+        )}
 
         <div
           className={`flex flex-col items-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2`}
