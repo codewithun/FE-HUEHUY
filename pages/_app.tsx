@@ -8,6 +8,7 @@ import { ReactElement, ReactNode } from 'react';
 import { UserProvider } from '../context/user.context';
 import '../styles/general.css';
 import HuehuyAdPopup from '../components/construct.components/modal/HuehuyAdPopup';
+import 'leaflet/dist/leaflet.css';
 config.autoAddCss = false;
 
 const font = Roboto({
