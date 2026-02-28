@@ -18,8 +18,13 @@ import {
   faLock,
   faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons';
-import { GoogleMap, InfoBox, useJsApiLoader } from '@react-google-maps/api';
+import dynamic from 'next/dynamic';
 import { useGet } from '../../helpers';
+
+const BerburuLeafletMap = dynamic(
+  () => import('../../components/construct.components/maps/BerburuLeafletMap'),
+  { ssr: false }
+);
 import {
   ButtonComponent,
   FloatingPageComponent,
@@ -27,7 +32,6 @@ import {
 } from '../../components/base.components';
 import Link from 'next/link';
 import BottomSheetComponent from '../../components/construct.components/BottomSheetComponent';
-import CubeComponent from '../../components/construct.components/CubeComponent';
 import { distanceConvert } from '../../helpers/distanceConvert.helpers';
 import MenuCubePage from '../../components/construct.components/partial-page/MenuCube.page';
 import MenuAdPage from '../../components/construct.components/partial-page/MenuAd.page';
@@ -392,14 +396,12 @@ export default function Berburu() {
           </div>
 
           <div className="bg-white overflow-hidden rounded-[15px] mt-4 max-h-[195px] relative w-full ">
-            <div className="-mb-10">
-              <MapWithAMarker
-                googleMapURL="https://maps.googleapis.com/maps/api/js?key=AIzaSyBLjp3NfOdkLbKJ85DFBg3CCQuIoKEzVZc&v=3.exp&libraries=geometry,drawing,places"
-                loadingElement={<div style={{ height: `300px` }} />}
-                containerElement={<div style={{ height: `300px` }} />}
-                mapElement={<div style={{ height: `250px` }} />}
+            <div>
+              <BerburuLeafletMap
                 position={map}
                 dataAds={dataAds?.data}
+                height={195}
+                zoom={9}
               />
             </div>
             <div
@@ -613,17 +615,15 @@ export default function Berburu() {
           onClose={() => setMapZoom(false)}
         >
           <div className="mt-2 relative">
-            <MapWithAMarker
-              googleMapURL="https://maps.googleapis.com/maps/api/js?key=AIzaSyBLjp3NfOdkLbKJ85DFBg3CCQuIoKEzVZc&v=3.exp&libraries=geometry,drawing,places"
-              loadingElement={<div style={{ height: `800px` }} />}
-              containerElement={<div style={{ height: `800px` }} />}
-              mapElement={<div style={{ height: `800px` }} />}
+            <BerburuLeafletMap
               position={map}
               dataAds={dataAds?.data}
+              height={700}
+              zoom={11}
             />
 
             <div
-              className="absolute top-4 right-4 w-12 h-12 bg-white flex items-center justify-center rounded-lg"
+              className="absolute top-4 right-4 w-12 h-12 bg-white flex items-center justify-center rounded-xl shadow-md hover:shadow-lg hover:bg-slate-100 transition-all duration-150 cursor-pointer z-[1000]"
               onClick={() => setRefreshMap(!refreshMap)}
             >
               <FontAwesomeIcon icon={faCrosshairs} className="text-2xl" />
@@ -695,56 +695,4 @@ export default function Berburu() {
   );
 }
 
-function MapWithAMarker({ position, dataAds }) {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: 'AIzaSyD74gvRdtA7NAo4j8ENoOsdy3QGXU6Oklc', // API key baru
-    libraries: ['places'],
-  });
 
-  if (!isLoaded) return <div style={{ height: '250px' }}>Loading...</div>;
-
-  return (
-    <GoogleMap
-      center={position ? position : { lat: -6.905977, lng: 107.613144 }}
-      zoom={9}
-      mapContainerStyle={{ height: '250px', width: '100%' }}
-      options={{
-        streetViewControl: false,
-        fullscreenControl: false,
-        disableDefaultUI: true,
-        keyboardShortcuts: false,
-      }}
-    >
-      {dataAds?.map((ad, key) => {
-        // Pastikan koordinat valid sebelum render InfoBox
-        if (!ad?.cube?.map_lat || !ad?.cube?.map_lng) return null;
-
-        return (
-          <InfoBox
-            position={{
-              lat: parseFloat(ad?.cube?.map_lat),
-              lng: parseFloat(ad?.cube?.map_lng),
-            }}
-            options={{ closeBoxURL: '', enableEventPropagation: true }}
-            key={key}
-          >
-            <Link href={buildPromoLink(ad)}>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 bg-slate-200 p-1 border-white flex justify-center items-center">
-                  {ad?.cube?.picture_source ? (
-                    <img src={ad?.cube?.picture_source} className="w-12" />
-                  ) : (
-                    <CubeComponent
-                      size={18}
-                      color={`${ad?.cube?.cube_type?.color}`}
-                    />
-                  )}
-                </div>
-              </div>
-            </Link>
-          </InfoBox>
-        );
-      })}
-    </GoogleMap>
-  );
-}
