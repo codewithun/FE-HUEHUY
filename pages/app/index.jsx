@@ -107,7 +107,6 @@ export default function Index() {
 
   const getAdImage = (ad) =>
     ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
-
   // Delay API calls sedikit untuk memastikan token ready setelah redirect
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -258,7 +257,7 @@ export default function Index() {
         try {
           setLoading(true);
 
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
           const apiBase = baseUrl.replace(/\/api\/?$/, '');
 
           // Ambil token (jika ada)
@@ -446,11 +445,12 @@ export default function Index() {
                     style={{ minWidth: 90 }}
                   >
                     <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-slate-200 bg-white shadow-sm">
-                      <img
-                        src={imgSrc}
-                        alt={label}
-                        className="object-cover w-full h-full brightness-95"
-                        loading="lazy"
+                      <img //BANNER
+                        src={getAdImage(item)}
+                        width={1500}
+                        height={520}
+                        alt=""
+                        className="h-full object-cover"
                       />
                       <div className="absolute bottom-0 left-0 w-full text-center bg-white/60 backdrop-blur-sm py-1">
                         <p className="text-[11px] text-slate-900 font-medium line-clamp-1">{label}</p>
@@ -731,7 +731,7 @@ export default function Index() {
                       <SwiperSlide key={key} className="overflow-hidden">
                         <div className="w-full aspect-[16/8] overflow-hidden bg-primary">
                           <img
-                            src={item.picture_source}
+                            src={getAdImage(item)}
                             width={1500}
                             height={520}
                             alt=""
@@ -887,9 +887,10 @@ export default function Index() {
                                   <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                                     <img
                                       src={getAdImage(item)}
-                                      height={700}
-                                      width={700}
+                                      height={1000}
+                                      width={1000}
                                       alt=""
+                                      className="h-full aspect-square brightness-90"
                                     />
                                   </div>
                                   <div className="col-span-3">

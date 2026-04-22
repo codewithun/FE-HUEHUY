@@ -40,6 +40,15 @@ import { Decrypt } from '../../../../helpers/encryption.helpers';
 import ViewCounter from '../../../../components/base.components/ViewCounter.component';
 
 const authHeader = () => {
+  // prioritaskan plain token dari localStorage
+  if (typeof window !== 'undefined') {
+    const plainToken = localStorage.getItem('huehuy_token_plain');
+    if (plainToken && plainToken.trim() !== '') {
+      return { Authorization: `Bearer ${plainToken}` };
+    }
+  }
+  
+  // fallback ke cookie terenkripsi
   const enc = Cookies.get(token_cookie_name);
   const token = enc ? Decrypt(enc) : '';
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -496,9 +505,18 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
       if (!communityId || communityId === 'promo-entry') return;
 
       try {
-        const encryptedToken = Cookies.get(token_cookie_name);
-        const token = encryptedToken ? Decrypt(encryptedToken) : '';
+            let currentUserToken = null;
+            if (typeof window !== 'undefined') {
+              currentUserToken = localStorage.getItem('huehuy_token_plain');
+            }
 
+            // Fallback ke cookie terenkripsi
+            if (!currentUserToken) {
+              const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+              if (encryptedToken) {
+                currentUserToken = Decrypt(encryptedToken);
+              }
+            }
         // Handle API URL properly - remove /api if it exists, then add it back
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
         const apiUrl = baseUrl.replace(/\/api\/?$/, '');
@@ -546,9 +564,18 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
 
     const checkClaimedStatus = async () => {
       try {
-        const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
-        const currentUserToken = encryptedToken ? Decrypt(encryptedToken) : '';
+            let currentUserToken = null;
+            if (typeof window !== 'undefined') {
+              currentUserToken = localStorage.getItem('huehuy_token_plain');
+            }
 
+            // Fallback ke cookie terenkripsi
+            if (!currentUserToken) {
+              const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+              if (encryptedToken) {
+                currentUserToken = Decrypt(encryptedToken);
+              }
+            }
         if (!currentUserToken) {
           setIsAlreadyClaimed(false);
           return;
@@ -619,9 +646,24 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   const promoCoordsRef = useRef(null);
 
   // izinkan fetch ulang kalau ID komunitas/Promo berubah
-  useEffect(() => {
-    hasFetched.current = false;
-  }, [effectivePromoId, communityId]);
+let token = null;
+
+try {
+  // Prioritaskan plain token dari localStorage
+  if (typeof window !== 'undefined') {
+    token = localStorage.getItem('huehuy_token_plain');
+  }
+  
+  // Fallback ke cookie terenkripsi
+  if (!token) {
+    const encrypted = Cookies.get(token_cookie_name || 'huehuy_token');
+    if (typeof encrypted === 'string' && encrypted) {
+      token = Decrypt(encrypted);
+    }
+  }
+} catch (e) {
+  console.error('Failed to get token:', e);
+}
 
   // +++ Helper jarak + koordinat +++
   const haversineKm = (lat1, lon1, lat2, lon2) => {
@@ -1417,21 +1459,29 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     if (!autoRegister) return;
     if (isCheckingRef.current || verificationDoneRef.current) return; // Prevent API spam
 
-    let token = null;
+let token = null;
 
-    try {
-      const encrypted = Cookies.get(token_cookie_name || 'huehuy_token');
-      if (typeof encrypted === 'string' && encrypted) {
-        token = Decrypt(encrypted);
-      }
-    } catch (e) {
-      console.error('Failed to decrypt token:', e);
-      Cookies.remove(token_cookie_name || 'huehuy_token');
+try {
+  // plain token dari localStorage (kunci fix!)
+  if (typeof window !== 'undefined') {
+    token = localStorage.getItem('huehuy_token_plain');
+  }
+  
+  // fallback ke cookie terenkripsi
+  if (!token) {
+    const encrypted = Cookies.get(token_cookie_name || 'huehuy_token');
+    if (typeof encrypted === 'string' && encrypted) {
+      token = Decrypt(encrypted);
     }
-
-    if (typeof window !== 'undefined' && !token) {
-      token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-    }
+  }
+  
+  // fallback terakhir ke key lama (kalau ada)
+  if (!token && typeof window !== 'undefined') {
+    token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+  }
+} catch (e) {
+  console.error('Failed to get token:', e);
+}
 
     setHasTriedAuth(true); // Mark that we've tried auth
 
@@ -1804,9 +1854,27 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
     setIsClaimedLoading(true);
 
     try {
-      const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
-      const token = encryptedToken ? (() => { try { return Decrypt(encryptedToken); } catch { return ''; } })() : '';
+          let token = null;
+          if (typeof window !== 'undefined') {
+            token = localStorage.getItem('huehuy_token_plain');
+          }
 
+          // Fallback ke cookie terenkripsi
+          if (!token) {
+            const encryptedToken = Cookies.get(token_cookie_name || 'huehuy_token');
+            if (encryptedToken) {
+              try {
+                token = Decrypt(encryptedToken);
+              } catch {
+                token = '';
+              }
+            }
+          }
+          if (!token) {
+            setErrorMessage('Sesi login telah berakhir. Silakan login kembali.');
+            setShowErrorModal(true);
+            return;
+          }
       if (!token) {
         setErrorMessage('Sesi login telah berakhir. Silakan login kembali.');
         setShowErrorModal(true);

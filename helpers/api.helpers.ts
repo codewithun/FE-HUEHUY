@@ -21,71 +21,49 @@ const buildBaseUrl = (base?: string, path?: string) => {
   return [b, p].filter(Boolean).join('/');
 };
 
+// ✅ HELPER: Ambil token dari localStorage (plain) atau cookie (encrypted)
+const getRawToken = () => {
+  if (typeof window === 'undefined') return null;
+  
+  // 1. Prioritaskan plain token dari localStorage (buat dev)
+  const plainToken = localStorage.getItem('huehuy_token_plain');
+  if (plainToken && plainToken.trim() !== '') {
+    return plainToken;
+  }
+  
+  // 2. Fallback ke encrypted token dari cookie
+  const isBrowser = typeof window !== 'undefined';
+  const isAdminScope = isBrowser && window.location?.pathname?.startsWith('/admin');
+  const isCorporateScope = isBrowser && window.location?.pathname?.startsWith('/corporate');
+  
+  let cookieName = isAdminScope ? admin_token_cookie_name : 
+                   isCorporateScope ? corporate_token_cookie_name : 
+                   token_cookie_name;
+  
+  const enc = Cookies.get(cookieName) || localStorage.getItem(cookieName) || undefined;
+  if (!enc) return null;
+  
+  try {
+    const decrypted = Decrypt(enc);
+    return decrypted && decrypted.trim() !== '' ? decrypted : null;
+  } catch {
+    return null;
+  }
+};
+
 const getAuthHeader = () => {
   try {
-    const isBrowser = typeof window !== 'undefined';
-    const isAdminScope = isBrowser && typeof window.location?.pathname === 'string'
-      ? window.location.pathname.startsWith('/admin')
-      : false;
-    const isCorporateScope = isBrowser && typeof window.location?.pathname === 'string'
-      ? window.location.pathname.startsWith('/corporate')
-      : false;
-
-    // STRICT MODE: Gunakan token sesuai scope TANPA fallback ke scope lain
-    // Ini mencegah token corporate/admin mempengaruhi halaman user
-    let cookieName: string;
-    if (isAdminScope) {
-      cookieName = admin_token_cookie_name;
-    } else if (isCorporateScope) {
-      cookieName = corporate_token_cookie_name;
-    } else {
-      cookieName = token_cookie_name;
-    }
-
-    let enc: string | undefined = undefined;
-    enc = Cookies.get(cookieName);
-    if (!enc && isBrowser) {
-      const ls = localStorage.getItem(cookieName);
-      enc = ls === null ? undefined : ls;
-    }
-
-    if (!enc) {
-      // eslint-disable-next-line no-console
-      console.debug(`No encrypted token found for scope: ${isAdminScope ? 'admin' : isCorporateScope ? 'corporate' : 'user'}`);
+    const token = getRawToken();
+    if (!token) {
+      const isBrowser = typeof window !== 'undefined';
+      const isAdminScope = isBrowser && window.location?.pathname?.startsWith('/admin');
+      const isCorporateScope = isBrowser && window.location?.pathname?.startsWith('/corporate');
+      console.debug(`No token found for scope: ${isAdminScope ? 'admin' : isCorporateScope ? 'corporate' : 'user'}`);
       return {};
     }
-
-    const token = Decrypt(enc);
-    if (!token || token.trim() === '') {
-      // eslint-disable-next-line no-console
-      console.warn('Token decryption failed or empty; clearing storages');
-      try {
-        Cookies.remove(token_cookie_name);
-        Cookies.remove(admin_token_cookie_name);
-        Cookies.remove(corporate_token_cookie_name);
-        if (isBrowser) {
-          localStorage.removeItem(token_cookie_name);
-          localStorage.removeItem(admin_token_cookie_name);
-          localStorage.removeItem(corporate_token_cookie_name);
-        }
-      } catch {}
-      return {};
-    }
-
     return { Authorization: `Bearer ${token}` };
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to resolve token from storages:', error);
-    try {
-      Cookies.remove(token_cookie_name);
-      Cookies.remove(admin_token_cookie_name);
-      Cookies.remove(corporate_token_cookie_name);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(token_cookie_name);
-        localStorage.removeItem(admin_token_cookie_name);
-        localStorage.removeItem(corporate_token_cookie_name);
-      }
-    } catch {}
+    console.error('Failed to build auth header:', error);
     return {};
   }
 };

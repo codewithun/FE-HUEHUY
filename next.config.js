@@ -13,7 +13,7 @@ const runtimeCaching = [
   },
   // Dev/local API
   {
-    urlPattern: /^http:\/\/localhost:8000\/api\//,
+    urlPattern: /^http:\/\/localhost:9000\/api\//,
     handler: 'NetworkFirst',
     options: {
       cacheName: 'api-cache',
@@ -40,7 +40,7 @@ const withPWA = require('next-pwa')({
 });
 
 // Derive host from NEXT_PUBLIC_API_URL to allow images from that origin too
-const API_BASE_FOR_IMAGES = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+const API_BASE_FOR_IMAGES = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000')
   .replace(/\/$/, '')
   .replace(/\/api$/i, '');
 /** @type {import('next/dist/shared/lib/image-config').RemotePattern[]} */
@@ -59,7 +59,7 @@ try {
 module.exports = withPWA({
   // ✅ Tambahan: proxy agar hindari CORS untuk file statis Laravel
   async rewrites() {
-    const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000').replace(/\/$/, '');
     const FILE_BASE = API_BASE.replace(/\/api$/i, '');
 
     return [
@@ -116,14 +116,14 @@ module.exports = withPWA({
     remotePatterns: [
       // computed from NEXT_PUBLIC_API_URL (covers dev/prod backends)
       ...envRemotePattern,
-      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/storage/**' },
-      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/storage/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '9000', pathname: '/storage/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '9000', pathname: '/storage/**' },
       // izinkan jika backend kadang melayani /ads/** langsung
-      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/ads/**' },
-      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/ads/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '9000', pathname: '/ads/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '9000', pathname: '/ads/**' },
       // izinkan jika backend kadang melayani /communities/** langsung
-      { protocol: 'http', hostname: '127.0.0.1', port: '8000', pathname: '/communities/**' },
-      { protocol: 'http', hostname: 'localhost',  port: '8000', pathname: '/communities/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '9000', pathname: '/communities/**' },
+      { protocol: 'http', hostname: 'localhost',  port: '9000', pathname: '/communities/**' },
 
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/storage/**' },
       { protocol: 'https', hostname: 'api.huehuy.com', pathname: '/ads/**' },
