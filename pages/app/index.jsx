@@ -446,7 +446,7 @@ export default function Index() {
                   >
                     <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-slate-200 bg-white shadow-sm">
                       <img //BANNER
-                        src={getAdImage(item)}
+                        src={imgSrc}
                         width={1500}
                         height={520}
                         alt=""

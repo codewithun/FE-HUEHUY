@@ -36,6 +36,9 @@ const withPWA = require('next-pwa')({
   register: true,
   skipWaiting: true,
   runtimeCaching,
+  // Next 15 doesn't serve this file, but some builds may still try to precache it.
+  // Excluding it prevents Workbox install from failing with 404.
+  buildExcludes: [/dynamic-css-manifest\.json$/],
   disable: process.env.NODE_ENV === 'development',
 });
 
