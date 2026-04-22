@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 // api.helper.ts
 import { useEffect, useState } from 'react';
 import axios, { AxiosProgressEvent } from 'axios';
