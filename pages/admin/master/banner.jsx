@@ -24,14 +24,18 @@ export default function ManageSlider() {
     const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api$/, '');
     if (!s) return '';
     if (typeof s !== 'string') return '';
+
     const str = s.trim();
-    if (/^https?:\/\//i.test(str)) return str; // already absolute
+
+    if (/^https?:\/\//i.test(str)) return str;
     if (str.startsWith('/storage/')) return `${base}${str}`;
+
     const trimmed = str.replace(/^\/+/, '');
     if (trimmed.startsWith('storage/')) return `${base}/${trimmed}`;
+
     return `${base}/storage/${trimmed}`;
   };
-  // const { accessActive, loading } = useAccessContext();
+
   const [paginate, setPaginate] = useState(9);
   const [page, setPage] = useState(1);
   const [totalRow, setTotalRow] = useState(0);
@@ -60,6 +64,7 @@ export default function ManageSlider() {
       search: keyword,
     },
   });
+
   useEffect(() => {
     setTotalRow(data?.total_row ?? data?.total ?? data?.data?.length ?? 0);
   }, [fetchLoading, data]);
@@ -76,202 +81,148 @@ export default function ManageSlider() {
       </div>
 
       <div className="flex items-center justify-between my-4">
-        {
-          // =========================>
-          // ## Input Paginate
-          // =========================>
-        }
-        <div className="relative z-20">
-          <>
-            <div className="bg-white p-1.5 rounded-md w-24">
-              <SelectComponent
-                name="paginate"
-                options={[
-                  {
-                    value: 9,
-                    label: '9',
-                  },
-                  {
-                    value: 18,
-                    label: '18',
-                  },
-                  {
-                    value: 27,
-                    label: '27',
-                  },
-                  {
-                    value: 45,
-                    label: '45',
-                  },
-                ]}
-                size="sm"
-                value={paginate}
-                onChange={(e) => {
-                  setPaginate(e);
-                }}
-              />
-            </div>
-          </>
+        <div className="bg-white p-1.5 rounded-md w-24">
+          <SelectComponent
+            name="paginate"
+            options={[
+              { value: 9, label: '9' },
+              { value: 18, label: '18' },
+              { value: 27, label: '27' },
+              { value: 45, label: '45' },
+            ]}
+            size="sm"
+            value={paginate}
+            onChange={(e) => setPaginate(e)}
+          />
         </div>
 
         <div className="w-3/4 lg:w-2/3 flex gap-2 justify-end">
           <div className="bg-white p-1.5 rounded-md flex gap-1.5 w-[350px]">
-            <div className="w-full min-w-[150px]">
-              <InputComponent
-                name="search"
-                size="sm"
-                placeholder="Cari disini..."
-                rightIcon={faMagnifyingGlass}
-                value={keyword}
-                onChange={(e) => setKeyword(e)}
-              />
-            </div>
+            <InputComponent
+              name="search"
+              size="sm"
+              placeholder="Cari disini..."
+              rightIcon={faMagnifyingGlass}
+              value={keyword}
+              onChange={(e) => setKeyword(e)}
+            />
           </div>
 
-          <div className="bg-white p-1.5 rounded-md relative">
+          <div className="bg-white p-1.5 rounded-md">
             <IconButtonComponent
               icon={faRefresh}
-              customPaint={{
-                bg: 'base',
-                border: 'slate-300 ',
-                color: 'slate-400',
-              }}
-              onClick={() => {
-                reset();
-              }}
+              onClick={reset}
               size="sm"
             />
           </div>
         </div>
       </div>
-      <div className="relative w-full grid grid-cols-3 lg:grid-cols-9 gap-2">
+
+      <div className="grid grid-cols-3 lg:grid-cols-9 gap-2">
         {fetchLoading ? (
-          [1, 2, 3, 4, 5, 6, 7, 8, 9].map((_, key) => {
-            return (
-              <div
-                className=" col-span-3 h-36 bg-white rounded-lg border-white border-2"
-                key={key}
-              >
-                <div className="group w-full h-full relative bg-white skeleton__loading"></div>
-              </div>
-            );
-          })
+          Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="col-span-3 h-36 bg-white rounded-lg skeleton__loading" />
+          ))
         ) : !data?.data ? (
-          <div className="col-span-4 col-start-3 flex justify-center p-5">
-            {
-              // =========================>
-              // ## When Empty
-              // =========================>
-            }
-            <div className="flex flex-col items-center justify-center gap-8 p-5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/204.svg" width={'200px'} alt="server error" />
-              <h1 className="text-2xl font-bold">Data Kosong</h1>
-            </div>
+          <div className="col-span-9 text-center p-5">
+            <img src="/204.svg" width="200" alt="empty" />
+            <h1 className="text-xl font-bold">Data Kosong</h1>
           </div>
         ) : (
-          data?.data.map((item, key) => {
+          data.data.map((item, key) => {
             const rawUrl = toStoragePath(item?.picture_source);
-            const bgUrl = rawUrl ? `${rawUrl}?v=${encodeURIComponent(item?.updated_at || item?.id || '')}` : '';
+            const bgUrl = rawUrl
+              ? `${rawUrl}?v=${encodeURIComponent(item?.updated_at || item?.id)}`
+              : '';
+
             return (
               <div
-                className=" col-span-3 h-40 bg-white rounded-lg"
+                key={key}
+                className="col-span-3 h-40 bg-white rounded-lg"
                 style={{
                   backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
                   backgroundSize: 'cover',
                 }}
-                key={key}
               >
-                <div className="group w-full h-full relative overflow-hidden">
-                  <div className=" absolute flex gap-2 p-2 bg-white rounded-lg shadow-sm top-2 right-2 ">
-                    <IconButtonComponent
-                      icon={faEdit}
-                      paint="warning"
-                      rounded
-                      onClick={() => {
-                        setSelected(item);
-                        setModalForm(true);
-                      }}
-                    />
-                    <IconButtonComponent
-                      icon={faTrash}
-                      paint="danger"
-                      rounded
-                      onClick={() => {
-                        setSelected(item);
-                        setModalDelete(true);
-                      }}
-                    />
-                  </div>
+                <div className="flex gap-2 p-2">
+                  <IconButtonComponent
+                    icon={faEdit}
+                    onClick={() => {
+                      setSelected(item);
+                      setModalForm(true);
+                    }}
+                  />
+                  <IconButtonComponent
+                    icon={faTrash}
+                    onClick={() => {
+                      setSelected(item);
+                      setModalDelete(true);
+                    }}
+                  />
                 </div>
               </div>
             );
           })
         )}
       </div>
-      <div className="mt-2">
-        <PaginateComponent
-          page={page}
-          paginate={paginate}
-          totalRow={totalRow}
-          onChange={(newTotalRow, newPaginate, newPage) => {
-            setPaginate(newPaginate);
-            setPage(newPage);
-          }}
-        />
-      </div>
+
+      <PaginateComponent
+        page={page}
+        paginate={paginate}
+        totalRow={totalRow}
+        onChange={(t, p, pg) => {
+          setPaginate(p);
+          setPage(pg);
+        }}
+      />
+
+      {/* MODAL FORM */}
       <FloatingPageComponent
-        title={!selected ? 'Tambah Banner Baru' : 'Ubah Banner'}
+        title={!selected ? 'Tambah Banner' : 'Edit Banner'}
         show={modalForm}
         onClose={() => {
           setModalForm(false);
           setSelected(null);
         }}
       >
-        <div className="px-6 pt-4 pb-20 h-full overflow-scroll scroll_control">
+        <div className="p-6">
           <FormSupervisionComponent
             submitControl={{
-              path:
-                selected === null
-                  ? fetchControl.path
-                  : fetchControl.path + '/' + selected?.id,
+              path: selected ? `${fetchControl.path}/${selected.id}` : fetchControl.path,
               contentType: 'multipart/form-data',
             }}
-            // method={dataSelected === null ? 'post' : 'put'}
             confirmation
             onSuccess={() => {
               setModalForm(false);
-              reset();
               setSelected(null);
+              reset();
             }}
             forms={[
               {
                 type: 'custom',
-                custom: ({ formControl }) => {
-                  return (
-                    <>
-                      <InputImageComponent
-                        {...formControl('image')}
-                        name="image"
-                        label="Banner"
-                        aspect="16/6"
-                      />
-                    </>
-                  );
-                },
+                custom: ({ formControl }) => (
+                  <InputImageComponent
+                    {...formControl('picture')}   // ✅ FIX UTAMA
+                    name="picture"                // ✅ HARUS SAMA
+                    label="Banner"
+                    aspect="16/6"
+                  />
+                ),
               },
             ]}
             defaultValue={
               selected && {
                 _method: 'PUT',
-                image: toStoragePath(selected?.picture_source),
+                picture: toStoragePath(selected?.picture_source), // ✅ FIX
               }
             }
           />
         </div>
       </FloatingPageComponent>
+
+      {/* DELETE */}
       <ModalConfirmComponent
-        title={'Yakin ingin menghapus banner'}
+        title="Hapus banner?"
         show={modalDelete}
         onClose={() => {
           setModalDelete(false);
@@ -279,24 +230,17 @@ export default function ManageSlider() {
         }}
         onSubmit={async () => {
           setLoadingDelete(true);
+          const res = await destroy({
+            path: `${fetchControl.path}/${selected?.id}`,
+          });
 
-          if (selected !== null) {
-            let response = await destroy({
-              ...fetchControl,
-              path: fetchControl.path + '/' + selected?.id,
-            });
-
-            if (response?.status == 200 || response?.status == 201) {
-              setLoadingDelete(false);
-              reset();
-              setSelected(null);
-              setModalDelete(false);
-            } else {
-              // setModalDeleteError(true);
-              setLoadingDelete(false);
-              // setModalDelete(false);
-            }
+          if (res?.status === 200) {
+            reset();
+            setModalDelete(false);
+            setSelected(null);
           }
+
+          setLoadingDelete(false);
         }}
         submitButton={{
           label: 'Ya',
@@ -307,6 +251,4 @@ export default function ManageSlider() {
   );
 }
 
-ManageSlider.getLayout = function getLayout(page) {
-  return <AdminLayout>{page}</AdminLayout>;
-};
+ManageSlider.getLayout = (page) => <AdminLayout>{page}</AdminLayout>;

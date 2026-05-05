@@ -46,8 +46,78 @@ import {
   prepareKubusVoucherData,
   validateVoucherData
 } from '../../../../helpers/voucher.helpers';
+const axiosInstance = axios.create({
+  baseURL: 'http://localhost:8000',
+  timeout: 60000,
+});
 // Note: Real modals are imported above
 function KubusMain() {
+  useEffect(() => {
+  // ======================
+  // 🔐 REQUEST
+  // ======================
+  const reqInterceptor = axiosInstance.interceptors.request.use(
+    (config) => {
+      const token =
+        Cookies.get(admin_token_cookie_name) ||
+        (typeof window !== 'undefined'
+          ? localStorage.getItem(admin_token_cookie_name)
+          : null);
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      config.headers['Accept'] = 'application/json';
+
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
+
+  // ======================
+  // 🚨 RESPONSE
+  // ======================
+  const resInterceptor = axiosInstance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      const status = error?.response?.status;
+
+      // 🔐 AUTH ERROR
+      if (status === 401 || status === 403) {
+        Cookies.remove(admin_token_cookie_name);
+
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(admin_token_cookie_name);
+          window.location.href = '/admin';
+        }
+      }
+
+      // 💥 SERVER ERROR
+      if (status >= 500) {
+        console.error('Server error:', error?.response?.data);
+        return Promise.resolve({ data: [] }); // ⬅️ jangan crash UI
+      }
+
+      // 🌐 NETWORK ERROR
+      if (!error.response) {
+        console.error('Network error:', error.message);
+        return Promise.resolve({ data: [] }); // ⬅️ penting
+      }
+
+      return Promise.reject(error);
+    }
+  );
+
+  // ======================
+  // CLEANUP (WAJIB)
+  // ======================
+  return () => {
+    axiosInstance.interceptors.request.eject(reqInterceptor);
+    axiosInstance.interceptors.response.eject(resInterceptor);
+  };
+}, []);
+
   // States
   const [selected, setSelected] = useState(null);
   const [pendingEditRow, setPendingEditRow] = useState(null);
@@ -298,6 +368,7 @@ function KubusMain() {
         title="Kubus"
         fetchControl={{
           path: 'admin/cubes',
+          axiosInstance: axiosInstance
         }}
         columnControl={{
           custom: [

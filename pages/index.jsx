@@ -43,72 +43,80 @@ export default function Login() {
   const [loading, setLoading] = useState(true);
 
   // Perbaiki onSuccess function
-  const onSuccess = (res) => {
-    // eslint-disable-next-line no-console
-    console.log('=== LOGIN SUCCESS RESPONSE ===', res);
+const onSuccess = (res) => {
+  console.log('=== LOGIN SUCCESS RESPONSE ===', res);
 
-    // bedakan http code vs business status
-    const httpCode = res?.status ?? res?.code ?? 200;
-    const bizStatus = typeof res?.data?.status === 'string'
-      ? res.data.status
-      : (typeof res?.status === 'string' ? res.status : undefined);
+  const httpCode = res?.status ?? res?.code ?? 200;
+  const bizStatus = typeof res?.data?.status === 'string'
+    ? res.data.status
+    : (typeof res?.status === 'string' ? res.status : undefined);
 
-    const reason = typeof res?.data?.reason === 'string'
-      ? res.data.reason
-      : (typeof res?.reason === 'string' ? res.reason : undefined);
+  const reason = typeof res?.data?.reason === 'string'
+    ? res.data.reason
+    : (typeof res?.reason === 'string' ? res.reason : undefined);
 
-    // ambil redirect_url & email dari body lebih dulu
-    const rurl = res?.data?.redirect_url || res?.redirect_url || null;
-    const email = res?.data?.email || res?.email || '';
+  const rurl = res?.data?.redirect_url || res?.redirect_url || null;
+  const email = res?.data?.email || res?.email || '';
 
-    // anggap unverified jika: http 202 ATAU business status/reason 'unverified' ATAU ada redirect_url
-    const needVerify =
-      httpCode === 202 ||
-      bizStatus === 'unverified' ||
-      reason === 'unverified' ||
-      !!rurl ||
-      res?.data?.need_verification === true ||
-      res?.need_verification === true;
+  const needVerify =
+    httpCode === 202 ||
+    bizStatus === 'unverified' ||
+    reason === 'unverified' ||
+    !!rurl ||
+    res?.data?.need_verification === true ||
+    res?.need_verification === true;
 
-    if (needVerify) {
-      // Prioritaskan ?redirect jika ada (diset saat scan QR komunitas)
-      const redirectParam = router?.query?.redirect
-        ? String(router.query.redirect)
-        : null;
-      const safeRedirect = redirectParam && isSafeInternal(redirectParam)
-        ? redirectParam
-        : null;
+  if (needVerify) {
+    const redirectParam = router?.query?.redirect
+      ? String(router.query.redirect)
+      : null;
 
-      const next = safeRedirect || consumeNext(router); // ambil dari ?redirect -> ?next -> localStorage
-      const base = rurl || `/verifikasi?email=${encodeURIComponent(email)}`;
-      const target = next ? `${base}&next=${encodeURIComponent(next)}` : base;
-      window.location.href = target;
-      return;
-    }
+    const safeRedirect = redirectParam && isSafeInternal(redirectParam)
+      ? redirectParam
+      : null;
 
-    // sudah verified → simpan token
-    const token = res?.data?.token || res?.token;
-    if (token) {
-      // Gunakan secure cookie hanya di production agar tersimpan saat dev (http)
-      const cookieOpts = { expires: 365, secure: process.env.NODE_ENV === 'production' };
-      Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
-      // Ambil URL redirect dari query, fallback ke helper consumeNext
-      const redirectParam = router?.query?.redirect ? String(router.query.redirect) : null;
-      const safeRedirect = redirectParam && isSafeInternal(redirectParam) ? redirectParam : null;
-      const redirect = safeRedirect || consumeNext(router);
-      setTimeout(() => {
-        if (redirect) {
-          window.location.href = decodeURIComponent(redirect);
-        } else {
-          window.location.href = '/app';
-        }
-      }, 100);
-      return;
-    }
+    const next = safeRedirect || consumeNext(router);
+    const base = rurl || `/verifikasi?email=${encodeURIComponent(email)}`;
+    const target = next ? `${base}&next=${encodeURIComponent(next)}` : base;
 
-    // eslint-disable-next-line no-console
-    console.error('No token and no unverified signal in response:', res);
-  };
+    window.location.href = target;
+    return;
+  }
+
+  // ✅ FIX UTAMA DI SINI
+  const token = res?.data?.token || res?.token;
+
+  if (token) {
+    const cookieOpts = {
+      expires: 365,
+      secure: process.env.NODE_ENV === 'production'
+    };
+
+    // simpan ke cookie (encrypted)
+    Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
+
+    // 🔥 PENTING BANGET: simpan juga plain token
+    localStorage.setItem('huehuy_token_plain', token);
+
+    const redirectParam = router?.query?.redirect
+      ? String(router.query.redirect)
+      : null;
+
+    const safeRedirect = redirectParam && isSafeInternal(redirectParam)
+      ? redirectParam
+      : null;
+
+    const redirect = safeRedirect || consumeNext(router);
+
+    setTimeout(() => {
+      window.location.href = redirect || '/app';
+    }, 100);
+
+    return;
+  }
+
+  console.error('No token and no unverified signal in response:', res);
+};
 
   const [{ formControl, submit, submitLoading, setDefaultValues }] = useForm(
     {
