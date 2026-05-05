@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
@@ -43,80 +44,80 @@ export default function Login() {
   const [loading, setLoading] = useState(true);
 
   // Perbaiki onSuccess function
-const onSuccess = (res) => {
-  console.log('=== LOGIN SUCCESS RESPONSE ===', res);
+  const onSuccess = (res) => {
+    console.log('=== LOGIN SUCCESS RESPONSE ===', res);
 
-  const httpCode = res?.status ?? res?.code ?? 200;
-  const bizStatus = typeof res?.data?.status === 'string'
-    ? res.data.status
-    : (typeof res?.status === 'string' ? res.status : undefined);
+    const httpCode = res?.status ?? res?.code ?? 200;
+    const bizStatus = typeof res?.data?.status === 'string'
+      ? res.data.status
+      : (typeof res?.status === 'string' ? res.status : undefined);
 
-  const reason = typeof res?.data?.reason === 'string'
-    ? res.data.reason
-    : (typeof res?.reason === 'string' ? res.reason : undefined);
+    const reason = typeof res?.data?.reason === 'string'
+      ? res.data.reason
+      : (typeof res?.reason === 'string' ? res.reason : undefined);
 
-  const rurl = res?.data?.redirect_url || res?.redirect_url || null;
-  const email = res?.data?.email || res?.email || '';
+    const rurl = res?.data?.redirect_url || res?.redirect_url || null;
+    const email = res?.data?.email || res?.email || '';
 
-  const needVerify =
-    httpCode === 202 ||
-    bizStatus === 'unverified' ||
-    reason === 'unverified' ||
-    !!rurl ||
-    res?.data?.need_verification === true ||
-    res?.need_verification === true;
+    const needVerify =
+      httpCode === 202 ||
+      bizStatus === 'unverified' ||
+      reason === 'unverified' ||
+      !!rurl ||
+      res?.data?.need_verification === true ||
+      res?.need_verification === true;
 
-  if (needVerify) {
-    const redirectParam = router?.query?.redirect
-      ? String(router.query.redirect)
-      : null;
+    if (needVerify) {
+      const redirectParam = router?.query?.redirect
+        ? String(router.query.redirect)
+        : null;
 
-    const safeRedirect = redirectParam && isSafeInternal(redirectParam)
-      ? redirectParam
-      : null;
+      const safeRedirect = redirectParam && isSafeInternal(redirectParam)
+        ? redirectParam
+        : null;
 
-    const next = safeRedirect || consumeNext(router);
-    const base = rurl || `/verifikasi?email=${encodeURIComponent(email)}`;
-    const target = next ? `${base}&next=${encodeURIComponent(next)}` : base;
+      const next = safeRedirect || consumeNext(router);
+      const base = rurl || `/verifikasi?email=${encodeURIComponent(email)}`;
+      const target = next ? `${base}&next=${encodeURIComponent(next)}` : base;
 
-    window.location.href = target;
-    return;
-  }
+      window.location.href = target;
+      return;
+    }
 
-  // ✅ FIX UTAMA DI SINI
-  const token = res?.data?.token || res?.token;
+    // ✅ FIX UTAMA DI SINI
+    const token = res?.data?.token || res?.token;
 
-  if (token) {
-    const cookieOpts = {
-      expires: 365,
-      secure: process.env.NODE_ENV === 'production'
-    };
+    if (token) {
+      const cookieOpts = {
+        expires: 365,
+        secure: process.env.NODE_ENV === 'production'
+      };
 
-    // simpan ke cookie (encrypted)
-    Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
+      // simpan ke cookie (encrypted)
+      Cookies.set(token_cookie_name, Encrypt(token), cookieOpts);
 
-    // 🔥 PENTING BANGET: simpan juga plain token
-    localStorage.setItem('huehuy_token_plain', token);
+      // 🔥 PENTING BANGET: simpan juga plain token
+      localStorage.setItem('huehuy_token_plain', token);
 
-    const redirectParam = router?.query?.redirect
-      ? String(router.query.redirect)
-      : null;
+      const redirectParam = router?.query?.redirect
+        ? String(router.query.redirect)
+        : null;
 
-    const safeRedirect = redirectParam && isSafeInternal(redirectParam)
-      ? redirectParam
-      : null;
+      const safeRedirect = redirectParam && isSafeInternal(redirectParam)
+        ? redirectParam
+        : null;
 
-    const redirect = safeRedirect || consumeNext(router);
+      const redirect = safeRedirect || consumeNext(router);
 
-    setTimeout(() => {
-      window.location.href = redirect || '/app';
-    }, 100);
+      setTimeout(() => {
+        window.location.href = redirect || '/app';
+      }, 100);
 
-    return;
-  }
+      return;
+    }
 
-  console.error('No token and no unverified signal in response:', res);
-};
+    console.error('No token and no unverified signal in response:', res);
+  };
 
   const [{ formControl, submit, submitLoading, setDefaultValues }] = useForm(
     {
