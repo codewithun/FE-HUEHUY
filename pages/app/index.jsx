@@ -105,30 +105,9 @@ export default function Index() {
     return cubeCode ? `/app/kubus-informasi/kubus-infor?code=${encodeURIComponent(cubeCode)}` : '#';
   };
 
-  
-const cleanImage = (img) => {
-  if (!img) return null;
-
-  const val = String(img).trim();
-
-  if (
-    val === '0' ||
-    val === 'null' ||
-    val === 'undefined'
-  ) {
-    return null;
-  }
-
-  return val;
-};
-
-const getAdImage = (ad) =>
-  cleanImage(ad?.image_1) ||
-  cleanImage(ad?.image_2) ||
-  cleanImage(ad?.image_3) ||
-  cleanImage(ad?.picture_source) ||
-  '';
-    // Delay API calls sedikit untuk memastikan token ready setelah redirect
+  const getAdImage = (ad) =>
+    ad?.image_1 || ad?.image_2 || ad?.image_3 || ad?.picture_source || '';
+  // Delay API calls sedikit untuk memastikan token ready setelah redirect
   useEffect(() => {
     const timer = setTimeout(() => {
       // DEBUG: Simple token check
