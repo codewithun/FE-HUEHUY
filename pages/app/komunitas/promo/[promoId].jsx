@@ -2253,9 +2253,11 @@ try {
             {/* Hero Image Carousel */}
             <div className="mb-4">
               <ImageCarousel
-                images={promoImages}
-                title={promoData?.title || getTypeLabel(promoData)}
-                className="w-full"
+                key={`${currentIndex}-${images[currentIndex]}`}
+                src={images[currentIndex]}
+                alt="Promo"
+                fill
+                className="object-cover"
               />
             </div>
 

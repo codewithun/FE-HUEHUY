@@ -243,7 +243,7 @@ const CommunityPromoPage = () => {
   };
 
   const normalizePromos = (arr = []) => {
-    let promos = (Array.isArray(arr) ? arr : []).map((p) => {
+    let promos = (Array.isArray(arr) ? arr : []).map((p, index) => {
       // Ambil gambar dari ads[0] jika ada
       let ad = Array.isArray(p.ads) && p.ads.length > 0 ? p.ads[0] : null;
       let raw =
@@ -258,7 +258,7 @@ const CommunityPromoPage = () => {
       const image = buildImageUrl(raw);
 
       return {
-        id: p.id ?? p.promo_id ?? ad?.id ?? Math.random(),
+        id: p.id ?? p.promo_id ?? ad?.id ?? `promo-${index}`,
         title: p.title ?? ad?.title ?? p.name ?? 'Promo',
         merchant: p.merchant ?? p.community?.name ?? ad?.merchant ?? 'Merchant',
         distance: p.distance ?? '0 KM',
@@ -588,7 +588,11 @@ const CommunityPromoPage = () => {
               <Link href="#" key={key} onClick={(e) => { e.preventDefault(); handleClick(); }}>
                 <div className="grid grid-cols-4 gap-3 p-3 rounded-[15px] bg-white/40 backdrop-blur-sm border border-white/30 hover:scale-[1.01] transition-transform">
                   <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-300">
-                    <Image src={buildImageUrl(imageUrl)} alt={title} width={700} height={700} className="w-full h-full object-cover" />
+                    <Image 
+                    key={buildImageUrl(imageUrl)}
+                    src={buildImageUrl(imageUrl)} 
+                    alt={title} width={700} height={700} 
+                    className="w-full h-full object-cover" />
                   </div>
                   <div className="col-span-3">
                     <p className="font-semibold text-white drop-shadow-sm limit__line__1">{title}</p>
@@ -1181,6 +1185,7 @@ const CommunityPromoPage = () => {
       <div className="flex p-4 items-center">
         <div className="w-28 h-28 rounded-[12px] overflow-hidden flex-shrink-0 bg-white/10">
           <Image
+            key={promo.image}
             src={promo.image}
             alt={promo.title}
             width={112}
