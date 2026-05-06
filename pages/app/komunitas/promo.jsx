@@ -180,7 +180,7 @@ const CommunityPromoPage = () => {
 
   // Build consistent link to appropriate detail page (sama seperti di home.jsx)
   const buildPromoLink = (ad, cube = null, communityId = null) => {
-    const id = ad?.id || ad?.ad_id;
+    const id = ad?.id ?? null;
     const normBool = (v) => {
       if (v === true || v === 1) return true;
       if (typeof v === 'string') {
@@ -248,7 +248,8 @@ const normalizePromos = (arr = []) => {
   (Array.isArray(arr) ? arr : []).forEach((p, index) => {
     // kalau ada banyak ads, flatten jadi item masing-masing
     if (Array.isArray(p.ads) && p.ads.length > 0) {
-      p.ads.forEach((ad, adIndex) => {
+      p.ads.forEach((ad) => {
+        if (!ad?.id) return;
         const raw =
           ad?.image_1 ||
           ad?.image ||
@@ -261,7 +262,7 @@ const normalizePromos = (arr = []) => {
         const image = buildImageUrl(raw);
 
         promos.push({
-          id: ad?.id ?? `${p.id}-${adIndex}`,
+          id: ad.id,
           cube_id: p.id,
           title: ad?.title ?? p.title ?? p.name ?? 'Promo',
           merchant: ad?.merchant ?? p.community?.name ?? 'Merchant',
@@ -617,9 +618,11 @@ const normalizePromos = (arr = []) => {
             const worldName = ad?.cube?.world?.name || cube?.world?.name || 'General';
 
             const handleClick = () => {
-              const link = buildPromoLink(ad, cube, communityId);
-              router.push(link);
-            };
+  if (!ad?.id) return;
+
+  const link = buildPromoLink(ad, cube, communityId);
+  router.push(link);
+};
 
             return (
               <Link href="#" key={key} onClick={(e) => { e.preventDefault(); handleClick(); }}>
@@ -814,9 +817,11 @@ const normalizePromos = (arr = []) => {
             if (!ad && !cube) return null;
 
             const handleClick = () => {
-              const link = buildPromoLink(ad, cube, communityId);
-              router.push(link);
-            };
+  if (!ad?.id) return;
+
+  const link = buildPromoLink(ad, cube, communityId);
+  router.push(link);
+};
 
             const size = widget.size || 'M';
             return (
@@ -1085,7 +1090,7 @@ const normalizePromos = (arr = []) => {
 
               return (
                 <div
-                  key={`${cube?.id}-${ad?.id || 'noad'}`}
+                  key={`promo-${ad?.id}`}
                   className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                   style={{ minWidth: 90 }}
                   onClick={() => {
@@ -1208,14 +1213,15 @@ const normalizePromos = (arr = []) => {
 
             // XL-Ads / XL / L / S / M - Gunakan KomunitasCard untuk konsistensi dengan promo acak
             const handleClick = () => {
-              const link = buildPromoLink(ad, cube, communityId);
-              console.log(`  🔗 Click link for cube ${cube.id}:`, link);
-              router.push(link);
-            };
+  if (!ad?.id) return;
+
+  const link = buildPromoLink(ad, cube, communityId);
+  router.push(link);
+};
 
             return (
               <KomunitasCard
-                key={`${cube?.id}-${ad?.id || 'noad'}`}
+                key={`promo-${ad?.id}`}
                 item={{ ad, cube }}
                 size={size}
                 onClick={handleClick}
