@@ -2253,8 +2253,8 @@ try {
             {/* Hero Image Carousel */}
             <div className="mb-4">
               <ImageCarousel
-                key={`${currentIndex}-${images[currentIndex]}`}
-                src={images[currentIndex]}
+                key={`${currentIndex}-${images?.[currentIndex] || 'default'}`}
+                src={images?.[currentIndex] || '/default-avatar.png'}
                 alt="Promo"
                 fill
                 className="object-cover"
