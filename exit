@@ -1,0 +1,198 @@
+[33mb811e64[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m fix image carousel stale image issue
+[33m222a822[m fix image carousel stale image issue
+[33m4d516b4[m fix image carousel stale image issue
+[33m7397305[m remove console logs
+[33mcf4a5ad[m Merge pull request #467 from codewithun/fix/leaflet-map
+[33mf64aa75[m[33m ([m[1;31morigin/fix/leaflet-map[m[33m)[m fix: improve onSuccess function for better token handling and redirection
+[33md40de2a[m fix image fallback
+[33me91fc0f[m Merge pull request #466 from codewithun/fix/leaflet-map
+[33m3053982[m Refactor code structure for improved readability and maintainability
+[33mda7caba[m fix: image display
+[33m8e2c760[m Update README.md
+[33m81c6131[m Update README.md
+[33m202faff[m Merge pull request #465 from codewithun/fix/leaflet-map
+[33m05539b7[m feat: implement Leaflet map component for Berburu and Dashboard pages
+[33mcbe4132[m Merge pull request #464 from codewithun/fix/leaflet-map
+[33meeabb4d[m feat: integrate Leaflet for map functionality in admin dashboard
+[33m31568c5[m[33m ([m[1;31morigin/fix/iklan[m[33m)[m Merge pull request #463 from codewithun/vercel/react-server-components-cve-vu-gv2ax0
+[33m53eccd2[m[33m ([m[1;31morigin/vercel/react-server-components-cve-vu-gv2ax0[m[33m)[m Fix React Server Components CVE vulnerabilities
+[33m55b435f[m Merge pull request #462 from codewithun/fix/iklan
+[33m14a2434[m fix: add debug logging for authentication token and view tracking in ViewCounter component
+[33m596fd43[m feat: add ViewCounter component and integrate it into ad and promo detail pages
+[33md17ba78[m Merge pull request #461 from codewithun/fix/iklan
+[33m4dad9b6[m fix: update labels and placeholders for promo and voucher settings in CorporateKubusPage fix: adjust API path for cube options in CorporateWidget to include selected community ID
+[33m3aaa377[m Merge pull request #460 from codewithun/feat/edit-fix
+[33m0e72eca[m[33m ([m[1;31morigin/feat/edit-fix[m[33m)[m fix: update community join logic to redirect to dashboard for public communities and adjust QRa handling
+[33m3a095ac[m Merge pull request #459 from codewithun/fix/iklan
+[33mea1889e[m fix: implement client-side filtering for cube list with search and widget type selection
+[33m78a79f3[m Merge pull request #458 from codewithun/fix/iklan
+[33m3a5a26b[m fix: enable console logging for debugging in InputMapComponent
+[33mc53ece9[m Merge pull request #457 from codewithun/fix/iklan
+[33mb1e36f8[m fix: add address geocoding functionality and autocomplete suggestions in InputMapComponent
+[33m6af4267[m Merge pull request #456 from codewithun/feat/dev
+[33m8e2bc78[m[33m ([m[1;31morigin/feat/dev[m[33m)[m fix: conditionally render location and distance information based on status type
+[33m37cccda[m Merge pull request #455 from codewithun/fix/iklan
+[33m5e50f3f[m fix: enhance community update detection and improve file upload handling in form submission
+[33m19da06e[m Merge pull request #454 from codewithun/feat/dev
+[33m6cc1a53[m fix
+[33mabe12c1[m Merge pull request #453 from codewithun/feat/dev
+[33m22648ce[m fix: enhance sharing functionality with dynamic share text and WhatsApp cache-busting
+[33mcb798c3[m Merge pull request #452 from codewithun/feat/dev
+[33macd533f[m push
+[33m3e1b96b[m Merge pull request #451 from codewithun/fix/iklan
+[33md206032[m fix: improve image handling for Open Graph meta tags and avoid duplicates
+[33ma40642d[m Merge pull request #450 from codewithun/fix/iklan
+[33m6f7d683[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into fix/iklan
+[33m9d5ef69[m fix: update URLs to use v2.huehuy.com and enhance Open Graph meta tags for better sharing experience
+[33m2b8c9d4[m Merge pull request #449 from codewithun/feat/dev
+[33mf5948c8[m gak bener nih
+[33mdcacf44[m Merge pull request #448 from codewithun/feat/dev
+[33m45b9deb[m Remove unused ad category rendering logic from Berburu component
+[33m230c845[m Merge pull request #447 from codewithun/feat/dev
+[33mfa9e9d7[m Refactor handlePromoClick to use buildPromoLink for consistent routing
+[33mc9244d6[m Merge pull request #446 from codewithun/feat/dev
+[33me1542e1[m Hide PromoCardIcons for 'Informasi' and 'Advertising' categories in KomunitasCard and Index components
+[33m250c99f[m Merge pull request #445 from codewithun/feat/dev
+[33me2963db[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into feat/dev
+[33m2bf33ac[m ha a
+[33mbf33bea[m Merge pull request #444 from codewithun/fix/iklan
+[33m509a505[m Remove unused 'Role' field from CorporateMemberPage table configuration
+[33maa90204[m Merge pull request #443 from codewithun/fix/iklan
+[33m773cf34[m Remove unused select fields from CorporateMemberPage and adjust default values in form submission
+[33mf4f6656[m Merge pull request #442 from codewithun/feat/dev
+[33mf68aaf9[m Update DashboardCard to display huehuy_ads and set linkPath for navigation
+[33m7c8a662[m Merge pull request #441 from codewithun/feat/dev
+[33m4634bbb[m Refactor MapWithAMarker to use InfoBox instead of Marker for displaying ads, enhancing the user interface and interaction experience.
+[33me6b2a45[m Merge pull request #440 from codewithun/feat/dev
+[33m7ee3ef0[m fix
+[33m2556ba1[m Merge pull request #439 from codewithun/feat/dev
+[33ma792b68[m Refactor authentication handling to use separate cookies for admin and corporate users, ensuring proper scope management and preventing token conflicts.
+[33m8e2fdaa[m Merge pull request #438 from codewithun/fix/iklan
+[33m86b1bbe[m Fix InfoWindow position in MapWithAMarker to prevent errors
+[33mcd0a575[m Merge pull request #437 from codewithun/feat/dev
+[33m062cf7c[m Add offline filter for promotions in Cari, Index, CommunityDashboard, and CommunityPromoPage components
+[33me78309c[m Merge pull request #436 from codewithun/fix/iklan
+[33m8aa937d[m Fetch and set corporate community ID on mount; update mapping logic to use community ID from state
+[33m8e208bf[m Merge pull request #435 from codewithun/feat/edit-fix
+[33m081947d[m Enhance user update detection and integrate image upload functionality in ManageUser component
+[33m2fd8d32[m Merge pull request #434 from codewithun/fix/iklan
+[33mf89bd94[m Refactor mapping logic for default values to align with admin structure and improve clarity
+[33md91e9bd[m Merge pull request #433 from codewithun/fix/iklan
+[33m366d15f[m Fix map rendering by validating coordinates before displaying markers and info boxes
+[33md35d89f[m Merge pull request #432 from codewithun/fix/iklan
+[33m2c39c01[m Add contact card download feature and improve QR scan handling
+[33m85c5c3a[m Merge pull request #431 from codewithun/fix/iklan
+[33m6536504[m Enhance chat functionality: add corporate ID handling and improve chat list filtering
+[33m32bb754[m Update fetch paths in CorporateKubus and CorporateWidget components to align with admin structure and include corporate ID filters
+[33mbad1df3[m Merge pull request #430 from codewithun/fix/iklan
+[33mcfd6b65[m Refactor Notification and Chat components: remove tab logic for single-tab mode and enhance product card handling
+[33md2e973c[m Merge pull request #429 from codewithun/feat/dev
+[33mb2515ba[m Refactor promo card components and enhance category icon handling
+[33ma6054a3[m Merge pull request #428 from codewithun/fix/iklan
+[33m4593a4a[m Enhance chat functionality: include product card details in chat redirection and display in chat list
+[33mf3cc635[m Merge pull request #427 from codewithun/fix/iklan
+[33m2f7fd69[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into fix/iklan
+[33m56e5bf0[m Add chat functionality and enhance user image resolution in messaging components
+[33m67e3953[m Merge pull request #426 from codewithun/feat/edit-fix
+[33m519cda0[m Refactor form helpers: reorder imports and enhance update detection for dynamic content
+[33me070414[m Merge pull request #425 from codewithun/fix/iklan
+[33m7fb0c4d[m Rename 'Iklan' to 'Kubus' in report content and update related status messages
+[33m7492170[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into fix/iklan
+[33m23c4aa5[m Merge pull request #424 from codewithun/feat/dev
+[33m7db6a8d[m yo
+[33m0838600[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into fix/iklan
+[33md9d3bb4[m Merge pull request #423 from codewithun/feat/dev
+[33m9c27032[m Refactor forms and modals to improve state management and labeling; enhance clarity in Promo and Voucher forms, and update UpdateCubeStatusModal for better value handling.
+[33m28cd19e[m Refactor ReportContent component: adjust column widths and enhance item rendering for ad titles and report messages
+[33m033c79a[m Fix formatting and logical error in updateStatus condition in ReportContent component
+[33m9514684[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into fix/iklan
+[33m530b7ae[m Implement report submission to API in AdDetailUnified and PromoDetailUnified components
+[33me095cf9[m Merge pull request #422 from codewithun/feat/dev
+[33m655fd6b[m Refactor sharing and reporting modals in AdDetailUnified and KubusInformasi components; enhance share functionality with platform-specific handling and improve report options with clear reasons.
+[33mc620f6f[m Merge pull request #421 from codewithun/fix/iklan
+[33m438b507[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into fix/iklan
+[33m7b4e2b8[m Refactor CommunityProfile component: replace Image with img tag and improve error handling
+[33me45a0f4[m Merge pull request #420 from codewithun/fix/iklan
+[33m5b15b7e[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into fix/iklan
+[33m67fd795[m Add modals for member requests, history, and adding new members in KomunitasCorporate component
+[33m58ab16b[m Add modals for community members and cubes in KomunitasCorporate component
+[33m85d5081[m Merge pull request #419 from codewithun/feat/dev
+[33m23c87bf[m fix
+[33mb6f4b5e[m Merge pull request #418 from codewithun/feat/dev
+[33mcaeb3ed[m cek
+[33m1872656[m Merge pull request #417 from codewithun/feat/dev
+[33mff41553[m cek
+[33m9d6bf5d[m Merge pull request #416 from codewithun/feat/dev
+[33m4c5f01d[m feat(promo): enhance server-side data fetching with fallback endpoints for promo, ads, and cubes
+[33m4406f97[m Merge pull request #415 from codewithun/feat/dev
+[33m1300cea[m feat(ad-detail): implement server-side rendering for ad details and improve Open Graph meta tags
+[33m73e1c6d[m Merge pull request #414 from codewithun/feat/dev
+[33m56e0305[m Refactor code structure for improved readability and maintainability
+[33mbb18fcf[m Merge pull request #413 from codewithun/feat/dev
+[33m84df1ba[m feat(share): enhance sharing functionality with image blob support and fallback methods
+[33m98b0983[m Merge pull request #412 from codewithun/fix/iklan
+[33m201709e[m feat(ad-popup): implement HuehuyAdPopup component for promo/voucher pages
+[33md998c2d[m fix(index): simplify conditional rendering for remaining stock display
+[33m1cf57c6[m feat(widget): add Corporate Widget management page and update layout menu
+[33md93fd83[m Merge pull request #411 from codewithun/feat/dev
+[33m6baea97[m feat(berburu): add helper functions for ad normalization and promo link building
+[33ma4a5bc3[m Merge pull request #410 from codewithun/feat/dev
+[33m496af56[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into feat/dev
+[33m603dfe5[m fix(kubus): update voucher stock display logic to use total_remaining from backend
+[33md94062a[m Merge pull request #409 from codewithun/feat/edit-fix
+[33m829686d[m fix(saku): update button navigation to redirect to the search page for promotions
+[33mfe37cd6[m fix(kubus): update voucher label and improve stock display logic for daily vouchers
+[33me1afb59[m Merge pull request #408 from codewithun/feat/dev
+[33m62510a1[m Enhance voucher handling: skip stock checks for claimed vouchers, improve notification processing, and ensure accurate display of daily voucher restock information.
+[33mabbae73[m Merge pull request #407 from codewithun/feat/edit-fix
+[33mf19c558[m feat(promo): enhance category icon handling and improve promo detail fetching logic
+[33md397b05[m Merge pull request #406 from codewithun/feat/edit-fix
+[33m82711e0[m feat(promo): implement unified mapping for promo and ad data, enhance fetch logic and error handling
+[33m0e023e0[m feat(promo): improve comments and enhance data transformation for promo details
+[33m5bc4656[m Merge pull request #405 from codewithun/feat/edit-fix
+[33m1e37d98[m feat(qr-entry): streamline token handling and improve redirect logic
+[33m1f86097[m Merge pull request #404 from codewithun/feat/edit-fix
+[33m1cd9302[m feat(promo): remove unused category icons and enhance promo distance calculation
+[33m39610ce[m Merge pull request #403 from codewithun/feat/edit-fix
+[33m9b1df53[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into feat/edit-fix
+[33m47d9f92[m feat(promo): enhance promo entry URL generation and auto-register handling from QR
+[33m3fde44c[m Merge pull request #402 from codewithun/feat/dev
+[33m6d95dc1[m beb pulang
+[33m76764a9[m tes
+[33m4d7f171[m Merge pull request #400 from codewithun/feat/dev
+[33m78176f9[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into feat/dev
+[33m64e5401[m Add category icons and display in promo detail view
+[33md26a5e6[m Merge pull request #399 from codewithun/feat/edit-fix
+[33m84d387d[m feat(qr-entry): enhance token handling and cookie management during registration
+[33m28d1ac7[m Merge pull request #398 from codewithun/feat/edit-fix
+[33m8acf03d[m feat(promo): update fetchPromoDetails logic for QR scan and normal navigation
+[33m74d5603[m Merge pull request #397 from codewithun/feat/edit-fix
+[33mffc4a7c[m feat(promo): enhance promo entry URL generation and parsing with community support
+[33m6c17776[m Merge pull request #396 from codewithun/feat/edit-fix
+[33m73f6177[m feat(promo): update communityId state management and dependencies
+[33m46d1840[m Refactor ManageCubePage and add KomunitasCorporate page
+[33md13cf0c[m[33m ([m[1;31morigin/fix/chat[m[33m)[m Merge pull request #395 from codewithun/feat/edit-fix
+[33mf0744e4[m fix: add shuffle ads data fetching for shuffle_cube widgets
+[33m98fff6c[m Merge pull request #394 from codewithun/feat/dev
+[33m82a971e[m feat(notification): add notification handling and cleanup logic
+[33m323ad83[m Merge pull request #393 from codewithun/feat/edit-fix
+[33m48c84e7[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into feat/edit-fix
+[33mc3cff15[m fix: update cube options path and enable search functionality in Widget component
+[33m48b62e0[m Merge pull request #392 from codewithun/feat/edit-fix
+[33m7072a7b[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into feat/edit-fix
+[33mbd232c1[m chore: add shuffle ads data fetching for shuffle_cube widgets
+[33mac990f1[m Merge pull request #391 from codewithun/feat/edit-fix
+[33m8bcfba3[m fix: correct import path for KomunitasCard component
+[33m813f576[m refactor(community): extract KomunitasCard component for reuse
+[33m3d7a26f[m Merge pull request #390 from codewithun/feat/dev
+[33m2f382c2[m feat(promo): enhance claimed status handling and validation time limit display
+[33m6b4fdb8[m Merge pull request #389 from codewithun/feat/edit-fix
+[33mc090ec0[m feat(profile): implement public profile page and update account QR
+[33m4fbe17d[m Merge pull request #388 from codewithun/feat/edit-fix
+[33m0ea8cf0[m feat(home): add ad category widget with API integration
+[33mdf5c75a[m feat(home): add category box widget component
+[33m24551bd[m Merge pull request #387 from codewithun/feat/dev
+[33mf71b18b[m Merge branch 'main' of https://github.com/codewithun/FE-HUEHUY into feat/dev
+[33m344a5cf[m feat(notification): add functions to retrieve start and end times for vouchers and enhance expiration checks
+[33mf59c865[m Merge pull request #386 from codewithun/fix/chat
+[33me518e2d[m feat(TableSupervision): add manual front-end filtering for data display

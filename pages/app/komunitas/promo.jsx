@@ -242,57 +242,94 @@ const CommunityPromoPage = () => {
     return getNormalizedType(ad, cube) === 'iklan';
   };
 
-  const normalizePromos = (arr = []) => {
-    let promos = (Array.isArray(arr) ? arr : []).map((p, index) => {
-      // Ambil gambar dari ads[0] jika ada
-      let ad = Array.isArray(p.ads) && p.ads.length > 0 ? p.ads[0] : null;
-      let raw =
-        ad?.image_1 ||
-        ad?.image ||
-        ad?.picture_source ||
+const normalizePromos = (arr = []) => {
+  let promos = [];
+
+  (Array.isArray(arr) ? arr : []).forEach((p, index) => {
+    // kalau ada banyak ads, flatten jadi item masing-masing
+    if (Array.isArray(p.ads) && p.ads.length > 0) {
+      p.ads.forEach((ad, adIndex) => {
+        const raw =
+          ad?.image_1 ||
+          ad?.image ||
+          ad?.picture_source ||
+          p.image_url ||
+          p.image ||
+          p.image_path ||
+          FALLBACK_IMAGE;
+
+        const image = buildImageUrl(raw);
+
+        promos.push({
+          id: ad?.id ?? `${p.id}-${adIndex}`,
+          cube_id: p.id,
+          title: ad?.title ?? p.title ?? p.name ?? 'Promo',
+          merchant: ad?.merchant ?? p.community?.name ?? 'Merchant',
+          distance: p.distance ?? '0 KM',
+          location: p.location ?? p.community?.location ?? 'Location',
+          image,
+          created_at: ad?.created_at ?? p.created_at,
+          updated_at: ad?.updated_at ?? p.updated_at,
+
+          type: ad?.type,
+          ad_category: ad?.ad_category,
+          is_advertising: ad?.is_advertising,
+          advertising: ad?.advertising,
+
+          code: ad?.code ?? p.code,
+          is_information: ad?.is_information ?? p.is_information,
+          content_type: ad?.content_type ?? p.content_type,
+          is_voucher: ad?.is_voucher ?? p.is_voucher,
+
+          rawCube: p,
+          cube: ad?.cube || p || null,
+
+          // simpan ad asli
+          ad,
+        });
+      });
+    } else {
+      const raw =
         p.image_url ||
         p.image ||
         p.image_path ||
         FALLBACK_IMAGE;
 
-      const image = buildImageUrl(raw);
-
-      return {
-        id: p.id ?? p.promo_id ?? ad?.id ?? `promo-${index}`,
-        title: p.title ?? ad?.title ?? p.name ?? 'Promo',
-        merchant: p.merchant ?? p.community?.name ?? ad?.merchant ?? 'Merchant',
+      promos.push({
+        id: p.id ?? `promo-${index}`,
+        title: p.title ?? p.name ?? 'Promo',
+        merchant: p.community?.name ?? 'Merchant',
         distance: p.distance ?? '0 KM',
-        location: p.location ?? p.community?.location ?? 'Location',
-        image,
-        created_at: p.created_at ?? ad?.created_at,
-        updated_at: p.updated_at ?? ad?.updated_at,
-        // Tambahkan informasi untuk identifikasi iklan
-        type: ad?.type ?? p.type,
-        ad_category: ad?.ad_category ?? p.ad_category,
-        is_advertising: ad?.is_advertising ?? p.is_advertising,
-        advertising: ad?.advertising ?? p.advertising,
-        // Field tambahan untuk routing detection seperti di home.jsx
-        code: p.code ?? ad?.code,
-        is_information: p.is_information ?? ad?.is_information,
-        content_type: p.content_type ?? ad?.content_type,
-        is_voucher: p.is_voucher ?? ad?.is_voucher,
-        rawCube: p, // simpan raw cube untuk akses penuh
-        cube: ad?.cube || null,
-      };
-    });
+        location: p.location ?? 'Location',
+        image: buildImageUrl(raw),
+        created_at: p.created_at,
+        updated_at: p.updated_at,
 
-    promos.sort((a, b) => {
-      const ta = new Date(a.updated_at || a.created_at || 0).getTime() || 0;
-      const tb = new Date(b.updated_at || b.created_at || 0).getTime() || 0;
-      if (tb !== ta) return tb - ta;
-      const ia = Number(a.id),
-        ib = Number(b.id);
-      if (!Number.isNaN(ia) && !Number.isNaN(ib)) return ib - ia;
-      return 0;
-    });
+        type: p.type,
+        ad_category: p.ad_category,
+        is_advertising: p.is_advertising,
+        advertising: p.advertising,
 
-    return promos;
-  };
+        code: p.code,
+        is_information: p.is_information,
+        content_type: p.content_type,
+        is_voucher: p.is_voucher,
+
+        rawCube: p,
+        cube: p,
+        ad: null,
+      });
+    }
+  });
+
+  promos.sort((a, b) => {
+    const ta = new Date(a.updated_at || a.created_at || 0).getTime() || 0;
+    const tb = new Date(b.updated_at || b.created_at || 0).getTime() || 0;
+    return tb - ta;
+  });
+
+  return promos;
+};
 
   // Fungsi handle klik promo - menggunakan buildPromoLink untuk konsistensi
   const handlePromoClick = (promo) => {
@@ -303,7 +340,7 @@ const CommunityPromoPage = () => {
     }
 
     // Extract ad and cube data
-    const ad = promo?.rawCube?.ads?.[0] || promo;
+    const ad = promo?.ad || promo;
     const cube = promo?.rawCube || promo?.cube;
 
     // Gunakan buildPromoLink untuk routing yang konsisten
@@ -589,6 +626,7 @@ const CommunityPromoPage = () => {
                 <div className="grid grid-cols-4 gap-3 p-3 rounded-[15px] bg-white/40 backdrop-blur-sm border border-white/30 hover:scale-[1.01] transition-transform">
                   <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-300">
                     <Image 
+                    unoptimized
                     key={buildImageUrl(imageUrl)}
                     src={buildImageUrl(imageUrl)} 
                     alt={title} width={700} height={700} 
@@ -660,8 +698,10 @@ const CommunityPromoPage = () => {
               >
                 <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
                   <Image
-                    src={normalizeImageSrc(imgSrc)}
-                    alt={label}
+                  unoptimized
+                  src={normalizeImageSrc(imgSrc)}
+                  key={normalizeImageSrc(imgSrc)}
+                  alt={label}
                     fill
                     className="object-cover brightness-90"
                   />
@@ -873,7 +913,7 @@ const CommunityPromoPage = () => {
 
               return (
                 <KomunitasCard
-                  key={index}
+                  key={item?.id || cube?.id || ad?.id}
                   item={{ ad, cube }}
                   size="XL"
                   onClick={() => router.push(buildPromoLink(ad, cube, communityId))}
@@ -1049,6 +1089,7 @@ const CommunityPromoPage = () => {
                 >
                   <div className="relative w-[90px] aspect-square rounded-[12px] overflow-hidden border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
                     <Image
+                    unoptimized
                       src={buildImageUrl(cube.image)}
                       alt={cube.category}
                       fill
@@ -1128,7 +1169,10 @@ const CommunityPromoPage = () => {
             }
 
             // Ambil 1 ad yang menempel ke cube (kalau ada)
-            const ad = cube.ads?.[0] || null;
+            const ad =
+                cubeData?.ad ||
+                cube?.ads?.find(Boolean) ||
+                null;
 
             console.log(`  📦 Cube ${index + 1} PROCESSED:`, {
               cube_id: cube.id,
@@ -1185,6 +1229,7 @@ const CommunityPromoPage = () => {
       <div className="flex p-4 items-center">
         <div className="w-28 h-28 rounded-[12px] overflow-hidden flex-shrink-0 bg-white/10">
           <Image
+            unoptimized
             key={promo.image}
             src={promo.image}
             alt={promo.title}
