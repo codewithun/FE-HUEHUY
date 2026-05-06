@@ -809,7 +809,7 @@ const normalizePromos = (arr = []) => {
 
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
           {items.map((item, index) => {
-            const ad = item?.ad || item;
+            const ad = item?.ad ?? null;
             const cube = item?.cube || ad?.cube;
             if (!ad && !cube) return null;
 
@@ -919,9 +919,9 @@ const normalizePromos = (arr = []) => {
                   onClick={() => {
                     const currentAd = ad;
                     const currentCube = cube;
-                                    
+
                     const link = buildPromoLink(currentAd, currentCube, communityId);
-                                    
+
                     router.push(link);
                   }}
                 />
