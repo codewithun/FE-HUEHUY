@@ -824,7 +824,7 @@ const normalizePromos = (arr = []) => {
                 item={item}
                 size={size}
                 onClick={handleClick}
-                key={ad?.id || cube?.id || index}
+                key={`${ad?.id || 'ad'}-${cube?.id || 'cube'}`}
               />
             );
           })}
@@ -913,10 +913,17 @@ const normalizePromos = (arr = []) => {
 
               return (
                 <KomunitasCard
-                  key={item?.id || cube?.id || ad?.id}
+                  key={`${ad?.id || 'ad'}-${cube?.id || 'cube'}`}
                   item={{ ad, cube }}
                   size="XL"
-                  onClick={() => router.push(buildPromoLink(ad, cube, communityId))}
+                  onClick={() => {
+                    const currentAd = ad;
+                    const currentCube = cube;
+                                    
+                    const link = buildPromoLink(currentAd, currentCube, communityId);
+                                    
+                    router.push(link);
+                  }}
                 />
               );
             })}
@@ -1023,7 +1030,7 @@ const normalizePromos = (arr = []) => {
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
           {shuffleData.map((item, index) => (
             <KomunitasCard
-              key={item?.id || item?.cube?.id || index}
+              key={`${item?.id || 'item'}-${item?.cube?.id || 'cube'}`}
               item={item}
               size={widget.size || 'M'}
               onClick={() => {
@@ -1078,7 +1085,7 @@ const normalizePromos = (arr = []) => {
 
               return (
                 <div
-                  key={cube.id || index}
+                  key={`${cube?.id}-${ad?.id || 'noad'}`}
                   className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:scale-105 transition-all duration-300"
                   style={{ minWidth: 90 }}
                   onClick={() => {
@@ -1208,7 +1215,7 @@ const normalizePromos = (arr = []) => {
 
             return (
               <KomunitasCard
-                key={cube.id || index}
+                key={`${cube?.id}-${ad?.id || 'noad'}`}
                 item={{ ad, cube }}
                 size={size}
                 onClick={handleClick}
