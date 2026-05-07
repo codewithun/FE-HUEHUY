@@ -467,7 +467,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
 
     console.log('🖼️ Using default image');
     return ['/default-avatar.png'];
-  }, [promoData, buildImageUrl, effectivePromoId]); 
+  }, [promoData, buildImageUrl]);
 
   // Debug log untuk memastikan images terdeteksi dengan benar
   useEffect(() => {
@@ -639,7 +639,7 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   }, [effectivePromoId, communityId]);
 
   // --- Fetch detail (stabil, anti double-run) ---
-  const hasFetched = useRef(null);
+  const hasFetched = useRef(false);
 
   // simpan posisi user untuk origin rute
   const userPosRef = useRef(null);
@@ -812,12 +812,8 @@ try {
   const fetchPromoDetails = useCallback(async () => {
     if (!router.isReady || !effectivePromoId) return null;
     if (String(effectivePromoId).toLowerCase() === 'detail_promo') return null;
-    
-    setLoading(true);
-    setPromoData(null);
-    
-    if (hasFetched.current === effectivePromoId) return null;
-    hasFetched.current = effectivePromoId;
+    if (hasFetched.current) return null;
+    hasFetched.current = true;
 
     try {
       setLoading(true);
@@ -1266,12 +1262,9 @@ try {
     if (!router.isReady) return;
     if (!effectivePromoId) return;
     if (autoRegister) return;
-
-    hasFetched.current = null;
-
     fetchPromoDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [router.isReady, effectivePromoId, autoRegister, fetchPromoDetails]);
+  }, [router.isReady, effectivePromoId, autoRegister]);
 
   // --- Auto register setelah QR ---
   const handleAutoRegister = useCallback(
@@ -1451,14 +1444,14 @@ try {
   useEffect(() => {
     if (!router.isReady) return;
     if (!autoRegister) return;
-    if (effectivePromoId && !hasFetched.current) {
 
-    hasFetched.current = null;
+    if (effectivePromoId && !hasFetched.current) {
       // panggil fetch meskipun tanpa communityId (promo umum)
       fetchPromoDetails();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [router.isReady, effectivePromoId, autoRegister, fetchPromoDetails]);
+  }, [router.isReady, autoRegister, effectivePromoId, communityId]);
+
   // --- QR entry flow ---
   useEffect(() => {
     if (!router.isReady) return;
@@ -2260,7 +2253,6 @@ try {
             {/* Hero Image Carousel */}
             <div className="mb-4">
               <ImageCarousel
-                key={`carousel-${effectivePromoId}-${promoImages?.length || 0}`}
                 images={promoImages}
                 title={promoData?.title || getTypeLabel(promoData)}
                 className="w-full"
