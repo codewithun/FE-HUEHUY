@@ -127,46 +127,67 @@ export default function ScanQR() {
     }
   };
 
-  const handleScanResult = async (result) => {
-    if (!result || loading) return;
-    setLoading(true);
-    setScanResult(result);
-    setIsScanning(false);
+const handleScanResult = async (result) => {
+  if (!result || loading) return;
+  
+  console.log('🔍 [SCAN RESULT] Raw data:', result);
+  
+  setLoading(true);
+  setScanResult(result);
+  setIsScanning(false);
 
+  try {
+    // ============================================
+    // ✅ PRIORITAS 1: Coba parse sebagai JSON dulu
+    // ============================================
+    let qrData = null;
+    
     try {
-      // ============================================
-      // ✅ BARU: Handle QR untuk VALIDASI PROMO/VOUCHER (tenant_scan)
-      // ============================================
-      try {
-        const qrData = typeof result === 'string' ? JSON.parse(result) : result;
-        
-        // Cek apakah ini QR untuk validasi oleh tenant
-        if (
-          qrData.validation_purpose === 'tenant_scan' || 
-          (qrData.type === 'promo' && qrData.item_id && qrData.code) ||
-          (qrData.type === 'voucher' && qrData.item_id && qrData.code)
-        ) {
-          if (qrData.item_id && qrData.code) {
-            // Panggil API validasi
-            await handleValidationScan(qrData);
-            return; // Exit early, jangan lanjut ke logic lain
-          }
-        }
-      } catch (parseError) {
-        // Jika bukan JSON valid, lanjut ke logic lama
-        console.log('Not a validation QR, continuing to old logic...');
+      qrData = typeof result === 'string' ? JSON.parse(result) : result;
+      console.log('✅ [PARSE] Berhasil parse JSON:', qrData);
+    } catch (parseError) {
+      console.log('❌ [PARSE] Bukan JSON atau parse error:', parseError.message);
+      qrData = null;
+    }
+
+    // ============================================
+    // ✅ PRIORITAS 2: Cek apakah ini QR VALIDATION
+    // ============================================
+    if (qrData) {
+      console.log('🔍 [CHECK] Validation purpose:', qrData.validation_purpose);
+      console.log('🔍 [CHECK] Type:', qrData.type);
+      console.log('🔍 [CHECK] Item ID:', qrData.item_id);
+      console.log('🔍 [CHECK] Code:', qrData.code);
+
+      // Deteksi QR untuk validasi promo/voucher
+      const isValidationQR = 
+        qrData.validation_purpose === 'tenant_scan' ||
+        qrData.validation_purpose === 'owner_validation' ||
+        (qrData.type === 'promo' && qrData.item_id && qrData.code) ||
+        (qrData.type === 'voucher' && qrData.item_id && qrData.code);
+
+      if (isValidationQR && qrData.item_id && qrData.code) {
+        console.log('✅ [DETECTED] Ini QR Validation! Memanggil handleValidationScan...');
+        await handleValidationScan(qrData);
+        return; // ✅ EXIT - Jangan lanjut ke logic lain
       }
 
-      // ============================================
-      // Logic Lama (tetap dipertahankan)
-      // ============================================
+      // Deteksi QR untuk redirect URL
+      if (qrData.url && (qrData.url.startsWith('http://') || qrData.url.startsWith('https://'))) {
+        console.log('✅ [DETECTED] Ini QR URL! Redirecting...');
+        window.location.href = qrData.url;
+        return;
+      }
+    }
 
-      // Jika hasil scan adalah URL profile, ambil data kontak
-      if (
-        typeof result === 'string' &&
-        (result.startsWith('http://') || result.startsWith('https://')) &&
-        result.includes('/profile/')
-      ) {
+    // ============================================
+    // ✅ PRIORITAS 3: Cek apakah ini URL langsung
+    // ============================================
+    if (typeof result === 'string' && (result.startsWith('http://') || result.startsWith('https://'))) {
+      console.log('✅ [DETECTED] Ini URL langsung! Redirecting...');
+      
+      if (result.includes('/profile/')) {
+        // Handle profile URL
         const profileMatch = result.match(/\/profile\/(\d+)/);
         if (profileMatch) {
           const profileId = profileMatch[1];
@@ -174,139 +195,53 @@ export default function ScanQR() {
             const profileResponse = await get({ path: `users/${profileId}/public` });
             if (profileResponse?.status === 200 && profileResponse?.data) {
               const profile = profileResponse?.data?.data || null;
-              if (!profile) {
-                setScanResult('Profil publik tidak ditemukan atau respons tidak valid');
+              if (profile) {
+                setContactData({
+                  id: profile.id,
+                  name: profile.name || 'Nama tidak tersedia',
+                  email: profile.email || null,
+                  phone: profile.phone || profile.handphone || null,
+                  code: profile.code || `HUEHUY-${String(profile.id).padStart(6, '0')}`,
+                  verified: profile.verified_at ? true : false,
+                  avatar: profile.picture_source || '/avatar.jpg'
+                });
+                setShowContactConfirm(true);
                 setLoading(false);
-                setIsScanning(true);
                 return;
               }
-              setContactData({
-                id: profile.id,
-                name: profile.name || 'Nama tidak tersedia',
-                email: profile.email || null,
-                phone: profile.phone || profile.handphone || null,
-                code: profile.code || `HUEHUY-${String(profile.id).padStart(6, '0')}`,
-                verified: profile.verified_at ? true : false,
-                avatar: profile.picture_source || '/avatar.jpg'
-              });
-              setShowContactConfirm(true);
-              setIsScanning(false);
-              setLoading(false);
-              return;
             }
           } catch (error) {
-            setScanResult(`Error mengambil data profil: ${error.message}`);
-            setLoading(false);
-            setIsScanning(true);
-            return;
+            console.error('❌ [ERROR] Gagal ambil data profil:', error);
           }
         }
       }
-
-      // Jika hasil scan adalah URL promo/voucher, langsung redirect
-      if (
-        typeof result === 'string' &&
-        (result.startsWith('http://') || result.startsWith('https://')) &&
-        (
-          result.includes('/app/komunitas/promo/') ||
-          result.includes('/app/komunitas/voucher/') ||
-          result.includes('/app/voucher/')
-        )
-      ) {
+      
+      // Redirect langsung untuk URL promo/voucher
+      if (result.includes('/app/komunitas/promo/') || result.includes('/app/komunitas/voucher/') || result.includes('/app/voucher/')) {
         window.location.href = result;
         return;
       }
-
-      // --- Parsing QR untuk voucher code ---
-      let voucherCode = null;
-      let voucherId = null;
-
-      try {
-        const data = JSON.parse(result);
-        if (data.type === 'voucher' && (data.code || data.id)) {
-          voucherCode = data.code;
-          voucherId = data.id;
-        }
-      } catch {
-        if (result.startsWith('voucher|')) {
-          const parts = result.split('|');
-          if (parts.length >= 2) voucherCode = parts[1];
-        } else if (result.startsWith('VOUCHER') || result.match(/^[A-Z0-9]{6,}$/)) {
-          voucherCode = result;
-        }
-      }
-
-      if (voucherCode || voucherId) {
-        try {
-          const voucherResponse = await get({
-            path: voucherId ? `admin/vouchers/${voucherId}` : `admin/vouchers?search=${voucherCode}&paginate=1`
-          });
-
-          if (voucherResponse?.status === 200 && voucherResponse?.data) {
-            let voucher = null;
-            if (voucherId) {
-              voucher = voucherResponse.data.data;
-            } else {
-              const vouchers = Array.isArray(voucherResponse.data.data) ? voucherResponse.data.data : [voucherResponse.data.data];
-              voucher = vouchers.find(v => v.code === voucherCode) || vouchers[0];
-            }
-            if (voucher) {
-              router.push(`/app/voucher/${voucher.id}`);
-              return;
-            }
-          }
-          setScanResult(`Voucher dengan kode "${voucherCode || voucherId}" tidak ditemukan`);
-          setLoading(false);
-          setIsScanning(true);
-          return;
-        } catch (error) {
-          setScanResult(`Error mencari voucher: ${error.message}`);
-          setLoading(false);
-          setIsScanning(true);
-          return;
-        }
-      }
-
-      // --- Parsing QR untuk promo/voucher (format lama) ---
-      let promoId = null;
-      let communityId = null;
-
-      try {
-        const data = JSON.parse(result);
-        if (data.type === 'promo' && data.promoId && data.communityId) {
-          promoId = data.promoId;
-          communityId = data.communityId;
-        }
-      } catch {
-        if (result.startsWith('promo|')) {
-          const parts = result.split('|');
-          if (parts.length >= 3) {
-            promoId = parts[1];
-            communityId = parts[2];
-          }
-        }
-      }
-
-      if (promoId && communityId) {
-        router.push(`/app/komunitas/promo/detail_promo?promoId=${promoId}&communityId=${communityId}`);
-        return;
-      }
-
-      // --- fallback lama ---
-      const qrData = parseQRCode(result);
-      if (qrData.type === 'event_booth') {
-        router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=event&booth=${qrData.boothId}`);
-      } else if (qrData.type === 'tenant_promo') {
-        router.push(`/app/scanner/register-tenant?qr=${encodeURIComponent(result)}&type=tenant&tenantId=${qrData.tenantId}`);
-      } else {
-        router.push(`/app/scanner/register-event?qr=${encodeURIComponent(result)}&type=general&booth=BOOTH01`);
-      }
-    } catch (error) {
-      setScanResult(`Error: ${error.message || 'Unknown error processing QR code'}`);
-      setLoading(false);
-      setIsScanning(true);
     }
-  };
+
+    // ============================================
+    // ⚠️ FALLBACK: QR tidak dikenali
+    // ============================================
+    console.warn('⚠️ [FALLBACK] QR tidak dikenali, tampilkan pesan error');
+    setScanResult({
+      type: 'validation_error',
+      message: '❌ QR Code tidak valid atau tidak didukung',
+      error: { message: 'Unrecognized QR format' },
+      qrData: qrData || result,
+    });
+    setLoading(false);
+
+  } catch (error) {
+    console.error('❌ [ERROR] Fatal error di handleScanResult:', error);
+    setScanResult(`Error: ${error.message || 'Unknown error processing QR code'}`);
+    setLoading(false);
+    setIsScanning(true);
+  }
+};
 
   const downloadContactCard = () => {
     if (!contactData) return;
