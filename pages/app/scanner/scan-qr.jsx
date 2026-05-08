@@ -9,11 +9,14 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 
-// Helper untuk mendapatkan auth header
+// ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
   let token = null;
   if (typeof window !== 'undefined') {
+    // Prioritas: plain token dari localStorage
     token = localStorage.getItem('huehuy_token_plain');
+    
+    // Fallback: decrypt token dari cookie
     if (!token) {
       const encrypted = Cookies.get(token_cookie_name || 'huehuy_token');
       if (encrypted) {
@@ -45,7 +48,7 @@ export default function ScanQR() {
         code: qrData.code,
         item_id: qrData.item_id,
         item_owner_id: qrData.item_owner_id,
-        validator_role: 'tenant',
+        validator_role: 'tenant',  // ← WAJIB: backend cek role ini
         validation_purpose: qrData.validation_purpose || 'tenant_scan',
         qr_timestamp: qrData.timestamp,
       };
@@ -53,7 +56,6 @@ export default function ScanQR() {
       if (qrData.type === 'voucher') {
         endpoint = `${baseUrl}/api/vouchers/validate`;
       } else if (qrData.type === 'promo') {
-        // Coba endpoint promo dulu
         endpoint = `${baseUrl}/api/promos/validate-code`;
       } else {
         // Fallback ke grabs/validate untuk general validation
@@ -67,7 +69,7 @@ export default function ScanQR() {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          ...getAuthHeader(),
+          ...getAuthHeader(),  // ← Kirim token auth
         },
         body: JSON.stringify(payload),
       });
@@ -85,9 +87,29 @@ export default function ScanQR() {
         });
       } else {
         // Validasi gagal (tapi response 200/4xx dari backend)
+        const errorMsg = result.message || 'Validasi gagal';
+        
+        // ✅ Deteksi pesan "sudah divalidasi" untuk UX yang lebih jelas
+        let displayMessage = errorMsg;
+        let displayType = 'validation_error';
+        
+        if (errorMsg.toLowerCase().includes('sudah') || 
+            errorMsg.toLowerCase().includes('already') ||
+            errorMsg.toLowerCase().includes('redeemed') ||
+            errorMsg.toLowerCase().includes('digunakan')) {
+          displayMessage = '⚠️ Promo ini sudah pernah divalidasi sebelumnya';
+          displayType = 'validation_already_used';
+        } else if (errorMsg.toLowerCase().includes('kadaluwarsa') || errorMsg.toLowerCase().includes('expired')) {
+          displayMessage = '⏰ Promo sudah kadaluwarsa';
+          displayType = 'validation_expired';
+        } else if (errorMsg.toLowerCase().includes('tidak ditemukan') || errorMsg.toLowerCase().includes('not found')) {
+          displayMessage = '❌ Kode promo tidak valid';
+          displayType = 'validation_invalid';
+        }
+        
         setScanResult({
-          type: 'validation_error',
-          message: result.message || 'Validasi gagal',
+          type: displayType,
+          message: displayMessage,
           error: result,
           qrData,
         });
@@ -391,44 +413,65 @@ export default function ScanQR() {
   // ✅ BARU: Render hasil validasi dengan UI yang lebih informatif
   const renderValidationResult = () => {
     if (!scanResult || typeof scanResult === 'string') return null;
-    if (scanResult.type !== 'validation_success' && scanResult.type !== 'validation_error') return null;
+    if (!scanResult.type?.startsWith('validation_')) return null;
 
     const isSuccess = scanResult.type === 'validation_success';
-    const bgColor = isSuccess ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
-    const textColor = isSuccess ? 'text-green-800' : 'text-red-800';
-    const icon = isSuccess ? faShieldCheck : faQrcode;
+    const isAlreadyUsed = scanResult.type === 'validation_already_used';
+    const isExpired = scanResult.type === 'validation_expired';
+    const isInvalid = scanResult.type === 'validation_invalid';
+    
+    // Tentukan warna & icon berdasarkan tipe
+    let bgColor, borderColor, textColor, icon, title;
+    
+    if (isSuccess) {
+      bgColor = 'bg-green-50'; borderColor = 'border-green-200 border-l-green-500'; textColor = 'text-green-800';
+      icon = faShieldCheck; title = '✅ Validasi Berhasil';
+    } else if (isAlreadyUsed) {
+      bgColor = 'bg-yellow-50'; borderColor = 'border-yellow-200 border-l-yellow-500'; textColor = 'text-yellow-800';
+      icon = faQrcode; title = '⚠️ Sudah Divvalidasi';
+    } else if (isExpired) {
+      bgColor = 'bg-orange-50'; borderColor = 'border-orange-200 border-l-orange-500'; textColor = 'text-orange-800';
+      icon = faQrcode; title = '⏰ Kadaluwarsa';
+    } else {
+      bgColor = 'bg-red-50'; borderColor = 'border-red-200 border-l-red-500'; textColor = 'text-red-800';
+      icon = faQrcode; title = '❌ Validasi Gagal';
+    }
 
     return (
-      <div className={`px-4 pb-20`}>
-        <div className={`rounded-[20px] p-4 shadow-sm border border-l-4 ${bgColor} border-l-${isSuccess ? 'green' : 'red'}-500`}>
+      <div className="px-4 pb-20">
+        <div className={`rounded-[20px] p-4 shadow-sm border border-l-4 ${bgColor} ${borderColor}`}>
           <h3 className={`font-semibold mb-2 text-sm flex items-center gap-2 ${textColor}`}>
-            <FontAwesomeIcon icon={icon} className={isSuccess ? 'text-green-600' : 'text-red-600'} />
-            {isSuccess ? '✅ Validasi Berhasil' : '❌ Validasi Gagal'}
+            <FontAwesomeIcon icon={icon} className={isSuccess ? 'text-green-600' : 'text-yellow-600'} />
+            {title}
           </h3>
           <p className={`text-sm ${textColor} mb-3`}>{scanResult.message}</p>
           
-          {scanResult.data && (
-            <div className="bg-white/50 rounded-[12px] p-3 text-xs space-y-1">
-              {scanResult.data.voucher_item && (
-                <>
-                  <p><strong>Kode:</strong> {scanResult.data.voucher_item.code}</p>
-                  {scanResult.data.voucher_item.voucher?.name && (
-                    <p><strong>Promo:</strong> {scanResult.data.voucher_item.voucher.name}</p>
-                  )}
-                  {scanResult.data.voucher_item.voucher?.valid_until && (
-                    <p><strong>Berlaku hingga:</strong> {new Date(scanResult.data.voucher_item.voucher.valid_until).toLocaleDateString('id-ID')}</p>
-                  )}
-                </>
+          {/* Tampilkan detail promo jika ada */}
+          {scanResult.data?.promo_item && (
+            <div className="bg-white/50 rounded-[12px] p-3 text-xs space-y-1 mb-3">
+              {scanResult.data.promo_item.promo?.title && (
+                <p><strong>Promo:</strong> {scanResult.data.promo_item.promo.title}</p>
+              )}
+              {scanResult.data.promo_item.code && (
+                <p><strong>Kode:</strong> {scanResult.data.promo_item.code}</p>
+              )}
+              {scanResult.data.promo_item.redeemed_at && (
+                <p><strong>Divvalidasi:</strong> {new Date(scanResult.data.promo_item.redeemed_at).toLocaleString('id-ID')}</p>
+              )}
+              {scanResult.data.promo_item.expires_at && (
+                <p><strong>Berlaku hingga:</strong> {new Date(scanResult.data.promo_item.expires_at).toLocaleDateString('id-ID')}</p>
               )}
             </div>
           )}
           
           <button
             onClick={resetScanner}
-            className={`mt-4 w-full py-2 px-4 rounded-[12px] font-medium text-sm transition-colors ${
+            className={`w-full py-2 px-4 rounded-[12px] font-medium text-sm transition-colors ${
               isSuccess 
                 ? 'bg-green-600 text-white hover:bg-green-700' 
-                : 'bg-red-600 text-white hover:bg-red-700'
+                : isAlreadyUsed
+                  ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
             }`}
           >
             Scan Lagi
@@ -450,7 +493,7 @@ export default function ScanQR() {
             <div className="flex-1">
               <h1 className="text-lg font-semibold text-white">QR Scanner</h1>
               <p className="text-sm text-white/90">
-                {isScanning ? 'Arahkan kamera ke QR Code' : loading ? 'Memproses...' : 'Selesai'}
+                {isScanning ? 'Arahkan kamera ke QR Code' : loading ? 'Memvalidasi...' : 'Selesai'}
               </p>
             </div>
             <FontAwesomeIcon icon={faQrcode} className="text-xl text-white/80" />
