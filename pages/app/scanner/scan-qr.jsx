@@ -1,800 +1,900 @@
-import { faArrowLeft, faCamera, faFlashlight, faFlashlightSlash, faQrcode, faShieldCheck } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Link from 'next/link';
+/* eslint-disable @next/next/no-img-element */
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
-import QrScannerComponent from '../../../components/construct.components/QrScannerComponent';
-import { get, post } from '../../../helpers/api.helpers';
-import { token_cookie_name } from '../../../helpers';
-import { Decrypt } from '../../../helpers/encryption.helpers';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faArrowLeftLong,
+  faCheckCircle,
+  faQrcode,
+  faShieldCheck,
+  faFlashlight,
+  faFlashlightSlash,
+  faCamera,
+  faEye,
+} from '@fortawesome/free-solid-svg-icons';
 import Cookies from 'js-cookie';
+import { token_cookie_name, Decrypt } from '../../helpers';
+import { useUserContext } from '../../context/user.context';
+import {
+  ButtonComponent,
+  IconButtonComponent,
+} from '../../components/base.components';
+import { ModalConfirmComponent } from '../../components/base.components';
+import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
 
-// ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
-const getAuthHeader = () => {
-  let token = null;
-  if (typeof window !== 'undefined') {
-    // Prioritas: plain token dari localStorage
-    token = localStorage.getItem('huehuy_token_plain');
-    
-    // Fallback: decrypt token dari cookie
-    if (!token) {
-      const encrypted = Cookies.get(token_cookie_name || 'huehuy_token');
-      if (encrypted) {
-        try { token = Decrypt(encrypted); } catch {}
-      }
-    }
-  }
-  return token ? { Authorization: `Bearer ${token}` } : {};
+// ✅ Pastikan base URL tanpa /api di akhir
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  .replace(/\/$/, '')
+  .replace(/\/api$/, '');
+
+// Batasi console log hanya saat dev
+const dev = process.env.NODE_ENV !== 'production';
+// eslint-disable-next-line no-console
+const dlog = (...args) => dev && console.log(...args);
+// ===== Single-use guard (local cache) =====
+const USED_CODES_KEY = 'validated_codes_v2';
+const USED_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 hari
+
+// === ADD: key unik per item (code + item_id + user_id) ===
+const buildUsedKey = ({ code, item_id, user_id }) => {
+  const c = String(code || '')
+    .toUpperCase()
+    .trim();
+  const item = item_id != null ? `I:${item_id}` : 'I:-';
+  const owner = user_id != null ? `U:${user_id}` : 'U:-';
+  return `${c}__${item}__${owner}`;
 };
 
-export default function ScanQR() {
+const loadUsedCodes = () => {
+  try {
+    const raw = localStorage.getItem(USED_CODES_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    const cleaned = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => now - (v?.ts || 0) < USED_TTL_MS)
+    );
+    if (Object.keys(cleaned).length !== Object.keys(data).length) {
+      localStorage.setItem(USED_CODES_KEY, JSON.stringify(cleaned));
+    }
+    return cleaned;
+  } catch {
+    return {};
+  }
+};
+const saveUsedCodes = (obj) => {
+  try {
+    localStorage.setItem(USED_CODES_KEY, JSON.stringify(obj));
+  } catch { }
+};
+
+// ===== Normalizer pesan server =====
+const normalizeServerMsg = (rawMsg, fallback) => {
+  if (!rawMsg) return fallback;
+  const m = String(rawMsg).toLowerCase();
+
+  if (m.includes('qr ini hanya dapat divalidasi oleh tenant'))
+    return 'QR ini hanya bisa divalidasi oleh tenant pemilik.';
+
+  if (m.includes('not your') || (m.includes('bukan') && m.includes('tenant')))
+    return 'Kode ini tidak terdaftar di tenant Anda.';
+
+  if (m.includes('owner') && (m.includes('mismatch') || m.includes('different')))
+    return 'Kode tidak sesuai pemilik.';
+
+  if (
+    (m.includes('sudah') &&
+      (m.includes('dipakai') || m.includes('divalidasi'))) ||
+    m.includes('already') ||
+    m.includes('used')
+  )
+    return 'Kode ini sudah pernah divalidasi.';
+
+  if (
+    m.includes('not found') ||
+    m.includes('tidak ditemukan') ||
+    m.includes('invalid')
+  )
+    return 'Kode tidak ditemukan atau tidak valid.';
+
+  return rawMsg || fallback;
+};
+
+// Ambil item_id dari berbagai kemungkinan struktur response backend
+const getRespItemId = (payload) => {
+  if (!payload) return null;
+  const d = payload.data || payload;
+  return (
+    d?.voucher_item?.id ||
+    d?.voucher_item_id ||
+    d?.promo_item?.id ||
+    d?.promo_item_id ||
+    null
+  );
+};
+
+export default function ScanValidasi() {
   const router = useRouter();
+  const { profile, loading, fetchProfile } = useUserContext();
+
+  const [modalSuccess, setModalSuccess] = useState(false);
+  const [modalFailed, setModalFailed] = useState(false);
+  const [modalFailedMessage, setModalFailedMessage] = useState(
+    'Kode Tidak Valid / Sudah Digunakan'
+  );
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [lastItemType, setLastItemType] = useState(null);
   const [scanResult, setScanResult] = useState(null);
   const [isScanning, setIsScanning] = useState(true);
   const [flashOn, setFlashOn] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showContactConfirm, setShowContactConfirm] = useState(false);
-  const [contactData, setContactData] = useState(null);
+  const [scannedCode, setScannedCode] = useState(''); // Store the actual code for display
 
-  // ✅ BARU: Function untuk handle QR validation (tenant_scan)
-  const handleValidationScan = async (qrData) => {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-      const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-      
-      // Tentukan endpoint berdasarkan type
-      let endpoint = '';
-      let payload = {
-        code: qrData.code,
-        item_id: qrData.item_id,
-        item_owner_id: qrData.item_owner_id,
-        validator_role: 'tenant',  // ← WAJIB: backend cek role ini
-        validation_purpose: qrData.validation_purpose || 'tenant_scan',
-        qr_timestamp: qrData.timestamp,
-      };
-
-      if (qrData.type === 'voucher') {
-        endpoint = `${baseUrl}/api/vouchers/validate`;
-      } else if (qrData.type === 'promo') {
-        endpoint = `${baseUrl}/api/promos/validate-code`;
-      } else {
-        // Fallback ke grabs/validate untuk general validation
-        endpoint = `${baseUrl}/api/grabs/validate`;
-      }
-
-      console.log('Calling validation endpoint:', endpoint, payload);
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...getAuthHeader(),  // ← Kirim token auth
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-      console.log('Validation response:', result);
-
-      if (response.ok && result.success) {
-        // Validasi berhasil
-        setScanResult({
-          type: 'validation_success',
-          message: result.message || 'Validasi berhasil!',
-          data: result.data,
-          qrData,
-        });
-      } else {
-        // Validasi gagal (tapi response 200/4xx dari backend)
-        const errorMsg = result.message || 'Validasi gagal';
-        
-        // Deteksi pesan "sudah divalidasi" untuk UX yang lebih jelas
-        let displayMessage = errorMsg;
-        let displayType = 'validation_error';
-        
-        if (errorMsg.toLowerCase().includes('sudah') || 
-            errorMsg.toLowerCase().includes('already') ||
-            errorMsg.toLowerCase().includes('redeemed') ||
-            errorMsg.toLowerCase().includes('digunakan')) {
-          displayMessage = '⚠️ Promo ini sudah pernah divalidasi sebelumnya';
-          displayType = 'validation_already_used';
-        } else if (errorMsg.toLowerCase().includes('kadaluwarsa') || errorMsg.toLowerCase().includes('expired')) {
-          displayMessage = '⏰ Promo sudah kadaluwarsa';
-          displayType = 'validation_expired';
-        } else if (errorMsg.toLowerCase().includes('tidak ditemukan') || errorMsg.toLowerCase().includes('not found')) {
-          displayMessage = '❌ Kode promo tidak valid';
-          displayType = 'validation_invalid';
-        }
-        
-        setScanResult({
-          type: displayType,
-          message: displayMessage,
-          error: result,
-          qrData,
-        });
-      }
-    } catch (error) {
-      console.error('Validation error:', error);
-      setScanResult({
-        type: 'validation_error',
-        message: 'Error koneksi: ' + error.message,
-        error: error,
-        qrData,
-      });
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const token = Cookies.get(token_cookie_name);
+    if (token && !profile && !loading) {
+      fetchProfile();
     }
+  }, [profile, loading, fetchProfile]);
+
+  // Redirect jika bukan Manager Tenant
+  useEffect(() => {
+    loadUsedCodes();
+  }, []);
+  useEffect(() => {
+    if (profile && profile.role_id !== 6) {
+      router.push('/app/akun');
+    }
+  }, [profile, router]);
+
+  const isManagerTenant = profile?.role_id === 6;
+
+  // Helper: ekstrak data dari hasil scan QR
+  const extractValidationCode = (qrResult) => {
+    dlog('🔍 Raw QR Scan Result:', qrResult);
+
+    if (!qrResult || typeof qrResult !== 'string') {
+      dlog('❌ Invalid QR result format');
+      return null;
+    }
+
+    // 1) Coba parse JSON (format baru dengan metadata)
+    try {
+      const parsed = JSON.parse(qrResult);
+      dlog('📦 Parsed JSON from QR:', parsed);
+
+      if (parsed && typeof parsed === 'object' && parsed.code) {
+        dlog('✅ Found structured QR data:', {
+          code: parsed.code,
+          type: parsed.type,
+          item_id: parsed.item_id,
+          user_id: parsed.user_id,
+          owner_validation: parsed.owner_validation,
+          validation_purpose: parsed.validation_purpose,
+        });
+
+        return {
+          code: parsed.code,
+          type: parsed.type || 'unknown',
+          item_id: parsed.item_id,
+          user_id: parsed.user_id,
+          owner_validation: parsed.owner_validation,
+          validation_purpose: parsed.validation_purpose,
+          owner_only: parsed.owner_only,
+          timestamp: parsed.timestamp,
+          isStructured: true,
+        };
+      }
+
+      // Legacy JSON fallback
+      if (parsed.code) {
+        dlog('✅ Found code in legacy JSON:', parsed.code);
+        return {
+          code: parsed.code,
+          type: parsed.type || 'unknown',
+          isStructured: false,
+        };
+      }
+      if (parsed.type === 'voucher' && parsed.id) {
+        dlog('✅ Found voucher ID in JSON:', parsed.id);
+        return { code: parsed.id, type: 'voucher', isStructured: false };
+      }
+      if (parsed.type === 'promo' && parsed.id) {
+        dlog('✅ Found promo ID in JSON:', parsed.id);
+        return { code: parsed.id, type: 'promo', isStructured: false };
+      }
+    } catch {
+      dlog('📝 QR is not JSON, treating as plain text');
+    }
+
+    // 2) Jika URL → coba ekstrak
+    if (qrResult.includes('http')) {
+      dlog('🔗 QR contains URL:', qrResult);
+
+      const urlMatch = qrResult.match(/\/(voucher|promo)\/(\d+)/);
+      if (urlMatch) {
+        const code = urlMatch[2];
+        dlog(`✅ Extracted ${urlMatch[1]} ID from URL:`, code);
+        return { code, type: urlMatch[1], isStructured: false };
+      }
+
+      const codeMatch = qrResult.match(/[?&]code=([^&]+)/);
+      if (codeMatch) {
+        const code = decodeURIComponent(codeMatch[1]);
+        dlog('✅ Extracted code from URL query:', code);
+        return { code, type: 'unknown', isStructured: false };
+      }
+    }
+
+    // 3) Pipe format "type|code"
+    if (qrResult.includes('|')) {
+      const parts = qrResult.split('|');
+      dlog('📋 Pipe-separated QR parts:', parts);
+
+      if (
+        parts.length >= 2 &&
+        (parts[0] === 'voucher' || parts[0] === 'promo')
+      ) {
+        const code = parts[1];
+        dlog(`✅ Extracted ${parts[0]} code:`, code);
+        return { code, type: parts[0], isStructured: false };
+      }
+    }
+
+    // 4) Direct code
+    if (/^[A-Z0-9]{6,}$/i.test(qrResult.trim())) {
+      dlog('✅ QR appears to be direct validation code:', qrResult.trim());
+      return { code: qrResult.trim(), type: 'unknown', isStructured: false };
+    }
+
+    // 5) Default
+    const trimmedResult = qrResult.trim();
+    dlog(
+      '⚠️ Using QR result as-is (no specific pattern found):',
+      trimmedResult
+    );
+    return { code: trimmedResult, type: 'unknown', isStructured: false };
   };
 
-const handleScanResult = async (result) => {
-  if (!result || loading) return;
+  // Validasi tenant – TANPA redeem manual (hindari 409)
+  const submitValidate = async (qrData) => {
+    setSubmitLoading(true);
+    setIsScanning(false);
 
-  console.log('[SCAN RESULT] Raw data:', result);
+    dlog('🚀 STARTING VALIDATION PROCESS:', {
+      qrData,
+      tenant: {
+        id: profile?.id,
+        name: profile?.fullname,
+        email: profile?.email,
+        role_id: profile?.role_id,
+      },
+      timestamp: new Date().toISOString(),
+    });
 
-  setLoading(true);
-  setScanResult(result);
-  setIsScanning(false);
-
-  try {
-    let qrData = null;
-
-    // =========================
-    // PARSE QR
-    // =========================
     try {
-      qrData =
-        typeof result === 'string'
-          ? JSON.parse(result)
-          : result;
+      const encryptedToken = Cookies.get(token_cookie_name);
+      const token = encryptedToken ? Decrypt(encryptedToken) : null;
 
-      console.log(
-        '[PARSE] JSON success:',
-        qrData
-      );
-    } catch (parseError) {
-      console.log(
-        '[PARSE] Not JSON:',
-        parseError.message
-      );
-
-      qrData = null;
-    }
-
-    // =========================
-    // HANDLE JSON QR
-    // =========================
-    if (qrData) {
-      console.log(
-        '[CHECK] QR DATA:',
-        qrData
-      );
-
-      // ======================================
-      // UNIVERSAL QR DETECTION
-      // ======================================
-
-      const isPromoQR =
-        ['promo', 'voucher'].includes(
-          qrData.type
-        ) && qrData.code;
-
-      const isUserQR =
-        qrData.type === 'user' ||
-        qrData.user_id ||
-        qrData.profile_id ||
-        qrData.contact_id;
-
-      // ======================================
-      // PROMO / VOUCHER VALIDATION
-      // ======================================
-      if (isPromoQR) {
-        console.log(
-          '✅ Promo/Voucher QR detected'
-        );
-
-        await handleValidationScan(qrData);
-
+      if (!token) {
+        setModalFailedMessage('Sesi login berakhir. Silakan login kembali.');
+        setModalFailed(true);
+        setSubmitLoading(false);
+        setIsScanning(true);
         return;
       }
 
-      // ======================================
-      // USER QR
-      // ======================================
-      if (isUserQR) {
-        console.log(
-          '✅ User QR detected'
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      };
+
+      // Extract dari QR
+      const validationData = extractValidationCode(qrData);
+
+      if (!validationData || !validationData.code) {
+        setModalFailedMessage(
+          'QR Code tidak valid atau tidak mengandung kode validasi yang dapat dibaca.'
         );
+        setModalFailed(true);
+        setSubmitLoading(false);
+        setIsScanning(true);
+        return;
+      }
 
-        try {
-          const profileId =
-            qrData.user_id ||
-            qrData.profile_id ||
-            qrData.contact_id;
+      const codeToValidate = validationData.code;
+      const qrItemType = validationData.type;
+      const itemId = validationData.item_id;
+      const userId = validationData.user_id;
+      const isStructured = validationData.isStructured;
 
-          if (!profileId) {
-            throw new Error(
-              'Profile ID not found'
-            );
-          }
+      setScannedCode(codeToValidate);
 
-          const profileResponse = await get({
-            path: `users/${profileId}/public`,
-          });
+      if (!codeToValidate || codeToValidate.trim() === '') {
+        setModalFailedMessage('Kode validasi tidak boleh kosong.');
+        setModalFailed(true);
+        setSubmitLoading(false);
+        setIsScanning(true);
+        return;
+      }
+      // === only block locally if QR membawa ID kuat (item_id atau user_id) ===
+      const hasStrongId = itemId != null || userId != null;
+      if (hasStrongId) {
+        const key = buildUsedKey({
+          code: codeToValidate,
+          item_id: itemId, // dari QR structured
+          user_id: userId, // dari QR structured
+        });
+        const usedMap = loadUsedCodes();
+        const usedEntry = usedMap[key];
 
-          if (
-            profileResponse?.status === 200 &&
-            profileResponse?.data
-          ) {
-            const profile =
-              profileResponse?.data?.data ||
-              null;
-
-            if (profile) {
-              setContactData({
-                id: profile.id,
-                name:
-                  profile.name ||
-                  'Nama tidak tersedia',
-                email:
-                  profile.email || null,
-                phone:
-                  profile.phone ||
-                  profile.handphone ||
-                  null,
-                code:
-                  profile.code ||
-                  `HUEHUY-${String(
-                    profile.id
-                  ).padStart(6, '0')}`,
-                verified:
-                  profile.verified_at
-                    ? true
-                    : false,
-                avatar:
-                  profile.picture_source ||
-                  '/avatar.jpg',
-              });
-
-              setShowContactConfirm(true);
-              setLoading(false);
-
-              return;
-            }
-          }
-
-          throw new Error(
-            'Profile not found'
+        if (
+          usedEntry &&
+          String(usedEntry.tenantId ?? '') === String(profile?.id ?? '')
+        ) {
+          setModalFailedMessage(
+            `Kode "${codeToValidate}" sudah pernah divalidasi untuk item ini oleh akun ini di perangkat ini.`
           );
-        } catch (err) {
-          console.error(
-            'User QR error:',
-            err
-          );
-
-          setScanResult({
-            type: 'validation_error',
-            message:
-              '❌ User tidak ditemukan',
-            error: err,
-          });
-
-          setLoading(false);
-
+          setModalFailed(true);
+          setSubmitLoading(false);
+          setIsScanning(true);
           return;
         }
       }
 
-      // ======================================
-      // JSON URL QR
-      // ======================================
-      if (
-        qrData.url &&
-        (qrData.url.startsWith(
-          'http://'
-        ) ||
-          qrData.url.startsWith(
-            'https://'
-          ))
-      ) {
-        console.log(
-          '✅ URL QR detected'
-        );
+      dlog('🔍 Validating code:', codeToValidate);
+      dlog('📋 QR metadata:', {
+        type: qrItemType,
+        item_id: itemId,
+        user_id: userId,
+        isStructured,
+      });
+      dlog('🔐 Validation request headers:', headers);
 
-        window.location.href = qrData.url;
+      const tenantPayload = {
+        code: codeToValidate.trim(),
+        tenant_id: profile?.id,
+        validation_source: 'qr_scan',
+        is_tenant_validation: true,
+        validator_role: 'tenant',
+      };
 
-        return;
-      }
-    }
+      if (userId) tenantPayload.item_owner_id = userId;
+      if (itemId) tenantPayload.item_id = itemId;
+      // ❌ REMOVED: expected_type tidak diperlukan backend
+      // ❌ REMOVED: validation_purpose tidak diperlukan backend  
+      // ❌ REMOVED: qr_timestamp tidak diperlukan backend
 
-    // =========================
-    // DIRECT URL QR
-    // =========================
-    if (
-      typeof result === 'string' &&
-      (result.startsWith('http://') ||
-        result.startsWith('https://'))
-    ) {
-      console.log(
-        '✅ Direct URL detected'
-      );
+      dlog('🏢 Enhanced tenant validation payload:', tenantPayload);
+      
+      // ✅ DEBUG: Log final payload yang akan dikirim
+      dlog('🔍 FINAL PAYLOAD TO SEND:', JSON.stringify(tenantPayload, null, 2));
+      dlog('🔍 API URL:', apiUrl);
+      dlog('🔍 HEADERS:', headers);
 
-      // ======================================
-      // PROFILE URL
-      // ======================================
-      if (result.includes('/profile/')) {
-        const profileMatch =
-          result.match(/\/profile\/(\d+)/);
+      let primaryRes, primaryResult, primaryType;
+      let fallbackRes, fallbackResult, fallbackType;
 
-        if (profileMatch) {
-          const profileId =
-            profileMatch[1];
+      // helper: cuma fallback kalau "not found / type salah"
+      const shouldFallback = (status, msg) => {
+        const m = String(msg || '').toLowerCase();
+        if ([401, 403, 409].includes(status)) return false; // error spesifik: JANGAN fallback
+        if (status === 404) return true;
+        if (status === 422) {
+          // fallback hanya jika indikasi salah endpoint / tipe
+          return (
+            m.includes('type') ||
+            m.includes('tipe') ||
+            m.includes('promo') ||
+            m.includes('voucher') ||
+            m.includes('format')
+          );
+        }
+        return false;
+      };
 
-          try {
-            const profileResponse =
-              await get({
-                path: `users/${profileId}/public`,
-              });
+      // --- pilih endpoint utama berdasarkan hint QR ---
+      const hitVoucherFirst = qrItemType === 'voucher';
 
-            if (
-              profileResponse?.status ===
-                200 &&
-              profileResponse?.data
-            ) {
-              const profile =
-                profileResponse?.data
-                  ?.data || null;
+      // 1) HIT UTAMA
+      if (hitVoucherFirst) {
+        primaryType = 'voucher';
+        primaryRes = await fetch(`${apiUrl}/api/vouchers/validate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(tenantPayload),
+        }).catch(err => {
+          dlog('❌ FETCH ERROR for vouchers/validate:', err);
+          throw err;
+        });
+        primaryResult = await primaryRes.json().catch(() => null);
 
-              if (profile) {
-                setContactData({
-                  id: profile.id,
-                  name:
-                    profile.name ||
-                    'Nama tidak tersedia',
-                  email:
-                    profile.email ||
-                    null,
-                  phone:
-                    profile.phone ||
-                    profile.handphone ||
-                    null,
-                  code:
-                    profile.code ||
-                    `HUEHUY-${String(
-                      profile.id
-                    ).padStart(6, '0')}`,
-                  verified:
-                    profile.verified_at
-                      ? true
-                      : false,
-                  avatar:
-                    profile.picture_source ||
-                    '/avatar.jpg',
-                });
+        // fallback bila perlu
+        if (
+          !primaryRes.ok &&
+          shouldFallback(primaryRes.status, primaryResult?.message)
+        ) {
+          fallbackType = 'promo';
+          fallbackRes = await fetch(`${apiUrl}/api/promos/validate`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(tenantPayload),
+          }).catch(err => {
+            dlog('❌ FETCH ERROR for promos/validate:', err);
+            throw err;
+          });
+          fallbackResult = await fallbackRes.json().catch(() => null);
+        }
+      } else {
+        primaryType = 'promo';
+        primaryRes = await fetch(`${apiUrl}/api/promos/validate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(tenantPayload),
+        }).catch(err => {
+          dlog('❌ FETCH ERROR for promos/validate:', err);
+          throw err;
+        });
+        primaryResult = await primaryRes.json().catch(() => null);
 
-                setShowContactConfirm(
-                  true
-                );
-
-                setLoading(false);
-
-                return;
-              }
-            }
-          } catch (error) {
-            console.error(
-              'Profile URL error:',
-              error
-            );
-          }
+        // fallback bila perlu
+        if (
+          !primaryRes.ok &&
+          shouldFallback(primaryRes.status, primaryResult?.message)
+        ) {
+          fallbackType = 'voucher';
+          fallbackRes = await fetch(`${apiUrl}/api/vouchers/validate`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(tenantPayload),
+          }).catch(err => {
+            dlog('❌ FETCH ERROR for vouchers/validate:', err);
+            throw err;
+          });
+          fallbackResult = await fallbackRes.json().catch(() => null);
         }
       }
 
-      // ======================================
-      // PROMO/VOUCHER URL
-      // ======================================
-      if (
-        result.includes(
-          '/app/komunitas/promo/'
-        ) ||
-        result.includes(
-          '/app/komunitas/voucher/'
-        ) ||
-        result.includes('/app/voucher/')
-      ) {
-        window.location.href = result;
-
-        return;
+      // Pilih hasil akhir:
+      let finalRes = primaryRes,
+        finalResult = primaryResult,
+        itemType = primaryType;
+      if (!primaryRes.ok && fallbackRes?.ok) {
+        finalRes = fallbackRes;
+        finalResult = fallbackResult;
+        itemType = fallbackType;
       }
 
-      // ======================================
-      // UNKNOWN URL
-      // ======================================
-      window.location.href = result;
+      dlog('❌ FINAL SNAPSHOT', {
+        status: finalRes?.status,
+        itemType,
+        message: finalResult?.message,
+        data: finalResult?.data || null,
+      });
 
+      if (finalRes?.status === 401) {
+        setModalFailedMessage('Sesi login berakhir. Silakan login kembali.');
+        setModalFailed(true);
+      } else if (finalRes?.ok) {
+        // === SUKSES VALIDASI TENANT ===
+        const respItemId = getRespItemId(finalResult);
+        if (
+          isStructured &&
+          itemId &&
+          respItemId &&
+          String(respItemId) !== String(itemId)
+        ) {
+          dlog('ℹ️ ID Info:', {
+            qr_item_id: itemId,
+            resp_item_id: respItemId,
+            note: 'Backend handles correct item association',
+          });
+        }
+
+        const dd = finalResult?.data || finalResult;
+        const already =
+          dd?.already_validated ||
+          dd?.validated_at ||
+          dd?.voucher_item?.validated_at ||
+          dd?.promo_item?.validated_at;
+
+        if (already) {
+          setModalFailedMessage('Kode ini sudah pernah divalidasi.');
+          setModalFailed(true);
+          setSubmitLoading(false);
+          setIsScanning(true);
+          return;
+        }
+
+        setLastItemType(itemType);
+        setModalSuccess(true);
+
+        try {
+          const usedKey = buildUsedKey({
+            code: codeToValidate,
+            item_id: itemId,
+            user_id: userId,
+          });
+          const map = loadUsedCodes();
+          map[usedKey] = {
+            ts: Date.now(),
+            itemType,
+            tenantId: profile?.id,
+            item_id: itemId ?? null,
+            user_id: userId ?? null,
+            at: new Date().toISOString(),
+          };
+          saveUsedCodes(map);
+        } catch { }
+
+        dlog('✅ VALIDATION SUCCESSFUL:', {
+          itemType,
+          itemId: respItemId,
+          code: codeToValidate,
+          tenantId: profile?.id,
+          tenantName: profile?.fullname,
+          timestamp: new Date().toISOString(),
+          validationResponse: finalResult,
+        });
+      } else {
+        // --- gunakan finalRes/finalResult dari PATCH 1 ---
+        const lower = (s) => (s ? String(s).toLowerCase() : '');
+        const srvMsg = normalizeServerMsg(finalResult?.message, '');
+
+        // ambil detail
+        const d = finalResult?.data || finalResult;
+
+        const validatedByTenantId =
+          d?.validated_by_tenant_id ||
+          d?.voucher_item?.validated_by_tenant_id ||
+          d?.promo_item?.validated_by_tenant_id ||
+          d?.validation?.validated_by_tenant_id;
+
+        const itemTenantId =
+          d?.tenant_id ||
+          d?.voucher_item?.tenant_id ||
+          d?.promo_item?.tenant_id;
+
+        // flags status
+        const alreadyByStatus =
+          [400, 409].includes(finalRes?.status) ||
+          lower(finalResult?.message).includes('already') ||
+          lower(finalResult?.message).includes('used') ||
+          lower(finalResult?.message).includes('divalidasi') ||
+          lower(finalResult?.message).includes('sudah');
+
+        const notFoundByStatus =
+          finalRes?.status === 404 ||
+          lower(finalResult?.message).includes('not found') ||
+          lower(finalResult?.message).includes('tidak ditemukan') ||
+          lower(finalResult?.message).includes('invalid');
+
+        // --- PRIORITAS PESAN ---
+        let errorMsg = 'Kode tidak valid atau tidak ditemukan';
+
+        if (finalRes?.status === 401) {
+          errorMsg = 'Sesi login berakhir. Silakan login kembali.';
+        } else if (
+          finalRes?.status === 403 ||
+          (itemTenantId &&
+            profile?.id &&
+            String(itemTenantId) !== String(profile.id))
+        ) {
+          // tenant mismatch HARUS diutamakan
+          errorMsg = 'Kode ini bukan milik tenant Anda.';
+        } else if (
+          validatedByTenantId &&
+          profile?.id &&
+          String(validatedByTenantId) !== String(profile.id)
+        ) {
+          errorMsg = 'Kode ini sudah divalidasi oleh tenant lain.';
+        } else if (alreadyByStatus) {
+          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'
+            } dengan kode "${codeToValidate}" sudah pernah divalidasi.`;
+        } else if (notFoundByStatus) {
+          errorMsg = `${(qrItemType || itemType) === 'promo' ? 'Promo' : 'Voucher'
+            } dengan kode "${codeToValidate}" tidak ditemukan.`;
+        } else if (finalRes?.status === 422) {
+          errorMsg =
+            srvMsg || `Kode "${codeToValidate}" tidak valid atau format salah.`;
+        } else if (srvMsg) {
+          errorMsg = srvMsg;
+        }
+
+        setModalFailedMessage(errorMsg);
+        setModalFailed(true);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      if (dev) console.error('Validation error:', err);
+      setModalFailedMessage(
+        'Terjadi kesalahan saat validasi. Silakan coba lagi.'
+      );
+      setModalFailed(true);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleScanResult = async (result) => {
+    // Hindari multiple triggers
+    if (!result || submitLoading || !isScanning) {
+      dlog('🚫 Scan blocked:', {
+        hasResult: !!result,
+        isLoading: submitLoading,
+        isScanning,
+      });
       return;
     }
 
-    // =========================
-    // FALLBACK
-    // =========================
-    console.warn(
-      '⚠️ Unknown QR format'
-    );
+    setIsScanning(false);
+    dlog('🎯 QR SCAN RESULT:', result);
 
-    setScanResult({
-      type: 'validation_error',
-      message:
-        '❌ QR Code tidak valid atau tidak didukung',
-      error: {
-        message:
-          'Unrecognized QR format',
-      },
-      qrData: qrData || result,
+    let qrDataToProcess = result;
+
+    // Library scanner sering memberi objek { text: '...' }
+    if (result?.text) {
+      dlog('📱 QR Code Text Found:', result.text);
+      qrDataToProcess = result.text;
+    } else if (typeof result === 'string') {
+      dlog('➡️ Direct String QR Code:', result);
+      qrDataToProcess = result;
+    }
+
+    // Ekstrak & validasi
+    const validationData = extractValidationCode(qrDataToProcess);
+
+    dlog('🧪 Extracted Validation Data:', {
+      originalQR: qrDataToProcess,
+      validationData,
+      isValidData: validationData && validationData.code,
     });
 
-    setLoading(false);
-  } catch (error) {
-    console.error(
-      'Fatal QR error:',
-      error
-    );
-
-    setScanResult({
-      type: 'validation_error',
-      message:
-        '❌ Terjadi kesalahan saat membaca QR',
-      error,
-    });
-
-    setLoading(false);
-    setIsScanning(true);
-  }
-};
-
-  const downloadContactCard = () => {
-    if (!contactData) return;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx.roundRect) {
-      ctx.roundRect = function (x, y, width, height, radius) {
-        this.beginPath();
-        this.moveTo(x + radius, y);
-        this.arcTo(x + width, y, x + width, y + height, radius);
-        this.arcTo(x + width, y + height, x, y + height, radius);
-        this.arcTo(x, y + height, x, y, radius);
-        this.arcTo(x, y, x + width, y, radius);
-        this.closePath();
-      };
+    if (validationData && validationData.code) {
+      setScannedCode(validationData.code);
+      setScanResult(result);
+      await submitValidate(qrDataToProcess); // kirim raw QR agar parser seragam
+    } else {
+      dlog('❌ Failed to extract validation code from QR');
+      setModalFailedMessage(
+        'QR Code tidak valid atau tidak mengandung kode validasi.'
+      );
+      setModalFailed(true);
+      setSubmitLoading(false);
+      setIsScanning(true);
     }
-    canvas.width = 600;
-    canvas.height = 400;
-    const gradient = ctx.createLinearGradient(0, 0, 600, 400);
-    gradient.addColorStop(0, '#10b981');
-    gradient.addColorStop(1, '#059669');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 600, 400);
-    ctx.fillStyle = 'white';
-    ctx.roundRect(30, 30, 540, 340, 20);
-    ctx.fill();
-    ctx.fillStyle = '#059669';
-    ctx.roundRect(50, 50, 500, 80, 15);
-    ctx.fill();
-    ctx.fillStyle = '#f8fafc';
-    ctx.beginPath();
-    ctx.arc(90, 90, 25, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.fillStyle = '#059669';
-    ctx.font = 'bold 20px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('H', 90, 96);
-    ctx.fillStyle = 'white';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('HUEHUY CONTACT', 130, 85);
-    ctx.font = '14px Arial';
-    ctx.fillText('Digital Business Card', 130, 105);
-    ctx.fillStyle = '#1f2937';
-    ctx.textAlign = 'left';
-    ctx.font = 'bold 28px Arial';
-    ctx.fillText(contactData.name, 70, 180);
-    ctx.font = '16px Arial';
-    ctx.fillStyle = contactData.verified ? '#10b981' : '#6b7280';
-    ctx.fillText(contactData.verified ? '✓ Verified Member' : 'Member', 70, 205);
-    ctx.fillStyle = '#1f2937';
-    ctx.font = 'bold 18px Arial';
-    ctx.fillText('Email: ' + (contactData.email || 'Tidak tersedia'), 70, 245);
-    ctx.fillText('Phone: ' + (contactData.phone || 'Tidak tersedia'), 70, 275);
-    ctx.fillText('Code: ' + contactData.code, 70, 305);
-    ctx.fillStyle = '#9ca3af';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Generated by HUEHUY Platform', 300, 350);
-    ctx.fillText(new Date().toLocaleDateString('id-ID'), 300, 365);
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = `contact-${contactData.name.replace(/\s+/g, '-')}-${contactData.code}.png`;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-    }, 'image/png');
-    setShowContactConfirm(false);
-    setContactData(null);
-    resetScanner();
-  };
-
-  const parseQRCode = (qrText) => {
-    try {
-      const data = JSON.parse(qrText);
-      return data;
-    } catch {
-      if (qrText.includes('event') || qrText.includes('booth') || qrText.includes('curiosity')) {
-        return { type: 'event_booth', boothId: extractBoothId(qrText) || 'CURIOSITY2024' };
-      } else if (qrText.includes('tenant') || qrText.includes('promo') || qrText.includes('resto') || qrText.includes('food')) {
-        return { type: 'tenant_promo', tenantId: extractTenantId(qrText) || 'FOODCOURT01' };
-      }
-      return { type: 'event_booth', boothId: 'CURIOSITY2024', data: qrText };
-    }
-  };
-
-  const extractBoothId = (qrText) => {
-    const match = qrText.match(/booth[_-](\w+)/i);
-    return match ? match[1] : null;
-  };
-
-  const extractTenantId = (qrText) => {
-    const match = qrText.match(/tenant[_-](\w+)/i);
-    return match ? match[1] : null;
   };
 
   const resetScanner = () => {
+    dlog('🔄 RESETTING SCANNER at', new Date().toISOString());
     setScanResult(null);
+    setScannedCode(null);
     setIsScanning(true);
-    setLoading(false);
+    setSubmitLoading(false);
+    setModalSuccess(false);
+    setModalFailed(false);
+    setLastItemType(null);
   };
 
-  // ✅ BARU: Render hasil validasi dengan UI yang lebih informatif
-  const renderValidationResult = () => {
-    if (!scanResult || typeof scanResult === 'string') return null;
-    if (!scanResult.type?.startsWith('validation_')) return null;
-
-    const isSuccess = scanResult.type === 'validation_success';
-    const isAlreadyUsed = scanResult.type === 'validation_already_used';
-    const isExpired = scanResult.type === 'validation_expired';
-    const isInvalid = scanResult.type === 'validation_invalid';
-    
-    // Tentukan warna & icon berdasarkan tipe
-    let bgColor, borderColor, textColor, icon, title;
-    
-    if (isSuccess) {
-      bgColor = 'bg-green-50'; borderColor = 'border-green-200 border-l-green-500'; textColor = 'text-green-800';
-      icon = faShieldCheck; title = '✅ Validasi Berhasil';
-    } else if (isAlreadyUsed) {
-      bgColor = 'bg-yellow-50'; borderColor = 'border-yellow-200 border-l-yellow-500'; textColor = 'text-yellow-800';
-      icon = faQrcode; title = '⚠️ Sudah Divvalidasi';
-    } else if (isExpired) {
-      bgColor = 'bg-orange-50'; borderColor = 'border-orange-200 border-l-orange-500'; textColor = 'text-orange-800';
-      icon = faQrcode; title = '⏰ Kadaluwarsa';
-    } else {
-      bgColor = 'bg-red-50'; borderColor = 'border-red-200 border-l-red-500'; textColor = 'text-red-800';
-      icon = faQrcode; title = '❌ Validasi Gagal';
-    }
-
+  // Loading state
+  if (loading) {
     return (
-      <div className="px-4 pb-20">
-        <div className={`rounded-[20px] p-4 shadow-sm border border-l-4 ${bgColor} ${borderColor}`}>
-          <h3 className={`font-semibold mb-2 text-sm flex items-center gap-2 ${textColor}`}>
-            <FontAwesomeIcon icon={icon} className={isSuccess ? 'text-green-600' : 'text-yellow-600'} />
-            {title}
-          </h3>
-          <p className={`text-sm ${textColor} mb-3`}>{scanResult.message}</p>
-          
-          {/* Tampilkan detail promo jika ada */}
-          {scanResult.data?.promo_item && (
-            <div className="bg-white/50 rounded-[12px] p-3 text-xs space-y-1 mb-3">
-              {scanResult.data.promo_item.promo?.title && (
-                <p><strong>Promo:</strong> {scanResult.data.promo_item.promo.title}</p>
-              )}
-              {scanResult.data.promo_item.code && (
-                <p><strong>Kode:</strong> {scanResult.data.promo_item.code}</p>
-              )}
-              {scanResult.data.promo_item.redeemed_at && (
-                <p><strong>Divvalidasi:</strong> {new Date(scanResult.data.promo_item.redeemed_at).toLocaleString('id-ID')}</p>
-              )}
-              {scanResult.data.promo_item.expires_at && (
-                <p><strong>Berlaku hingga:</strong> {new Date(scanResult.data.promo_item.expires_at).toLocaleDateString('id-ID')}</p>
-              )}
-            </div>
-          )}
-          
-          <button
-            onClick={resetScanner}
-            className={`w-full py-2 px-4 rounded-[12px] font-medium text-sm transition-colors ${
-              isSuccess 
-                ? 'bg-green-600 text-white hover:bg-green-700' 
-                : isAlreadyUsed
-                  ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                  : 'bg-red-600 text-white hover:bg-red-700'
-            }`}
-          >
-            Scan Lagi
-          </button>
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="bg-primary h-10" />
+        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-3 border-gray-200 border-t-primary mx-auto" />
+            <p className="text-gray-700 mt-3 font-medium">Memuat...</p>
+          </div>
         </div>
       </div>
     );
-  };
+  }
 
-  return (
-    <div className="lg:mx-auto lg:relative lg:max-w-md">
-      <div className="container mx-auto relative z-10 min-h-screen bg-gradient-to-br from-cyan-50">
-        {/* Header */}
-        <div className="bg-primary px-4 py-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <Link href="/app" className="p-2 hover:bg-white/20 rounded-full transition-colors">
-              <FontAwesomeIcon icon={faArrowLeft} className="text-lg text-white" />
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-lg font-semibold text-white">QR Scanner</h1>
-              <p className="text-sm text-white/90">
-                {isScanning ? 'Arahkan kamera ke QR Code' : loading ? 'Memvalidasi...' : 'Selesai'}
-              </p>
+  // Jika bukan Manager Tenant
+  if (!isManagerTenant) {
+    return (
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="bg-primary h-10" />
+        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50 flex items-center justify-center">
+          <div className="text-center px-6">
+            <div className="bg-red-100 p-4 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <FontAwesomeIcon
+                icon={faShieldCheck}
+                className="text-2xl text-red-600"
+              />
             </div>
-            <FontAwesomeIcon icon={faQrcode} className="text-xl text-white/80" />
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">
+              Akses Ditolak
+            </h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Fitur ini hanya tersedia untuk Manager Tenant.
+            </p>
+            <ButtonComponent
+              label="Kembali"
+              onClick={() => router.push('/app/akun')}
+              size="md"
+            />
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Scanner Area */}
-        <div className="px-4 pb-4 mt-4">
-          <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm border border-gray-100 overflow-hidden">
-            {isScanning ? (
-              <div className="relative">
-                <QrScannerComponent onScan={handleScanResult} />
-                <div className="absolute inset-0 border-2 border-white/30 rounded-[20px]">
-                  <div className="absolute top-3 left-3 w-5 h-5 border-l-3 border-t-3 border-white rounded-tl-lg"></div>
-                  <div className="absolute top-3 right-3 w-5 h-5 border-r-3 border-t-3 border-white rounded-tr-lg"></div>
-                  <div className="absolute bottom-3 left-3 w-5 h-5 border-l-3 border-b-3 border-white rounded-bl-lg"></div>
-                  <div className="absolute bottom-3 right-3 w-5 h-5 border-r-3 border-b-3 border-white rounded-br-lg"></div>
+  return (
+    <>
+      <div className="lg:mx-auto lg:relative lg:max-w-md">
+        <div className="bg-primary h-10" />
+        <div className="bg-background h-screen overflow-y-auto scroll_control w-full rounded-t-[25px] -mt-6 relative z-20 bg-gradient-to-br from-cyan-50">
+          <div className="flex justify-between items-center gap-2 p-2 sticky top-0 z-30 bg-white bg-opacity-40 backdrop-blur-sm border-b">
+            <div className="px-2">
+              <IconButtonComponent
+                icon={faArrowLeftLong}
+                variant="simple"
+                size="lg"
+                onClick={() => router.back()}
+              />
+            </div>
+            <div className="font-semibold w-full text-lg">Scan QR Validasi</div>
+            <div className="w-12" />
+          </div>
+
+          <div className="bg-background bg-gradient-to-br -mt-4 rounded-t-[15px] pt-2 from-cyan-50 relative z-50 px-4">
+            <div className="flex justify-center items-center gap-4 my-6">
+              <div className="w-1/5 h-0.5 bg-gray-300" />
+              <p className="text-slate-400 font-medium text-center">
+                Scan QR Code
+              </p>
+              <div className="w-1/5 h-0.5 bg-gray-300" />
+            </div>
+
+            {/* Scanner Area */}
+            <div className="mb-6">
+              {/* Kode yang di-scan */}
+              {scannedCode && (
+                <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FontAwesomeIcon icon={faEye} className="text-blue-600" />
+                    <p className="text-sm font-medium text-blue-800">
+                      Kode yang di-scan:
+                    </p>
+                  </div>
+                  <p className="text-lg font-mono text-blue-900 break-all bg-white p-2 rounded border">
+                    {scannedCode}
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div className="aspect-square flex items-center justify-center p-6">
-                {loading ? (
-                  <div className="text-center">
-                    <div className="relative">
-                      <div className="animate-spin rounded-full h-16 w-16 border-3 border-gray-200 border-t-primary mx-auto"></div>
-                      <FontAwesomeIcon icon={faQrcode} className="absolute inset-0 m-auto text-xl text-primary" />
+              )}
+
+              <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm border border-gray-100 overflow-hidden">
+                {isScanning ? (
+                  <div className="relative">
+                    <QrScannerComponent onScan={handleScanResult} />
+                    <div className="absolute inset-0 border-2 border-white/30 rounded-[20px]">
+                      <div className="absolute top-3 left-3 w-5 h-5 border-l-3 border-t-3 border-white rounded-tl-lg" />
+                      <div className="absolute top-3 right-3 w-5 h-5 border-r-3 border-t-3 border-white rounded-tr-lg" />
+                      <div className="absolute bottom-3 left-3 w-5 h-5 border-l-3 border-b-3 border-white rounded-bl-lg" />
+                      <div className="absolute bottom-3 right-3 w-5 h-5 border-r-3 border-b-3 border-white rounded-br-lg" />
                     </div>
-                    <p className="text-gray-700 mt-3 font-medium text-sm">Memvalidasi QR Code...</p>
-                    <p className="text-gray-400 text-xs">Mohon tunggu sebentar</p>
                   </div>
                 ) : (
-                  <div className="text-center">
-                    <div className="bg-primary/10 p-4 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
-                      <FontAwesomeIcon icon={faShieldCheck} className="text-2xl text-primary" />
-                    </div>
-                    <p className="text-gray-800 font-medium text-sm">QR Code Berhasil Dipindai!</p>
-                    <p className="text-gray-500 text-xs">Menampilkan hasil...</p>
+                  <div className="aspect-square flex items-center justify-center p-6">
+                    {submitLoading ? (
+                      <div className="text-center">
+                        <div className="relative">
+                          <div className="animate-spin rounded-full h-16 w-16 border-3 border-gray-200 border-t-primary mx-auto" />
+                          <FontAwesomeIcon
+                            icon={faQrcode}
+                            className="absolute inset-0 m-auto text-xl text-primary"
+                          />
+                        </div>
+                        <p className="text-gray-700 mt-3 font-medium text-sm">
+                          Memvalidasi...
+                        </p>
+                        <p className="text-gray-400 text-xs">
+                          Mohon tunggu sebentar
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <div className="bg-primary/10 p-4 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                          <FontAwesomeIcon
+                            icon={faShieldCheck}
+                            className="text-2xl text-primary"
+                          />
+                        </div>
+                        <p className="text-gray-800 font-medium text-sm">
+                          QR Code Berhasil Dipindai!
+                        </p>
+                        <p className="text-gray-500 text-xs">
+                          Memproses validasi...
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Controls */}
-        <div className="px-4 pb-4">
-          <div className="flex gap-3">
-            <button
-              onClick={() => setFlashOn(!flashOn)}
-              className={`flex-1 py-3 px-3 rounded-[15px] flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${
-                flashOn
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <FontAwesomeIcon icon={flashOn ? faFlashlightSlash : faFlashlight} className="text-base" />
-              <span>{flashOn ? 'Matikan Flash' : 'Flash'}</span>
-            </button>
-
-            {!isScanning && (
+            {/* Controls */}
+            <div className="flex gap-3 mb-6">
               <button
-                onClick={resetScanner}
-                className="flex-1 bg-primary text-white py-3 px-3 rounded-[15px] font-medium text-sm shadow-sm hover:shadow-md transition-all"
+                onClick={() => setFlashOn(!flashOn)}
+                className={`flex-1 py-3 px-3 rounded-[15px] flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm ${flashOn
+                    ? 'bg-yellow-500 text-white'
+                    : 'bg-white bg-opacity-40 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
               >
-                <FontAwesomeIcon icon={faCamera} className="mr-2" />
-                Scan Lagi
+                <FontAwesomeIcon
+                  icon={flashOn ? faFlashlightSlash : faFlashlight}
+                  className="text-base"
+                />
+                <span>{flashOn ? 'Matikan Flash' : 'Flash'}</span>
               </button>
+
+              {!isScanning && (
+                <button
+                  onClick={resetScanner}
+                  className="flex-1 bg-primary text-white py-3 px-3 rounded-[15px] font-medium text-sm shadow-sm hover:shadow-md transition-all"
+                >
+                  <FontAwesomeIcon icon={faCamera} className="mr-2" />
+                  Scan Lagi
+                </button>
+              )}
+            </div>
+
+            {/* Hasil Scan (raw) */}
+            {scanResult && (
+              <div className="mb-6">
+                <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] p-4 shadow-sm border border-gray-100 border-l-4 border-l-primary">
+                  <h3 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                    <FontAwesomeIcon
+                      icon={faShieldCheck}
+                      className="text-primary"
+                    />
+                    Hasil Scan
+                  </h3>
+                  <div className="bg-gray-50 p-3 rounded-[12px]">
+                    <p className="text-xs text-gray-700 font-mono break-all">
+                      {typeof scanResult === 'string'
+                        ? scanResult
+                        : JSON.stringify(scanResult)}
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
-
-        {/* ✅ BARU: Render hasil validasi khusus */}
-        {renderValidationResult()}
-
-        {/* Hasil Scan (untuk hasil non-validasi) */}
-        {scanResult && typeof scanResult === 'string' && (
-          <div className="px-4 pb-20">
-            <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] p-4 shadow-sm border border-gray-100 border-l-4 border-l-primary">
-              <h3 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
-                <FontAwesomeIcon icon={faShieldCheck} className="text-primary" />
-                Hasil Scan
-              </h3>
-              <div className="bg-gray-50 p-3 rounded-[12px]">
-                <p className="text-xs text-gray-700 font-mono break-all">{scanResult}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Contact Confirmation Modal */}
-        {showContactConfirm && contactData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
-              <div className="text-center mb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FontAwesomeIcon icon={faQrcode} className="text-2xl text-green-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">Kontak Ditemukan!</h3>
-                <p className="text-sm text-gray-600 mt-1">Apakah Anda ingin mengunduh contact card?</p>
-              </div>
-              <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-4 mb-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                    <span className="text-green-600 font-bold text-lg">{contactData.name.charAt(0)}</span>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-white text-base">{contactData.name}</h4>
-                    {contactData.verified && (
-                      <span className="text-xs text-green-100 flex items-center gap-1">
-                        <FontAwesomeIcon icon={faShieldCheck} className="text-xs" />
-                        Verified
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2 text-white text-sm">
-                  {contactData.email && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-200">Email</span>
-                      <span className="break-all">{contactData.email}</span>
-                    </div>
-                  )}
-                  {contactData.phone && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-200">Phone</span>
-                      <span>{contactData.phone}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-200">Code</span>
-                    <span>{contactData.code}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-green-50 rounded-lg p-3 mb-4">
-                <p className="text-xs text-green-700 text-center">
-                  Contact card akan diunduh sebagai file gambar PNG yang dapat Anda simpan di galeri atau bagikan.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setShowContactConfirm(false); setContactData(null); resetScanner(); }}
-                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={downloadContactCard}
-                  className="flex-1 py-3 px-4 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors"
-                >
-                  Unduh
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-    </div>
+
+      <ModalConfirmComponent
+        show={modalSuccess}
+        onClose={() => {
+          setModalSuccess(false);
+          resetScanner();
+        }}
+        paint="primary"
+        icon={faCheckCircle}
+        title={`Selamat, ${lastItemType === 'promo' ? 'Promo' : 'Voucher'
+          } Berhasil divalidasi`}
+        onSubmit={async () => {
+          setModalSuccess(false);
+          resetScanner();
+        }}
+      />
+
+      <ModalConfirmComponent
+        show={modalFailed}
+        onClose={() => {
+          setModalFailed(false);
+          resetScanner();
+        }}
+        paint="danger"
+        icon={faShieldCheck} // <-- ganti ini
+        title={modalFailedMessage}
+        onSubmit={async () => {
+          setModalFailed(false);
+          resetScanner();
+        }}
+      />
+    </>
   );
 }
