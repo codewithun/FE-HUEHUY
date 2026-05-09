@@ -62,7 +62,7 @@ export default function ScanQR() {
         endpoint = `${baseUrl}/api/grabs/validate`;
       }
 
-      console.log('Calling validation endpoint:', endpoint, payload);
+      console.log('🔍 Calling validation endpoint:', endpoint, payload);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -75,7 +75,7 @@ export default function ScanQR() {
       });
 
       const result = await response.json();
-      console.log('Validation response:', result);
+      console.log('✅ Validation response:', result);
 
       if (response.ok && result.success) {
         // Validasi berhasil
@@ -89,7 +89,7 @@ export default function ScanQR() {
         // Validasi gagal (tapi response 200/4xx dari backend)
         const errorMsg = result.message || 'Validasi gagal';
         
-        // Deteksi pesan "sudah divalidasi" untuk UX yang lebih jelas
+        // ✅ Deteksi pesan "sudah divalidasi" untuk UX yang lebih jelas
         let displayMessage = errorMsg;
         let displayType = 'validation_error';
         
@@ -115,7 +115,7 @@ export default function ScanQR() {
         });
       }
     } catch (error) {
-      console.error('Validation error:', error);
+      console.error('❌ Validation error:', error);
       setScanResult({
         type: 'validation_error',
         message: 'Error koneksi: ' + error.message,
@@ -129,324 +129,115 @@ export default function ScanQR() {
 
 const handleScanResult = async (result) => {
   if (!result || loading) return;
-
-  console.log('[SCAN RESULT] Raw data:', result);
-
+  
+  console.log('🔍 [SCAN RESULT] Raw data:', result);
+  
   setLoading(true);
   setScanResult(result);
   setIsScanning(false);
 
   try {
+    // ============================================
+    // ✅ PRIORITAS 1: Coba parse sebagai JSON dulu
+    // ============================================
     let qrData = null;
-
-    // =========================
-    // PARSE QR
-    // =========================
+    
     try {
-      qrData =
-        typeof result === 'string'
-          ? JSON.parse(result)
-          : result;
-
-      console.log(
-        '[PARSE] JSON success:',
-        qrData
-      );
+      qrData = typeof result === 'string' ? JSON.parse(result) : result;
+      console.log('✅ [PARSE] Berhasil parse JSON:', qrData);
     } catch (parseError) {
-      console.log(
-        '[PARSE] Not JSON:',
-        parseError.message
-      );
-
+      console.log('❌ [PARSE] Bukan JSON atau parse error:', parseError.message);
       qrData = null;
     }
 
-    // =========================
-    // HANDLE JSON QR
-    // =========================
+    // ============================================
+    // ✅ PRIORITAS 2: Cek apakah ini QR VALIDATION
+    // ============================================
     if (qrData) {
-      console.log(
-        '[CHECK] QR DATA:',
-        qrData
-      );
+      console.log('🔍 [CHECK] Validation purpose:', qrData.validation_purpose);
+      console.log('🔍 [CHECK] Type:', qrData.type);
+      console.log('🔍 [CHECK] Item ID:', qrData.item_id);
+      console.log('🔍 [CHECK] Code:', qrData.code);
 
-      // ======================================
-      // UNIVERSAL QR DETECTION
-      // ======================================
+      // Deteksi QR untuk validasi promo/voucher
+      const isValidationQR = 
+        qrData.validation_purpose === 'tenant_scan' ||
+        qrData.validation_purpose === 'owner_validation' ||
+        (qrData.type === 'promo' && qrData.item_id && qrData.code) ||
+        (qrData.type === 'voucher' && qrData.item_id && qrData.code);
 
-      const isPromoQR =
-        ['promo', 'voucher'].includes(
-          qrData.type
-        ) && qrData.code;
-
-      const isUserQR =
-        qrData.type === 'user' ||
-        qrData.user_id ||
-        qrData.profile_id ||
-        qrData.contact_id;
-
-      // ======================================
-      // PROMO / VOUCHER VALIDATION
-      // ======================================
-      if (isPromoQR) {
-        console.log(
-          '✅ Promo/Voucher QR detected'
-        );
-
+      if (isValidationQR && qrData.item_id && qrData.code) {
+        console.log('✅ [DETECTED] Ini QR Validation! Memanggil handleValidationScan...');
         await handleValidationScan(qrData);
-
-        return;
+        return; // ✅ EXIT - Jangan lanjut ke logic lain
       }
 
-      // ======================================
-      // USER QR
-      // ======================================
-      if (isUserQR) {
-        console.log(
-          '✅ User QR detected'
-        );
-
-        try {
-          const profileId =
-            qrData.user_id ||
-            qrData.profile_id ||
-            qrData.contact_id;
-
-          if (!profileId) {
-            throw new Error(
-              'Profile ID not found'
-            );
-          }
-
-          const profileResponse = await get({
-            path: `users/${profileId}/public`,
-          });
-
-          if (
-            profileResponse?.status === 200 &&
-            profileResponse?.data
-          ) {
-            const profile =
-              profileResponse?.data?.data ||
-              null;
-
-            if (profile) {
-              setContactData({
-                id: profile.id,
-                name:
-                  profile.name ||
-                  'Nama tidak tersedia',
-                email:
-                  profile.email || null,
-                phone:
-                  profile.phone ||
-                  profile.handphone ||
-                  null,
-                code:
-                  profile.code ||
-                  `HUEHUY-${String(
-                    profile.id
-                  ).padStart(6, '0')}`,
-                verified:
-                  profile.verified_at
-                    ? true
-                    : false,
-                avatar:
-                  profile.picture_source ||
-                  '/avatar.jpg',
-              });
-
-              setShowContactConfirm(true);
-              setLoading(false);
-
-              return;
-            }
-          }
-
-          throw new Error(
-            'Profile not found'
-          );
-        } catch (err) {
-          console.error(
-            'User QR error:',
-            err
-          );
-
-          setScanResult({
-            type: 'validation_error',
-            message:
-              '❌ User tidak ditemukan',
-            error: err,
-          });
-
-          setLoading(false);
-
-          return;
-        }
-      }
-
-      // ======================================
-      // JSON URL QR
-      // ======================================
-      if (
-        qrData.url &&
-        (qrData.url.startsWith(
-          'http://'
-        ) ||
-          qrData.url.startsWith(
-            'https://'
-          ))
-      ) {
-        console.log(
-          '✅ URL QR detected'
-        );
-
+      // Deteksi QR untuk redirect URL
+      if (qrData.url && (qrData.url.startsWith('http://') || qrData.url.startsWith('https://'))) {
+        console.log('✅ [DETECTED] Ini QR URL! Redirecting...');
         window.location.href = qrData.url;
-
         return;
       }
     }
 
-    // =========================
-    // DIRECT URL QR
-    // =========================
-    if (
-      typeof result === 'string' &&
-      (result.startsWith('http://') ||
-        result.startsWith('https://'))
-    ) {
-      console.log(
-        '✅ Direct URL detected'
-      );
-
-      // ======================================
-      // PROFILE URL
-      // ======================================
+    // ============================================
+    // ✅ PRIORITAS 3: Cek apakah ini URL langsung
+    // ============================================
+    if (typeof result === 'string' && (result.startsWith('http://') || result.startsWith('https://'))) {
+      console.log('✅ [DETECTED] Ini URL langsung! Redirecting...');
+      
       if (result.includes('/profile/')) {
-        const profileMatch =
-          result.match(/\/profile\/(\d+)/);
-
+        // Handle profile URL
+        const profileMatch = result.match(/\/profile\/(\d+)/);
         if (profileMatch) {
-          const profileId =
-            profileMatch[1];
-
+          const profileId = profileMatch[1];
           try {
-            const profileResponse =
-              await get({
-                path: `users/${profileId}/public`,
-              });
-
-            if (
-              profileResponse?.status ===
-                200 &&
-              profileResponse?.data
-            ) {
-              const profile =
-                profileResponse?.data
-                  ?.data || null;
-
+            const profileResponse = await get({ path: `users/${profileId}/public` });
+            if (profileResponse?.status === 200 && profileResponse?.data) {
+              const profile = profileResponse?.data?.data || null;
               if (profile) {
                 setContactData({
                   id: profile.id,
-                  name:
-                    profile.name ||
-                    'Nama tidak tersedia',
-                  email:
-                    profile.email ||
-                    null,
-                  phone:
-                    profile.phone ||
-                    profile.handphone ||
-                    null,
-                  code:
-                    profile.code ||
-                    `HUEHUY-${String(
-                      profile.id
-                    ).padStart(6, '0')}`,
-                  verified:
-                    profile.verified_at
-                      ? true
-                      : false,
-                  avatar:
-                    profile.picture_source ||
-                    '/avatar.jpg',
+                  name: profile.name || 'Nama tidak tersedia',
+                  email: profile.email || null,
+                  phone: profile.phone || profile.handphone || null,
+                  code: profile.code || `HUEHUY-${String(profile.id).padStart(6, '0')}`,
+                  verified: profile.verified_at ? true : false,
+                  avatar: profile.picture_source || '/avatar.jpg'
                 });
-
-                setShowContactConfirm(
-                  true
-                );
-
+                setShowContactConfirm(true);
                 setLoading(false);
-
                 return;
               }
             }
           } catch (error) {
-            console.error(
-              'Profile URL error:',
-              error
-            );
+            console.error('❌ [ERROR] Gagal ambil data profil:', error);
           }
         }
       }
-
-      // ======================================
-      // PROMO/VOUCHER URL
-      // ======================================
-      if (
-        result.includes(
-          '/app/komunitas/promo/'
-        ) ||
-        result.includes(
-          '/app/komunitas/voucher/'
-        ) ||
-        result.includes('/app/voucher/')
-      ) {
+      
+      // Redirect langsung untuk URL promo/voucher
+      if (result.includes('/app/komunitas/promo/') || result.includes('/app/komunitas/voucher/') || result.includes('/app/voucher/')) {
         window.location.href = result;
-
         return;
       }
-
-      // ======================================
-      // UNKNOWN URL
-      // ======================================
-      window.location.href = result;
-
-      return;
     }
 
-    // =========================
-    // FALLBACK
-    // =========================
-    console.warn(
-      '⚠️ Unknown QR format'
-    );
-
+    // ============================================
+    // ⚠️ FALLBACK: QR tidak dikenali
+    // ============================================
+    console.warn('⚠️ [FALLBACK] QR tidak dikenali, tampilkan pesan error');
     setScanResult({
       type: 'validation_error',
-      message:
-        '❌ QR Code tidak valid atau tidak didukung',
-      error: {
-        message:
-          'Unrecognized QR format',
-      },
+      message: '❌ QR Code tidak valid atau tidak didukung',
+      error: { message: 'Unrecognized QR format' },
       qrData: qrData || result,
     });
-
     setLoading(false);
+
   } catch (error) {
-    console.error(
-      'Fatal QR error:',
-      error
-    );
-
-    setScanResult({
-      type: 'validation_error',
-      message:
-        '❌ Terjadi kesalahan saat membaca QR',
-      error,
-    });
-
+    console.error('❌ [ERROR] Fatal error di handleScanResult:', error);
+    setScanResult(`Error: ${error.message || 'Unknown error processing QR code'}`);
     setLoading(false);
     setIsScanning(true);
   }
