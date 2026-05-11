@@ -9,6 +9,7 @@ import { get, post } from '../../../helpers/api.helpers';
 import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
+import { useUserContext } from '../../../context/user.context';
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -30,6 +31,7 @@ const getAuthHeader = () => {
 
 export default function ScanQR() {
   const router = useRouter();
+  const { profile } = useUserContext();
   const [scanResult, setScanResult] = useState(null);
   const [isScanning, setIsScanning] = useState(true);
   const [flashOn, setFlashOn] = useState(false);
@@ -48,7 +50,7 @@ export default function ScanQR() {
       let payload = {
         code: qrData.code,
         item_id: qrData.item_id,
-        item_owner_id: qrData.item_owner_id,
+        item_owner_id: qrData.user_id,
         validator_role: 'tenant',  // ← WAJIB: backend cek role ini
         validation_purpose: qrData.validation_purpose || 'tenant_scan',
         qr_timestamp: qrData.timestamp,
@@ -57,7 +59,7 @@ export default function ScanQR() {
       if (qrData.type === 'voucher') {
         endpoint = `${baseUrl}/api/vouchers/validate`;
       } else if (qrData.type === 'promo') {
-        endpoint = `${baseUrl}/api/promos/validate-code`;
+        endpoint = `${baseUrl}/api/promos/validate`;
       } else {
         // Fallback ke grabs/validate untuk general validation
         endpoint = `${baseUrl}/api/grabs/validate`;
@@ -78,7 +80,7 @@ export default function ScanQR() {
       const result = await response.json();
       console.log('✅ Validation response:', result);
 
-      if (response.ok && result.success) {
+      if (response.ok) {
         // Validasi berhasil
         setScanResult({
           type: 'validation_success',
@@ -243,6 +245,178 @@ export default function ScanQR() {
       setIsScanning(true);
     }
   };
+
+const handleScanResult = async (result) => {
+  if (!result || loading) return;
+  
+  console.log('[SCAN RESULT] Raw data:', result);
+  
+  setLoading(true);
+  setIsScanning(false);
+
+  try {
+    const rawText = result?.text || result;
+
+    // ============================================
+    // import logic scan-validasi.jsx
+    // ============================================
+    const extractValidationCode = (qrResult) => {
+      if (!qrResult || typeof qrResult !== 'string') { 
+        return null; 
+      }
+    try { 
+      const parsed = JSON.parse(qrResult);
+
+      if (parsed && parsed.code) { 
+        return { 
+          code: parsed.code, 
+          type: parsed.type || 'unknown', 
+          item_id: parsed.item_id, 
+          user_id: parsed.user_id, 
+          validation_purpose: 
+          parsed.validation_purpose, 
+          isStructured: true, 
+        }; 
+      } 
+    } catch {}
+
+    // url promo/voucher
+    if (qrResult.includes('http')) { 
+      const urlMatch = qrResult.match(/\/(voucher|promo)\/(\d+)/);
+
+      // Deteksi QR untuk validasi promo/voucher
+      if (urlMatch) 
+        { return { 
+          code: urlMatch[2], 
+          type: urlMatch[1], 
+          isStructured: false, 
+        }; 
+      } 
+    }
+
+    // pipe format 
+    if (qrResult.includes('|')) { 
+      const parts = qrResult.split('|');
+
+      if ( parts.length >= 2 && 
+        (parts[0] === 'voucher' || parts[0] === 'promo') 
+      ) { 
+        return { 
+          code: parts[1], 
+          type: parts[0], 
+          isStructured: false, 
+        }; 
+      } 
+    } 
+    return null; 
+  };
+
+  const validationData = extractValidationCode(rawText);
+
+    // qr promo/voucer untuk validasi
+  if ( 
+    validationData && 
+    validationData.code && 
+    (
+      validationData.type === 'promo' || 
+      validationData.type === 'voucher'
+    ) 
+    ) { 
+      
+      // hanya merchant 
+      if (profile?.role_id !== 6) { 
+
+        setScanResult({ 
+          type: 'validation_error', 
+          message: 'Hanya merchant yang dapat memvalidasi promo', 
+        }); 
+
+          setLoading(false);
+          return; 
+        }
+
+    console.log('QR VALIDATION DETECTED');
+
+    await handleValidationScan({ 
+      code: validationData.code, 
+      type: validationData.type, 
+      item_id: validationData.item_id, 
+      user_id: validationData.user_id, 
+      validation_purpose: 'tenant_scan', 
+    }); 
+
+    return; 
+  }
+
+  if ( 
+    typeof rawText === 'string' && 
+    (rawText.startsWith('http://') || 
+    rawText.startsWith('https://')) 
+  ) { 
+
+    if (rawText.includes('/profile/')) { 
+      const profileMatch = rawText.match(/\/profile\/(\d+)/); 
+
+      if (profileMatch) { 
+        const profileId = profileMatch[1]; 
+
+        try { 
+          const profileResponse = await get({ 
+          path: `users/${profileId}/public` 
+        }); 
+        
+        if ( 
+          profileResponse?.status === 200 && 
+          profileResponse?.data 
+        ) { 
+
+          const profile = 
+          profileResponse?.data?.data || null; 
+
+          if (profile) { 
+            setContactData({ 
+              id: profile.id, 
+              name: profile.name || 'Nama tidak tersedia', 
+              email: profile.email || null, 
+              phone: profile.phone || null, 
+              code: 
+                profile.code || 
+                `HUEHUY-${String(profile.id).padStart(6, '0')}`, 
+                verified: !!profile.verified_at, 
+                avatar: 
+                  profile.picture_source || '/avatar.jpg', 
+                }); 
+                
+                setShowContactConfirm(true); 
+                setLoading(false); 
+                return; 
+              } 
+            } 
+          } catch (err) { 
+            console.error(err); 
+          } 
+        } 
+      } 
+    }
+    
+    setScanResult({ 
+      type: 'validation_error', 
+      message: 'QR Code tidak dikenali', 
+    }); 
+
+  } catch (error) { 
+
+    console.error(error); 
+
+    setScanResult({ 
+      type: 'validation_error', 
+      message: error.message, 
+    }); 
+
+  } finally { 
+    setLoading(false); 
+  } 
+};
 
   const downloadContactCard = () => {
     if (!contactData) return;
