@@ -307,15 +307,13 @@ export function Cube({ cubeData }) {
             {data?.data?.ads && data?.data?.ads.length > 0 && (
               <div className="mb-4">
                 <ImageCarousel
-                  images={
-                    data?.data?.ads
-                      ?.map(item =>
-                        item?.picture_source
-                          ? `${process.env.NEXT_PUBLIC_API_URL}/${item.picture_source}`
-                          : null
-                        )
-                        .filter(Boolean)
-                      }
+                 src={
+                    item?.ads?.at(0)?.picture_source
+                      ? `${process.env.NEXT_PUBLIC_API_URL}/${item.ads.at(0).picture_source}`
+                      : '/images/placeholder.png'
+                    }
+                     alt=""
+                    className="w-full h-full object-cover"
                   title={currentPromo?.title || 'Promo'}
                   className="w-full"
                 />
