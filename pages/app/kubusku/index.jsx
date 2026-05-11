@@ -15,34 +15,50 @@ export default function Kubusku() {
     path: `cubes`,
   });
 
-  const getImageUrl = (path) => {
+const getAdImage = (ad) => {
+  return (
+    ad?.image_1 ||
+    ad?.image_2 ||
+    ad?.image_3 ||
+    ad?.picture_source ||
+    ''
+  );
+};
+
+const getImageUrl = (ad) => {
+  const path = getAdImage(ad);
+
   if (!path || path === 'null' || path === 'undefined') {
     return '/images/placeholder.png';
   }
 
-  // Kalau sudah full URL
-  if (path.startsWith('http://') || path.startsWith('https://')) {
+  // kalau sudah full URL
+  if (
+    typeof path === 'string' &&
+    (path.startsWith('http://') || path.startsWith('https://'))
+  ) {
     return path;
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
 
-  // hapus /api di belakang
+  // hapus /api
   const cleanBaseUrl = baseUrl
     .replace(/\/api\/?$/, '')
     .replace(/\/$/, '');
 
   // hapus slash depan
-  const cleanPath = path.replace(/^\/+/, '');
+  const cleanPath = String(path).replace(/^\/+/, '');
 
-  // kalau belum ada storage/
+  // cek storage
   const finalPath = cleanPath.startsWith('storage/')
     ? cleanPath
     : `storage/${cleanPath}`;
 
   const finalUrl = `${cleanBaseUrl}/${finalPath}`;
 
-  console.log('🖼️ [KUBUSKU] Final Image URL:', finalUrl);
+  console.log('🖼️ [KUBUSKU] FINAL URL:', finalUrl);
 
   return finalUrl;
 };
@@ -79,17 +95,18 @@ export default function Kubusku() {
 
                       <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-200 flex justify-center items-center">
                         <img
-                          src={getImageUrl(promo?.picture_source)}
-                          alt={promo?.title || 'Promo'}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            console.error('❌ [KUBUSKU] Image load failed:', {
-                              src: e.currentTarget.src,
-                              promo: promo,
-                            });
-                            e.currentTarget.src = '/images/placeholder.png';
-                          }}
+  src={getImageUrl(promo)}
+  alt={promo?.title || 'Promo'}
+  className="w-full h-full object-cover"
+  loading="lazy"
+  onError={(e) => {
+    console.error('❌ [KUBUSKU] Image load failed:', {
+      src: e.currentTarget.src,
+      promo,
+    });
+
+    e.currentTarget.src = '/images/placeholder.png';
+  }}
                         />
                       </div>
 
