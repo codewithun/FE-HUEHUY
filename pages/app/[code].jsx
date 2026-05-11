@@ -160,6 +160,7 @@ export function Cube({ cubeData }) {
     }
   }, [currentPromo?.id]);
 
+  const [showHuehuyAds, setShowHuehuyAds] = useState(false);
   useEffect(() => {
     if (dataHuehuyAd?.data) {
       setShowHuehuyAds(true);
@@ -307,15 +308,14 @@ export function Cube({ cubeData }) {
             {data?.data?.ads && data?.data?.ads.length > 0 && (
               <div className="mb-4">
                 <ImageCarousel
-                 src={
-                    item?.ads?.at(0)?.picture_source
-                      ? `${process.env.NEXT_PUBLIC_API_URL}/${item.ads.at(0).picture_source}`
+                  src={
+                    currentPromo?.picture_source
+                      ? `${process.env.NEXT_PUBLIC_API_URL}/${currentPromo.picture_source}`
                       : '/images/placeholder.png'
-                    }
-                     alt=""
-                    className="w-full h-full object-cover"
+                  }
+                  alt={currentPromo?.title || 'Promo'}
+                  className="w-full h-full object-cover"
                   title={currentPromo?.title || 'Promo'}
-                  className="w-full"
                 />
               </div>
             )}
