@@ -15,28 +15,36 @@ export default function Kubusku() {
     path: `cubes`,
   });
 
-const getImageUrl = (path) => {
+  const getImageUrl = (path) => {
   if (!path || path === 'null' || path === 'undefined') {
     return '/images/placeholder.png';
   }
+
   // Kalau sudah full URL
   if (path.startsWith('http://') || path.startsWith('https://')) {
     return path;
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  // Hapus /api dari akhir baseUrl kalau ada
-  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
-  // Hapus slash di awal path
+
+  // hapus /api di belakang
+  const cleanBaseUrl = baseUrl
+    .replace(/\/api\/?$/, '')
+    .replace(/\/$/, '');
+
+  // hapus slash depan
   const cleanPath = path.replace(/^\/+/, '');
-  // Pastikan path dimulai dengan storage/
-  const finalPath = cleanPath.startsWith('storage/') ? cleanPath : `storage/${cleanPath}`;
-  console.log('🖼️ [KUBUSKU] Image debug:', {
-    originalPath: promo?.picture_source,
-    imageUrl: getImageUrl(promo?.picture_source),
-    promo,
-  });
-  return `${cleanBaseUrl}/${finalPath}`;
+
+  // kalau belum ada storage/
+  const finalPath = cleanPath.startsWith('storage/')
+    ? cleanPath
+    : `storage/${cleanPath}`;
+
+  const finalUrl = `${cleanBaseUrl}/${finalPath}`;
+
+  console.log('🖼️ [KUBUSKU] Final Image URL:', finalUrl);
+
+  return finalUrl;
 };
 
   return (
@@ -63,7 +71,7 @@ const getImageUrl = (path) => {
           <div className="mt-2 px-2 flex flex-col gap-4">
             {data?.data?.length ? (
               data?.data?.map((item, key) => {
-                const promo = item?.ads?.at(0);
+                const promo = item?.ads?.[0] || {};
 
                 return (
                   <Link href={`/app/${item?.code}`} key={key}>
