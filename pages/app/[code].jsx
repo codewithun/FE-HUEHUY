@@ -159,13 +159,24 @@ export function Cube({ cubeData }) {
       checkClaimedStatus();
     }
   }, [currentPromo?.id]);
-
+  
   const [showHuehuyAds, setShowHuehuyAds] = useState(false);
   useEffect(() => {
     if (dataHuehuyAd?.data) {
       setShowHuehuyAds(true);
     }
   }, [dataHuehuyAd]);
+
+  const getImageUrl = (path) => {
+    if (!path) return '/images/placeholder.png';
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+  return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+};
 
   // Handler functions
   const handleBack = () => {
@@ -308,11 +319,7 @@ export function Cube({ cubeData }) {
             {data?.data?.ads && data?.data?.ads.length > 0 && (
               <div className="mb-4">
                 <ImageCarousel
-                  src={
-                    currentPromo?.picture_source
-                      ? `${process.env.NEXT_PUBLIC_API_URL}/${currentPromo.picture_source}`
-                      : '/images/placeholder.png'
-                  }
+                  src={getImageUrl(currentPromo?.picture_source)}
                   alt={currentPromo?.title || 'Promo'}
                   className="w-full h-full object-cover"
                   title={currentPromo?.title || 'Promo'}
