@@ -35,10 +35,13 @@ export default function BuatKubus() {
     cube?.data?.ads?.at(0)?.finish_validate
       ? {
           // eslint-disable-next-line prettier/prettier
-          'ads[start_validate]': moment(cube?.data?.ads?.at(0).start_validate).format('DD-MM-YYYY'),
+          'ads[start_validate]': moment(
+            cube?.data?.ads?.at(0)?.start_validate
+          ).format('YYYY-MM-DD'),
           // eslint-disable-next-line prettier/prettier
-          'ads[finish_validate]': moment(cube?.data?.ads?.at(0).finish_validate).format('DD-MM-YYYY'),
-        }
+          'ads[finish_validate]': moment(
+            cube?.data?.ads?.at(0)?.finish_validate
+          ).format('YYYY-MM-DD'),        }
       : null;
   return (
     <>
@@ -77,7 +80,7 @@ export default function BuatKubus() {
                   'cube_tags[0][map_lng]': cube?.data?.tags?.at(0)?.map_lng,
                   'cube_tags[0][address]': cube?.data?.tags?.at(0)?.address,
                   'cube_tags[0][link]': cube?.data?.tags?.at(0)?.link,
-                  'ads[image]': cube?.data?.ads?.at(0)?.picture_source,
+                  'ads[image]': null,
                   'ads[title]': cube?.data?.ads?.at(0)?.title,
                   'ads[description]': cube?.data?.ads?.at(0)?.description,
                   'ads[ad_category_id]': cube?.data?.ads?.at(0)?.ad_category_id,
@@ -85,7 +88,7 @@ export default function BuatKubus() {
                   'ads[is_daily_grab]':
                     cube?.data?.ads?.at(0)?.is_daily_grab || 0,
                   'ads[max_grab]': cube?.data?.ads?.at(0)?.max_grab || 0,
-                  'ads[openHours]': cube?.data?.ads?.at(0)?.openHours,
+                  // 'ads[openHours]': cube?.data?.ads?.at(0)?.openHours,
                   ...validate,
                   change_map: cube?.data?.map_lat ? false : true,
                 }}
@@ -117,7 +120,7 @@ export default function BuatKubus() {
                                   { name: 'address', value: e?.address },
                                   {
                                     name: 'cube_tags[0][map_lat]',
-                                    value: e?.lat,
+                                    value: e?.lat || '',
                                   },
                                   {
                                     name: 'cube_tags[0][map_lng]',
@@ -183,7 +186,7 @@ export default function BuatKubus() {
                               : ''
                           }
                           errors={
-                            errors.filter((i) => i.name == 'address')?.error
+                            errors.find((i) => i.name == 'address')?.error
                           }
                         />
                       );
@@ -279,18 +282,18 @@ export default function BuatKubus() {
                               onChange={() =>
                                 setValues([
                                   ...values.filter(
-                                    (i) => i.name != 'change_tag-map'
+                                    (i) => i.name != 'change_tag_map'
                                   ),
                                   {
-                                    name: 'change_tag-map',
+                                    name: 'change_tag_map',
                                     value: !values.find(
-                                      (i) => i.name == 'change_tag-map'
+                                      (i) => i.name == 'change_tag_map'
                                     )?.value,
                                   },
                                 ])
                               }
                               checked={
-                                values?.find((i) => i.name == 'change_tag-map')
+                                values?.find((i) => i.name == 'change_tag_map')
                                   ?.value
                               }
                             />
@@ -303,7 +306,7 @@ export default function BuatKubus() {
                     type: 'custom',
                     custom: ({ values, setValues }) => {
                       return (
-                        values?.find((i) => i.name == 'change_tag-map')
+                        values?.find((i) => i.name == 'change_tag_map')
                           ?.value == true && (
                           <div className="hover:mx-2 hover:border-4 border-sky-500 rounded-lg">
                             <InputMapComponent
@@ -321,7 +324,7 @@ export default function BuatKubus() {
 
                                   {
                                     name: 'cube_tags[0][map_lat]',
-                                    value: e?.lat,
+                                    value: e?.lat || '',
                                   },
                                   {
                                     name: 'cube_tags[0][map_lng]',
@@ -484,7 +487,7 @@ export default function BuatKubus() {
                             ),
                             {
                               name: 'ads[start_validate]',
-                              value: moment(e).format('DD-MM-YYYY'),
+                              value: moment(e).format('YYYY-MM-DD'),
                             },
                           ]);
                         }}
@@ -492,8 +495,7 @@ export default function BuatKubus() {
                           values.find((i) => i.name == 'ads[start_validate]')
                             ?.value
                             ? // eslint-disable-next-line prettier/prettier
-                        moment(values.find((i) => i.name == 'ads[start_validate]')?.value,'DD-MM-YYYY').format('YYYY-MM-DD')
-                            : ''
+                          values.find((i) => i.name == 'ads[start_validate]')?.value || ''                            : ''
                         }
                         errors={
                           errors.filter((i) => i.name == 'ads[start_validate]')
@@ -519,7 +521,7 @@ export default function BuatKubus() {
                             ),
                             {
                               name: 'ads[finish_validate]',
-                              value: moment(e).format('DD-MM-YYYY'),
+                              value: moment(e).format('YYYY-MM-DD'),
                             },
                           ]);
                         }}
