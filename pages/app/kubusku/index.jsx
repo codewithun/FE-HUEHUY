@@ -41,10 +41,15 @@ export default function Kubusku() {
                     <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm items-center">
                       <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-400 flex justify-center items-center">
                         <img
-                          src={item?.ads?.at(0)?.picture_source}
+                          src={
+                            item?.ads?.at(0)?.picture_source
+                              ? `${process.env.NEXT_PUBLIC_API_URL}/${item.ads.at(0).picture_source}`
+                              : '/images/placeholder.png'
+                          }
                           height={700}
                           width={700}
-                          alt=""
+                          alt={item?.ads?.at(0)?.title || 'Promo'}
+                          className="w-full h-full object-cover"
                         />
                       </div>
                       <div className="col-span-3">
