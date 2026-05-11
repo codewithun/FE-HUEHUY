@@ -71,18 +71,17 @@ const getImageUrl = (path) => {
 
                       <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-200 flex justify-center items-center">
                         <img
-                          // src={getImageUrl(promo?.picture_source)}
-                          // alt={promo?.title || 'Promo'}
-                          // className="w-full h-full object-cover"
-                          // loading="lazy"
-                          // onError={(e) => {
-                          //   console.error('❌ [KUBUSKU] Image load failed:', {
-                          //     src: e.currentTarget.src,
-                          //     promo: promo,
-                          //   });
-                          //   e.currentTarget.src = '/images/placeholder.png';
-                          // }}
-                          tes
+                          src={getImageUrl(promo?.picture_source)}
+                          alt={promo?.title || 'Promo'}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            console.error('❌ [KUBUSKU] Image load failed:', {
+                              src: e.currentTarget.src,
+                              promo: promo,
+                            });
+                            e.currentTarget.src = '/images/placeholder.png';
+                          }}
                         />
                       </div>
 
