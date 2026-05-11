@@ -538,7 +538,7 @@ const handleScanResult = async (result) => {
       icon = faShieldCheck; title = '✅ Validasi Berhasil';
     } else if (isAlreadyUsed) {
       bgColor = 'bg-yellow-50'; borderColor = 'border-yellow-200 border-l-yellow-500'; textColor = 'text-yellow-800';
-      icon = faQrcode; title = '⚠️ Sudah Divvalidasi';
+      icon = faQrcode; title = '⚠️ Sudah Divalidasi';
     } else if (isExpired) {
       bgColor = 'bg-orange-50'; borderColor = 'border-orange-200 border-l-orange-500'; textColor = 'text-orange-800';
       icon = faQrcode; title = '⏰ Kadaluwarsa';
@@ -566,7 +566,7 @@ const handleScanResult = async (result) => {
                 <p><strong>Kode:</strong> {scanResult.data.promo_item.code}</p>
               )}
               {scanResult.data.promo_item.redeemed_at && (
-                <p><strong>Divvalidasi:</strong> {new Date(scanResult.data.promo_item.redeemed_at).toLocaleString('id-ID')}</p>
+                <p><strong>Divalidasi:</strong> {new Date(scanResult.data.promo_item.redeemed_at).toLocaleString('id-ID')}</p>
               )}
               {scanResult.data.promo_item.expires_at && (
                 <p><strong>Berlaku hingga:</strong> {new Date(scanResult.data.promo_item.expires_at).toLocaleDateString('id-ID')}</p>
