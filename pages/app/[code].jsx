@@ -167,15 +167,32 @@ export function Cube({ cubeData }) {
     }
   }, [dataHuehuyAd]);
 
-  const getImageUrl = (path) => {
-    if (!path) return '/images/placeholder.png';
+const getImageUrl = (path) => {
+  if (!path || path === 'null' || path === 'undefined') {
+    return '/images/placeholder.png';
+  }
+  // Kalau sudah full URL
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
 
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // Hapus /api dari akhir baseUrl kalau ada
+  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+  // Hapus slash di awal path
+  const cleanPath = path.replace(/^\/+/, '');
+  // Pastikan path dimulai dengan storage/
+  const finalPath = cleanPath.startsWith('storage/') ? cleanPath : `storage/${cleanPath}`;
+  const finalUrl = `${cleanBaseUrl}/${finalPath}`;
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-  return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  console.log('🖼️ [CUBE DETAIL] Image debug:', {
+    originalPath: path,
+    finalUrl,
+    cleanBaseUrl,
+    cleanPath,
+  });
+  
+  return finalUrl;
 };
 
   // Handler functions
@@ -323,6 +340,12 @@ export function Cube({ cubeData }) {
                   alt={currentPromo?.title || 'Promo'}
                   className="w-full h-full object-cover"
                   title={currentPromo?.title || 'Promo'}
+                  onError={(e) => {
+                    console.error('❌ [CUBE DETAIL] Image load failed:', {
+                      src: e.currentTarget.src,
+                      promo: currentPromo,
+                    });
+                  }}
                 />
               </div>
             )}

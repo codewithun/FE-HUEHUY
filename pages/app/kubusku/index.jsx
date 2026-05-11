@@ -15,18 +15,29 @@ export default function Kubusku() {
     path: `cubes`,
   });
 
-  const getImageUrl = (path) => {
-    if (!path) return '/images/placeholder.png';
+const getImageUrl = (path) => {
+  if (!path || path === 'null' || path === 'undefined') {
+    return '/images/placeholder.png';
+  }
+  // Kalau sudah full URL
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
 
-    // kalau sudah full URL
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
-
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-
-    return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
-  };
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // Hapus /api dari akhir baseUrl kalau ada
+  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+  // Hapus slash di awal path
+  const cleanPath = path.replace(/^\/+/, '');
+  // Pastikan path dimulai dengan storage/
+  const finalPath = cleanPath.startsWith('storage/') ? cleanPath : `storage/${cleanPath}`;
+  console.log('🖼️ [KUBUSKU] Image debug:', {
+    originalPath: promo?.picture_source,
+    imageUrl: getImageUrl(promo?.picture_source),
+    promo,
+  });
+  return `${cleanBaseUrl}/${finalPath}`;
+};
 
   return (
     <>
@@ -65,6 +76,10 @@ export default function Kubusku() {
                           className="w-full h-full object-cover"
                           loading="lazy"
                           onError={(e) => {
+                            console.error('❌ [KUBUSKU] Image load failed:', {
+                              src: e.currentTarget.src,
+                              promo: promo,
+                            });
                             e.currentTarget.src = '/images/placeholder.png';
                           }}
                         />
