@@ -17,9 +17,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ButtonComponent,
-} from '../../components/base.components';
+import { ButtonComponent } from '../../components/base.components';
 import ImageCarousel from '../../components/base.components/carousel/ImageCarousel.component';
 import { get, post, useGet } from '../../helpers';
 
@@ -41,12 +39,19 @@ export function Cube({ cubeData }) {
     path: code && `get-cube-by-code/${code}`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loadingHuehuyAd, codeHuehuyAd, dataHuehuyAd] = useGet({
-    path: `cube-huehuy-ads`,
-  });
+  // ✅ FIX: Hapus atau comment endpoint yang tidak ada
+  // const [loadingHuehuyAd, codeHuehuyAd, dataHuehuyAd] = useGet({
+  //   path: `cube-huehuy-ads`,  // ← Endpoint ini tidak ada di backend
+  // });
 
-  // Helper functions untuk validasi waktu seperti di promoId.jsx
+  const [showHuehuyAds, setShowHuehuyAds] = useState(false);
+  // useEffect(() => {
+  //   if (dataHuehuyAd?.data) {
+  //     setShowHuehuyAds(true);
+  //   }
+  // }, [dataHuehuyAd]);
+
+  // Helper functions untuk validasi waktu
   const MONTH_ID = useMemo(() => ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'], []);
 
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -66,15 +71,13 @@ export function Cube({ cubeData }) {
     return `${day} ${month} ${year}`;
   }, [MONTH_ID]);
 
-  // Function untuk mendapatkan warna utama community
   const getCommunityPrimaryColor = useCallback(() => {
-    return '#16a34a'; // fallback ke green-600
+    return '#16a34a';
   }, []);
 
-  // Ambil data promo aktif
   const currentPromo = data?.data?.ads?.at(activeIndex);
 
-  // Validasi waktu promo seperti di promoId.jsx
+  // Validasi waktu promo
   const timeFlags = useMemo(() => {
     if (!currentPromo) {
       return {
@@ -84,18 +87,16 @@ export function Cube({ cubeData }) {
     }
 
     const now = new Date();
-    const jakartaOffset = 7 * 60 * 60 * 1000; // UTC+7 dalam ms
+    const jakartaOffset = 7 * 60 * 60 * 1000;
     const nowJakarta = new Date(now.getTime() + jakartaOffset);
 
-    // Cek expired berdasarkan tanggal
     let expiredByDate = false;
     if (currentPromo.finish_validate) {
       const endDate = new Date(currentPromo.finish_validate);
-      endDate.setHours(23, 59, 59, 999); // Set ke akhir hari
+      endDate.setHours(23, 59, 59, 999);
       expiredByDate = nowJakarta > endDate;
     }
 
-    // Cek jam berlaku
     let withinDailyTime = true;
     if (currentPromo.jam_mulai && currentPromo.jam_berakhir) {
       const currentTime = `${pad2(nowJakarta.getHours())}:${pad2(nowJakarta.getMinutes())}`;
@@ -113,7 +114,6 @@ export function Cube({ cubeData }) {
     };
   }, [currentPromo, toHM]);
 
-  // Status "belum mulai"
   const isNotStarted = useMemo(() => {
     if (!currentPromo?.start_validate) return false;
     const now = new Date();
@@ -138,10 +138,9 @@ export function Cube({ cubeData }) {
     return startDate >= tomorrow && startDate < dayAfterTomorrow;
   }, [currentPromo]);
 
-  // Status dapat di-claim
   const canClaim = !timeFlags.expiredByDate && timeFlags.withinDailyTime && !isNotStarted;
 
-  // Cek status claimed dari API
+  // ✅ FIX: Handle error dengan try-catch yang proper
   useEffect(() => {
     if (currentPromo?.id) {
       const checkClaimedStatus = async () => {
@@ -153,49 +152,41 @@ export function Cube({ cubeData }) {
             setIsAlreadyClaimed(true);
           }
         } catch (error) {
-          // console.log('Error checking claimed status:', error);
+          // ✅ Jangan throw error, cukup log dan biarkan default false
+          console.warn('Check claimed status failed (endpoint mungkin belum ada):', error);
+          // Biarkan isAlreadyClaimed = false
         }
       };
       checkClaimedStatus();
     }
   }, [currentPromo?.id]);
-  
-  const [showHuehuyAds, setShowHuehuyAds] = useState(false);
-  useEffect(() => {
-    if (dataHuehuyAd?.data) {
-      setShowHuehuyAds(true);
+
+  // ✅ FIX: Function getImageUrl yang lebih robust
+  const getImageUrl = (path) => {
+    if (!path || path === 'null' || path === 'undefined') {
+      return '/images/placeholder.png';
     }
-  }, [dataHuehuyAd]);
 
-const getImageUrl = (path) => {
-  if (!path || path === 'null' || path === 'undefined') {
-    return '/images/placeholder.png';
-  }
-  // Kalau sudah full URL
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path;
-  }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  // Hapus /api dari akhir baseUrl kalau ada
-  const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
-  // Hapus slash di awal path
-  const cleanPath = path.replace(/^\/+/, '');
-  // Pastikan path dimulai dengan storage/
-  const finalPath = cleanPath.startsWith('storage/') ? cleanPath : `storage/${cleanPath}`;
-  const finalUrl = `${cleanBaseUrl}/${finalPath}`;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+    const cleanPath = path.replace(/^\/+/, '');
+    const finalPath = cleanPath.startsWith('storage/') ? cleanPath : `storage/${cleanPath}`;
+    
+    const finalUrl = `${cleanBaseUrl}/${finalPath}`;
+    
+    // Debug log (hapus setelah fix)
+    console.log('🖼️ [CUBE DETAIL] Image URL:', {
+      originalPath: path,
+      finalUrl,
+    });
+    
+    return finalUrl;
+  };
 
-  console.log('🖼️ [CUBE DETAIL] Image debug:', {
-    originalPath: path,
-    finalUrl,
-    cleanBaseUrl,
-    cleanPath,
-  });
-  
-  return finalUrl;
-};
-
-  // Handler functions
   const handleBack = () => {
     router.back();
   };
@@ -228,8 +219,6 @@ const getImageUrl = (path) => {
   };
 
   const submitReport = () => {
-    // Implementasi pelaporan
-    // console.log('Report:', reason);
     setShowReportModal(false);
   };
 
@@ -268,33 +257,31 @@ const getImageUrl = (path) => {
     router.push('/app/saku');
   };
 
+  // ✅ FIX: Debug log untuk tracking data
+  useEffect(() => {
+    if (data?.data) {
+      console.log('📦 [CUBE DETAIL] Data received:', data.data);
+      const promo = data.data.ads?.at(0);
+      console.log('🖼️ [CUBE DETAIL] Promo image:', {
+        pictureSource: promo?.picture_source,
+        imageUrl: getImageUrl(promo?.picture_source),
+        promo,
+      });
+    }
+  }, [data]);
+
   return (
     <>
       <Head>
         <title>{cubeData?.data?.ads?.at(0)?.title || 'Promo HUEHUY'}</title>
-        <meta
-          property="og:title"
-          content={cubeData?.data?.ads?.at(0)?.title || 'Cuma Ada Di Huehuy!'}
-        />
-        <meta
-          property="og:description"
-          content={
-            cubeData?.data?.ads?.at(0)?.description ||
-            'Temukan Promo Menarik Lainnya Hanya di HUEHUY'
-          }
-        />
-        <meta
-          property="og:image"
-          content={
-            cubeData?.data?.ads?.at(0)?.picture_source ||
-            'https://app.huehuy.com/_next/image?url=%2Flogo.png&w=640&q=75'
-          }
-        />
+        <meta property="og:title" content={cubeData?.data?.ads?.at(0)?.title || 'Cuma Ada Di Huehuy!'} />
+        <meta property="og:description" content={cubeData?.data?.ads?.at(0)?.description || 'Temukan Promo Menarik Lainnya Hanya di HUEHUY'} />
+        <meta property="og:image" content={cubeData?.data?.ads?.at(0)?.picture_source || 'https://app.huehuy.com/_next/image?url=%2Flogo.png&w=640&q=75'} />
         <meta property="og:url" content={`https://app.huehuy.com/${code}`} />
         <meta property="og:type" content="product" />
       </Head>
       <div className="lg:mx-auto relative lg:max-w-md">
-        {/* Header seperti di promoId.jsx */}
+        {/* Header */}
         <div className="w-full h-[60px] px-4 relative overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600">
           <div className="absolute inset-0">
             <div className="absolute top-1 right-3 w-6 h-6 bg-white rounded-full opacity-10"></div>
@@ -302,34 +289,24 @@ const getImageUrl = (path) => {
             <div className="absolute top-2 left-1/3 w-3 h-3 bg-white rounded-full opacity-10"></div>
           </div>
           <div className="flex items-center justify-between h-full relative z-10">
-            <button
-              onClick={handleBack}
-              className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-            >
+            <button onClick={handleBack} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
               <FontAwesomeIcon icon={faArrowLeft} className="text-white text-sm" />
             </button>
             <div className="flex-1 text-center">
-              <h1 className="text-white font-bold text-sm">
-                {data?.data?.is_information ? 'Kubus Informasi' : 'Promo'}
-              </h1>
+              <h1 className="text-white font-bold text-sm">{data?.data?.is_information ? 'Kubus Informasi' : 'Promo'}</h1>
             </div>
             <div className="flex space-x-1.5">
-              <button
-                onClick={handleShare}
-                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-              >
+              <button onClick={handleShare} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
                 <FontAwesomeIcon icon={faShare} className="text-white text-sm" />
               </button>
-              <button
-                onClick={handleReport}
-                className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all"
-              >
+              <button onClick={handleReport} className="bg-white bg-opacity-20 backdrop-blur-sm p-2 rounded-[10px] hover:bg-opacity-30 transition-all">
                 <FontAwesomeIcon icon={faExclamationTriangle} className="text-white text-sm" />
               </button>
             </div>
           </div>
         </div>
-        {/* Main content dengan design baru */}
+
+        {/* Main content */}
         <div className="bg-white min-h-screen w-full px-4 lg:px-6 pt-4 lg:pt-6 pb-28 lg:pb-4">
           <div className="lg:mx-auto lg:max-w-md">
             {/* Image Carousel */}
@@ -342,7 +319,7 @@ const getImageUrl = (path) => {
                   title={currentPromo?.title || 'Promo'}
                   onError={(e) => {
                     console.error('❌ [CUBE DETAIL] Image load failed:', {
-                      src: e.currentTarget.src,
+                      src: e.currentTarget?.src,
                       promo: currentPromo,
                     });
                   }}
@@ -350,15 +327,13 @@ const getImageUrl = (path) => {
               </div>
             )}
 
-            {/* Info Cards seperti di promoId.jsx */}
+            {/* Info Cards */}
             <div className="mb-4">
               <div className="rounded-[20px] p-4 shadow-lg bg-gradient-to-r from-blue-500 to-purple-600">
                 <div className="flex items-center justify-between mb-3 p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                   <div className="flex items-center">
                     <FontAwesomeIcon icon={faMapMarkerAlt} className="text-white mr-2 text-sm" />
-                    <span className="text-sm font-semibold text-white">
-                      {data?.data?.distance ? `${data?.data?.distance} km` : 'Lokasi'}
-                    </span>
+                    <span className="text-sm font-semibold text-white">{data?.data?.distance ? `${data?.data?.distance} km` : 'Lokasi'}</span>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-white opacity-80">Kubus:</span>
@@ -375,9 +350,7 @@ const getImageUrl = (path) => {
                           'Periode Berlaku'
                         }
                       </span>
-                      <div className="text-xs text-white opacity-80">
-                        {data?.data?.world?.name || 'General'}
-                      </div>
+                      <div className="text-xs text-white opacity-80">{data?.data?.world?.name || 'General'}</div>
                     </div>
                     <div className="text-right">
                       <div className="bg-yellow-400 text-slate-800 px-3 py-1 rounded-[8px] text-sm font-semibold">
@@ -394,46 +367,30 @@ const getImageUrl = (path) => {
                 <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-[12px]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <FontAwesomeIcon
-                        icon={data?.data?.status === 'active' ? faWifi : faWifiSlash}
-                        className="mr-2 text-white text-sm"
-                      />
-                      <span className="text-sm font-semibold text-white">
-                        {data?.data?.status === 'active' ? 'Online' : 'Offline'}
-                      </span>
+                      <FontAwesomeIcon icon={data?.data?.status === 'active' ? faWifi : faWifiSlash} className="mr-2 text-white text-sm" />
+                      <span className="text-sm font-semibold text-white">{data?.data?.status === 'active' ? 'Online' : 'Offline'}</span>
                     </div>
-                    <span className="text-xs text-white opacity-70">
-                      {data?.data?.status === 'active' ? 'Promo Aktif' : 'Promo Tidak Aktif'}
-                    </span>
+                    <span className="text-xs text-white opacity-70">{data?.data?.status === 'active' ? 'Promo Aktif' : 'Promo Tidak Aktif'}</span>
                   </div>
                 </div>
               </div>
             </div>
+
             {/* Detail Content */}
             <div className="mb-4">
               <div className="bg-white rounded-[20px] p-5 shadow-lg border border-slate-100">
-                <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">
-                  {currentPromo?.title}
-                </h2>
-                <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">
-                  {currentPromo?.description}
-                </p>
+                <h2 className="text-xl font-bold text-slate-900 leading-tight mb-4 text-left">{currentPromo?.title}</h2>
+                <p className="text-slate-600 leading-relaxed text-sm text-left mb-4">{currentPromo?.description}</p>
 
                 <div className="text-left">
-                  <button
-                    onClick={() => setShowDetailExpanded(!showDetailExpanded)}
-                    className="text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all flex items-center bg-blue-500"
-                  >
+                  <button onClick={() => setShowDetailExpanded(!showDetailExpanded)} className="text-white px-6 py-2 rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all flex items-center bg-blue-500">
                     {showDetailExpanded ? 'Tutup Detail' : 'Selengkapnya'}
-                    <span className={`ml-2 transition-transform duration-300 ${showDetailExpanded ? 'rotate-180' : ''}`}>
-                      ▼
-                    </span>
+                    <span className={`ml-2 transition-transform duration-300 ${showDetailExpanded ? 'rotate-180' : ''}`}>▼</span>
                   </button>
                 </div>
 
                 {/* Expanded Detail */}
-                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'
-                  }`}>
+                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showDetailExpanded ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
                   <div className="border-t border-slate-200 pt-4">
                     {!data?.data?.is_information && (
                       <>
@@ -444,9 +401,7 @@ const getImageUrl = (path) => {
                               <p>Kode:</p>
                               <p className="col-span-3">#{code}</p>
                               <p>Tipe:</p>
-                              <p className="col-span-3">
-                                {data?.data?.cube_type?.name} ({data?.data?.cube_type?.code})
-                              </p>
+                              <p className="col-span-3">{data?.data?.cube_type?.name} ({data?.data?.cube_type?.code})</p>
                               <p>Dunia:</p>
                               <p className="col-span-3">{data?.data?.world?.name || 'General'}</p>
                             </div>
@@ -463,15 +418,11 @@ const getImageUrl = (path) => {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span>Kapasitas Produksi/Hari:</span>
-                                  <span className="font-semibold text-blue-600">
-                                    {currentPromo.max_production_per_day} Pcs
-                                  </span>
+                                  <span className="font-semibold text-blue-600">{currentPromo.max_production_per_day} Pcs</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Rata-rata Penjualan/Hari:</span>
-                                  <span className="font-semibold text-blue-600">
-                                    {currentPromo.sell_per_day} Pcs
-                                  </span>
+                                  <span className="font-semibold text-blue-600">{currentPromo.sell_per_day} Pcs</span>
                                 </div>
                               </div>
                             </div>
@@ -487,57 +438,44 @@ const getImageUrl = (path) => {
             {/* Lokasi dan Pemilik */}
             {!data?.data?.is_information && (
               <>
-                {/* Lokasi */}
                 <div className="mb-4">
                   <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
                     <h4 className="font-semibold text-slate-900 mb-3 text-sm">Lokasi Promo</h4>
-                    <p className="text-slate-600 text-xs leading-relaxed mb-3">
-                      {data?.data?.tags?.at(0)?.address || data?.data?.address}
-                    </p>
-                    <button
-                      onClick={() => {
-                        const lat = data?.data?.tags?.at(0)?.map_lat || data?.data?.map_lat;
-                        const lng = data?.data?.tags?.at(0)?.map_lng || data?.data?.map_lng;
-                        if (lat && lng) {
-                          window.open(`http://www.google.com/maps/place/${lat},${lng}`, '_blank');
-                        }
-                      }}
-                      className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center bg-blue-500"
-                    >
+                    <p className="text-slate-600 text-xs leading-relaxed mb-3">{data?.data?.tags?.at(0)?.address || data?.data?.address}</p>
+                    <button onClick={() => {
+                      const lat = data?.data?.tags?.at(0)?.map_lat || data?.data?.map_lat;
+                      const lng = data?.data?.tags?.at(0)?.map_lng || data?.data?.map_lng;
+                      if (lat && lng) {
+                        window.open(`http://www.google.com/maps/place/${lat},${lng}`, '_blank');
+                      }
+                    }} className="w-full text-white py-2 px-6 rounded-[12px] hover:opacity-90 transition-colors text-sm font-semibold flex items-center justify-center bg-blue-500">
                       <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-sm" />
                       Rute
                     </button>
                   </div>
                 </div>
 
-                {/* Pemilik */}
                 <div className="mb-4">
                   <div className="bg-white rounded-[20px] p-4 shadow-lg border border-slate-100">
                     <h4 className="font-semibold text-slate-900 mb-3 text-sm">Pemilik Kubus</h4>
                     <div className="space-y-2">
-                      <p className="font-semibold text-slate-900 text-xs">
-                        Nama: {data?.data?.user?.name || data?.data?.corporate?.name}
-                      </p>
+                      <p className="font-semibold text-slate-900 text-xs">Nama: {data?.data?.user?.name || data?.data?.corporate?.name}</p>
                       <p className="text-xs text-slate-500">
                         No Hp/WA: {data?.data?.user?.phone || '-'}
                         {data?.data?.user?.phone && (
                           <div className="mt-2">
-                            <button
-                              onClick={() => {
-                                const phone = String(data.data.user.phone).replace(/\s+/g, '');
-                                let formattedPhone = phone.replace(/\D/g, '');
-                                if (formattedPhone.startsWith('0')) {
-                                  formattedPhone = '62' + formattedPhone.substring(1);
-                                } else if (!formattedPhone.startsWith('62')) {
-                                  formattedPhone = '62' + formattedPhone;
-                                }
-                                const message = encodeURIComponent(`Halo, saya tertarik dengan informasi pada kubus "${cubeData?.name || ''}". Bisa bantu?`);
-                                const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
-                                window.open(whatsappUrl, '_blank');
-                              }}
-                              className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center"
-                              style={{ backgroundColor: getCommunityPrimaryColor() }}
-                            >
+                            <button onClick={() => {
+                              const phone = String(data.data.user.phone).replace(/\s+/g, '');
+                              let formattedPhone = phone.replace(/\D/g, '');
+                              if (formattedPhone.startsWith('0')) {
+                                formattedPhone = '62' + formattedPhone.substring(1);
+                              } else if (!formattedPhone.startsWith('62')) {
+                                formattedPhone = '62' + formattedPhone;
+                              }
+                              const message = encodeURIComponent(`Halo, saya tertarik dengan informasi pada kubus "${cubeData?.name || ''}". Bisa bantu?`);
+                              const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+                              window.open(whatsappUrl, '_blank');
+                            }} className="w-full text-white p-3 rounded-full hover:bg-opacity-90 transition-colors flex items-center justify-center" style={{ backgroundColor: getCommunityPrimaryColor() }}>
                               <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="phone" className="svg-inline--fa fa-phone text-sm" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
                                 <path fill="currentColor" d="M164.9 24.6c-7.7-18.6-28-28.5-47.4-23.2l-88 24C12.1 30.2 0 46 0 64C0 311.4 200.6 512 448 512c18 0 33.8-12.1 38.6-29.5l24-88c5.3-19.4-4.6-39.7-23.2-47.4l-96-40c-16.3-6.8-35.2-2.1-46.3 11.6L304.7 368C234.3 334.7 177.3 277.7 144 207.3L193.3 167c13.7-11.2 18.4-30 11.6-46.3l-40-96z"></path>
                               </svg>
@@ -545,7 +483,6 @@ const getImageUrl = (path) => {
                           </div>
                         )}
                       </p>
-                      {/* removed duplicate bottom WA button to keep single green SVG button above */}
                     </div>
                   </div>
                 </div>
@@ -559,55 +496,16 @@ const getImageUrl = (path) => {
           <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-6 lg:mb-4 bg-white border-t border-slate-200 lg:border-t-0 p-4 lg:p-6 z-30">
             <div className="lg:max-w-sm lg:mx-auto">
               {!data?.data?.is_my_cube ? (
-                <button
-                  onClick={handleClaimPromo}
-                  disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed}
-                  className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted)
-                    ? 'bg-gray-400 text-white cursor-not-allowed'
-                    : isAlreadyClaimed
-                      ? 'bg-gray-400 text-white cursor-not-allowed'
-                      : isClaimedLoading
-                        ? 'bg-slate-400 text-white cursor-not-allowed'
-                        : 'bg-blue-500 text-white focus:ring-4 focus:ring-opacity-50'
-                    }`}
-                >
-                  {timeFlags.expiredByDate ? (
-                    'Promo sudah kadaluwarsa'
-                  ) : !timeFlags.withinDailyTime ? (
-                    'Di luar jam berlaku'
-                  ) : isNotStarted ? (
-                    (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai')
-                  ) : isAlreadyClaimed ? (
-                    <div className="flex items-center justify-center">
-                      <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-                      Sudah Direbut
-                    </div>
-                  ) : isClaimedLoading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Merebut Promo...
-                    </div>
-                  ) : (
-                    'Rebut Promo Sekarang'
-                  )}
+                <button onClick={handleClaimPromo} disabled={!canClaim || isNotStarted || isClaimedLoading || isAlreadyClaimed} className={`w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${(timeFlags.expiredByDate || !timeFlags.withinDailyTime || isNotStarted) ? 'bg-gray-400 text-white cursor-not-allowed' : isAlreadyClaimed ? 'bg-gray-400 text-white cursor-not-allowed' : isClaimedLoading ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-blue-500 text-white focus:ring-4 focus:ring-opacity-50'}`}>
+                  {timeFlags.expiredByDate ? ('Promo sudah kadaluwarsa') : !timeFlags.withinDailyTime ? ('Di luar jam berlaku') : isNotStarted ? (isStartTomorrow ? 'Promo mulai besok' : 'Promo belum dimulai') : isAlreadyClaimed ? (<div className="flex items-center justify-center"><FontAwesomeIcon icon={faCheckCircle} className="mr-2" />Sudah Direbut</div>) : isClaimedLoading ? (<div className="flex items-center justify-center"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>Merebut Promo...</div>) : ('Rebut Promo Sekarang')}
                 </button>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   <Link href={'/app/hubungi-kami'}>
-                    <ButtonComponent
-                      label="Aktifasi Kubus"
-                      size="lg"
-                      block
-                      disabled={data?.data?.status == 'active'}
-                    />
+                    <ButtonComponent label="Aktifasi Kubus" size="lg" block disabled={data?.data?.status == 'active'} />
                   </Link>
                   <Link href={'/app/kubusku/edit-kubus?code=' + code}>
-                    <ButtonComponent
-                      label="Edit Promo"
-                      size="lg"
-                      variant="outline"
-                      block
-                    />
+                    <ButtonComponent label="Edit Promo" size="lg" variant="outline" block />
                   </Link>
                 </div>
               )}
@@ -615,7 +513,7 @@ const getImageUrl = (path) => {
           </div>
         )}
 
-        {/* Success Modal */}
+        {/* Modals (sama seperti sebelumnya) */}
         {showSuccessModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
@@ -623,29 +521,15 @@ const getImageUrl = (path) => {
                 <FontAwesomeIcon icon={faCheckCircle} className="text-3xl text-blue-500" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Selamat!</h3>
-              <p className="text-slate-600 mb-6 leading-relaxed">
-                Promo <span className="font-semibold text-blue-500">{currentPromo?.title}</span> berhasil direbut dan masuk ke Saku
-                Promo Anda!
-              </p>
+              <p className="text-slate-600 mb-6 leading-relaxed">Promo <span className="font-semibold text-blue-500">{currentPromo?.title}</span> berhasil direbut dan masuk ke Saku Promo Anda!</p>
               <div className="space-y-3">
-                <button
-                  onClick={handleSuccessModalClose}
-                  className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all bg-blue-500"
-                >
-                  Lihat Saku Promo
-                </button>
-                <button
-                  onClick={() => setShowSuccessModal(false)}
-                  className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
-                >
-                  Tetap di Halaman Ini
-                </button>
+                <button onClick={handleSuccessModalClose} className="w-full text-white py-3 rounded-[12px] font-semibold hover:opacity-90 transition-all bg-blue-500">Lihat Saku Promo</button>
+                <button onClick={() => setShowSuccessModal(false)} className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all">Tetap di Halaman Ini</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Error Modal */}
         {showErrorModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[20px] w-full max-w-sm mx-auto p-6 text-center animate-bounce-in">
@@ -654,70 +538,36 @@ const getImageUrl = (path) => {
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Oops!</h3>
               <p className="text-slate-600 mb-6 leading-relaxed">{errorMessage}</p>
-              <button
-                onClick={() => setShowErrorModal(false)}
-                className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all"
-              >
-                OK, Mengerti
-              </button>
+              <button onClick={() => setShowErrorModal(false)} className="w-full bg-red-500 text-white py-3 rounded-[12px] font-semibold hover:bg-red-600 transition-all">OK, Mengerti</button>
             </div>
           </div>
         )}
 
-        {/* Share Modal */}
         {showShareModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
             <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900">Bagikan Promo</h3>
-                <button
-                  onClick={() => setShowShareModal(false)}
-                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setShowShareModal(false)} className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleShareComplete('whatsapp')}
-                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-green-50 hover:border-green-300 transition-all"
-                >
-                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
-                    <span className="text-white font-bold text-sm">WA</span>
-                  </div>
+                <button onClick={() => handleShareComplete('whatsapp')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-green-50 hover:border-green-300 transition-all">
+                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">WA</span></div>
                   <span className="text-xs text-slate-600">WhatsApp</span>
                 </button>
-                <button
-                  onClick={() => handleShareComplete('telegram')}
-                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
-                >
-                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2">
-                    <span className="text-white font-bold text-sm">TG</span>
-                  </div>
+                <button onClick={() => handleShareComplete('telegram')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all">
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">TG</span></div>
                   <span className="text-xs text-slate-600">Telegram</span>
                 </button>
-                <button
-                  onClick={() => handleShareComplete('facebook')}
-                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all"
-                >
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2">
-                    <span className="text-white font-bold text-sm">FB</span>
-                  </div>
+                <button onClick={() => handleShareComplete('facebook')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-blue-50 hover:border-blue-300 transition-all">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">FB</span></div>
                   <span className="text-xs text-slate-600">Facebook</span>
                 </button>
-                <button
-                  onClick={() => handleShareComplete('twitter')}
-                  className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all"
-                >
-                  <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2">
-                    <span className="text-white font-bold text-sm">TW</span>
-                  </div>
+                <button onClick={() => handleShareComplete('twitter')} className="flex flex-col items-center p-4 border border-slate-200 rounded-[12px] hover:bg-sky-50 hover:border-sky-300 transition-all">
+                  <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center mb-2"><span className="text-white font-bold text-sm">TW</span></div>
                   <span className="text-xs text-slate-600">Twitter</span>
                 </button>
-                <button
-                  onClick={() => handleShareComplete('copy')}
-                  className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all"
-                >
+                <button onClick={() => handleShareComplete('copy')} className="col-span-2 flex items-center justify-center p-4 border border-slate-200 rounded-[12px] hover:bg-slate-50 hover:border-slate-300 transition-all">
                   <span className="text-sm text-slate-700">📋 Salin Link</span>
                 </button>
               </div>
@@ -725,44 +575,18 @@ const getImageUrl = (path) => {
           </div>
         )}
 
-        {/* Report Modal */}
         {showReportModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 lg:items-center">
             <div className="bg-white rounded-t-[20px] lg:rounded-[20px] w-full lg:max-w-md p-6 lg:m-4 animate-slide-up">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900">Laporkan Promo</h3>
-                <button
-                  onClick={() => setShowReportModal(false)}
-                  className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setShowReportModal(false)} className="text-slate-500 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all">✕</button>
               </div>
               <div className="space-y-3">
-                <button
-                  onClick={() => submitReport()}
-                  className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all"
-                >
-                  Iklan tidak sesuai
-                </button>
-                <button
-                  onClick={() => submitReport()}
-                  className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all"
-                >
-                  Penipuan / scam
-                </button>
-                <button
-                  onClick={() => submitReport()}
-                  className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all"
-                >
-                  Konten tidak pantas
-                </button>
-                <button
-                  onClick={() => setShowReportModal(false)}
-                  className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all"
-                >
-                  Batal
-                </button>
+                <button onClick={() => submitReport()} className="w-full bg-red-100 text-red-700 py-3 rounded-[12px] font-semibold hover:bg-red-200 transition-all">Iklan tidak sesuai</button>
+                <button onClick={() => submitReport()} className="w-full bg-yellow-100 text-yellow-700 py-3 rounded-[12px] font-semibold hover:bg-yellow-200 transition-all">Penipuan / scam</button>
+                <button onClick={() => submitReport()} className="w-full bg-slate-100 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-200 transition-all">Konten tidak pantas</button>
+                <button onClick={() => setShowReportModal(false)} className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-[12px] font-semibold hover:bg-slate-100 transition-all">Batal</button>
               </div>
             </div>
           </div>
@@ -771,43 +595,19 @@ const getImageUrl = (path) => {
 
       <style jsx>{`
         @keyframes bounce-in {
-          0% {
-            transform: scale(0.3);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.05);
-          }
-          70% {
-            transform: scale(0.9);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.05); }
+          70% { transform: scale(0.9); }
+          100% { transform: scale(1); opacity: 1; }
         }
         @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-        .animate-bounce-in {
-          animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-
+        .animate-bounce-in { animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        .animate-slide-up { animation: slide-up 0.3s ease-out; }
         @media (min-width: 1024px) {
-          .desktop-container {
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
-              0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          }
+          .desktop-container { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
         }
       `}</style>
     </>
