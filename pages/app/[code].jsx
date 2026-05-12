@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable @next/next/no-img-element */
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -175,15 +176,15 @@ export function Cube({ cubeData }) {
     const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
     const cleanPath = path.replace(/^\/+/, '');
     const finalPath = cleanPath.startsWith('storage/') ? cleanPath : `storage/${cleanPath}`;
-    
+
     const finalUrl = `${cleanBaseUrl}/${finalPath}`;
-    
+
     // Debug log (hapus setelah fix)
     console.log('🖼️ [CUBE DETAIL] Image URL:', {
       originalPath: path,
       finalUrl,
     });
-    
+
     return finalUrl;
   };
 
