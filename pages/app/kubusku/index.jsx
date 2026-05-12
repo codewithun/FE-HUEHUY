@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable @next/next/no-img-element */
 import React from 'react';
 import BottomBarComponent from '../../../components/construct.components/BottomBarComponent';
@@ -15,53 +16,53 @@ export default function Kubusku() {
     path: `cubes`,
   });
 
-const getAdImage = (ad) => {
-  return (
-    ad?.image_1 ||
-    ad?.image_2 ||
-    ad?.image_3 ||
-    ad?.picture_source ||
-    ''
-  );
-};
+  const getAdImage = (ad) => {
+    return (
+      ad?.image_1 ||
+      ad?.image_2 ||
+      ad?.image_3 ||
+      ad?.picture_source ||
+      ''
+    );
+  };
 
-const getImageUrl = (ad) => {
-  const path = getAdImage(ad);
+  const getImageUrl = (ad) => {
+    const path = getAdImage(ad);
 
-  if (!path || path === 'null' || path === 'undefined') {
-    return '/images/placeholder.png';
-  }
+    if (!path || path === 'null' || path === 'undefined') {
+      return '/images/placeholder.png';
+    }
 
-  // kalau sudah full URL
-  if (
-    typeof path === 'string' &&
-    (path.startsWith('http://') || path.startsWith('https://'))
-  ) {
-    return path;
-  }
+    // kalau sudah full URL
+    if (
+      typeof path === 'string' &&
+      (path.startsWith('http://') || path.startsWith('https://'))
+    ) {
+      return path;
+    }
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
+    const baseUrl =
+      process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
 
-  // hapus /api
-  const cleanBaseUrl = baseUrl
-    .replace(/\/api\/?$/, '')
-    .replace(/\/$/, '');
+    // hapus /api
+    const cleanBaseUrl = baseUrl
+      .replace(/\/api\/?$/, '')
+      .replace(/\/$/, '');
 
-  // hapus slash depan
-  const cleanPath = String(path).replace(/^\/+/, '');
+    // hapus slash depan
+    const cleanPath = String(path).replace(/^\/+/, '');
 
-  // cek storage
-  const finalPath = cleanPath.startsWith('storage/')
-    ? cleanPath
-    : `storage/${cleanPath}`;
+    // cek storage
+    const finalPath = cleanPath.startsWith('storage/')
+      ? cleanPath
+      : `storage/${cleanPath}`;
 
-  const finalUrl = `${cleanBaseUrl}/${finalPath}`;
+    const finalUrl = `${cleanBaseUrl}/${finalPath}`;
 
-  console.log('🖼️ [KUBUSKU] FINAL URL:', finalUrl);
+    console.log('🖼️ [KUBUSKU] FINAL URL:', finalUrl);
 
-  return finalUrl;
-};
+    return finalUrl;
+  };
 
   return (
     <>
@@ -95,18 +96,18 @@ const getImageUrl = (ad) => {
 
                       <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-200 flex justify-center items-center">
                         <img
-  src={getImageUrl(promo)}
-  alt={promo?.title || 'Promo'}
-  className="w-full h-full object-cover"
-  loading="lazy"
-  onError={(e) => {
-    console.error('❌ [KUBUSKU] Image load failed:', {
-      src: e.currentTarget.src,
-      promo,
-    });
+                          src={getImageUrl(promo)}
+                          alt={promo?.title || 'Promo'}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            console.error('❌ [KUBUSKU] Image load failed:', {
+                              src: e.currentTarget.src,
+                              promo,
+                            });
 
-    e.currentTarget.src = '/images/placeholder.png';
-  }}
+                            e.currentTarget.src = '/images/placeholder.png';
+                          }}
                         />
                       </div>
 
@@ -132,14 +133,12 @@ const getImageUrl = (ad) => {
                         <p className="mt-1 text-sm text-slate-600 limit__line__1">
                           Sisa{' '}
                           {promo?.is_daily_grab
-                            ? `${
-                                (promo?.max_grab || 0) -
-                                (promo?.total_grab || 0)
-                              } promo / hari`
-                            : `${
-                                (promo?.max_grab || 0) -
-                                (promo?.total_grab || 0)
-                              } promo`}
+                            ? `${(promo?.max_grab || 0) -
+                            (promo?.total_grab || 0)
+                            } promo / hari`
+                            : `${(promo?.max_grab || 0) -
+                            (promo?.total_grab || 0)
+                            } promo`}
                         </p>
                       </div>
                     </div>
