@@ -833,8 +833,10 @@ function CommunityCard({
   onOpenCommunity,
   onJoinRequest,
 }) {
+
   const isPrivate =
-    community.privacy === "private";
+    community.privacy ===
+    "private";
 
   const isJoined =
     Boolean(community.isJoined);
@@ -843,44 +845,35 @@ function CommunityCard({
     Boolean(community.hasRequested);
 
   const handleClick = () => {
-    if (!community?.id) return;
 
-    onOpenCommunity(
-      community.id
-    );
+    if (isJoined) {
+
+      onOpenCommunity(
+        community.id
+      );
+
+    }
   };
 
   const handleJoin = (e) => {
-    e.stopPropagation();
 
-    if (
-      isJoined ||
-      hasRequested
-    ) return;
+    e.stopPropagation();
 
     onJoinRequest(
       community
     );
-  };
 
-  const handleEnterOpen = (e) => {
-    if (
-      e.key === "Enter" ||
-      e.key === " "
-    ) {
-      e.preventDefault();
-      handleClick();
-    }
   };
 
   return (
+
     <div
       onClick={handleClick}
-      onKeyDown={handleEnterOpen}
-      role="button"
-      tabIndex={0}
-      className="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+      className="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-all"
     >
+
+      {/* TOP GRADIENT */}
+
       <div
         className="h-3"
         style={{
@@ -889,18 +882,27 @@ function CommunityCard({
         }}
       />
 
+      {/* CONTENT */}
+
       <div className="p-5 flex gap-4">
+
+        {/* LOGO */}
+
         <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border flex items-center justify-center">
+
           {community.logo ? (
+
             <Image
               src={community.logo}
               width={56}
               height={56}
               alt={community.name}
-              className="object-cover w-full h-full"
+              className="object-cover"
               unoptimized
             />
+
           ) : (
+
             <div
               className="w-full h-full flex items-center justify-center text-white font-bold"
               style={{
@@ -908,47 +910,70 @@ function CommunityCard({
                   `linear-gradient(135deg, ${community.bg_color_1}, ${community.bg_color_2})`
               }}
             >
+
               {community.name
                 ?.slice(0, 2)
                 ?.toUpperCase()}
+
             </div>
+
           )}
+
         </div>
 
+        {/* INFO */}
+
         <div className="flex-1 min-w-0">
+
           <div className="flex items-center gap-2">
+
             <h3 className="font-semibold text-slate-900 truncate">
               {community.name}
             </h3>
 
             {community.isVerified && (
+
               <FontAwesomeIcon
                 icon={faCheckCircle}
                 className="text-blue-500 text-sm"
               />
+
             )}
 
             {isPrivate && (
+
               <FontAwesomeIcon
                 icon={faLock}
                 className="text-slate-400 text-sm"
               />
+
             )}
+
           </div>
 
           <div className="mt-1">
+
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-slate-50 text-slate-700 border-slate-200">
+
               {community.category}
+
             </span>
+
           </div>
 
           <p className="text-slate-600 text-sm mt-2 line-clamp-2">
-            {community.description || "Tidak ada deskripsi"}
+
+            {community.description ||
+              "Tidak ada deskripsi"}
+
           </p>
 
           <div className="flex items-center justify-between mt-4">
+
             <div className="flex items-center gap-4 text-sm text-slate-500">
+
               <div className="flex items-center gap-1">
+
                 <FontAwesomeIcon
                   icon={faUsers}
                   className="text-xs"
@@ -957,62 +982,84 @@ function CommunityCard({
                 <span>
                   {community.members} anggota
                 </span>
+
               </div>
 
               {isJoined && (
+
                 <div className="flex items-center gap-1">
+
                   <FontAwesomeIcon
                     icon={faTags}
                     className="text-xs"
                   />
 
                   <span className="text-primary font-medium">
+
                     {community.activePromos} promo
+
                   </span>
+
                 </div>
+
               )}
+
             </div>
 
+            {/* BUTTON */}
+
             {isJoined ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleClick();
-                }}
-                className="px-4 py-2 rounded-lg bg-green-100 text-green-700 text-sm font-medium"
-              >
+
+              <button className="px-4 py-2 rounded-lg bg-green-100 text-green-700 text-sm font-medium">
+
                 Masuk
+
               </button>
+
             ) : hasRequested ? (
-              <button
-                type="button"
-                onClick={(e) => e.stopPropagation()}
-                className="px-4 py-2 rounded-lg bg-yellow-100 text-yellow-700 text-sm font-medium flex items-center gap-1"
-              >
+
+              <button className="px-4 py-2 rounded-lg bg-yellow-100 text-yellow-700 text-sm font-medium flex items-center gap-1">
+
                 <FontAwesomeIcon
                   icon={faClock}
                   className="text-xs"
                 />
+
                 Menunggu
+
               </button>
+
             ) : (
+
               <button
-                type="button"
                 onClick={handleJoin}
                 className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-1"
               >
+
                 <FontAwesomeIcon
-                  icon={isPrivate ? faUsers : faPlus}
+                  icon={
+                    isPrivate
+                      ? faUsers
+                      : faPlus
+                  }
                   className="text-xs"
                 />
 
-                {isPrivate ? "Minta" : "Gabung"}
+                {isPrivate
+                  ? "Minta"
+                  : "Gabung"}
+
               </button>
+
             )}
+
           </div>
+
         </div>
+
       </div>
+
     </div>
+
   );
 }
