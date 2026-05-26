@@ -25,9 +25,9 @@ import FlexibleNotification from '../../../components/construct.components/notif
 import { token_cookie_name } from "../../../helpers";
 import { Decrypt } from "../../../helpers/encryption.helpers";
 
-/* =========================================
+/* ========================================
    API BASE
-========================================= */
+======================================== */
 
 const getApiBase = () => {
   const baseUrl =
@@ -37,9 +37,9 @@ const getApiBase = () => {
   return baseUrl.replace(/\/api\/?$/, "");
 };
 
-/* =========================================
+/* ========================================
    AUTH
-========================================= */
+======================================== */
 
 const getAuthHeaders = () => {
   const encryptedToken = Cookies.get(token_cookie_name);
@@ -57,9 +57,9 @@ const getAuthHeaders = () => {
   };
 };
 
-/* =========================================
-   LOGO URL
-========================================= */
+/* ========================================
+   BUILD LOGO URL
+======================================== */
 
 const buildLogoUrl = (apiUrl, logo) => {
   if (!logo) return null;
@@ -75,12 +75,11 @@ const buildLogoUrl = (apiUrl, logo) => {
   return `${apiUrl}/storage/${clean}`;
 };
 
-/* =========================================
-   NORMALIZE
-========================================= */
+/* ========================================
+   NORMALIZE COMMUNITY
+======================================== */
 
 const normalizeCommunities = (raw) => {
-
   console.log("RAW API:", raw);
 
   let list = [];
@@ -98,51 +97,36 @@ const normalizeCommunities = (raw) => {
     list = raw.data.data;
   }
 
-  console.log("FINAL LIST:", list);
+  console.log("LIST RESULT:", list);
 
   return list.map((c) => ({
-
     id: Number(c.id),
-
     name: c.name || "Tanpa Nama",
-
     description: c.description || "",
-
     category: c.category || "Umum",
 
     logo: c.logo || null,
 
-    bg_color_1:
-      c.bg_color_1 || "#0b2e13",
-
-    bg_color_2:
-      c.bg_color_2 || "#14532d",
+    bg_color_1: c.bg_color_1 || "#0b2e13",
+    bg_color_2: c.bg_color_2 || "#14532d",
 
     privacy:
-      String(
-        c.privacy ||
-        c.world_type ||
-        c.type ||
-        "public"
-      ).toLowerCase(),
+      c.privacy ||
+      c.world_type ||
+      c.type ||
+      "public",
 
     isVerified:
-      Boolean(
-        c.isVerified ||
-        c.is_verified
-      ),
+      Boolean(c.isVerified) ||
+      Boolean(c.is_verified),
 
     isJoined:
-      Boolean(
-        c.isJoined ||
-        c.is_joined
-      ),
+      Boolean(c.isJoined) ||
+      Boolean(c.is_joined),
 
     hasRequested:
-      Boolean(
-        c.hasRequested ||
-        c.has_requested
-      ),
+      Boolean(c.hasRequested) ||
+      Boolean(c.has_requested),
 
     members:
       Number(c.members || 0),
@@ -154,30 +138,24 @@ const normalizeCommunities = (raw) => {
   }));
 };
 
-/* =========================================
+/* ========================================
    FETCH COMMUNITIES
-========================================= */
+======================================== */
 
 const fetchCommunitiesAPI = async () => {
-
   const apiUrl = getApiBase();
 
   const headers = getAuthHeaders();
 
   const endpoints = [
-
     `${apiUrl}/api/communities`,
-
     `${apiUrl}/api/admin/communities`,
-
     `${apiUrl}/api/communities/with-membership`,
   ];
 
   for (const endpoint of endpoints) {
-
     try {
-
-      console.log("FETCH:", endpoint);
+      console.log("TRY FETCH:", endpoint);
 
       const res = await fetch(endpoint, {
         headers,
@@ -201,105 +179,16 @@ const fetchCommunitiesAPI = async () => {
       }
 
     } catch (err) {
-
       console.log("FETCH ERROR:", err);
-
     }
   }
 
   return [];
 };
 
-/* =========================================
-   JOIN API
-========================================= */
-
-const joinCommunityAPI = async (
-  communityId
-) => {
-
-  const apiUrl = getApiBase();
-
-  const headers = getAuthHeaders();
-
-  const res = await fetch(
-    `${apiUrl}/api/communities/${communityId}/join`,
-    {
-      method: "POST",
-      headers,
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error(
-      "Gagal join komunitas"
-    );
-  }
-
-  return res.json();
-};
-
-/* =========================================
-   REQUEST PRIVATE JOIN
-========================================= */
-
-const requestJoinCommunityAPI =
-  async (communityId) => {
-
-  const apiUrl = getApiBase();
-
-  const headers = getAuthHeaders();
-
-  const candidates = [
-
-    {
-      url:
-        `${apiUrl}/api/communities/${communityId}/join-request`,
-      method: "POST",
-    },
-
-    {
-      url:
-        `${apiUrl}/api/member-requests`,
-      method: "POST",
-      body: JSON.stringify({
-        community_id: communityId
-      }),
-    }
-  ];
-
-  for (const c of candidates) {
-
-    try {
-
-      const res = await fetch(
-        c.url,
-        {
-          method: c.method,
-          headers,
-          body: c.body,
-        }
-      );
-
-      if (res.ok) {
-        return await res.json();
-      }
-
-    } catch (err) {
-
-      console.log(err);
-
-    }
-  }
-
-  throw new Error(
-    "Gagal request join"
-  );
-};
-
-/* =========================================
+/* ========================================
    PAGE
-========================================= */
+======================================== */
 
 export default function Komunitas() {
 
@@ -325,135 +214,96 @@ export default function Komunitas() {
       message: "",
     });
 
-  /* =========================================
-     NOTIFICATION
-  ========================================= */
-
-  const showNotification =
-    (config) => {
-
-      setNotification({
-        ...config,
-        show: true,
-      });
-
-    };
+  const showNotification = (config) => {
+    setNotification({
+      ...config,
+      show: true,
+    });
+  };
 
   const hideNotification = () => {
-
     setNotification((prev) => ({
       ...prev,
       show: false,
     }));
-
   };
 
-  /* =========================================
-     FETCH
-  ========================================= */
+  /* ========================================
+     FETCH DATA
+  ======================================== */
 
-  const fetchCommunities =
-    useCallback(async () => {
+  const fetchCommunities = useCallback(async () => {
 
-      try {
+    try {
 
-        setLoading(true);
+      setLoading(true);
 
-        const apiBase =
-          getApiBase();
+      const apiBase = getApiBase();
 
-        const data =
-          await fetchCommunitiesAPI();
+      const data =
+        await fetchCommunitiesAPI();
 
-        const mapped = data.map(
-          (c) => ({
-            ...c,
-            logo:
-              buildLogoUrl(
-                apiBase,
-                c.logo
-              ),
-          })
-        );
+      const mapped = data.map((c) => ({
+        ...c,
+        logo: buildLogoUrl(apiBase, c.logo),
+      }));
 
-        console.log(
-          "FINAL DATA:",
-          mapped
-        );
+      console.log("FINAL DATA:", mapped);
 
-        setCommunities(mapped);
+      setCommunities(mapped);
 
-      } catch (err) {
+    } catch (err) {
 
-        console.log(err);
+      console.log(err);
 
-        setCommunities([]);
+      setCommunities([]);
 
-      } finally {
+    } finally {
 
-        setLoading(false);
+      setLoading(false);
 
-      }
+    }
 
-    }, []);
+  }, []);
 
   useEffect(() => {
-
     fetchCommunities();
-
   }, [fetchCommunities]);
 
-  /* =========================================
+  /* ========================================
      FILTER
-  ========================================= */
+  ======================================== */
 
   const filteredCommunities =
     useMemo(() => {
 
       let data = [...communities];
 
-      if (
-        activeTab ===
-        "komunitasku"
-      ) {
-
+      if (activeTab === "komunitasku") {
         data = data.filter(
           (c) =>
             c.isJoined ||
             c.hasRequested
         );
-
       }
 
-      if (
-        activeTab ===
-        "belum-gabung"
-      ) {
-
+      if (activeTab === "belum-gabung") {
         data = data.filter(
           (c) =>
             !c.isJoined &&
             !c.hasRequested
         );
-
       }
 
-      if (
-        searchQuery.trim()
-      ) {
+      if (searchQuery.trim()) {
 
         const q =
           searchQuery.toLowerCase();
 
-        data = data.filter(
-          (c) =>
-            c.name
-              ?.toLowerCase()
-              .includes(q) ||
-
-            c.category
-              ?.toLowerCase()
-              .includes(q)
+        data = data.filter((c) =>
+          c.name
+            ?.toLowerCase()
+            .includes(q)
         );
       }
 
@@ -465,138 +315,47 @@ export default function Komunitas() {
       searchQuery
     ]);
 
-  /* =========================================
-     STATS
-  ========================================= */
-
-  const stats = useMemo(() => {
-
-    const joined =
-      communities.filter(
-        (c) =>
-          c.isJoined ||
-          c.hasRequested
-      ).length;
-
-    const available =
-      communities.filter(
-        (c) =>
-          !c.isJoined &&
-          !c.hasRequested
-      ).length;
-
-    return {
-      joined,
-      available
-    };
-
-  }, [communities]);
-
-  /* =========================================
+  /* ========================================
      OPEN COMMUNITY
-  ========================================= */
+  ======================================== */
 
   const handleOpenCommunity =
     (id) => {
-
       router.push(
         `/app/komunitas/dashboard/${id}`
       );
-
     };
 
-  /* =========================================
-     JOIN
-  ========================================= */
-
-  const handleJoinAction =
-    async (community) => {
-
-      try {
-
-        const isPrivate =
-          community.privacy ===
-          "private";
-
-        if (isPrivate) {
-
-          await requestJoinCommunityAPI(
-            community.id
-          );
-
-          showNotification({
-            type: "success",
-            title:
-              "Berhasil",
-            message:
-              "Permintaan bergabung dikirim",
-          });
-
-        } else {
-
-          await joinCommunityAPI(
-            community.id
-          );
-
-          showNotification({
-            type: "success",
-            title:
-              "Berhasil",
-            message:
-              "Berhasil bergabung komunitas",
-          });
-
-        }
-
-        fetchCommunities();
-
-      } catch (err) {
-
-        console.log(err);
-
-        showNotification({
-          type: "error",
-          title: "Error",
-          message:
-            err.message ||
-            "Terjadi kesalahan",
-        });
-
-      }
-
-    };
+  /* ========================================
+     RENDER
+  ======================================== */
 
   return (
     <>
+      <div className="lg:mx-auto lg:max-w-md">
 
-      <div className="lg:mx-auto lg:relative lg:max-w-md">
-
-        <div className="container mx-auto relative z-10 pb-28">
+        <div className="container mx-auto pb-28">
 
           {/* HEADER */}
 
           <div className="relative">
 
-            <div className="w-full aspect-[16/6] overflow-hidden bg-gradient-to-r from-[#0b2e13] to-[#14532d] flex items-center justify-center z-10" />
+            <div className="w-full aspect-[16/6] bg-gradient-to-r from-[#0b2e13] to-[#14532d]" />
 
-            <div className="absolute top-3 left-4 z-30">
+            <div className="absolute top-3 left-4">
 
-              <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/25 backdrop-blur-md border border-white/40 shadow-sm">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/20 backdrop-blur">
 
-                <Link
-                  href="/app"
-                  title="Kembali"
-                  className="text-white"
-                >
+                <Link href="/app">
 
                   <FontAwesomeIcon
                     icon={faArrowLeft}
-                    className="text-base"
+                    className="text-white"
                   />
 
                 </Link>
 
-                <h1 className="text-sm font-semibold text-white drop-shadow-sm">
+                <h1 className="text-white font-semibold">
                   Kelola Komunitas
                 </h1>
 
@@ -606,40 +365,30 @@ export default function Komunitas() {
 
           </div>
 
-          {/* BODY */}
+          {/* CONTENT */}
 
-          <div className="bg-background min-h-screen w-full rounded-t-[25px] -mt-4 relative z-20 bg-gradient-to-br from-cyan-50">
+          <div className="bg-white min-h-screen rounded-t-[25px] -mt-4 relative z-20 px-4 py-6">
 
             {/* SEARCH */}
 
-            <div className="relative -top-4 px-4">
+            <div className="mb-5">
 
-              <div className="bg-white border border-primary rounded-[20px] flex items-center overflow-hidden">
+              <div className="border rounded-xl flex items-center px-4 py-3">
 
-                <div className="flex-1">
+                <FontAwesomeIcon
+                  icon={faSearch}
+                  className="text-primary mr-3"
+                />
 
-                  <div className="px-6 py-3 flex items-center gap-3">
-
-                    <FontAwesomeIcon
-                      icon={faSearch}
-                      className="text-primary"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Cari komunitas..."
-                      value={searchQuery}
-                      onChange={(e) =>
-                        setSearchQuery(
-                          e.target.value
-                        )
-                      }
-                      className="w-full bg-transparent outline-none text-slate-800 placeholder-slate-400"
-                    />
-
-                  </div>
-
-                </div>
+                <input
+                  type="text"
+                  placeholder="Cari komunitas..."
+                  value={searchQuery}
+                  onChange={(e) =>
+                    setSearchQuery(e.target.value)
+                  }
+                  className="w-full outline-none"
+                />
 
               </div>
 
@@ -647,162 +396,170 @@ export default function Komunitas() {
 
             {/* TAB */}
 
-            <div className="bg-transparent border-b border-[#cdd0b3]">
+            <div className="flex gap-4 mb-6">
 
-              <div className="px-4">
+              {[
+                "semua",
+                "komunitasku",
+                "belum-gabung"
+              ].map((tab) => (
 
-                <div className="flex space-x-8">
+                <button
+                  key={tab}
+                  onClick={() =>
+                    setActiveTab(tab)
+                  }
+                  className={`px-4 py-2 rounded-lg text-sm ${
+                    activeTab === tab
+                      ? "bg-primary text-white"
+                      : "bg-slate-100"
+                  }`}
+                >
 
-                  {[
-                    'semua',
-                    'komunitasku',
-                    'belum-gabung'
-                  ].map((tab) => (
+                  {tab}
 
-                    <button
-                      key={tab}
-                      className={`py-3 border-b-2 font-medium text-sm transition-colors ${
-                        activeTab === tab
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                      }`}
-                      onClick={() =>
-                        setActiveTab(tab)
-                      }
-                    >
+                </button>
 
-                      {tab === 'semua'
-                        ? 'Semua Komunitas'
-                        : tab === 'komunitasku'
-                        ? 'Komunitas Saya'
-                        : 'Tersedia'}
-
-                    </button>
-
-                  ))}
-
-                </div>
-
-              </div>
+              ))}
 
             </div>
 
-            {/* CONTENT */}
+            {/* LIST */}
 
-            <div className="px-4 py-6">
+            {loading ? (
 
-              {/* STATS */}
+              <div className="py-10 text-center">
+                Loading komunitas...
+              </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
+            ) : filteredCommunities.length === 0 ? (
 
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#0b2e13]/5">
+              <div className="py-10 text-center">
+                Tidak ada komunitas
+              </div>
 
-                  <div className="flex items-center">
+            ) : (
 
-                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#0b2e13] text-white">
+              <div className="space-y-4">
 
-                      <FontAwesomeIcon
-                        icon={faUsers}
-                        className="text-sm"
-                      />
+                {filteredCommunities.map(
+                  (community) => (
 
-                    </div>
+                  <div
+                    key={community.id}
+                    onClick={() =>
+                      handleOpenCommunity(
+                        community.id
+                      )
+                    }
+                    className="bg-white border rounded-xl overflow-hidden shadow-sm cursor-pointer"
+                  >
 
-                    <div className="ml-3">
+                    <div
+                      className="h-3"
+                      style={{
+                        background:
+                          `linear-gradient(135deg, ${community.bg_color_1}, ${community.bg_color_2})`
+                      }}
+                    />
 
-                      <p className="text-sm font-medium text-[#14532d]">
-                        Bergabung
-                      </p>
+                    <div className="p-4 flex gap-4">
 
-                      <p className="text-lg font-semibold text-slate-900">
-                        {stats.joined}
-                      </p>
+                      {/* LOGO */}
+
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center">
+
+                        {community.logo ? (
+
+                          <Image
+                            src={community.logo}
+                            width={56}
+                            height={56}
+                            alt=""
+                            className="object-cover"
+                            unoptimized
+                          />
+
+                        ) : (
+
+                          <span className="font-bold text-primary">
+                            {community.name
+                              ?.slice(0, 2)
+                              ?.toUpperCase()}
+                          </span>
+
+                        )}
+
+                      </div>
+
+                      {/* CONTENT */}
+
+                      <div className="flex-1">
+
+                        <div className="flex items-center gap-2">
+
+                          <h2 className="font-semibold">
+                            {community.name}
+                          </h2>
+
+                          {community.isVerified && (
+                            <FontAwesomeIcon
+                              icon={faCheckCircle}
+                              className="text-blue-500 text-sm"
+                            />
+                          )}
+
+                          {community.privacy ===
+                            "private" && (
+                            <FontAwesomeIcon
+                              icon={faLock}
+                              className="text-slate-400 text-sm"
+                            />
+                          )}
+
+                        </div>
+
+                        <p className="text-sm text-slate-500 mt-1">
+                          {community.description}
+                        </p>
+
+                        <div className="flex items-center justify-between mt-3">
+
+                          <div className="flex items-center text-sm text-slate-500 gap-2">
+
+                            <FontAwesomeIcon
+                              icon={faUsers}
+                            />
+
+                            <span>
+                              {community.members} anggota
+                            </span>
+
+                          </div>
+
+                          <button
+                            className="bg-primary text-white px-4 py-2 rounded-lg text-sm"
+                          >
+
+                            {community.isJoined
+                              ? "Masuk"
+                              : "Gabung"}
+
+                          </button>
+
+                        </div>
+
+                      </div>
 
                     </div>
 
                   </div>
 
-                </div>
-
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#d8d8d8] bg-[#0b2e13]/5">
-
-                  <div className="flex items-center">
-
-                    <div className="flex-shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-[#14532d] text-white">
-
-                      <FontAwesomeIcon
-                        icon={faGlobe}
-                        className="text-sm"
-                      />
-
-                    </div>
-
-                    <div className="ml-3">
-
-                      <p className="text-sm font-medium text-[#14532d]">
-                        Tersedia
-                      </p>
-
-                      <p className="text-lg font-semibold text-slate-900">
-                        {stats.available}
-                      </p>
-
-                    </div>
-
-                  </div>
-
-                </div>
+                ))}
 
               </div>
 
-              {/* LIST */}
-
-              <div className="space-y-3">
-
-                {loading ? (
-
-                  <div className="text-center py-10">
-                    Loading komunitas...
-                  </div>
-
-                ) : filteredCommunities.length === 0 ? (
-
-                  <div className="bg-white rounded-xl p-8 text-center border border-[#d8d8d8]">
-
-                    <FontAwesomeIcon
-                      icon={faUsers}
-                      className="text-3xl text-slate-300 mb-4"
-                    />
-
-                    <p className="text-slate-500">
-                      Tidak ada komunitas
-                    </p>
-
-                  </div>
-
-                ) : (
-
-                  filteredCommunities.map(
-                    (community) => (
-
-                    <CommunityCard
-                      key={community.id}
-                      community={community}
-                      onOpenCommunity={
-                        handleOpenCommunity
-                      }
-                      onJoinRequest={
-                        handleJoinAction
-                      }
-                    />
-
-                  )))
-
-                }
-
-              </div>
-
-            </div>
+            )}
 
           </div>
 
@@ -821,245 +578,5 @@ export default function Komunitas() {
       <BottomBarComponent active={'community'} />
 
     </>
-  );
-}
-
-/* =========================================
-   CARD
-========================================= */
-
-function CommunityCard({
-  community,
-  onOpenCommunity,
-  onJoinRequest,
-}) {
-
-  const isPrivate =
-    community.privacy ===
-    "private";
-
-  const isJoined =
-    Boolean(community.isJoined);
-
-  const hasRequested =
-    Boolean(community.hasRequested);
-
-  const handleClick = () => {
-
-    if (isJoined) {
-
-      onOpenCommunity(
-        community.id
-      );
-
-    }
-  };
-
-  const handleJoin = (e) => {
-
-    e.stopPropagation();
-
-    onJoinRequest(
-      community
-    );
-
-  };
-
-  return (
-
-    <div
-      onClick={handleClick}
-      className="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-all"
-    >
-
-      {/* TOP GRADIENT */}
-
-      <div
-        className="h-3"
-        style={{
-          background:
-            `linear-gradient(135deg, ${community.bg_color_1}, ${community.bg_color_2})`
-        }}
-      />
-
-      {/* CONTENT */}
-
-      <div className="p-5 flex gap-4">
-
-        {/* LOGO */}
-
-        <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border flex items-center justify-center">
-
-          {community.logo ? (
-
-            <Image
-              src={community.logo}
-              width={56}
-              height={56}
-              alt={community.name}
-              className="object-cover"
-              unoptimized
-            />
-
-          ) : (
-
-            <div
-              className="w-full h-full flex items-center justify-center text-white font-bold"
-              style={{
-                background:
-                  `linear-gradient(135deg, ${community.bg_color_1}, ${community.bg_color_2})`
-              }}
-            >
-
-              {community.name
-                ?.slice(0, 2)
-                ?.toUpperCase()}
-
-            </div>
-
-          )}
-
-        </div>
-
-        {/* INFO */}
-
-        <div className="flex-1 min-w-0">
-
-          <div className="flex items-center gap-2">
-
-            <h3 className="font-semibold text-slate-900 truncate">
-              {community.name}
-            </h3>
-
-            {community.isVerified && (
-
-              <FontAwesomeIcon
-                icon={faCheckCircle}
-                className="text-blue-500 text-sm"
-              />
-
-            )}
-
-            {isPrivate && (
-
-              <FontAwesomeIcon
-                icon={faLock}
-                className="text-slate-400 text-sm"
-              />
-
-            )}
-
-          </div>
-
-          <div className="mt-1">
-
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-slate-50 text-slate-700 border-slate-200">
-
-              {community.category}
-
-            </span>
-
-          </div>
-
-          <p className="text-slate-600 text-sm mt-2 line-clamp-2">
-
-            {community.description ||
-              "Tidak ada deskripsi"}
-
-          </p>
-
-          <div className="flex items-center justify-between mt-4">
-
-            <div className="flex items-center gap-4 text-sm text-slate-500">
-
-              <div className="flex items-center gap-1">
-
-                <FontAwesomeIcon
-                  icon={faUsers}
-                  className="text-xs"
-                />
-
-                <span>
-                  {community.members} anggota
-                </span>
-
-              </div>
-
-              {isJoined && (
-
-                <div className="flex items-center gap-1">
-
-                  <FontAwesomeIcon
-                    icon={faTags}
-                    className="text-xs"
-                  />
-
-                  <span className="text-primary font-medium">
-
-                    {community.activePromos} promo
-
-                  </span>
-
-                </div>
-
-              )}
-
-            </div>
-
-            {/* BUTTON */}
-
-            {isJoined ? (
-
-              <button className="px-4 py-2 rounded-lg bg-green-100 text-green-700 text-sm font-medium">
-
-                Masuk
-
-              </button>
-
-            ) : hasRequested ? (
-
-              <button className="px-4 py-2 rounded-lg bg-yellow-100 text-yellow-700 text-sm font-medium flex items-center gap-1">
-
-                <FontAwesomeIcon
-                  icon={faClock}
-                  className="text-xs"
-                />
-
-                Menunggu
-
-              </button>
-
-            ) : (
-
-              <button
-                onClick={handleJoin}
-                className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-1"
-              >
-
-                <FontAwesomeIcon
-                  icon={
-                    isPrivate
-                      ? faUsers
-                      : faPlus
-                  }
-                  className="text-xs"
-                />
-
-                {isPrivate
-                  ? "Minta"
-                  : "Gabung"}
-
-              </button>
-
-            )}
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-
   );
 }
