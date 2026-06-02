@@ -8,6 +8,26 @@ import { inputLabel } from './input.decorate';
 import styles from './input.module.css';
 import { inputImageProps } from './props/input-image.props';
 
+const buildImagePreviewSrc = (raw: string) => {
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw) || /^data:/i.test(raw)) return raw;
+
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
+  let path = String(raw).trim().replace(/^\/+/, '').replace(/^api\/storage\//i, 'storage/');
+
+  if (/^storage\//i.test(path)) {
+    return `${apiBase}/${path}`.replace(/([^:]\/)\/+/, '$1');
+  }
+
+  if (/^(communities|ads|promos|uploads|images|files|banners)\//i.test(path)) {
+    path = `storage/${path}`;
+  } else {
+    path = `storage/communities/${path}`;
+  }
+
+  return `${apiBase}/${path}`.replace(/([^:]\/)\/+/, '$1');
+};
+
 export function InputImageComponent({
   name,
   label,
@@ -44,7 +64,9 @@ inputImageProps) {
     if (value) {
       // if (onChange && !uploadUrl) {
       setInputValue(
-        (typeof value == 'object' ? URL.createObjectURL(value) : value) || ''
+        (typeof value == 'object'
+          ? URL.createObjectURL(value)
+          : buildImagePreviewSrc(String(value))) || ''
       );
       // } else {
       //   setInputValue(STORAGE_URL + '/' + value);
@@ -213,8 +235,6 @@ inputImageProps) {
               <img
                 src={String(inputValue)}
                 alt="preview"
-                crossOrigin="anonymous"
-                referrerPolicy="no-referrer"
                 className="absolute inset-0 w-full h-full object-cover rounded-lg"
                 onError={() => {
                   // fallback: clear preview when external image blocked

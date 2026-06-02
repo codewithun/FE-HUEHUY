@@ -114,6 +114,9 @@ export function TableSupervisionComponent({
   const [dataSelected, setDataSelected] = useState<number | null>(null);
 
   const [forms, setForms] = useState<any[]>([]);
+  const activeForms = dataSelected === null
+    ? formControl?.custom || forms
+    : formUpdateControl?.custom || formControl?.custom || forms;
 
   // Base URL API tanpa trailing slash
   const apiBase = (
@@ -263,6 +266,22 @@ export function TableSupervisionComponent({
       }
     },
     [apiBase, fetchControl?.includeHeaders]
+  );
+
+  const pickDefaultFormValues = useCallback(
+    (row: Record<string, any> = {}) => {
+      const picked: Record<string, any> = {};
+
+      activeForms.forEach((form: any) => {
+        const name = form?.construction?.name;
+        if (!name || !(name in row)) return;
+
+        picked[name] = row[name];
+      });
+
+      return picked;
+    },
+    [activeForms]
   );
 
   const shouldFetch = Boolean(fetchControl?.path || fetchControl?.url);
@@ -962,9 +981,7 @@ export function TableSupervisionComponent({
               }}
               confirmation
               forms={
-                dataSelected == null
-                  ? formControl?.custom || forms
-                  : formUpdateControl?.custom || formControl?.custom || forms
+                activeForms
               }
               defaultValue={
                 dataSelected === null
@@ -978,7 +995,7 @@ export function TableSupervisionComponent({
                     }
                   : {
                       _method: 'PUT',
-                      ...(dataOriginal?.at(dataSelected) || {}),
+                      ...pickDefaultFormValues(dataOriginal?.at(dataSelected) || {}),
                     }
               }
               onSuccess={(resp: any) => {
