@@ -675,6 +675,19 @@ export const useForm = (
   };
 
   const setDefaultValues = (values: object) => {
+    const isFullEditSnapshot =
+      values && typeof values === 'object' && (values as any)._method === 'PUT';
+
+    if (isFullEditSnapshot) {
+      const nextValuesArr = Object.keys(values).map((name) => ({
+        name,
+        value: (values as any)[name],
+      }));
+
+      setFormValues(nextValuesArr);
+      return;
+    }
+
     // Merge incoming defaults with existing form values instead of fully replacing.
     // This prevents accidental clearing of fields when a partial default object is applied
     // (e.g., when FormSupervision passes a subset of fields).
