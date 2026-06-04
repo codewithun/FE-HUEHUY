@@ -79,79 +79,175 @@ const buildLogoUrl = (apiUrl, logo) => {
    NORMALIZE
 ========================================= */
 
-const normalizeCommunities = (raw) => {
+const extractList = (raw) => {
+  if (Array.isArray(raw)) return raw;
 
+  const candidates = [
+    raw?.data,
+    raw?.data?.data,
+    raw?.communities,
+    raw?.data?.communities,
+    raw?.community,
+    raw?.data?.community,
+    raw?.user_communities,
+    raw?.data?.user_communities,
+    raw?.joined_communities,
+    raw?.data?.joined_communities,
+    raw?.memberships,
+    raw?.data?.memberships,
+    raw?.member_requests,
+    raw?.data?.member_requests,
+    raw?.requests,
+    raw?.data?.requests,
+  ];
+
+  for (const item of candidates) {
+    if (Array.isArray(item)) return item;
+  }
+
+  return [];
+};
+
+const normalizeCommunities = (raw) => {
   console.log("RAW API:", raw);
 
-  let list = [];
-
-  if (Array.isArray(raw)) {
-    list = raw;
-  }
-  else if (Array.isArray(raw?.data)) {
-    list = raw.data;
-  }
-  else if (Array.isArray(raw?.communities)) {
-    list = raw.communities;
-  }
-  else if (Array.isArray(raw?.data?.data)) {
-    list = raw.data.data;
-  }
+  const list = extractList(raw);
 
   console.log("FINAL LIST:", list);
 
-  return list.map((c) => ({
+  return list.map((item) => {
+    const c =
+      item?.community ||
+      item?.communities ||
+      item?.komunitas ||
+      item;
 
-    id: Number(c.id),
+    const privacyRaw =
+      c.privacy ||
+      c.world_type ||
+      c.type ||
+      "public";
 
-    name: c.name || "Tanpa Nama",
+    const privacyString =
+      String(privacyRaw || "").toLowerCase();
 
-    description: c.description || "",
+    let privacy =
+      privacyString === "pribadi"
+        ? "private"
+        : privacyString || "public";
 
-    category: c.category || "Umum",
+    const isPrivateFlag =
+      c.is_private ?? c.private;
 
-    logo: c.logo || null,
+    if (typeof isPrivateFlag !== "undefined") {
+      if (Boolean(Number(isPrivateFlag)) || isPrivateFlag === true) {
+        privacy = "private";
+      }
+    }
 
-    bg_color_1:
-      c.bg_color_1 || "#0b2e13",
+    const statusRaw =
+      item.status ||
+      item.member_status ||
+      item.request_status ||
+      c.status ||
+      "";
 
-    bg_color_2:
-      c.bg_color_2 || "#14532d",
+    const status =
+      String(statusRaw || "").toLowerCase();
 
-    privacy:
-      String(
-        c.privacy ||
-        c.world_type ||
-        c.type ||
-        "public"
-      ).toLowerCase(),
+    const isJoinedRaw =
+      c.isJoined ??
+      c.is_joined ??
+      item.isJoined ??
+      item.is_joined ??
+      item.joined ??
+      false;
 
-    isVerified:
-      Boolean(
-        c.isVerified ||
-        c.is_verified
-      ),
+    const hasRequestedRaw =
+      c.hasRequested ??
+      c.has_requested ??
+      c.requestPending ??
+      item.hasRequested ??
+      item.has_requested ??
+      item.requestPending ??
+      false;
 
-    isJoined:
-      Boolean(
-        c.isJoined ||
-        c.is_joined
-      ),
+    const id =
+      c.id ??
+      item.community_id ??
+      item.komunitas_id ??
+      item.id;
 
-    hasRequested:
-      Boolean(
-        c.hasRequested ||
-        c.has_requested
-      ),
+    return {
+      id: Number(id),
 
-    members:
-      Number(c.members || 0),
+      name:
+        c.name ||
+        c.title ||
+        "Tanpa Nama",
 
-    activePromos:
-      Number(c.activePromos || 0),
+      description:
+        c.description ||
+        c.desc ||
+        "",
 
-    is_active: true,
-  }));
+      category:
+        c.category ||
+        c.category_name ||
+        "Umum",
+
+      logo:
+        c.logo ||
+        c.image ||
+        c.photo ||
+        null,
+
+      bg_color_1:
+        c.bg_color_1 || "#0b2e13",
+
+      bg_color_2:
+        c.bg_color_2 || "#14532d",
+
+      privacy,
+
+      isVerified:
+        Boolean(
+          c.isVerified ||
+          c.is_verified
+        ),
+
+      isJoined:
+        Boolean(isJoinedRaw) ||
+        status === "approved" ||
+        status === "accepted" ||
+        status === "joined" ||
+        status === "active" ||
+        status === "member",
+
+      hasRequested:
+        Boolean(hasRequestedRaw) ||
+        status === "pending" ||
+        status === "waiting" ||
+        status === "requested",
+
+      members:
+        Number(
+          c.members ||
+          c.member_count ||
+          c.total_members ||
+          0
+        ),
+
+      activePromos:
+        Number(
+          c.activePromos ||
+          c.active_promos ||
+          0
+        ),
+
+      is_active: true,
+    };
+  }).filter((c) => c.id && !Number.isNaN(c.id));
 };
 
 /* =========================================
@@ -161,19 +257,21 @@ const normalizeCommunities = (raw) => {
 const fetchCommunitiesAPI = async () => {
   const apiUrl = getApiBase();
   const headers = getAuthHeaders();
-  const fetchJson = async (url) => {
 
+  const fetchJson = async (url) => {
     try {
       console.log("FETCH:", url);
+
       const res = await fetch(url, { headers });
 
       console.log("STATUS:", res.status, url);
 
       if (!res.ok) return null;
+
       const json = await res.json();
 
       console.log("JSON:", url, json);
-      
+
       return json;
     } catch (err) {
       console.log("FETCH ERROR:", url, err);
@@ -186,10 +284,14 @@ const fetchCommunitiesAPI = async () => {
     `${apiUrl}/api/admin/communities`,
   ];
 
-  const joinedCommunityEndpoints = [
+  const membershipEndpoints = [
     `${apiUrl}/api/communities/user-communities`,
     `${apiUrl}/api/communities/with-membership`,
     `${apiUrl}/api/admin/communities/with-membership`,
+    `${apiUrl}/api/user/communities`,
+    `${apiUrl}/api/my/communities`,
+    `${apiUrl}/api/communities/joined`,
+    `${apiUrl}/api/member-requests`,
   ];
 
   let allCommunities = [];
@@ -210,37 +312,46 @@ const fetchCommunitiesAPI = async () => {
     return [];
   }
 
-  let joinedCommunities = [];
+  const joinedIds = new Set();
+  const requestedIds = new Set();
 
-  for (const endpoint of joinedCommunityEndpoints) {
+  for (const endpoint of membershipEndpoints) {
     const json = await fetchJson(endpoint);
     if (!json) continue;
 
     const normalized = normalizeCommunities(json);
 
-    if (normalized.length > 0) {
-      joinedCommunities = normalized;
-      break;
-    }
+    if (normalized.length === 0) continue;
+
+    normalized.forEach((community) => {
+      if (!community?.id) return;
+
+      if (community.hasRequested && !community.isJoined) {
+        requestedIds.add(Number(community.id));
+      } else {
+        joinedIds.add(Number(community.id));
+      }
+    });
   }
 
-  const joinedIds = new Set(
-    joinedCommunities
-      .filter((c) => c && c.id)
-      .map((c) => Number(c.id))
-  );
+  const finalData = allCommunities.map((community) => {
+    const id = Number(community.id);
 
-  const finalData = allCommunities.map((community) => ({
-    ...community,
-    isJoined:
-      Boolean(community.isJoined) ||
-      joinedIds.has(Number(community.id)),
-    hasRequested:
-      Boolean(community.hasRequested),
-  }));
+    return {
+      ...community,
+      isJoined:
+        Boolean(community.isJoined) ||
+        joinedIds.has(id),
+
+      hasRequested:
+        Boolean(community.hasRequested) ||
+        requestedIds.has(id),
+    };
+  });
 
   console.log("ALL COMMUNITIES:", allCommunities);
-  console.log("JOINED COMMUNITIES:", joinedCommunities);
+  console.log("JOINED IDS:", Array.from(joinedIds));
+  console.log("REQUESTED IDS:", Array.from(requestedIds));
   console.log("FINAL COMMUNITY DATA:", finalData);
 
   return finalData;
