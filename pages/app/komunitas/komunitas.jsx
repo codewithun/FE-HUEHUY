@@ -159,55 +159,91 @@ const normalizeCommunities = (raw) => {
 ========================================= */
 
 const fetchCommunitiesAPI = async () => {
-
   const apiUrl = getApiBase();
-
   const headers = getAuthHeaders();
-
-  const endpoints = [
-
-    `${apiUrl}/api/communities`,
-
-    `${apiUrl}/api/admin/communities`,
-
-    `${apiUrl}/api/communities/with-membership`,
-  ];
-
-  for (const endpoint of endpoints) {
+  const fetchJson = async (url) => {
 
     try {
+      console.log("FETCH:", url);
+      const res = await fetch(url, { headers });
 
-      console.log("FETCH:", endpoint);
+      console.log("STATUS:", res.status, url);
 
-      const res = await fetch(endpoint, {
-        headers,
-      });
-
-      console.log("STATUS:", res.status);
-
-      if (!res.ok) continue;
-
+      if (!res.ok) return null;
       const json = await res.json();
 
-      console.log("JSON:", json);
-
-      const normalized =
-        normalizeCommunities(json);
-
-      console.log("NORMALIZED:", normalized);
-
-      if (normalized.length > 0) {
-        return normalized;
-      }
-
+      console.log("JSON:", url, json);
+      
+      return json;
     } catch (err) {
+      console.log("FETCH ERROR:", url, err);
+      return null;
+    }
+  };
 
-      console.log("FETCH ERROR:", err);
+  const allCommunityEndpoints = [
+    `${apiUrl}/api/communities`,
+    `${apiUrl}/api/admin/communities`,
+  ];
 
+  const joinedCommunityEndpoints = [
+    `${apiUrl}/api/communities/user-communities`,
+    `${apiUrl}/api/communities/with-membership`,
+    `${apiUrl}/api/admin/communities/with-membership`,
+  ];
+
+  let allCommunities = [];
+
+  for (const endpoint of allCommunityEndpoints) {
+    const json = await fetchJson(endpoint);
+    if (!json) continue;
+
+    const normalized = normalizeCommunities(json);
+
+    if (normalized.length > 0) {
+      allCommunities = normalized;
+      break;
     }
   }
 
-  return [];
+  if (allCommunities.length === 0) {
+    return [];
+  }
+
+  let joinedCommunities = [];
+
+  for (const endpoint of joinedCommunityEndpoints) {
+    const json = await fetchJson(endpoint);
+    if (!json) continue;
+
+    const normalized = normalizeCommunities(json);
+
+    if (normalized.length > 0) {
+      joinedCommunities = normalized;
+      break;
+    }
+  }
+
+  const joinedIds = new Set(
+    joinedCommunities
+      .filter((c) => c && c.id)
+      .map((c) => Number(c.id))
+  );
+
+  const finalData = allCommunities.map((community) => ({
+    ...community,
+    isJoined:
+      Boolean(community.isJoined) ||
+      joinedIds.has(Number(community.id)),
+    hasRequested:
+      Boolean(community.hasRequested),
+  }));
+
+  console.log("ALL COMMUNITIES:", allCommunities);
+  console.log("JOINED COMMUNITIES:", joinedCommunities);
+  console.log("FINAL COMMUNITY DATA:", finalData);
+
+  return finalData;
 };
 
 /* =========================================
@@ -509,62 +545,85 @@ export default function Komunitas() {
      JOIN
   ========================================= */
 
-  const handleJoinAction =
-    async (community) => {
+const handleJoinAction =
+  async (community) => {
 
-      try {
+    try {
 
-        const isPrivate =
-          community.privacy ===
-          "private";
+      const isPrivate =
+        community.privacy ===
+        "private";
 
-        if (isPrivate) {
+      if (isPrivate) {
 
-          await requestJoinCommunityAPI(
-            community.id
-          );
-
-          showNotification({
-            type: "success",
-            title:
-              "Berhasil",
-            message:
-              "Permintaan bergabung dikirim",
-          });
-
-        } else {
-
-          await joinCommunityAPI(
-            community.id
-          );
-
-          showNotification({
-            type: "success",
-            title:
-              "Berhasil",
-            message:
-              "Berhasil bergabung komunitas",
-          });
-
-        }
-
-        fetchCommunities();
-
-      } catch (err) {
-
-        console.log(err);
+        await requestJoinCommunityAPI(
+          community.id
+        );
 
         showNotification({
-          type: "error",
-          title: "Error",
-          message:
-            err.message ||
-            "Terjadi kesalahan",
+          type: "success",
+          title: "Berhasil",
+          message: "Permintaan bergabung dikirim",
         });
+
+        // Update local state supaya masuk ke Komunitas Saya sebagai pending
+        setCommunities((prev) =>
+          prev.map((item) =>
+            Number(item.id) === Number(community.id)
+              ? {
+                  ...item,
+                  hasRequested: true,
+                }
+              : item
+          )
+        );
+
+      } else {
+
+        await joinCommunityAPI(
+          community.id
+        );
+
+        showNotification({
+          type: "success",
+          title: "Berhasil",
+          message: "Berhasil bergabung komunitas",
+        });
+
+        // Update local state supaya langsung pindah dari Tersedia ke Komunitas Saya
+        setCommunities((prev) =>
+          prev.map((item) =>
+            Number(item.id) === Number(community.id)
+              ? {
+                  ...item,
+                  isJoined: true,
+                  hasRequested: false,
+                  members: Number(item.members || 0) + 1,
+                }
+              : item
+          )
+        );
 
       }
 
-    };
+      // Refresh ulang dari API buat sinkron data asli
+      fetchCommunities();
+
+    } catch (err) {
+
+      console.log(err);
+
+      showNotification({
+        type: "error",
+        title: "Error",
+        message:
+          err.message ||
+          "Terjadi kesalahan",
+      });
+
+    }
+
+  };
 
   return (
     <>
