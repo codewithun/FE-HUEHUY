@@ -845,14 +845,7 @@ function CommunityCard({
     Boolean(community.hasRequested);
 
   const handleClick = () => {
-
-    if (isJoined) {
-
-      onOpenCommunity(
-        community.id
-      );
-
-    }
+      onOpenCommunity(community.id);
   };
 
   const handleJoin = (e) => {
@@ -869,7 +862,7 @@ function CommunityCard({
 
     <div
       onClick={handleClick}
-      className="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-all"
+      className="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer"
     >
 
       {/* TOP GRADIENT */}
