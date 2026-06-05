@@ -408,6 +408,39 @@ export default function KomunitasDashboard() {
               },
             },
             {
+              type: "select",
+              construction: {
+                name: "privacy",
+                label: "Tipe Komunitas",
+                validations: { required: true },
+                options: [
+                  { label: "Public", value: "public" },
+                  { label: "Private", value: "private" },
+                ],
+              },
+            },
+            {
+              construction: {
+                name: "bg_color_1",
+                label: "Warna Background 1",
+                placeholder: "#0b2e13",
+              },
+            },
+            {
+              construction: {
+                name: "bg_color_2",
+                label: "Warna Background 2",
+                placeholder: "#14532d",
+              },
+            },
+            {
+              construction: {
+                name: "mitra_id",
+                label: "Mitra Komunitas",
+                placeholder: "Masukkan ID Mitra",
+              },
+            },
+            {
               type: "image",
               construction: {
                 name: "logo",
