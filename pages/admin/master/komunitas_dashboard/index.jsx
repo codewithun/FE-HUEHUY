@@ -113,13 +113,10 @@ export default function KomunitasDashboard() {
     abortRef.current = controller;
 
     try {
-      const res = await fetch(
-        api(`admin/communities/${row.id}/members`),
-        {
-          headers: headersJSON(),
-          signal: controller.signal,
-        }
-      );
+      const res = await fetch(api(`admin/communities/${row.id}/members`), {
+        headers: headersJSON(),
+        signal: controller.signal,
+      });
 
       const json = await res.json();
 
@@ -139,13 +136,10 @@ export default function KomunitasDashboard() {
 
   const handleMemberRequest = async (requestId, action) => {
     try {
-      const res = await fetch(
-        api(`admin/member-requests/${requestId}/${action}`),
-        {
-          method: "POST",
-          headers: headersJSON(),
-        }
-      );
+      const res = await fetch(api(`admin/member-requests/${requestId}/${action}`), {
+        method: "POST",
+        headers: headersJSON(),
+      });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -156,9 +150,7 @@ export default function KomunitasDashboard() {
       }
     } catch (e) {
       console.error("Member request error:", e);
-      alert(
-        `Gagal ${action === "approve" ? "menyetujui" : "menolak"} permintaan`
-      );
+      alert(`Gagal ${action === "approve" ? "menyetujui" : "menolak"} permintaan`);
     }
   };
 
@@ -185,6 +177,7 @@ export default function KomunitasDashboard() {
     e.preventDefault();
 
     const email = memberEmail.trim();
+
     if (!activeCommunity?.id) {
       setMemberAddError("Komunitas belum dipilih.");
       return;
@@ -222,73 +215,89 @@ export default function KomunitasDashboard() {
     }
   };
 
-
   /* =============================
      CREATE / UPDATE
   ============================= */
-const submitCommunity = async ({ payload, isUpdate, row }) => {
-  let body;
-  let headers;
+  const submitCommunity = async ({ payload, isUpdate, row }) => {
+    let body;
+    let headers;
 
-  const cleanPayload = {
-    ...payload,
-    privacy: payload.privacy || "public",
-    world_type: payload.privacy || "public",
-    is_private: payload.privacy === "private" ? 1 : 0,
-    bg_color_1: payload.bg_color_1 || "#0b2e13",
-    bg_color_2: payload.bg_color_2 || "#14532d",
-  };
+    /*
+      Kolom communities yang tersedia:
+      - name
+      - description
+      - logo
+      - bg_color_1
+      - bg_color_2
+      - world_type
+      - is_active
 
-  if (!cleanPayload.mitra_id) {
-    delete cleanPayload.mitra_id;
-  }
+      Jangan kirim:
+      - privacy
+      - is_private
+      - mitra_id
 
-  if (cleanPayload.logo instanceof File) {
-    const form = new FormData();
+      Karena field tersebut belum ada di tabel communities dan bisa menyebabkan 500.
+    */
+    const cleanPayload = {
+      name: payload.name || "",
+      description: payload.description || "",
+      logo: payload.logo,
+      bg_color_1: payload.bg_color_1 || "#0b2e13",
+      bg_color_2: payload.bg_color_2 || "#14532d",
+      world_type: payload.privacy || payload.world_type || "public",
+      is_active: 1,
+    };
 
-    if (isUpdate) form.append("_method", "PUT");
+    if (cleanPayload.logo instanceof File) {
+      const form = new FormData();
 
-    Object.keys(cleanPayload).forEach((k) => {
-      if (k === "logo") {
-        form.append("logo", cleanPayload.logo);
-      } else {
-        form.append(k, cleanPayload[k] ?? "");
-      }
+      if (isUpdate) form.append("_method", "PUT");
+
+      Object.keys(cleanPayload).forEach((key) => {
+        if (key === "logo") {
+          form.append("logo", cleanPayload.logo);
+        } else {
+          form.append(key, cleanPayload[key] ?? "");
+        }
+      });
+
+      body = form;
+      headers = headersMultipart();
+    } else {
+      const jsonPayload = { ...cleanPayload };
+      delete jsonPayload.logo;
+
+      body = JSON.stringify(jsonPayload);
+      headers = headersJSON();
+    }
+
+    const url = isUpdate
+      ? api(`admin/communities/${row.id}`)
+      : api("admin/communities");
+
+    const method = cleanPayload.logo instanceof File
+      ? "POST"
+      : isUpdate
+        ? "PUT"
+        : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers,
+      body,
     });
 
-    body = form;
-    headers = headersMultipart();
-  } else {
-    body = JSON.stringify(cleanPayload);
-    headers = headersJSON();
-  }
+    const json = await res.json().catch(() => ({}));
 
-  const url = isUpdate
-    ? api(`admin/communities/${row.id}`)
-    : api("admin/communities");
+    if (!res.ok) {
+      console.error("Submit community error:", json);
+      throw new Error(json?.message || "Submit gagal");
+    }
 
-  const method = cleanPayload.logo instanceof File
-    ? "POST"
-    : isUpdate
-      ? "PUT"
-      : "POST";
-
-  const res = await fetch(url, {
-    method,
-    headers,
-    body,
-  });
-
-  const json = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    console.error("Submit community error:", json);
-    throw new Error(json?.message || "Submit gagal");
-  }
-
-  setRefresh((s) => !s);
-  return true;
-};
+    setRefresh((s) => !s);
+    return true;
+  };
 
   /* =============================
      TABLE COLUMN
@@ -297,19 +306,40 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
     {
       selector: "name",
       label: "Nama",
-      item: (r) => <b>{r.name}</b>,
+      item: (row) => <b>{row.name}</b>,
     },
     {
       selector: "description",
       label: "Deskripsi",
-      item: (r) => r.description || "-",
+      item: (row) => row.description || "-",
+    },
+    {
+      selector: "world_type",
+      label: "Tipe",
+      item: (row) => row.world_type || "-",
+    },
+    {
+      selector: "bg_color_1",
+      label: "Background",
+      item: (row) => (
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block h-5 w-5 rounded border"
+            style={{ backgroundColor: row.bg_color_1 || "#0b2e13" }}
+          />
+          <span
+            className="inline-block h-5 w-5 rounded border"
+            style={{ backgroundColor: row.bg_color_2 || "#14532d" }}
+          />
+        </div>
+      ),
     },
     {
       selector: "logo",
       label: "Logo",
-      item: (r) =>
-        buildCommunityLogoSrc(r.logo) ? (
-          <Image src={buildCommunityLogoSrc(r.logo)} width={40} height={40} alt="" />
+      item: (row) =>
+        buildCommunityLogoSrc(row.logo) ? (
+          <Image src={buildCommunityLogoSrc(row.logo)} width={40} height={40} alt="" />
         ) : "-",
     },
   ], []);
@@ -336,12 +366,12 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
       item: (row) =>
         row.joined_at
           ? new Date(row.joined_at).toLocaleDateString("id-ID", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
           : "-",
     },
   ], []);
@@ -372,12 +402,12 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
       item: (row) =>
         row.created_at
           ? new Date(row.created_at).toLocaleDateString("id-ID", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
           : "-",
     },
   ], []);
@@ -457,9 +487,9 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
             },
             {
               construction: {
-                name: "mitra_id",
+                name: "mitra_display",
                 label: "Mitra Komunitas",
-                placeholder: "Masukkan ID Mitra",
+                placeholder: "Belum terhubung ke backend",
               },
             },
             {
@@ -515,6 +545,7 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
                     loading={memberAddLoading}
                   />
                 </div>
+
                 {memberAddError ? (
                   <p className="mt-2 text-sm text-red-600">{memberAddError}</p>
                 ) : (
@@ -557,7 +588,7 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
               setToRefresh={memberRequestRefresh}
               customTopBar={<div />}
               fetchControl={{
-                url: api(`admin/communities/${activeCommunity?.id || ''}/member-requests`),
+                url: api(`admin/communities/${activeCommunity?.id || ""}/member-requests`),
                 headers: headersJSON,
               }}
               columnControl={{ custom: requestColumns }}
