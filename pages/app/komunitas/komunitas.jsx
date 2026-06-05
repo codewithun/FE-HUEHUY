@@ -1003,25 +1003,36 @@ function CommunityCard({
   onOpenCommunity,
   onJoinRequest,
 }) {
-  const isPrivate = community.privacy === "private";
+  const rawPrivacy = String(community?.privacy || "").toLowerCase();
+
+  const isPrivate =
+    rawPrivacy === "private" ||
+    rawPrivacy === "pribadi";
+
   const isJoined = Boolean(community.isJoined);
   const hasRequested = Boolean(community.hasRequested);
 
-  // Card tetap bisa diklik untuk masuk detail komunitas
+  // Klik area card tetap membuka detail komunitas
   const handleClick = () => {
     onOpenCommunity(community.id);
   };
 
-  const handleJoin = (e) => {
+  // Tombol gabung/request tidak boleh ikut trigger click card
+  const stopCardClick = (e) => {
+    e.preventDefault();
     e.stopPropagation();
+  };
+
+  const handleJoin = async (e) => {
+    stopCardClick(e);
 
     if (isJoined || hasRequested) return;
 
-    onJoinRequest(community);
+    await onJoinRequest(community);
   };
 
   const handleEnter = (e) => {
-    e.stopPropagation();
+    stopCardClick(e);
     onOpenCommunity(community.id);
   };
 
@@ -1110,14 +1121,18 @@ function CommunityCard({
 
             {isJoined ? (
               <button
+                type="button"
                 onClick={handleEnter}
+                onMouseDown={stopCardClick}
                 className="px-4 py-2 rounded-lg bg-green-100 text-green-700 text-sm font-medium"
               >
                 Masuk
               </button>
             ) : hasRequested ? (
               <button
-                onClick={(e) => e.stopPropagation()}
+                type="button"
+                onClick={stopCardClick}
+                onMouseDown={stopCardClick}
                 className="px-4 py-2 rounded-lg bg-yellow-100 text-yellow-700 text-sm font-medium flex items-center gap-1"
               >
                 <FontAwesomeIcon icon={faClock} className="text-xs" />
@@ -1125,11 +1140,16 @@ function CommunityCard({
               </button>
             ) : (
               <button
+                type="button"
                 onClick={handleJoin}
+                onMouseDown={stopCardClick}
                 className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-1"
               >
-                <FontAwesomeIcon icon={isPrivate ? faUsers : faPlus} className="text-xs" />
-                {isPrivate ? "Minta" : "Gabung"}
+                <FontAwesomeIcon
+                  icon={isPrivate ? faUsers : faPlus}
+                  className="text-xs"
+                />
+                {isPrivate ? "Minta Bergabung" : "Gabung"}
               </button>
             )}
           </div>
