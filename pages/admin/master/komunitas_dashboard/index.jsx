@@ -226,47 +226,69 @@ export default function KomunitasDashboard() {
   /* =============================
      CREATE / UPDATE
   ============================= */
-  const submitCommunity = async ({ payload, isUpdate, row }) => {
-    let body;
-    let headers;
+const submitCommunity = async ({ payload, isUpdate, row }) => {
+  let body;
+  let headers;
 
-    if (payload.logo instanceof File) {
-      const form = new FormData();
+  const cleanPayload = {
+    ...payload,
+    privacy: payload.privacy || "public",
+    world_type: payload.privacy || "public",
+    is_private: payload.privacy === "private" ? 1 : 0,
+    bg_color_1: payload.bg_color_1 || "#0b2e13",
+    bg_color_2: payload.bg_color_2 || "#14532d",
+  };
 
-      if (isUpdate) form.append("_method", "PUT");
+  if (!cleanPayload.mitra_id) {
+    delete cleanPayload.mitra_id;
+  }
 
-      Object.keys(payload).forEach((k) => {
-        if (k === "logo") {
-          form.append("logo", payload.logo);
-        } else {
-          form.append(k, payload[k] ?? "");
-        }
-      });
+  if (cleanPayload.logo instanceof File) {
+    const form = new FormData();
 
-      body = form;
-      headers = headersMultipart();
-    } else {
-      body = JSON.stringify(payload);
-      headers = headersJSON();
-    }
+    if (isUpdate) form.append("_method", "PUT");
 
-    const url = isUpdate
-      ? api(`admin/communities/${row.id}`)
-      : api("admin/communities");
-
-    const method = payload.logo instanceof File ? "POST" : isUpdate ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-      method,
-      headers,
-      body,
+    Object.keys(cleanPayload).forEach((k) => {
+      if (k === "logo") {
+        form.append("logo", cleanPayload.logo);
+      } else {
+        form.append(k, cleanPayload[k] ?? "");
+      }
     });
 
-    if (!res.ok) throw new Error("Submit gagal");
+    body = form;
+    headers = headersMultipart();
+  } else {
+    body = JSON.stringify(cleanPayload);
+    headers = headersJSON();
+  }
 
-    setRefresh((s) => !s);
-    return true;
-  };
+  const url = isUpdate
+    ? api(`admin/communities/${row.id}`)
+    : api("admin/communities");
+
+  const method = cleanPayload.logo instanceof File
+    ? "POST"
+    : isUpdate
+      ? "PUT"
+      : "POST";
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body,
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    console.error("Submit community error:", json);
+    throw new Error(json?.message || "Submit gagal");
+  }
+
+  setRefresh((s) => !s);
+  return true;
+};
 
   /* =============================
      TABLE COLUMN
