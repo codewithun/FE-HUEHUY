@@ -218,86 +218,76 @@ export default function KomunitasDashboard() {
   /* =============================
      CREATE / UPDATE
   ============================= */
-  const submitCommunity = async ({ payload, isUpdate, row }) => {
-    let body;
-    let headers;
+const submitCommunity = async ({ payload, isUpdate, row }) => {
+  let body;
+  let headers;
 
-    /*
-      Kolom communities yang tersedia:
-      - name
-      - description
-      - logo
-      - bg_color_1
-      - bg_color_2
-      - world_type
-      - is_active
+  const cleanPayload = {
+    name: payload.name || "",
+    description: payload.description || "",
+    logo: payload.logo,
 
-      Jangan kirim:
-      - privacy
-      - is_private
-      - mitra_id
+    // sesuai backend/database
+    bg_color_1: payload.bg_color_1 || "#0b2e13",
+    bg_color_2: payload.bg_color_2 || "#14532d",
+    world_type: payload.world_type || "public",
+    is_active: 1,
+  };
 
-      Karena field tersebut belum ada di tabel communities dan bisa menyebabkan 500.
-    */
-    const cleanPayload = {
-      name: payload.name || "",
-      description: payload.description || "",
-      logo: payload.logo,
-      bg_color_1: payload.bg_color_1 || "#0b2e13",
-      bg_color_2: payload.bg_color_2 || "#14532d",
-      world_type: payload.privacy || payload.world_type || "public",
-      is_active: 1,
-    };
+  // Mitra di backend namanya corporate_id, bukan mitra_id
+  if (payload.corporate_id) {
+    cleanPayload.corporate_id = payload.corporate_id;
+  }
 
-    if (cleanPayload.logo instanceof File) {
-      const form = new FormData();
+  if (cleanPayload.logo instanceof File) {
+    const form = new FormData();
 
-      if (isUpdate) form.append("_method", "PUT");
+    if (isUpdate) form.append("_method", "PUT");
 
-      Object.keys(cleanPayload).forEach((key) => {
-        if (key === "logo") {
-          form.append("logo", cleanPayload.logo);
-        } else {
-          form.append(key, cleanPayload[key] ?? "");
-        }
-      });
-
-      body = form;
-      headers = headersMultipart();
-    } else {
-      const jsonPayload = { ...cleanPayload };
-      delete jsonPayload.logo;
-
-      body = JSON.stringify(jsonPayload);
-      headers = headersJSON();
-    }
-
-    const url = isUpdate
-      ? api(`admin/communities/${row.id}`)
-      : api("admin/communities");
-
-    const method = cleanPayload.logo instanceof File
-      ? "POST"
-      : isUpdate
-        ? "PUT"
-        : "POST";
-
-    const res = await fetch(url, {
-      method,
-      headers,
-      body,
+    Object.keys(cleanPayload).forEach((key) => {
+      if (key === "logo") {
+        form.append("logo", cleanPayload.logo);
+      } else {
+        form.append(key, cleanPayload[key] ?? "");
+      }
     });
 
-    const json = await res.json().catch(() => ({}));
+    body = form;
+    headers = headersMultipart();
+  } else {
+    const jsonPayload = { ...cleanPayload };
+    delete jsonPayload.logo;
 
-    if (!res.ok) {
-      console.error("Submit community error:", json);
-      throw new Error(json?.message || "Submit gagal");
-    }
+    body = JSON.stringify(jsonPayload);
+    headers = headersJSON();
+  }
 
-    setRefresh((s) => !s);
-    return true;
-  };
+  const url = isUpdate
+    ? api(`admin/communities/${row.id}`)
+    : api("admin/communities");
+
+  const method = cleanPayload.logo instanceof File
+    ? "POST"
+    : isUpdate
+      ? "PUT"
+      : "POST";
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body,
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    console.error("Submit community error:", json);
+    throw new Error(json?.message || "Submit gagal");
+  }
+
+  setRefresh((s) => !s);
+  return true;
+};
 
   /* =============================
      TABLE COLUMN
@@ -442,65 +432,65 @@ export default function KomunitasDashboard() {
             />
           ),
         }}
-        formControl={{
-          submit: submitCommunity,
-          custom: [
-            {
-              construction: {
-                name: "name",
-                label: "Nama",
-                validations: { required: true },
-              },
-            },
-            {
-              type: "textarea",
-              construction: {
-                name: "description",
-                label: "Deskripsi",
-              },
-            },
-            {
-              type: "select",
-              construction: {
-                name: "privacy",
-                label: "Tipe Komunitas",
-                validations: { required: true },
-                options: [
-                  { label: "Public", value: "public" },
-                  { label: "Private", value: "private" },
-                ],
-              },
-            },
-            {
-              construction: {
-                name: "bg_color_1",
-                label: "Warna Background 1",
-                placeholder: "#0b2e13",
-              },
-            },
-            {
-              construction: {
-                name: "bg_color_2",
-                label: "Warna Background 2",
-                placeholder: "#14532d",
-              },
-            },
-            {
-              construction: {
-                name: "mitra_display",
-                label: "Mitra Komunitas",
-                placeholder: "Belum terhubung ke backend",
-              },
-            },
-            {
-              type: "image",
-              construction: {
-                name: "logo",
-                label: "Logo",
-              },
-            },
-          ],
-        }}
+formControl={{
+  submit: submitCommunity,
+  custom: [
+    {
+      construction: {
+        name: "name",
+        label: "Nama",
+        validations: { required: true },
+      },
+    },
+    {
+      type: "textarea",
+      construction: {
+        name: "description",
+        label: "Deskripsi",
+      },
+    },
+    {
+      type: "select",
+      construction: {
+        name: "world_type",
+        label: "Tipe Komunitas",
+        validations: { required: true },
+        options: [
+          { label: "Public", value: "public" },
+          { label: "Private", value: "private" },
+        ],
+      },
+    },
+    {
+      construction: {
+        name: "bg_color_1",
+        label: "Warna Background 1",
+        placeholder: "#0b2e13",
+      },
+    },
+    {
+      construction: {
+        name: "bg_color_2",
+        label: "Warna Background 2",
+        placeholder: "#14532d",
+      },
+    },
+    {
+      construction: {
+        name: "corporate_id",
+        label: "Mitra Komunitas",
+        placeholder: "Masukkan ID Mitra",
+      },
+    },
+    {
+      type: "image",
+      construction: {
+        name: "logo",
+        label: "Logo",
+      },
+    },
+  ],
+}}
       />
 
       {/* MEMBER MODAL */}
