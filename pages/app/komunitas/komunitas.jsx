@@ -1018,7 +1018,7 @@ function CommunityCard({
   const hasRequested = Boolean(community.hasRequested);
 
   const handleCardClick = (e) => {
-    // Kalau klik dari area tombol, jangan buka detail komunitas
+    // Kalau klik dari area tombol/status, jangan buka detail komunitas
     if (e.target.closest("[data-community-action='true']")) {
       return;
     }
@@ -1035,13 +1035,6 @@ function CommunityCard({
     await onJoinRequest(community);
   };
 
-  const handleEnter = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    onOpenCommunity(community.id);
-  };
-
   const handleWaiting = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1051,6 +1044,7 @@ function CommunityCard({
     <div
       onClick={handleCardClick}
       className="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer"
+      title="Klik card untuk melihat detail komunitas"
     >
       <div
         className="h-3"
@@ -1132,18 +1126,21 @@ function CommunityCard({
 
             <div data-community-action="true">
               {isJoined ? (
-                <button
-                  type="button"
-                  onClick={handleEnter}
-                  className="px-4 py-2 rounded-lg bg-green-100 text-green-700 text-sm font-medium"
+                <span
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  className="inline-flex items-center px-4 py-2 rounded-lg bg-green-100 text-green-700 text-sm font-medium border border-green-200"
                 >
-                  Masuk
-                </button>
+                  <FontAwesomeIcon icon={faCheckCircle} className="mr-1 text-xs" />
+                  Anggota
+                </span>
               ) : hasRequested ? (
                 <button
                   type="button"
                   onClick={handleWaiting}
-                  className="px-4 py-2 rounded-lg bg-yellow-100 text-yellow-700 text-sm font-medium flex items-center gap-1"
+                  className="px-4 py-2 rounded-lg bg-yellow-100 text-yellow-700 text-sm font-medium flex items-center gap-1 border border-yellow-200"
                 >
                   <FontAwesomeIcon icon={faClock} className="text-xs" />
                   Menunggu
@@ -1152,7 +1149,7 @@ function CommunityCard({
                 <button
                   type="button"
                   onClick={handleJoin}
-                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-1"
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-1 hover:bg-primary/90 transition-colors"
                 >
                   <FontAwesomeIcon
                     icon={isPrivate ? faUsers : faPlus}
