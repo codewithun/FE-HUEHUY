@@ -145,12 +145,20 @@ const normalizeCommunities = (raw) => {
       }
     }
 
-    const statusRaw =
-      item.status ||
-      item.member_status ||
-      item.request_status ||
-      c.status ||
-      "";
+    const isMembershipItem =
+      Boolean(item?.community) ||
+      Boolean(item?.community_id) ||
+      Boolean(item?.member_status) ||
+      Boolean(item?.request_status);
+      
+    const statusRaw = isMembershipItem
+      ? (
+          item.status ||
+          item.member_status ||
+          item.request_status ||
+          ""
+        )
+  : "";
 
     const status =
       String(statusRaw || "").toLowerCase();
@@ -323,15 +331,17 @@ const fetchCommunitiesAPI = async () => {
 
     if (normalized.length === 0) continue;
 
-    normalized.forEach((community) => {
-      if (!community?.id) return;
+  normalized.forEach((community) => {
+    if (!community?.id) return;
 
-      if (community.hasRequested && !community.isJoined) {
-        requestedIds.add(Number(community.id));
-      } else {
-        joinedIds.add(Number(community.id));
-      }
-    });
+    if (community.isJoined) {
+      joinedIds.add(Number(community.id));
+    }
+
+    if (community.hasRequested && !community.isJoined) {
+      requestedIds.add(Number(community.id));
+    }
+  });
   }
 
   const finalData = allCommunities.map((community) => {
