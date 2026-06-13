@@ -975,10 +975,20 @@ try {
         }
       }
 
-      // 1) Mode normal: Coba dari CubeController (pakai cube id)
-      response = await get({ path: `admin/cubes/${effectivePromoId}` });
+      // 1) Mode normal dari HOME: Coba dari CubeController hanya kalau BUKAN promo komunitas
+      const activeCommunityId =
+        communityId ||
+        initialCommunityId ||
+        router.query.communityId;
 
-      if (response?.status === 200 && (response?.data?.data || response?.data)) {
+      const isCommunityPromo =
+        activeCommunityId &&
+        activeCommunityId !== 'promo-entry';
+
+      if (!isCommunityPromo) {
+        response = await get({ path: `admin/cubes/${effectivePromoId}` });
+
+        if (response?.status === 200 && (response?.data?.data || response?.data)) {
         const cube = response.data?.data || response.data;
         const ads = Array.isArray(cube?.ads) ? cube.ads : [];
         const ad = ads.find(a => a?.status === 'active') || ads[0] || null;
@@ -1062,7 +1072,7 @@ try {
         setPromoData(transformed);
         return transformed;
       }
-
+    }
       // 2) Fallback: coba endpoint ads langsung jika ada
       response = await get({ path: `admin/ads/${effectivePromoId}` });
       if (response?.status === 200 && (response?.data?.data || response?.data)) {
