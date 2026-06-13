@@ -63,6 +63,45 @@ export default function CommunityProfile() {
   const [loadingProfile, setLoadingProfile] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const getApiBase = () => {
+  return (apiUrl || 'http://localhost:8000/api')
+    .replace(/\/api\/?$/, '')
+    .replace(/\/+$/, '');
+};
+
+const buildProfileImageUrl = (raw) => {
+  if (!raw || typeof raw !== 'string') {
+    return '/avatar.jpg';
+  }
+
+  let url = raw.trim();
+
+  if (!url) {
+    return '/avatar.jpg';
+  }
+
+  if (
+    /^\/?api\/placeholder\//i.test(url) ||
+    /^placeholder\//i.test(url)
+  ) {
+    return '/avatar.jpg';
+  }
+
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  if (/^data:/i.test(url)) {
+    return url;
+  }
+
+  let path = url
+    .replace(/^\/+/, '')
+    .replace(/^api\/storage\//i, 'storage/')
+    .replace(/^storage\//i, '');
+
+  return `${getApiBase()}/storage/${path}`;
+};
 
   // Ambil ID efektif dari query ('id' / 'communityId')
   const effectiveCommunityId = useMemo(() => {
@@ -178,7 +217,16 @@ export default function CommunityProfile() {
           setUserData({
             name: profile?.name || profile?.full_name || userData.name,
             email: profile?.email || profile?.contact_email || userData.email,
-            avatar: profile?.picture_source || profile?.avatar || userData.avatar,
+            avatar:
+              profile?.picture_source ||
+              profile?.avatar ||
+              profile?.photo ||
+              profile?.image ||
+              profile?.profile_photo ||
+              profile?.profile_picture ||
+              profile?.user?.picture_source ||
+              profile?.user?.avatar ||
+              userData.avatar,
             promoCount: profile?.promoCount ?? userData.promoCount
           });
         }
@@ -434,11 +482,14 @@ export default function CommunityProfile() {
               ) : (
                 <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
                   <img
-                    src={resolveUserImageUrl({ picture_source: userData.avatar }) || '/avatar.jpg'}
+                    src={buildProfileImageUrl(userData.avatar)}
                     width={64}
                     height={64}
-                    alt={userData.name}
+                    alt={userData.name || 'Profile'}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = '/avatar.jpg';
+                    }}
                   />
                 </div>
               )}
