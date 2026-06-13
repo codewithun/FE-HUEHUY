@@ -981,11 +981,22 @@ try {
         initialCommunityId ||
         router.query.communityId;
 
+      const source =
+        router.query.source ||
+        router.query.from;
+          
       const isCommunityPromo =
         activeCommunityId &&
         activeCommunityId !== 'promo-entry';
-
-      if (!isCommunityPromo) {
+          
+      const isHomePromo =
+        source === 'home';
+          
+      const shouldFetchCubeFirst =
+        !isCommunityPromo &&
+        !isHomePromo;
+          
+      if (shouldFetchCubeFirst) {
         response = await get({ path: `admin/cubes/${effectivePromoId}` });
 
         if (response?.status === 200 && (response?.data?.data || response?.data)) {
