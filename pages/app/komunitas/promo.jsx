@@ -443,39 +443,66 @@ const CommunityPromoPage = () => {
 
       setAuthHeaders(headers);
 
-      const res = await fetch(
+      const urls = [
+        `${apiBase}/api/admin/dynamic-content?type=promo&community_id=${communityId}`,
         `${apiBase}/api/admin/dynamic-content?type=hunting&community_id=${communityId}`,
-        {
-          headers,
-        }
-      );
+        `${apiBase}/api/admin/dynamic-content?type=information&community_id=${communityId}`,
+        `${apiBase}/api/admin/dynamic-content?community_id=${communityId}`,
+      ];
 
-      if (!res.ok) {
-        setWidgetData([]);
-        setAdCategories([]);
-        return;
+      const results = [];
+
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { headers });
+
+          if (!res.ok) continue;
+
+          const json = await res.json();
+
+          const data = Array.isArray(json?.data)
+            ? json.data
+            : Array.isArray(json)
+            ? json
+            : [];
+
+          results.push(...data);
+        } catch (err) {
+          console.log("Fetch widget error:", url, err);
+        }
       }
 
-      const json = await res.json();
+      const uniqueMap = new Map();
 
-      let widgets = Array.isArray(json?.data)
-        ? json.data
-        : Array.isArray(json)
-          ? json
-          : [];
+      results.forEach((item) => {
+        if (!item?.id) return;
+        uniqueMap.set(item.id, item);
+      });
+
+      let widgets = [...uniqueMap.values()];
 
       widgets = widgets
         .filter((w) => {
           const type = String(w.type || '').toLowerCase();
+          const sourceType = String(w.source_type || '').toLowerCase();
+          const contentType = String(w.content_type || '').toLowerCase();
 
           return (
             type === 'promo' ||
             type === 'hunting' ||
             type === 'iklan' ||
-            type === 'advertising'
+            type === 'advertising' ||
+            type === 'information' ||
+            contentType === 'promo' ||
+            contentType === 'category_box' ||
+            sourceType === 'category_box' ||
+            Array.isArray(w.dynamic_content_cubes)
           );
         })
-        .filter((w) => w?.is_active)
+        .filter((w) => {
+          if (typeof w.is_active === 'undefined') return true;
+          return Boolean(w.is_active);
+        })
         .sort((a, b) => (a.level || 0) - (b.level || 0));
 
       const categoryBoxWidgets = widgets.filter(
@@ -490,9 +517,7 @@ const CommunityPromoPage = () => {
       if (categoryBoxWidgets.length > 0) {
         const adCatRes = await fetch(
           `${apiBase}/api/admin/options/ad-category?community_id=${communityId}&full=1`,
-          {
-            headers,
-          }
+          { headers }
         );
 
         if (adCatRes.ok) {
@@ -501,12 +526,14 @@ const CommunityPromoPage = () => {
           const adCats = Array.isArray(adCatJson?.data)
             ? adCatJson.data
             : Array.isArray(adCatJson)
-              ? adCatJson
-              : [];
+            ? adCatJson
+            : [];
 
           setAdCategories(adCats);
         }
       }
+
+      console.log("PROMO COMMUNITY WIDGETS:", widgets);
 
       setWidgetData(widgets);
     } catch (error) {
@@ -515,7 +542,7 @@ const CommunityPromoPage = () => {
       setAdCategories([]);
     }
   };
-
+  
   const getCommunityGradient = (bgColor1, bgColor2) => {
     if (bgColor1 && bgColor2) {
       return {
