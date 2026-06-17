@@ -375,6 +375,114 @@ export default function PromoDetailUnified({ initialPromo = null, currentUrl = '
   const [showDetailExpanded, setShowDetailExpanded] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(router.query.from === 'saku' && router.query.claimed === 'true');
+  const getCurrentUserIdFromApi = async (token) => {
+  try {
+    const rawApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    const apiUrl = rawApi.replace(/\/+$/, '');
+
+    const res = await fetch(`${apiUrl}/account`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) return null;
+
+    const json = await res.json();
+
+    const profile =
+      json?.data?.profile ||
+      json?.data?.user ||
+      json?.data ||
+      json?.profile ||
+      json?.user ||
+      json ||
+      {};
+
+    return (
+      profile?.id ||
+      profile?.user_id ||
+      profile?.account_id ||
+      profile?.profile?.id ||
+      profile?.user?.id ||
+      null
+    );
+  } catch (err) {
+    console.warn('Gagal mengambil user login:', err);
+    return null;
+  }
+};
+
+const getPromoOwnerIds = (promo) => {
+  if (!promo) return [];
+
+  const ids = [
+    // top-level
+    promo?.user_id,
+    promo?.owner_id,
+    promo?.created_by,
+    promo?.creator_id,
+    promo?.account_id,
+
+    // raw ad
+    promo?.rawAd?.user_id,
+    promo?.rawAd?.owner_id,
+    promo?.rawAd?.created_by,
+    promo?.rawAd?.creator_id,
+    promo?.rawAd?.account_id,
+    promo?.rawAd?.user?.id,
+    promo?.rawAd?.owner?.id,
+    promo?.rawAd?.creator?.id,
+
+    // raw cube
+    promo?.rawCube?.user_id,
+    promo?.rawCube?.owner_id,
+    promo?.rawCube?.created_by,
+    promo?.rawCube?.creator_id,
+    promo?.rawCube?.account_id,
+    promo?.rawCube?.user?.id,
+    promo?.rawCube?.owner?.id,
+    promo?.rawCube?.creator?.id,
+
+    // raw promo
+    promo?.rawPromo?.user_id,
+    promo?.rawPromo?.owner_id,
+    promo?.rawPromo?.created_by,
+    promo?.rawPromo?.creator_id,
+    promo?.rawPromo?.account_id,
+    promo?.rawPromo?.user?.id,
+    promo?.rawPromo?.owner?.id,
+    promo?.rawPromo?.creator?.id,
+
+    // seller fallback
+    promo?.seller?.id,
+    promo?.seller?.user_id,
+  ];
+
+  return ids
+    .filter((id) => id !== null && typeof id !== 'undefined' && String(id).trim() !== '')
+    .map((id) => String(id));
+};
+
+const isPromoOwner = async (token, promo) => {
+  const currentUserId = await getCurrentUserIdFromApi(token);
+  if (!currentUserId) return false;
+
+  const ownerIds = getPromoOwnerIds(promo);
+
+  console.log('🔒 Check owner promo:', {
+    currentUserId,
+    ownerIds,
+    promoId: promo?.id,
+    title: promo?.title,
+  });
+
+  return ownerIds.includes(String(currentUserId));
+};
+
 
   // State untuk mencegah multiple redirects dan rate limiting
   const [hasTriedAuth, setHasTriedAuth] = useState(false);
@@ -851,6 +959,9 @@ try {
 
             const transformedData = {
               id: promo.id,
+              user_id: promo?.user_id || promo?.owner_id || promo?.created_by || promo?.user?.id || promo?.owner?.id || null,
+              owner_id: promo?.owner_id || promo?.user_id || promo?.created_by || promo?.user?.id || promo?.owner?.id || null,
+              created_by: promo?.created_by || null,
               title: promo.title,
               merchant: promo.owner_name || 'Merchant',
               images: imageUrls,
@@ -887,7 +998,7 @@ try {
                 phone: promo.owner_contact || ''
               },
               terms: 'TERM & CONDITIONS APPLY',
-              categoryLabel: getCategoryLabel(promo, promo.cube),
+              categoryLabel: getCategoryLabel(data, data.cube || null),
               link_information: promo.online_store_link || null,
               rawAd: null,
               rawPromo: promo,
@@ -925,6 +1036,9 @@ try {
 
           const transformedData = {
             id: data.id,
+            user_id: data?.user_id || data?.owner_id || data?.created_by || data?.user?.id || data?.owner?.id || null,
+            owner_id: data?.owner_id || data?.user_id || data?.created_by || data?.user?.id || data?.owner?.id || null,
+            created_by: data?.created_by || null,
             title: data.title,
             merchant: data.owner_name || 'Merchant',
             images: imageUrls,
@@ -958,7 +1072,7 @@ try {
               phone: data.owner_contact || ''
             },
             terms: 'TERM & CONDITIONS APPLY',
-            categoryLabel: getCategoryLabel(promo, promo.cube),
+            categoryLabel: getCategoryLabel(data, data.cube || null),
             link_information: data.online_store_link || null,
             rawAd: null,
             rawPromo: data,
@@ -1038,6 +1152,9 @@ try {
 
         const transformed = {
           id: ad?.id || cube?.id,
+          user_id: ad?.user_id || cube?.user_id || cube?.user?.id || null,
+          owner_id: ad?.owner_id || cube?.owner_id || cube?.user?.id || null,
+          created_by: ad?.created_by || cube?.created_by || null,
           title: ad?.title || cube?.label || 'Promo',
           merchant: ad?.merchant || cube?.user?.name || cube?.corporate?.name || 'Merchant',
           images: imageUrls,
@@ -1156,6 +1273,9 @@ try {
         const transformed = {
           id: ad?.id,
           title: ad?.title || 'Promo',
+          user_id: ad?.user_id || ad?.cube?.user_id || ad?.cube?.user?.id || null,
+          owner_id: ad?.owner_id || ad?.cube?.owner_id || ad?.cube?.user?.id || null,
+          created_by: ad?.created_by || ad?.cube?.created_by || null,
           merchant: ad?.merchant || cubeInfo.sellerName || 'Merchant',
           images: imageUrls,
           image: imageUrls[0], // Keep for backward compatibility
@@ -1226,6 +1346,9 @@ try {
 
         const transformedData = {
           id: data.id,
+          user_id: data?.user_id || data?.owner_id || data?.created_by || data?.user?.id || data?.owner?.id || null,
+          owner_id: data?.owner_id || data?.user_id || data?.created_by || data?.user?.id || data?.owner?.id || null,
+          created_by: data?.created_by || null,
           title: data.title,
           merchant: data.owner_name || 'Merchant',
           images: imageUrls,
@@ -1820,7 +1943,7 @@ try {
       const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        ...authHeader()
+        ...authHeader(),
       };
 
       const reportData = {
@@ -1909,6 +2032,13 @@ try {
         return;
       }
 
+      const ownerBlocked = await isPromoOwner(token, promoData);
+
+      if (ownerBlocked) {
+        setErrorMessage('Pemilik promo tidak dapat mengambil promo miliknya sendiri.');
+        setShowErrorModal(true);
+        return;
+      }
       // Single check for claimed status - reduce API calls
       const headers = {
         'Content-Type': 'application/json',
