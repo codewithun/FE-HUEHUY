@@ -1106,9 +1106,13 @@ try {
       const isHomePromo =
         source === 'home';
           
+      const isSearchPromo =
+        source === 'search';
+
       const shouldFetchCubeFirst =
         !isCommunityPromo &&
-        !isHomePromo;
+        !isHomePromo &&
+        !isSearchPromo;
           
       if (shouldFetchCubeFirst) {
         response = await get({ path: `admin/cubes/${effectivePromoId}` });

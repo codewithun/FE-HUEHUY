@@ -190,11 +190,11 @@ export default function Cari() {
                   ?.filter(isPromoOnly)
                   ?.map((item, key) => {
                     // Untuk konsistensi, gunakan routing promo langsung
-                    const promoUrl = `/app/komunitas/promo/${item?.id}?source=search`;
+                    const promoUrl = `/app/komunitas/promo/${item?.id}?source=home`;
                     const thumb = getAdImage(item);
 
                     return (
-                      <Link href={promoUrl} key={key}>
+                      <Link href={promoUrl} key={item?.id || key}>
                         <div className="grid grid-cols-4 gap-3 p-3 shadow-sm rounded-[15px] relative bg-white bg-opacity-40 backdrop-blur-sm">
                           <div className="w-full aspect-square overflow-hidden rounded-lg bg-slate-200 flex justify-center items-center">
                             {thumb ? (
