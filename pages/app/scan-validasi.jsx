@@ -218,11 +218,32 @@ export default function ScanValidasi() {
         return { code, type: urlMatch[1], isStructured: false };
       }
 
-      const codeMatch = qrResult.match(/[?&]code=([^&]+)/);
-      if (codeMatch) {
-        const code = decodeURIComponent(codeMatch[1]);
-        dlog('✅ Extracted code from URL query:', code);
-        return { code, type: 'unknown', isStructured: false };
+      try {
+        const url = new URL(qrResult);
+      
+        const codeFromQuery =
+          url.searchParams.get('code') ||
+          url.searchParams.get('kode') ||
+          url.searchParams.get('validation_code') ||
+          url.searchParams.get('unique_code') ||
+          url.searchParams.get('voucher_code') ||
+          url.searchParams.get('promo_code');
+      
+        if (codeFromQuery) {
+          const code = decodeURIComponent(codeFromQuery).trim();
+          dlog('✅ Extracted validation code from URL query:', code);
+          return { code, type: 'unknown', isStructured: false };
+        }
+      
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        const lastPath = pathParts[pathParts.length - 1];
+      
+        if (lastPath && /^[A-Z0-9-]{4,}$/i.test(lastPath)) {
+          dlog('✅ Extracted validation code from URL path:', lastPath);
+          return { code: lastPath.trim(), type: 'unknown', isStructured: false };
+        }
+      } catch {
+        dlog('⚠️ Failed to parse QR as URL');
       }
     }
 
