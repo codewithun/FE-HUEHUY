@@ -627,22 +627,8 @@ export default function ScanValidasi() {
       return;
     }
 
-    const handleManualValidate = async () => {
-    const code = manualCode.trim();
-      
-    if (!code) {
-      setModalFailedMessage('Kode validasi tidak boleh kosong.');
-      setModalFailed(true);
-      return;
-    }
-  
-    setScannedCode(code);
-    setScanResult(code);
-    await submitValidate(code);
-  };
-
     setIsScanning(false);
-    dlog('🎯 QR SCAN RESULT:', result);
+    dlog('QR SCAN RESULT:', result);
 
     let qrDataToProcess = result;
 
@@ -658,7 +644,7 @@ export default function ScanValidasi() {
     // Ekstrak & validasi
     const validationData = extractValidationCode(qrDataToProcess);
 
-    dlog('🧪 Extracted Validation Data:', {
+    dlog('Extracted Validation Data:', {
       originalQR: qrDataToProcess,
       validationData,
       isValidData: validationData && validationData.code,
@@ -677,6 +663,20 @@ export default function ScanValidasi() {
       setSubmitLoading(false);
       setIsScanning(true);
     }
+  };
+
+  const handleManualValidate = async () => {
+    const code = manualCode.trim();
+      
+    if (!code) {
+      setModalFailedMessage('Kode validasi tidak boleh kosong.');
+      setModalFailed(true);
+      return;
+    }
+  
+    setScannedCode(code);
+    setScanResult(code);
+    await submitValidate(code);
   };
 
   const resetScanner = () => {
