@@ -998,7 +998,7 @@ try {
                 phone: promo.owner_contact || ''
               },
               terms: 'TERM & CONDITIONS APPLY',
-              categoryLabel: getCategoryLabel(data, data.cube || null),
+              categoryLabel: getCategoryLabel(promo, promo.cube || null),
               link_information: promo.online_store_link || null,
               rawAd: null,
               rawPromo: promo,
@@ -2080,14 +2080,20 @@ try {
       const apiUrl = rawApi.replace(/\/+$/, '');
 
       // Try primary endpoint first, then fallback
-      const endpoints = [
-        // 1) Promo-first (storeForPromo)
-        `${apiUrl}/promos/${promoData.id}/items`,
-        // 2) Direct claim (payload promo_id/promo_code)
-        `${apiUrl}/admin/promo-items`,
-        // 3) Fallback Ad (hanya bila perlu)
-        `${apiUrl}/ads/${promoData.id}/claim`,
-      ];
+      const isVoucherClaim = getTypeLabel(promoData).toLowerCase() === 'voucher';
+
+      const endpoints = isVoucherClaim
+        ? [
+            `${apiUrl}/vouchers/${promoData.id}/claim`,
+            `${apiUrl}/promos/${promoData.id}/items`,
+            `${apiUrl}/admin/promo-items`,
+            `${apiUrl}/ads/${promoData.id}/claim`,
+          ]
+        : [
+            `${apiUrl}/promos/${promoData.id}/items`,
+            `${apiUrl}/admin/promo-items`,
+            `${apiUrl}/ads/${promoData.id}/claim`,
+          ];
 
       const claimHeaders = {
         'Content-Type': 'application/json',
@@ -2104,6 +2110,7 @@ try {
 
       let savedItem = null;
       let lastError = '';
+      let lastStatus = null;
 
       for (let i = 0; i < endpoints.length; i++) {
         const url = endpoints[i];
@@ -2130,7 +2137,14 @@ try {
             break;
           }
 
+          lastStatus = res.status;
           lastError = json?.message || json?.error || `HTTP ${res.status}`;
+
+          if (res.status === 403) {
+            break;
+          }
+
+          if (i < endpoints.length - 1) await new Promise(r => setTimeout(r, 500));
           if (i < endpoints.length - 1) await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           lastError = e?.message || 'Network error';
@@ -2140,6 +2154,22 @@ try {
 
       if (!savedItem) {
         const low = String(lastError || '').toLowerCase();
+
+        if (
+          lastStatus === 403 ||
+          low.includes('penerima') ||
+          low.includes('hanya dapat diklaim') ||
+          low.includes('tidak memiliki akses') ||
+          low.includes('forbidden')
+        ) {
+          setErrorMessage(
+            lastError || 'Voucher ini hanya dapat diklaim oleh penerima yang ditentukan.'
+          );
+          setShowErrorModal(true);
+          setIsAlreadyClaimed(false);
+          return;
+        }
+      
         if (low.includes('habis') || low.includes('stok') || low.includes('stock')) {
           setErrorMessage(`Maaf, stok ${getTypeLabel(promoData).toLowerCase()} sudah habis.`);
           setShowErrorModal(true);
