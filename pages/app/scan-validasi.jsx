@@ -211,16 +211,14 @@ export default function ScanValidasi() {
     if (qrResult.includes('http')) {
       dlog('🔗 QR contains URL:', qrResult);
 
-      const urlMatch = qrResult.match(/\/(voucher|promo)\/(\d+)/);
-      if (urlMatch) {
-        const code = urlMatch[2];
-        dlog(`✅ Extracted ${urlMatch[1]} ID from URL:`, code);
-        return { code, type: urlMatch[1], isStructured: false };
-      }
-
+    // 2) Jika URL → coba ekstrak
+    if (qrResult.includes('http')) {
+      dlog('🔗 QR contains URL:', qrResult);
+    
       try {
         const url = new URL(qrResult);
       
+        // Prioritas utama: ambil kode validasi dari query string
         const codeFromQuery =
           url.searchParams.get('code') ||
           url.searchParams.get('kode') ||
@@ -235,6 +233,7 @@ export default function ScanValidasi() {
           return { code, type: 'unknown', isStructured: false };
         }
       
+        // Fallback: ambil kode dari path terakhir
         const pathParts = url.pathname.split('/').filter(Boolean);
         const lastPath = pathParts[pathParts.length - 1];
       
@@ -244,6 +243,14 @@ export default function ScanValidasi() {
         }
       } catch {
         dlog('⚠️ Failed to parse QR as URL');
+      }
+    
+      // Fallback terakhir: format lama /voucher/123 atau /promo/123
+      const urlMatch = qrResult.match(/\/(voucher|promo)\/(\d+)/);
+      if (urlMatch) {
+        const code = urlMatch[2];
+        dlog(`✅ Extracted ${urlMatch[1]} ID from URL:`, code);
+        return { code, type: urlMatch[1], isStructured: false };
       }
     }
 
@@ -263,7 +270,7 @@ export default function ScanValidasi() {
     }
 
     // 4) Direct code
-    if (/^[A-Z0-9]{6,}$/i.test(qrResult.trim())) {
+    if (/^[A-Z0-9-]{4,}$/i.test(qrResult.trim())) {
       dlog('✅ QR appears to be direct validation code:', qrResult.trim());
       return { code: qrResult.trim(), type: 'unknown', isStructured: false };
     }
