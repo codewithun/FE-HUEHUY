@@ -13,7 +13,6 @@ import {
   InputComponent,
   ModalConfirmComponent,
 } from '../../components/base.components';
-import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
 import { useUserContext } from '../../context/user.context';
 import { token_cookie_name } from '../../helpers';
 import { Decrypt } from '../../helpers/encryption.helpers';
@@ -53,12 +52,6 @@ export default function Validasi() {
   }, [router.isReady]);
 
   const isManagerTenant = profile?.role_id === 6;
-
-  const handleScanResult = async (result) => {
-    if (!result || submitLoading) return;
-    setCode(result);
-    await submitValidate(result);
-  };
 
   const submitValidate = async (parsingCode = null) => {
     setSubmitLoading(true);
@@ -256,15 +249,8 @@ export default function Validasi() {
             </div>
 
             <div className="">
-              {isManagerTenant && (
-                <div className="mb-6">
-                  <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] shadow-sm border border-gray-100 overflow-hidden">
-                    <QrScannerComponent onScan={handleScanResult} />
-                  </div>
-                </div>
-              )}
               <InputComponent
-                placeholder="Masukkan kode disini..."
+                placeholder="Masukkan kode unik..."
                 value={code}
                 onChange={(e) => setCode(e)}
                 size="lg"
@@ -272,7 +258,7 @@ export default function Validasi() {
 
               <div className="mt-6 px-8 flex flex-col gap-3">
                 <ButtonComponent
-                  label="Validasi"
+                  label="Validasi Kode Unik"
                   block
                   size="lg"
                   onClick={() => submitValidate()}

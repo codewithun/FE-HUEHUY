@@ -127,8 +127,6 @@ export default function ScanValidasi() {
   const [isScanning, setIsScanning] = useState(true);
   const [flashOn, setFlashOn] = useState(false);
   const [scannedCode, setScannedCode] = useState(''); // Store the actual code for display
-  const [validationMode, setValidationMode] = useState('qr');
-  const [manualCode, setManualCode] = useState('');
 
   useEffect(() => {
     const token = Cookies.get(token_cookie_name);
@@ -689,20 +687,6 @@ export default function ScanValidasi() {
       }
     };
 
-    const handleManualValidate = async () => {
-      const code = manualCode.trim();
-
-      if (!code) {
-        setModalFailedMessage('Kode validasi tidak boleh kosong.');
-        setModalFailed(true);
-        return;
-      }
-
-      setScannedCode(code);
-      setScanResult(code);
-      await submitValidate(code);
-    };
-
     const resetScanner = () => {
       dlog('🔄 RESETTING SCANNER at', new Date().toISOString());
       setScanResult(null);
@@ -781,45 +765,11 @@ export default function ScanValidasi() {
               <div className="flex justify-center items-center gap-4 my-6">
                 <div className="w-1/5 h-0.5 bg-gray-300" />
                 <p className="text-slate-400 font-medium text-center">
-                  {validationMode === 'qr' ? 'Scan QR Code' : 'Input Kode Unik'}
+                Scan QR Code                
                 </p>
                 <div className="w-1/5 h-0.5 bg-gray-300" />
               </div>
-
-              {/* Mode Switch */}
-              <div className="grid grid-cols-2 gap-2 mb-5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setValidationMode('qr');
-                    setManualCode('');
-                    resetScanner();
-                  }}
-                  className={`py-3 rounded-xl text-sm font-semibold transition-all ${validationMode === 'qr'
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-white bg-opacity-60 text-slate-700 border border-slate-200'
-                    }`}
-                >
-                  Scan QR
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setValidationMode('manual');
-                    resetScanner();
-                  }}
-                  className={`py-3 rounded-xl text-sm font-semibold transition-all ${validationMode === 'manual'
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-white bg-opacity-60 text-slate-700 border border-slate-200'
-                    }`}
-                >
-                  Input Kode
-                </button>
-              </div>
-
-              {validationMode === 'qr' ? (
-                <>
+              <>
                   {/* Scanner Area */}
                   <div className="mb-6">
                     {/* Kode yang di-scan */}
@@ -936,42 +886,6 @@ export default function ScanValidasi() {
                     </div>
                   )}
                 </>
-              ) : (
-                <div className="mb-6">
-                  <div className="bg-white bg-opacity-40 backdrop-blur-sm rounded-[20px] p-4 shadow-sm border border-gray-100">
-                    <p className="text-sm font-medium text-slate-700 mb-2">
-                      Masukkan Kode Validasi
-                    </p>
-
-                    <input
-                      value={manualCode}
-                      onChange={(e) => setManualCode(e.target.value)}
-                      placeholder="Masukkan kode unik..."
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-slate-800 bg-white"
-                      disabled={submitLoading}
-                    />
-
-                    {scannedCode && (
-                      <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
-                        <p className="text-xs font-medium text-blue-800 mb-1">
-                          Kode yang divalidasi:
-                        </p>
-                        <p className="text-lg font-mono text-blue-900 break-all bg-white p-2 rounded border">
-                          {scannedCode}
-                        </p>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleManualValidate}
-                      disabled={submitLoading || !manualCode.trim()}
-                      className="w-full mt-4 bg-primary text-white py-3 rounded-xl font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {submitLoading ? 'Memvalidasi...' : 'Validasi Kode'}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
