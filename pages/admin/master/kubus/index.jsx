@@ -554,6 +554,32 @@ function KubusMain() {
 
               try {
                 const transformedData = prepareKubusVoucherData(formData);
+                const targetType = formData.target_type || 'all';
+                const targetUserIds = Array.isArray(formData.target_user_ids)
+                  ? formData.target_user_ids
+                  : [];
+                const communityId = formData.community_id || null;
+
+                const finalData = {
+                  ...transformedData,
+                
+                  target_type: targetType,
+                  target_user_ids: targetType === 'user' ? targetUserIds : [],
+                  community_id: targetType === 'community' ? communityId : null,
+                
+                  'ads[target_type]': targetType,
+                  'ads[target_user_ids]': targetType === 'user' ? targetUserIds : [],
+                  'ads[community_id]': targetType === 'community' ? communityId : '',
+                
+                  _voucher_sync_data: {
+                    ...(transformedData._voucher_sync_data || {}),
+                    target_type: targetType,
+                    target_user_ids: targetType === 'user' ? targetUserIds : [],
+                    community_id: targetType === 'community' ? communityId : null,
+                  },
+                };
+
+                return finalData;
 
                 // eslint-disable-next-line no-console
                 console.log('[TRANSFORM] ✅ Transformed data:', transformedData);
@@ -804,7 +830,7 @@ function KubusMain() {
             // Information Form
             {
               type: 'custom',
-              custom: ({ formControl, values }) => {
+              custom: ({ formControl, values, setValues }) => {
                 const info = values.find(i => i.name === 'is_information')?.value?.at?.(0);
                 if (!info) return null;
                 return <InformationForm formControl={formControl} />;
@@ -1022,7 +1048,7 @@ function KubusMain() {
             // 3 Images Section
             {
               type: 'custom',
-              custom: ({ formControl, values }) => {
+              custom: ({ formControl, values, setValues }) => {
                 const ct = getCT(values);
                 const show = ct === 'promo' || ct === 'voucher' || ct === 'iklan' || isInfo(values);
                 if (!show) return null;
@@ -1045,7 +1071,7 @@ function KubusMain() {
             // Banner Image
             {
               type: 'custom',
-              custom: ({ formControl, values }) => {
+              custom: ({ formControl, values, setValues }) => {
                 const BannerField = createImageField('ads[image]', 'Banner (Opsional)');
                 return (
                   <div className="mt-6">
@@ -1338,10 +1364,15 @@ function KubusMain() {
                 const current = fc.value ?? 'all';
 
                 const handleChange = (valOrEvent) => {
-                  const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
-                  fc.onChange(newValue);
-                  setValues(prev => prev.filter(v => !['target_user_ids', 'community_id'].includes(v.name)));
-                };
+                const newValue = valOrEvent?.target?.value ?? valOrEvent?.value ?? valOrEvent;
+
+                fc.onChange(newValue);
+
+                setValues(prev => [
+                  ...prev.filter(v => !['target_type', 'target_user_ids', 'community_id'].includes(v.name)),
+                  { name: 'target_type', value: newValue },
+                ]);
+              };
 
                 return (
                   <div className="space-y-3">
@@ -1393,7 +1424,7 @@ function KubusMain() {
             // User selection for voucher
             {
               type: 'custom',
-              custom: ({ formControl, values }) => {
+              custom: ({ formControl, values, setValues }) => {
                 const contentType = getCT(values);
                 const targetType = values.find(i => i.name === 'target_type')?.value;
                 if (contentType !== 'voucher' || targetType !== 'user') return null;
@@ -1406,7 +1437,18 @@ function KubusMain() {
                     <MultiSelectDropdown
                       options={onlyUsers.map((u) => ({ label: `${u.name || u.email || `#${u.id}`}`, value: u.id }))}
                       value={formControl('target_user_ids').value || []}
-                      onChange={formControl('target_user_ids').onChange}
+                      onChange={(selectedUsers) => {
+                        const ids = Array.isArray(selectedUsers)
+                          ? selectedUsers.map((item) => item?.value ?? item).filter(Boolean)
+                          : [];
+
+                        formControl('target_user_ids').onChange(ids);
+
+                        setValues([
+                          ...values.filter(i => i.name !== 'target_user_ids'),
+                          { name: 'target_user_ids', value: ids },
+                        ]);
+                      }}
                       placeholder="Pilih satu atau lebih pengguna..."
                       maxHeight={200}
                     />
@@ -1474,12 +1516,40 @@ function KubusMain() {
 
               try {
                 const transformedData = prepareKubusVoucherData(formData);
-
-                // eslint-disable-next-line no-console
-                console.log('🟠 [TRANSFORM UPDATE] Transformed data:', transformedData);
-                // eslint-disable-next-line no-console
-                console.log('🟠 [TRANSFORM UPDATE] FINAL max_grab =', transformedData.max_grab);
-
+                              
+                const targetType = formData.target_type || 'all';
+                const targetUserIds = Array.isArray(formData.target_user_ids)
+                  ? formData.target_user_ids
+                  : [];
+                const communityId = formData.community_id || null;
+                              
+                const finalData = {
+                  ...transformedData,
+                
+                  target_type: targetType,
+                  target_user_ids: targetType === 'user' ? targetUserIds : [],
+                  community_id: targetType === 'community' ? communityId : null,
+                
+                  'ads[target_type]': targetType,
+                  'ads[target_user_ids]': targetType === 'user' ? targetUserIds : [],
+                  'ads[community_id]': targetType === 'community' ? communityId : '',
+                
+                  _voucher_sync_data: {
+                    ...(transformedData._voucher_sync_data || {}),
+                    target_type: targetType,
+                    target_user_ids: targetType === 'user' ? targetUserIds : [],
+                    community_id: targetType === 'community' ? communityId : null,
+                  },
+                };
+                
+                console.log('🟠 [TRANSFORM UPDATE] Final target data:', {
+                  target_type: finalData.target_type,
+                  target_user_ids: finalData.target_user_ids,
+                  community_id: finalData.community_id,
+                  _voucher_sync_data: finalData._voucher_sync_data,
+                });
+                
+                return finalData;
                 return transformedData;
               } catch (error) {
                 // eslint-disable-next-line no-console
