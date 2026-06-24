@@ -2089,14 +2089,10 @@ try {
       const endpoints = isVoucherClaim
         ? [
             `${apiUrl}/vouchers/${promoData.id}/claim`,
-            `${apiUrl}/promos/${promoData.id}/items`,
-            `${apiUrl}/admin/promo-items`,
-            `${apiUrl}/ads/${promoData.id}/claim`,
           ]
         : [
             `${apiUrl}/promos/${promoData.id}/items`,
             `${apiUrl}/admin/promo-items`,
-            `${apiUrl}/ads/${promoData.id}/claim`,
           ];
 
       const claimHeaders = {
@@ -2145,7 +2141,11 @@ try {
           lastError = json?.message || json?.error || `HTTP ${res.status}`;
 
           if (res.status === 403) {
-            break;
+            throw new Error(
+              json?.message ||
+              json?.error ||
+              'Konten ini hanya dapat diklaim oleh penerima yang ditentukan.'
+            );
           }
 
           if (i < endpoints.length - 1) await new Promise(r => setTimeout(r, 500));
