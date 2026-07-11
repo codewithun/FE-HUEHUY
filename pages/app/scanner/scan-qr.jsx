@@ -10,6 +10,7 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
+import jsQR from "jsqr";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -37,7 +38,44 @@ export default function ScanQR() {
   const [flashOn, setFlashOn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showContactConfirm, setShowContactConfirm] = useState(false);
-  const [contactData, setContactData] = useState(null);
+  
+  const handleImageUpload = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const img = new Image();
+
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    const code = jsQR(
+      imageData.data,
+      imageData.width,
+      imageData.height
+    );
+
+    if (code) {
+      handleScanResult(code.data);
+    } else {
+      alert("QR Code tidak ditemukan.");
+    }
+  };
+
+  img.src = URL.createObjectURL(file);
+};
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
   const handleValidationScan = async (qrData) => {
@@ -501,6 +539,21 @@ export default function ScanQR() {
             )}
           </div>
         </div>
+
+        <input
+            type="file"
+            id="upload-qr"
+            accept="image/*"
+            hidden
+            onChange={handleImageUpload}
+        />
+
+        <label
+            htmlFor="upload-qr"
+            className="flex-1 bg-primary text-white py-3 px-3 rounded-[15px] text-center cursor-pointer"
+        >
+            Upload QR
+        </label>
 
         {/* ✅ BARU: Render hasil validasi khusus */}
         {renderValidationResult()}

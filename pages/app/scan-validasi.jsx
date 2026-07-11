@@ -21,6 +21,7 @@ import {
 } from '../../components/base.components';
 import { ModalConfirmComponent } from '../../components/base.components';
 import QrScannerComponent from '../../components/construct.components/QrScannerComponent';
+import jsQR from "jsqr";
 
 // ✅ Pastikan base URL tanpa /api di akhir
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
@@ -648,6 +649,46 @@ export default function ScanValidasi() {
         });
         return;
       }
+    
+    const handleImageUpload = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return   ;
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file)   ;
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d")   ;
+
+        canvas.width = img.width;
+        canvas.height = img.height    ;
+
+        ctx.drawImage(img, 0, 0)    ;
+
+        const imageData = ctx.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        )   ;
+
+        const code = jsQR(
+          imageData.data,
+          imageData.width,
+          imageData.height
+        )   ;
+
+        if (code) {
+          handleScanResult(code.data);
+        } else {
+          setModalFailedMessage("QR Code pada gambar tidak ditemukan.");
+          setModalFailed(true);
+            }
+
+        URL.revokeObjectURL(img.src);
+      };
+    };
 
       setIsScanning(false);
       dlog('QR SCAN RESULT:', result);
@@ -852,6 +893,18 @@ export default function ScanValidasi() {
                       />
                       <span>{flashOn ? 'Matikan Flash' : 'Flash'}</span>
                     </button>
+
+                    <label className="flex-1 cursor-pointer bg-white border border-gray-200 rounded-[15px] flex items-center justify-center py-3 px-3 text-sm font-medium">
+                      <FontAwesomeIcon icon={faCamera} className="mr-2" />
+                      Upload QR
+                                          
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                    </label>
 
                     {!isScanning && (
                       <button
