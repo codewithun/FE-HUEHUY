@@ -27,6 +27,7 @@
     "google-map-react": "^2.1.10",
     "js-cookie": "^3.0.1",
     "js-file-download": "^0.4.12",
+    "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
     "local-ip-address": "^1.0.0",
     "moment": "^2.29.4",
