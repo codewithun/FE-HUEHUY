@@ -10,7 +10,7 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
-import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BrowserMultiFormatReader } from "@zxing/library";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -38,33 +38,41 @@ export default function ScanQR() {
   const [flashOn, setFlashOn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showContactConfirm, setShowContactConfirm] = useState(false);
-  
+  const [contactData, setContactData] = useState(null);
+
   const handleImageUpload = async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const img = new Image();
-  const imageUrl = URL.createObjectURL(file);
+    const imageUrl = URL.createObjectURL(file);
 
-  img.onload = async () => {
-    try {
-      const reader = new BrowserMultiFormatReader();
+    const img = new Image();
 
-      const result = await reader.decodeFromImageElement(img);
+    img.onload = async () => {
+      try {
+        const reader = new BrowserMultiFormatReader();
 
-      console.log("QR ditemukan:", result.getText());
+        const result = await reader.decodeFromImageElement(img);
 
-      handleScanResult(result.getText());
-    } catch (err) {
-      console.error("QR tidak ditemukan:", err);
-      alert("QR Code tidak ditemukan.");
-    } finally {
-      URL.revokeObjectURL(imageUrl);
-    }
+        console.log(result.getText());
+
+        handleScanResult(result.getText());
+
+      } catch (err) {
+
+        console.error(err);
+
+        alert("QR Code tidak ditemukan.");
+
+      } finally {
+
+        URL.revokeObjectURL(imageUrl);
+
+      }
+    };
+
+    img.src = imageUrl;
   };
-
-  img.src = imageUrl;
-};
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
   const handleValidationScan = async (qrData) => {
