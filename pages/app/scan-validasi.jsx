@@ -649,52 +649,10 @@ export default function ScanValidasi() {
         });
         return;
       }
-    
-    const handleImageUpload = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return   ;
 
-      const img = new Image();
-      img.src = URL.createObjectURL(file)   ;
-
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d")   ;
-
-        canvas.width = img.width;
-        canvas.height = img.height    ;
-
-        ctx.drawImage(img, 0, 0)    ;
-
-        const imageData = ctx.getImageData(
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        )   ;
-
-        const code = jsQR(
-          imageData.data,
-          imageData.width,
-          imageData.height
-        )   ;
-
-        if (code) {
-          handleScanResult(code.data);
-        } else {
-          setModalFailedMessage("QR Code pada gambar tidak ditemukan.");
-          setModalFailed(true);
-            }
-
-        URL.revokeObjectURL(img.src);
-      };
-    };
-
-      setIsScanning(false);
-      dlog('QR SCAN RESULT:', result);
-
-      let qrDataToProcess = result;
-
+    setIsScanning(false);
+    dlog('QR SCAN RESULT:', result);
+    let qrDataToProcess = result;
       // Library scanner sering memberi objek { text: '...' }
       if (result?.text) {
         dlog('📱 QR Code Text Found:', result.text);
@@ -728,10 +686,55 @@ export default function ScanValidasi() {
       }
     };
 
+    const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+      if (!file) return   ;
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file)   ;
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            setModalFailedMessage("Canvas tidak didukung browser.");
+            setModalFailed(true);
+            return;
+          }
+
+        canvas.width = img.width;
+        canvas.height = img.height    ;
+
+        ctx.drawImage(img, 0, 0)    ;
+
+        const imageData = ctx.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        )   ;
+
+        const code = jsQR(
+          imageData.data,
+          imageData.width,
+          imageData.height
+        )   ;
+
+        if (code) {
+          handleScanResult(code.data);
+        } else {
+          setModalFailedMessage("QR Code pada gambar tidak ditemukan.");
+          setModalFailed(true);
+            }
+
+        URL.revokeObjectURL(img.src);
+      };
+    };
+
     const resetScanner = () => {
       dlog('🔄 RESETTING SCANNER at', new Date().toISOString());
       setScanResult(null);
-      setScannedCode(null);
+      setScannedCode('');
       setIsScanning(true);
       setSubmitLoading(false);
       setModalSuccess(false);
@@ -975,4 +978,4 @@ export default function ScanValidasi() {
         />
       </>
     );
-  }
+};

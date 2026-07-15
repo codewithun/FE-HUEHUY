@@ -549,11 +549,22 @@ export default function ScanQR() {
         />
 
         <label
-            htmlFor="upload-qr"
-            className="flex-1 bg-primary text-white py-3 px-3 rounded-[15px] text-center cursor-pointer"
+          htmlFor="upload-qr"
+          className="w-full mt-4 flex items-center justify-center gap-2
+                     bg-primary text-white py-4 rounded-2xl
+                     shadow-md hover:shadow-lg transition-all cursor-pointer"
         >
-            Upload QR
+            <FontAwesomeIcon icon={faCamera}/>
+            Upload QR dari Galeri
         </label>
+                  
+        <input
+            id="upload-qr"
+            hidden
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+        />
 
         {/* ✅ BARU: Render hasil validasi khusus */}
         {renderValidationResult()}
