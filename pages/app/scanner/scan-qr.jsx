@@ -42,37 +42,30 @@ export default function ScanQR() {
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-  
+
     const img = new Image();
-  
+
     img.onload = () => {
       // coba scan di beberapa ukuran
       const scales = [1, 1.5, 2, 3];
-    
+
       let qr = null;
-    
+
       for (const scale of scales) {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-      
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-      
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
-      
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img,0,0);
+
         const imageData = ctx.getImageData(
           0,
           0,
           canvas.width,
           canvas.height
         );
-      
+
         qr = jsQR(
           imageData.data,
           imageData.width,
@@ -81,10 +74,10 @@ export default function ScanQR() {
             inversionAttempts: "attemptBoth",
           }
         );
-      
+
         if (qr) break;
       }
-    
+
       if (qr) {
         console.log("QR ditemukan:", qr.data);
         handleScanResult(qr.data);
@@ -92,7 +85,7 @@ export default function ScanQR() {
         alert("QR Code tidak ditemukan.");
       }
     };
-  
+
     img.src = URL.createObjectURL(file);
   };
 
