@@ -55,25 +55,66 @@ export default function ScanQR() {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img,0,0);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
 
-        const imageData = ctx.getImageData(
+        ctx.drawImage(
+            img,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+      const imageData = ctx.getImageData(
           0,
           0,
           canvas.width,
           canvas.height
-        );
+      );
+      
+      const d = imageData.data;
+      
+      // grayscale
+      for (let i = 0; i < d.length; i += 4) {
+          const gray =
+              d[i] * 0.299 +
+              d[i + 1] * 0.587 +
+              d[i + 2] * 0.114;
+      
+          d[i] = gray;
+          d[i + 1] = gray;
+          d[i + 2] = gray;
+      }
+      
+      // contrast
+      const contrast = 80;
+      
+      const factor =
+          (259 * (contrast + 255)) /
+          (255 * (259 - contrast));
+      
+      for (let i = 0; i < d.length; i += 4) {
+          d[i]     = factor * (d[i]     - 128) + 128;
+          d[i + 1] = factor * (d[i + 1] - 128) + 128;
+          d[i + 2] = factor * (d[i + 2] - 128) + 128;
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+      console.log({
+          width: imageData.width,
+          height: imageData.height
+      });
 
-        qr = jsQR(
+      qr = jsQR(
           imageData.data,
           imageData.width,
           imageData.height,
           {
-            inversionAttempts: "attemptBoth",
+              inversionAttempts: "attemptBoth",
           }
-        );
+      );
+      console.log(qr);
 
         if (qr) break;
       }
@@ -569,14 +610,6 @@ export default function ScanQR() {
             <FontAwesomeIcon icon={faCamera}/>
             Upload QR dari Galeri
         </label>
-
-        <input
-            id="upload-qr"
-            hidden
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-        />
 
         {/* ✅ BARU: Render hasil validasi khusus */}
         {renderValidationResult()}
