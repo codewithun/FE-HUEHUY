@@ -58,12 +58,16 @@ export default function ScanQR() {
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
 
+        ctx.scale(scale, scale);
+
+        ctx.drawImage(img, 0, 0);
+
         ctx.drawImage(
             img,
             0,
             0,
-            canvas.width,
-            canvas.height
+            img.width,
+            img.height
         );
 
       const imageData = ctx.getImageData(
@@ -72,39 +76,6 @@ export default function ScanQR() {
           canvas.width,
           canvas.height
       );
-      
-      const d = imageData.data;
-      
-      // grayscale
-      for (let i = 0; i < d.length; i += 4) {
-          const gray =
-              d[i] * 0.299 +
-              d[i + 1] * 0.587 +
-              d[i + 2] * 0.114;
-      
-          d[i] = gray;
-          d[i + 1] = gray;
-          d[i + 2] = gray;
-      }
-      
-      // contrast
-      const contrast = 80;
-      
-      const factor =
-          (259 * (contrast + 255)) /
-          (255 * (259 - contrast));
-      
-      for (let i = 0; i < d.length; i += 4) {
-          d[i]     = factor * (d[i]     - 128) + 128;
-          d[i + 1] = factor * (d[i + 1] - 128) + 128;
-          d[i + 2] = factor * (d[i + 2] - 128) + 128;
-      }
-      
-      ctx.putImageData(imageData, 0, 0);
-      console.log({
-          width: imageData.width,
-          height: imageData.height
-      });
 
       qr = jsQR(
           imageData.data,
