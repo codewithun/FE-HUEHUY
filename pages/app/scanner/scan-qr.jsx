@@ -59,16 +59,13 @@ export default function ScanQR() {
         handleScanResult(result.getText());
 
       } catch (err) {
-
-        console.error(err);
-
-        alert("QR Code tidak ditemukan.");
-
-      } finally {
-
-        URL.revokeObjectURL(imageUrl);
-
-      }
+        console.error("ZXING ERROR", err);
+            
+        alert(
+          err?.message ||
+          JSON.stringify(err)
+        );
+      }}
     };
 
     img.src = imageUrl;
