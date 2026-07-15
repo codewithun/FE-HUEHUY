@@ -10,7 +10,7 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
-import jsQR from "jsqr";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -39,67 +39,32 @@ export default function ScanQR() {
   const [loading, setLoading] = useState(false);
   const [showContactConfirm, setShowContactConfirm] = useState(false);
   
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageUpload = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    const img = new Image();
+  const img = new Image();
+  const imageUrl = URL.createObjectURL(file);
 
-    img.onload = () => {
-      // coba scan di beberapa ukuran
-      const scales = [1, 1.5, 2, 3];
+  img.onload = async () => {
+    try {
+      const reader = new BrowserMultiFormatReader();
 
-      let qr = null;
+      const result = await reader.decodeFromImageElement(img);
 
-      for (const scale of scales) {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+      console.log("QR ditemukan:", result.getText());
 
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-
-        ctx.scale(scale, scale);
-
-        ctx.drawImage(img, 0, 0);
-
-        ctx.drawImage(
-            img,
-            0,
-            0,
-            img.width,
-            img.height
-        );
-
-      const imageData = ctx.getImageData(
-          0,
-          0,
-          canvas.width,
-          canvas.height
-      );
-
-      qr = jsQR(
-          imageData.data,
-          imageData.width,
-          imageData.height,
-          {
-              inversionAttempts: "attemptBoth",
-          }
-      );
-      console.log(qr);
-
-        if (qr) break;
-      }
-
-      if (qr) {
-        console.log("QR ditemukan:", qr.data);
-        handleScanResult(qr.data);
-      } else {
-        alert("QR Code tidak ditemukan.");
-      }
-    };
-
-    img.src = URL.createObjectURL(file);
+      handleScanResult(result.getText());
+    } catch (err) {
+      console.error("QR tidak ditemukan:", err);
+      alert("QR Code tidak ditemukan.");
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
   };
+
+  img.src = imageUrl;
+};
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
   const handleValidationScan = async (qrData) => {
