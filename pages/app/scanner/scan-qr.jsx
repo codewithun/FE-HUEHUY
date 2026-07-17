@@ -96,14 +96,88 @@ const tryZxingFallback = async (canvas) => {
 
 // ✅ Helper: upscale gambar kecil dengan nearest-neighbor (tanpa smoothing)
 // biar tepi modul QR tetap tegas, gak buram
-const upscaleCanvas = (sourceCanvas, targetSize) => {
+// ✅ Otsu's method: cari threshold biner optimal otomatis dari histogram
+const otsuThreshold = (grayData) => {
+  const histogram = new Array(256).fill(0);
+  for (let i = 0; i < grayData.length; i++) histogram[grayData[i]]++;
+
+  const total = grayData.length;
+  let sum = 0;
+  for (let t = 0; t < 256; t++) sum += t * histogram[t];
+
+  let sumB = 0, wB = 0, wF = 0, maxVar = 0, threshold = 128;
+
+  for (let t = 0; t < 256; t++) {
+    wB += histogram[t];
+    if (wB === 0) continue;
+    wF = total - wB;
+    if (wF === 0) break;
+
+    sumB += t * histogram[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const varBetween = wB * wF * (mB - mF) * (mB - mF);
+
+    if (varBetween > maxVar) {
+      maxVar = varBetween;
+      threshold = t;
+    }
+  }
+  return threshold;
+};
+
+const boostContrastAdaptive = (ctx, width, height) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const d = imageData.data;
+  const gray = new Uint8Array(width * height);
+
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+    gray[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  }
+
+  const threshold = otsuThreshold(gray);
+
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+    const v = gray[p] > threshold ? 255 : 0;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return imageData;
+};
+
+// ✅ Scale canvas dengan aspect ratio TERJAGA, tanpa smoothing
+const scaleCanvas = (sourceCanvas, factor) => {
+  const w = Math.max(1, Math.round(sourceCanvas.width * factor));
+  const h = Math.max(1, Math.round(sourceCanvas.height * factor)); // ✅ pakai height asli, bukan dipaksa kotak
   const canvas = document.createElement("canvas");
-  canvas.width = targetSize;
-  canvas.height = targetSize;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  ctx.imageSmoothingEnabled = false; // ✅ kunci utama: no blur pas upscale
-  ctx.drawImage(sourceCanvas, 0, 0, targetSize, targetSize);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sourceCanvas, 0, 0, w, h);
   return canvas;
+};
+
+const tryDecodeAtScale = async (canvas) => {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const { width, height } = canvas;
+
+  // 1. jsQR normal
+  let data = ctx.getImageData(0, 0, width, height);
+  let code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" });
+  if (code?.data) return code.data;
+
+  // 2. jsQR + adaptive contrast (Otsu)
+  const boosted = boostContrastAdaptive(ctx, width, height);
+  code = jsQR(boosted.data, width, height, { inversionAttempts: "attemptBoth" });
+  if (code?.data) return code.data;
+
+  // 3. zxing fallback (di canvas versi kontras tinggi, biasanya lebih akurat)
+  const zxingResult = await tryZxingFallback(canvas);
+  if (zxingResult) return zxingResult;
+
+  return null;
 };
 
 const handleImageUpload = async (e) => {
@@ -115,56 +189,39 @@ const handleImageUpload = async (e) => {
   reader.onload = async () => {
     try {
       const bitmap = await loadImageFixedOrientation(reader.result);
-      const minDim = Math.min(bitmap.width, bitmap.height);
 
-      // Canvas dasar di resolusi asli
       const baseCanvas = document.createElement("canvas");
       baseCanvas.width = bitmap.width;
       baseCanvas.height = bitmap.height;
-      const baseCtx = baseCanvas.getContext("2d", { willReadFrequently: true });
-      baseCtx.drawImage(bitmap, 0, 0);
+      baseCanvas.getContext("2d").drawImage(bitmap, 0, 0);
+
+      // ✅ Pyramid skala: dari kecil (downscale gambar besar) sampai besar
+      // (upscale gambar kecil) — target "sisi terpanjang" antara ~350–1400px
+      const longSide = Math.max(bitmap.width, bitmap.height);
+      const targetSizes = [350, 500, 700, 1000, 1400];
+
+      // Urutkan dari target yang paling dekat dengan ukuran asli (biar hemat & cepat ketemu)
+      const scaleFactors = targetSizes
+        .map((t) => t / longSide)
+        .sort((a, b) => Math.abs(1 - a) - Math.abs(1 - b));
 
       let finalResult = null;
-
-      // ✅ Susunan percobaan: kalau gambar kecil, prioritaskan upscale dulu
-      const attempts = [];
-      if (minDim < 400) {
-        // Gambar kecil: coba upscale beberapa level
-        attempts.push(
-          { canvas: upscaleCanvas(baseCanvas, bitmap.width * 4), label: "upscale 4x" },
-          { canvas: upscaleCanvas(baseCanvas, bitmap.width * 2), label: "upscale 2x" },
-          { canvas: baseCanvas, label: "original" }
-        );
-      } else {
-        // Gambar besar: seperti sebelumnya, resize turun dulu
-        const scale = Math.min(1, 1000 / Math.max(bitmap.width, bitmap.height));
-        const resizedCanvas = document.createElement("canvas");
-        resizedCanvas.width = Math.round(bitmap.width * scale);
-        resizedCanvas.height = Math.round(bitmap.height * scale);
-        resizedCanvas.getContext("2d").drawImage(bitmap, 0, 0, resizedCanvas.width, resizedCanvas.height);
-        attempts.push(
-          { canvas: resizedCanvas, label: "resized down" },
-          { canvas: baseCanvas, label: "original" }
-        );
-      }
-
-      for (const { canvas, label } of attempts) {
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-        finalResult = tryJsQR(canvas, ctx);
-        if (finalResult) { console.log("berhasil via:", label, "jsQR"); break; }
-
-        finalResult = await tryZxingFallback(canvas);
-        if (finalResult) { console.log("berhasil via:", label, "zxing"); break; }
+      for (const factor of scaleFactors) {
+        const canvas = scaleCanvas(baseCanvas, factor);
+        finalResult = await tryDecodeAtScale(canvas);
+        if (finalResult) {
+          console.log(`✅ Berhasil di skala ${factor.toFixed(2)}x (${canvas.width}x${canvas.height})`);
+          break;
+        }
       }
 
       if (finalResult) {
         console.log("QR RESULT:", finalResult);
         handleScanResult(finalResult);
       } else {
-        console.error("QR gagal dibaca: semua strategi gagal");
+        console.error("QR gagal dibaca: semua level skala gagal");
         alert(
-          "QR Code tidak dapat dibaca. Coba foto ulang dengan QR menghadap lurus ke kamera, pencahayaan cukup, dan tidak blur."
+          "QR Code tidak dapat dibaca. Pastikan QR tidak blur dan tidak terpotong."
         );
       }
     } catch (err) {
