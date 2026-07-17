@@ -10,7 +10,12 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
-import { BrowserMultiFormatReader } from "@zxing/library";
+import {
+    MultiFormatReader,
+    BinaryBitmap,
+    HybridBinarizer,
+    RGBLuminanceSource
+} from "@zxing/library";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -44,44 +49,22 @@ export default function ScanQR() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const reader = new FileReader();
-      reader.onload = () => {
-          const img = new Image();
+const reader = new FileReader();
 
-          img.onload = async () => {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d"); 
-            
-            canvas.width = img.width;
-            canvas.height = img.height;
+reader.onload = () => {
+    const img = new Image();
 
-            ctx.drawImage(img,0,0);
+    img.onload = () => {
 
-            console.log("canvas:", canvas.width, canvas.height);
-            console.log("img:", img.width, img.height);
-            try{
-                const codeReader = new BrowserMultiFormatReader();
+        console.log("width :", img.width);
+        console.log("height:", img.height);
 
-                document.body.appendChild(canvas);        
-                const result = await codeReader.decodeFromCanvas(canvas);
+    };
 
-                console.log(codeReader);
-                console.log(typeof codeReader.decodeFromCanvas);
+    img.src = reader.result;
+};
 
-                console.log(result.getText());
-
-                handleScanResult(result.getText());
-              } catch (err) {
-                  console.error("ZXING ERROR:", err);
-                  console.error("name:", err.name);
-                  console.error("message:", err.message);
-                            
-                  alert(err.name + "\n" + err.message);
-              }
-            }
-            img.src = reader.result;
-          }
-          reader.readAsDataURL(file);
+reader.readAsDataURL(file);
         };
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
