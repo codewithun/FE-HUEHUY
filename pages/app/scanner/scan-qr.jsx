@@ -11,6 +11,7 @@ import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
 import { BrowserMultiFormatReader } from "@zxing/browser";
+import jsQR from "jsqr";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -40,59 +41,68 @@ export default function ScanQR() {
   const [showContactConfirm, setShowContactConfirm] = useState(false);
   const [contactData, setContactData] = useState(null);
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+const handleImageUpload = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const img = new Image();
-      img.onload = async () => {
-        try {
-          const codeReader = new BrowserMultiFormatReader();
-          // ✅ PERBAIKAN 1: Pakai decodeFromImageElement langsung
-          // Ini lebih reliable daripada convert ke canvas dulu
-          const result = await codeReader.decodeFromImageElement(img);
+  const reader = new FileReader();
 
-          console.log("QR RESULT:", result.getText());
-          handleScanResult(result.getText());
-        } catch (err) {
-          console.error("QR gagal dibaca (attempt 1):", err);
+  reader.onload = () => {
+    const img = new Image();
 
-          // ✅ PERBAIKAN 2: Fallback dengan canvas + scaling up
-          try {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
+    img.onload = () => {
+      try {
+        // ✅ Batasi dimensi maksimal biar binarizer lebih akurat & cepat
+        const MAX_DIM = 1000;
+        const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
 
-            // Scale up gambar kecil supaya QR lebih gampang di-detect
-            const scale = Math.max(1, 800 / Math.max(img.width, img.height));
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
 
-            // Pakai image smoothing biar gak terlalu pixelated
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-            const codeReader = new BrowserMultiFormatReader();
-            const result = await codeReader.decodeFromCanvas(canvas);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            console.log("QR RESULT (scaled):", result.getText());
-            handleScanResult(result.getText());
+        // ✅ jsQR jauh lebih toleran untuk gambar upload/screenshot
+        let code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "attemptBoth",
+        });
 
-          } catch (err2) {
-            console.error("QR gagal dibaca (attempt 2):", err2);
-            alert("QR Code tidak dapat dibaca. Coba upload gambar dengan resolusi lebih tinggi.");
-          }
+        // ✅ Kalau masih gagal, coba lagi di resolusi asli (buat QR yang kecil banget)
+        if (!code && scale < 1) {
+          const fullCanvas = document.createElement("canvas");
+          fullCanvas.width = img.width;
+          fullCanvas.height = img.height;
+          const fullCtx = fullCanvas.getContext("2d");
+          fullCtx.drawImage(img, 0, 0);
+          const fullData = fullCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height);
+          code = jsQR(fullData.data, fullData.width, fullData.height, {
+            inversionAttempts: "attemptBoth",
+          });
         }
-      };
 
-      // ✅ PERBAIKAN 3: Pastikan crossOrigin di-set kalo gambar dari URL
-      img.crossOrigin = "anonymous";
-      img.src = reader.result;
+        if (code && code.data) {
+          console.log("QR RESULT:", code.data);
+          handleScanResult(code.data);
+        } else {
+          console.error("QR gagal dibaca: tidak ditemukan pola QR di gambar");
+          alert("QR Code tidak dapat dibaca. Pastikan foto QR jelas, tidak buram, dan tidak terlalu jauh/kecil.");
+        }
+      } catch (err) {
+        console.error("QR gagal dibaca:", err);
+        alert("QR Code tidak dapat dibaca");
+      }
     };
-    reader.readAsDataURL(file);
+
+    img.onerror = () => alert("Gagal memuat gambar, coba file lain");
+    img.src = reader.result;
   };
+
+  reader.onerror = () => alert("Gagal membaca file");
+  reader.readAsDataURL(file);
+};
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
   const handleValidationScan = async (qrData) => {
