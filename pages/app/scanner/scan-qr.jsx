@@ -48,25 +48,16 @@ export default function ScanQR() {
     const img = new Image();
 
     img.onload = async () => {
-    
-      console.log(
-        "Image loaded",
-        img.width,
-        img.height
-      );
       try {
-          const reader = new BrowserMultiFormatReader();
-          console.log("START DECODE");
+        const reader = new BrowserMultiFormatReader();
+        const result = await reader.decodeFromImageUrl(imageUrl);
+      
+        handleScanResult(result.getText());
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
-          const result = await reader.decodeFromImageUrl(imageUrl);          console.log("SUCCESS");
-          console.log(result);
-          handleScanResult(result.getText());
-
-    } catch (err) {
-      console.error("ZXING ERROR =", err);
-
-      alert(err.message || JSON.stringify(err));
-    }
     img.src = imageUrl;
   };
 
@@ -639,5 +630,4 @@ export default function ScanQR() {
       </div>
     </div>
   );
-}
 }
