@@ -43,36 +43,56 @@ export default function ScanQR() {
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onload = () => {
-    const img = new Image();
-    img.onload = async () => {
-      try {
-        // buat canvas
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+    reader.onload = async () => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const codeReader = new BrowserMultiFormatReader();
+          // ✅ PERBAIKAN 1: Pakai decodeFromImageElement langsung
+          // Ini lebih reliable daripada convert ke canvas dulu
+          const result = await codeReader.decodeFromImageElement(img);
 
-        canvas.width = img.width;
-        canvas.height = img.height;
+          console.log("QR RESULT:", result.getText());
+          handleScanResult(result.getText());
+        } catch (err) {
+          console.error("QR gagal dibaca (attempt 1):", err);
 
-        ctx.drawImage(img, 0, 0);
+          // ✅ PERBAIKAN 2: Fallback dengan canvas + scaling up
+          try {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
 
-        const codeReader = new BrowserMultiFormatReader();
+            // Scale up gambar kecil supaya QR lebih gampang di-detect
+            const scale = Math.max(1, 800 / Math.max(img.width, img.height));
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
 
-        const result = await codeReader.decodeFromCanvas(canvas);
+            // Pakai image smoothing biar gak terlalu pixelated
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        console.log("QR RESULT :", result.getText());
+            const codeReader = new BrowserMultiFormatReader();
+            const result = await codeReader.decodeFromCanvas(canvas);
 
-        handleScanResult(result.getText());
-      } catch (err) {
-        console.error("QR gagal dibaca :", err);
-        alert("QR Code tidak dapat dibaca");
-      }
+            console.log("QR RESULT (scaled):", result.getText());
+            handleScanResult(result.getText());
+
+          } catch (err2) {
+            console.error("QR gagal dibaca (attempt 2):", err2);
+            alert("QR Code tidak dapat dibaca. Coba upload gambar dengan resolusi lebih tinggi.");
+          }
+        }
+      };
+
+      // ✅ PERBAIKAN 3: Pastikan crossOrigin di-set kalo gambar dari URL
+      img.crossOrigin = "anonymous";
+      img.src = reader.result;
     };
-    img.src = reader.result;
+    reader.readAsDataURL(file);
   };
-  reader.readAsDataURL(file);
-};
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
   const handleValidationScan = async (qrData) => {
