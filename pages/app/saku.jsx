@@ -152,7 +152,7 @@ export default function Save() {
   const handleDownloadQR = async (item) => {
     try {
       const QRCode = await import('qrcode');
-      
+
       const qrData = JSON.stringify({
         code: item?.promo_item?.code || item?.voucher_item?.code || item?.code || 'NO_CODE',
         type: item?.type === 'voucher' ? 'voucher' : 'promo',
@@ -163,7 +163,7 @@ export default function Save() {
         validation_purpose: 'tenant_scan',
         owner_only: false,
       });
-      
+
       // Generate PNG data URL langsung
       const dataUrl = await QRCode.toDataURL(qrData, {
         width: 1024,
@@ -174,7 +174,7 @@ export default function Save() {
         },
         errorCorrectionLevel: 'H'
       });
-      
+
       // Trigger download
       const link = document.createElement('a');
       const title = (item?.ad?.title || item?.voucher?.name || 'Promo').replace(/[^a-z0-9]/gi, '_');
@@ -184,7 +184,7 @@ export default function Save() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
     } catch (err) {
       console.error('Download error:', err);
       alert('Gagal download QR. Pastikan library qrcode terinstall.');
@@ -897,7 +897,7 @@ export default function Save() {
                         
                         {/* ✅ TOMBOL DOWNLOAD QR */}
                         <button onClick={() => handleDownloadQR(selected)} className="w-full bg-slate-800 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-slate-900 transition-colors shadow-sm">
-                          <FontAwesomeIcon icon={faDownload} /> Download QR Code (HD)
+                          <FontAwesomeIcon icon={faDownload} /> Download QR Code
                         </button>
                       </>
                     ) : (
@@ -962,7 +962,7 @@ export default function Save() {
                       
                       {/* ✅ TOMBOL DOWNLOAD QR */}
                       <button onClick={() => handleDownloadQR(selected)} className="w-full bg-slate-800 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-slate-900 transition-colors shadow-sm">
-                        <FontAwesomeIcon icon={faDownload} /> Download QR Code (HD)
+                        <FontAwesomeIcon icon={faDownload} /> Download QR Code
                       </button>
                     </>
                   ) : (
