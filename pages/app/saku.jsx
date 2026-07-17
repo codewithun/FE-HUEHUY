@@ -148,23 +148,46 @@ export default function Save() {
   }, []);
 
   // ✅ FUNGSI DOWNLOAD: QR Code Resolusi Tinggi
-  const handleDownloadQR = (item) => {
-    if (!qrCanvasRef.current) {
-      console.error('QR Canvas ref tidak ditemukan');
-      return;
-      }
-    
+// ✅ CARA PALING SIMPLE & RELIABLE
+  const handleDownloadQR = async (item) => {
     try {
-      const dataUrl = qrCanvasRef.current.toDataURL('image/png');
+      const QRCode = await import('qrcode');
+      
+      const qrData = JSON.stringify({
+        code: item?.promo_item?.code || item?.voucher_item?.code || item?.code || 'NO_CODE',
+        type: item?.type === 'voucher' ? 'voucher' : 'promo',
+        item_id: item?.promo_item?.id || item?.voucher_item?.id || null,
+        user_id: item?.promo_item?.user_id || item?.voucher_item?.user_id || null,
+        item_owner_id: item?.promo_item?.user_id || item?.voucher_item?.user_id || null,
+        owner_validation: true,
+        validation_purpose: 'tenant_scan',
+        owner_only: false,
+      });
+      
+      // Generate PNG data URL langsung
+      const dataUrl = await QRCode.toDataURL(qrData, {
+        width: 1024,
+        margin: 2,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        },
+        errorCorrectionLevel: 'H'
+      });
+      
+      // Trigger download
       const link = document.createElement('a');
       const title = (item?.ad?.title || item?.voucher?.name || 'Promo').replace(/[^a-z0-9]/gi, '_');
       const code = item?.code || 'Code';
       link.download = `QR_${title}_${code}.png`;
       link.href = dataUrl;
-      link.clickا();
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
     } catch (err) {
-      console.error('Gagal mengunduh QR:', err);
-      alert('Gagal mengunduh QR Code. Silakan coba lagi.');
+      console.error('Download error:', err);
+      alert('Gagal download QR. Pastikan library qrcode terinstall.');
     }
   };
 
