@@ -10,7 +10,7 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
-import { BrowserMultiFormatReader } from "@zxing/library";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -45,29 +45,28 @@ export default function ScanQR() {
     if (!file) return;
 
     const imageUrl = URL.createObjectURL(file);
-
     const img = new Image();
 
     img.onload = async () => {
+    
+      console.log(
+        "Image loaded",
+        img.width,
+        img.height
+      );
       try {
-        const reader = new BrowserMultiFormatReader();
+          const reader = new BrowserMultiFormatReader();
+          console.log("START DECODE");
 
-        const result = await reader.decodeFromImageElement(img);
+          const result = await reader.decodeFromImageUrl(imageUrl);          console.log("SUCCESS");
+          console.log(result);
+          handleScanResult(result.getText());
 
-        console.log(result.getText());
+    } catch (err) {
+      console.error("ZXING ERROR =", err);
 
-        handleScanResult(result.getText());
-
-      } catch (err) {
-        console.error("ZXING ERROR", err);
-            
-        alert(
-          err?.message ||
-          JSON.stringify(err)
-        );
-      }}
-    };
-
+      alert(err.message || JSON.stringify(err));
+    }
     img.src = imageUrl;
   };
 
@@ -640,4 +639,5 @@ export default function ScanQR() {
       </div>
     </div>
   );
+}
 }
