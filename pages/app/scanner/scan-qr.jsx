@@ -43,49 +43,36 @@ export default function ScanQR() {
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setLoading(true);
-
-    try {
-      const reader = new FileReader();
-
-      reader.onload = async () => {
-        try {
+    
+    const reader = new FileReader();
+      reader.onload = () => {
           const img = new Image();
 
           img.onload = async () => {
-            try {
-              const hints = new Map();
-              hints.set(DecodeHintType.TRY_HARDER, true);
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d"); 
+            
+            canvas.width = img.width;
+            canvas.height = img.height;
 
-              const codeReader = new BrowserMultiFormatReader(hints);
-              const result = await codeReader.decodeFromImageElement(img);
-              console.log("QR RESULT :", result.getText());
+            ctx.drawImage(img,0,0);
+            try{
+                const codeReader = new BrowserMultiFormatReader();
+                const result = await codeReader.decodeFromCanvas(canvas);
 
-              handleScanResult(result.getText());
-            } catch (err) {
-              console.error("Decode gagal:", err);
+                console.log(result.getText());
 
-              setLoading(false);
-              setIsScanning(true);
-
-              alert("QR Code tidak dapat dibaca");
+                handleScanResult(result.getText());
+              } catch(err){
+                console.error(err);
+          
+                alert("QR gagal dibaca");
+              }
             }
-          };
-
-          img.src = reader.result;
-        } catch (err) {
-          console.error(err);
-        }
-      };
-
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error(err);
-      setLoading(false);
-    }
-
-    e.target.value = "";
-  };
+            img.src = reader.result;
+          }
+          reader.readAsDataURL(file);
+        };
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
   const handleValidationScan = async (qrData) => {
