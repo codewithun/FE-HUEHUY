@@ -43,26 +43,36 @@ export default function ScanQR() {
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
     const reader = new FileReader();
     reader.onload = () => {
-      const img = new Image();
-        img.onload = async () => {
-          
-          try {
-            const codeReader = new BrowserMultiFormatReader();
-            const result = await codeReader.decodeFromImageElement(img);
-            console.log("QR RESULT :", result.getText());
-            handleScanResult(result.getText());
-          } catch (err) {
-            console.error("QR gagal dibaca :", err);
-            alert("QR Code tidak dapat dibaca");
-          }
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
+    const img = new Image();
+    img.onload = async () => {
+      try {
+        // buat canvas
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        ctx.drawImage(img, 0, 0);
+
+        const codeReader = new BrowserMultiFormatReader();
+
+        const result = await codeReader.decodeFromCanvas(canvas);
+
+        console.log("QR RESULT :", result.getText());
+
+        handleScanResult(result.getText());
+      } catch (err) {
+        console.error("QR gagal dibaca :", err);
+        alert("QR Code tidak dapat dibaca");
+      }
     };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+};
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
   const handleValidationScan = async (qrData) => {

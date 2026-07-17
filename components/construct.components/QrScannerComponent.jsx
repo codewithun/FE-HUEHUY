@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { QrReader } from 'react-qr-reader';
-import { BrowserMultiFormatReader } from "@zxing/library";
+// import { BrowserMultiFormatReader } from "@zxing/browser";
 import NoSSR from '../base.components/NoSSR';
 
 export default function QrScannerComponent({ onScan }) {
