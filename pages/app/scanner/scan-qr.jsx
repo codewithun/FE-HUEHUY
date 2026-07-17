@@ -94,6 +94,18 @@ const tryZxingFallback = async (canvas) => {
   }
 };
 
+// ✅ Helper: upscale gambar kecil dengan nearest-neighbor (tanpa smoothing)
+// biar tepi modul QR tetap tegas, gak buram
+const upscaleCanvas = (sourceCanvas, targetSize) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = targetSize;
+  canvas.height = targetSize;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false; // ✅ kunci utama: no blur pas upscale
+  ctx.drawImage(sourceCanvas, 0, 0, targetSize, targetSize);
+  return canvas;
+};
+
 const handleImageUpload = async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
@@ -102,27 +114,48 @@ const handleImageUpload = async (e) => {
 
   reader.onload = async () => {
     try {
-      // ✅ Load dengan orientasi EXIF sudah diperbaiki
       const bitmap = await loadImageFixedOrientation(reader.result);
+      const minDim = Math.min(bitmap.width, bitmap.height);
 
-      const attempts = [1000, bitmap.width]; // coba resize dulu, lalu resolusi asli
+      // Canvas dasar di resolusi asli
+      const baseCanvas = document.createElement("canvas");
+      baseCanvas.width = bitmap.width;
+      baseCanvas.height = bitmap.height;
+      const baseCtx = baseCanvas.getContext("2d", { willReadFrequently: true });
+      baseCtx.drawImage(bitmap, 0, 0);
+
       let finalResult = null;
 
-      for (const maxDim of attempts) {
-        const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(bitmap.width * scale);
-        canvas.height = Math.round(bitmap.height * scale);
+      // ✅ Susunan percobaan: kalau gambar kecil, prioritaskan upscale dulu
+      const attempts = [];
+      if (minDim < 400) {
+        // Gambar kecil: coba upscale beberapa level
+        attempts.push(
+          { canvas: upscaleCanvas(baseCanvas, bitmap.width * 4), label: "upscale 4x" },
+          { canvas: upscaleCanvas(baseCanvas, bitmap.width * 2), label: "upscale 2x" },
+          { canvas: baseCanvas, label: "original" }
+        );
+      } else {
+        // Gambar besar: seperti sebelumnya, resize turun dulu
+        const scale = Math.min(1, 1000 / Math.max(bitmap.width, bitmap.height));
+        const resizedCanvas = document.createElement("canvas");
+        resizedCanvas.width = Math.round(bitmap.width * scale);
+        resizedCanvas.height = Math.round(bitmap.height * scale);
+        resizedCanvas.getContext("2d").drawImage(bitmap, 0, 0, resizedCanvas.width, resizedCanvas.height);
+        attempts.push(
+          { canvas: resizedCanvas, label: "resized down" },
+          { canvas: baseCanvas, label: "original" }
+        );
+      }
+
+      for (const { canvas, label } of attempts) {
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
-        // Strategi 1: jsQR (normal + kontras tinggi)
         finalResult = tryJsQR(canvas, ctx);
-        if (finalResult) break;
+        if (finalResult) { console.log("berhasil via:", label, "jsQR"); break; }
 
-        // Strategi 2: fallback zxing TRY_HARDER
         finalResult = await tryZxingFallback(canvas);
-        if (finalResult) break;
+        if (finalResult) { console.log("berhasil via:", label, "zxing"); break; }
       }
 
       if (finalResult) {
