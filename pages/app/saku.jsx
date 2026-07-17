@@ -866,7 +866,7 @@ export default function Save() {
                       <>
                         <div className="bg-slate-50 rounded-xl p-4 mb-4">
                           <QRCodeSVG
-                            value={JSON.stringify({ code: selected?.voucher_item?.code || selected?.code || 'NO_CODE', type: 'voucher', item_id: selected?.voucher_item?.id || null, user_id: selected?.voucher_item?.user_id || null, item_owner_id: selected?.voucher_item?.user_id || null, owner_validation: true, timestamp: Date.now(), validation_purpose: 'tenant_scan', owner_only: false })}
+                            value={JSON.stringify({ code: selected?.voucher_item?.code || selected?.code || 'NO_CODE', type: 'voucher', item_id: selected?.voucher_item?.id || null, user_id: selected?.voucher_item?.user_id || null, item_owner_id: selected?.voucher_item?.user_id || null, owner_validation: true, validation_purpose: 'tenant_scan', owner_only: false })}
                             size={180} bgColor="#f8fafc" fgColor="#0f172a" level="H" includeMargin={true} className="mx-auto rounded-lg"
                           />
                         </div>
@@ -931,7 +931,7 @@ export default function Save() {
                     <>
                       <div className="bg-slate-50 rounded-xl p-4 mb-4">
                         <QRCodeSVG
-                          value={JSON.stringify({ code: selected?.promo_item?.code || selected?.code || 'NO_CODE', type: 'promo', item_id: selected?.promo_item?.id || null, user_id: selected?.promo_item?.user_id || null, item_owner_id: selected?.promo_item?.user_id || null, owner_validation: true, timestamp: Date.now(), validation_purpose: 'tenant_scan', owner_only: false })}
+                          value={JSON.stringify({ code: selected?.promo_item?.code || selected?.code || 'NO_CODE', type: 'promo', item_id: selected?.promo_item?.id || null, user_id: selected?.promo_item?.user_id || null, item_owner_id: selected?.promo_item?.user_id || null, owner_validation: true, validation_purpose: 'tenant_scan', owner_only: false })}
                           size={180} bgColor="#f8fafc" fgColor="#0f172a" level="H" includeMargin={true} className="mx-auto rounded-lg"
                         />
                       </div>
@@ -986,7 +986,6 @@ export default function Save() {
               user_id: selected?.promo_item?.user_id || selected?.voucher_item?.user_id || null,
               item_owner_id: selected?.promo_item?.user_id || selected?.voucher_item?.user_id || null,
               owner_validation: true,
-              timestamp: Date.now(),
               validation_purpose: 'tenant_scan',
               owner_only: false,
             })}
