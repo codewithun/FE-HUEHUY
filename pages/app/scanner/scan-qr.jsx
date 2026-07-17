@@ -49,22 +49,69 @@ export default function ScanQR() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-const reader = new FileReader();
-
-reader.onload = () => {
-    const img = new Image();
-
-    img.onload = () => {
-
-        console.log("width :", img.width);
-        console.log("height:", img.height);
-
-    };
-
-    img.src = reader.result;
-};
-
-reader.readAsDataURL(file);
+  const reader = new FileReader();
+    
+  reader.onload = () => {
+      const img = new Image();
+  
+      img.onload = () => {
+      
+          console.log("width :", img.width);
+          console.log("height:", img.height);
+      
+          // ===========================
+          // BUAT CANVAS
+          // ===========================
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d", {
+              willReadFrequently: true,
+          });
+        
+          canvas.width = img.width;
+          canvas.height = img.height;
+        
+          // MASUKKAN GAMBAR KE CANVAS
+          ctx.drawImage(img, 0, 0);
+        
+          // AMBIL PIXEL
+          const imageData = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+          );
+        
+          try {
+              const luminanceSource = new RGBLuminanceSource(
+                  imageData.data,
+                  canvas.width,
+                  canvas.height
+              );
+            
+              const binaryBitmap = new BinaryBitmap(
+                  new HybridBinarizer(luminanceSource)
+              );
+            
+              const reader = new MultiFormatReader();
+            
+              const result = reader.decode(binaryBitmap);
+            
+              console.log("QR RESULT :", result.getText());
+            
+              // supaya sama kayak scan kamera
+              handleScanResult(result.getText());
+            
+          } catch (err) {
+              console.error("QR gagal dibaca :", err);
+              alert("QR Code tidak dapat dibaca");
+          }
+        
+      };
+    
+      img.src = reader.result;
+  };
+  
+  reader.readAsDataURL(file);
         };
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
