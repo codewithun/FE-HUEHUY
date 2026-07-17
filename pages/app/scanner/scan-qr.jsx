@@ -10,7 +10,7 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
-import { BrowserMultiFormatReader, DecodeHintType } from "@zxing/library";
+import { BrowserMultiFormatReader } from "@zxing/library";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -56,17 +56,27 @@ export default function ScanQR() {
             canvas.height = img.height;
 
             ctx.drawImage(img,0,0);
+
+            console.log("canvas:", canvas.width, canvas.height);
+            console.log("img:", img.width, img.height);
             try{
                 const codeReader = new BrowserMultiFormatReader();
+
+                document.body.appendChild(canvas);        
                 const result = await codeReader.decodeFromCanvas(canvas);
+
+                console.log(codeReader);
+                console.log(typeof codeReader.decodeFromCanvas);
 
                 console.log(result.getText());
 
                 handleScanResult(result.getText());
-              } catch(err){
-                console.error(err);
-          
-                alert("QR gagal dibaca");
+              } catch (err) {
+                  console.error("ZXING ERROR:", err);
+                  console.error("name:", err.name);
+                  console.error("message:", err.message);
+                            
+                  alert(err.name + "\n" + err.message);
               }
             }
             img.src = reader.result;
