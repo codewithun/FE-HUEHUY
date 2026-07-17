@@ -10,7 +10,7 @@ import { token_cookie_name } from '../../../helpers';
 import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
-import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BrowserMultiFormatReader, DecodeHintType } from "@zxing/library";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
 const getAuthHeader = () => {
@@ -43,22 +43,48 @@ export default function ScanQR() {
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setLoading(true);
 
-    const imageUrl = URL.createObjectURL(file);
-    const img = new Image();
+    try {
+      const reader = new FileReader();
 
-    img.onload = async () => {
-      try {
-        const reader = new BrowserMultiFormatReader();
-        const result = await reader.decodeFromImageUrl(imageUrl);
-      
-        handleScanResult(result.getText());
-      } catch (err) {
-        console.error(err);
-      }
-    };
+      reader.onload = async () => {
+        try {
+          const img = new Image();
 
-    img.src = imageUrl;
+          img.onload = async () => {
+            try {
+              const hints = new Map();
+              hints.set(DecodeHintType.TRY_HARDER, true);
+
+              const codeReader = new BrowserMultiFormatReader(hints);
+              const result = await codeReader.decodeFromImageElement(img);
+              console.log("QR RESULT :", result.getText());
+
+              handleScanResult(result.getText());
+            } catch (err) {
+              console.error("Decode gagal:", err);
+
+              setLoading(false);
+              setIsScanning(true);
+
+              alert("QR Code tidak dapat dibaca");
+            }
+          };
+
+          img.src = reader.result;
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+
+    e.target.value = "";
   };
 
   // ✅ BARU: Function untuk handle QR validation (tenant_scan)
