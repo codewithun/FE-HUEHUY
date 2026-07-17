@@ -49,21 +49,20 @@ export default function ScanQR() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-  const reader = new FileReader();
-    
-  img.onload = () => {
-  
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-  
-      canvas.width = img.width;
-      canvas.height = img.height;
-  
-      ctx.drawImage(img,0,0);
-  
-      document.body.appendChild(canvas);
-  
-  };
+const reader = new FileReader();
+
+reader.onload = () => {
+    const img = new Image();
+
+    img.onload = () => {
+
+        console.log("width :", img.width);
+        console.log("height:", img.height);
+
+    };
+
+    img.src = reader.result;
+};
 
 reader.readAsDataURL(file);
         };
