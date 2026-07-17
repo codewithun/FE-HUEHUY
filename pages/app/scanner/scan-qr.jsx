@@ -11,6 +11,7 @@ import { Decrypt } from '../../../helpers/encryption.helpers';
 import Cookies from 'js-cookie';
 import { useUserContext } from '../../../context/user.context';
 import { BrowserMultiFormatReader } from "@zxing/browser";
+import { DecodeHintType, BarcodeFormat } from "@zxing/library";
 import jsQR from "jsqr";
 
 // ✅ Helper untuk mendapatkan auth header dari localStorage/cookie
@@ -41,63 +42,102 @@ export default function ScanQR() {
   const [showContactConfirm, setShowContactConfirm] = useState(false);
   const [contactData, setContactData] = useState(null);
 
-const handleImageUpload = (e) => {
+// ✅ Helper: load image dengan EXIF orientation otomatis diperbaiki
+const loadImageFixedOrientation = (dataUrl) =>
+  new Promise((resolve, reject) => {
+    fetch(dataUrl)
+      .then((r) => r.blob())
+      .then((blob) => createImageBitmap(blob, { imageOrientation: "from-image" }))
+      .then(resolve)
+      .catch(reject);
+  });
+
+// ✅ Helper: tingkatkan kontras jadi B/W tegas (bantu banget buat foto low-contrast)
+const boostContrast = (ctx, width, height) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const v = gray > 128 ? 255 : 0; // threshold sederhana
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return imageData;
+};
+
+const tryJsQR = (canvas, ctx) => {
+  const { width, height } = canvas;
+  // Percobaan 1: normal
+  let data = ctx.getImageData(0, 0, width, height);
+  let code = jsQR(data.data, width, height, { inversionAttempts: "attemptBoth" });
+  if (code?.data) return code.data;
+
+  // Percobaan 2: kontras tinggi
+  const boosted = boostContrast(ctx, width, height);
+  code = jsQR(boosted.data, width, height, { inversionAttempts: "attemptBoth" });
+  if (code?.data) return code.data;
+
+  return null;
+};
+
+const tryZxingFallback = async (canvas) => {
+  try {
+    const hints = new Map();
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE]);
+
+    const codeReader = new BrowserMultiFormatReader(hints);
+    const result = await codeReader.decodeFromCanvas(canvas);
+    return result?.getText() || null;
+  } catch {
+    return null;
+  }
+};
+
+const handleImageUpload = async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
 
   const reader = new FileReader();
 
-  reader.onload = () => {
-    const img = new Image();
+  reader.onload = async () => {
+    try {
+      // ✅ Load dengan orientasi EXIF sudah diperbaiki
+      const bitmap = await loadImageFixedOrientation(reader.result);
 
-    img.onload = () => {
-      try {
-        // ✅ Batasi dimensi maksimal biar binarizer lebih akurat & cepat
-        const MAX_DIM = 1000;
-        const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+      const attempts = [1000, bitmap.width]; // coba resize dulu, lalu resolusi asli
+      let finalResult = null;
 
+      for (const maxDim of attempts) {
+        const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
         const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Strategi 1: jsQR (normal + kontras tinggi)
+        finalResult = tryJsQR(canvas, ctx);
+        if (finalResult) break;
 
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        // ✅ jsQR jauh lebih toleran untuk gambar upload/screenshot
-        let code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "attemptBoth",
-        });
-
-        // ✅ Kalau masih gagal, coba lagi di resolusi asli (buat QR yang kecil banget)
-        if (!code && scale < 1) {
-          const fullCanvas = document.createElement("canvas");
-          fullCanvas.width = img.width;
-          fullCanvas.height = img.height;
-          const fullCtx = fullCanvas.getContext("2d");
-          fullCtx.drawImage(img, 0, 0);
-          const fullData = fullCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height);
-          code = jsQR(fullData.data, fullData.width, fullData.height, {
-            inversionAttempts: "attemptBoth",
-          });
-        }
-
-        if (code && code.data) {
-          console.log("QR RESULT:", code.data);
-          handleScanResult(code.data);
-        } else {
-          console.error("QR gagal dibaca: tidak ditemukan pola QR di gambar");
-          alert("QR Code tidak dapat dibaca. Pastikan foto QR jelas, tidak buram, dan tidak terlalu jauh/kecil.");
-        }
-      } catch (err) {
-        console.error("QR gagal dibaca:", err);
-        alert("QR Code tidak dapat dibaca");
+        // Strategi 2: fallback zxing TRY_HARDER
+        finalResult = await tryZxingFallback(canvas);
+        if (finalResult) break;
       }
-    };
 
-    img.onerror = () => alert("Gagal memuat gambar, coba file lain");
-    img.src = reader.result;
+      if (finalResult) {
+        console.log("QR RESULT:", finalResult);
+        handleScanResult(finalResult);
+      } else {
+        console.error("QR gagal dibaca: semua strategi gagal");
+        alert(
+          "QR Code tidak dapat dibaca. Coba foto ulang dengan QR menghadap lurus ke kamera, pencahayaan cukup, dan tidak blur."
+        );
+      }
+    } catch (err) {
+      console.error("QR gagal dibaca:", err);
+      alert("QR Code tidak dapat dibaca");
+    }
   };
 
   reader.onerror = () => alert("Gagal membaca file");
