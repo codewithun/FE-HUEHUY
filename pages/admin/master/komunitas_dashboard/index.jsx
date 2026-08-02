@@ -168,13 +168,13 @@ export default function KomunitasDashboard() {
       const json = await res.json();
       const data = json?.data?.data || json?.data || json?.members || [];
       setMemberList(Array.isArray(data) ? data : []);
+      await fetchMemberRequestCount(row.id);
     } catch (e) {
       console.error("Member error:", e);
     } finally {
       setMemberLoading(false);
     }
   };
-  await fetchMemberRequestCount(row.id);
 
   const fetchMemberRequestCount = async (communityId) => {
     if (!communityId) return;
