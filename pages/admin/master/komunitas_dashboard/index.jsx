@@ -66,6 +66,7 @@ export default function KomunitasDashboard() {
   const [memberTab, setMemberTab] = useState("members");
   const [memberList, setMemberList] = useState([]);
   const [memberLoading, setMemberLoading] = useState(false);
+  const [memberRequestCount, setMemberRequestCount] = useState(0);
   const [memberRequestRefresh, setMemberRequestRefresh] = useState(false);
   const [memberEmail, setMemberEmail] = useState("");
   const [memberAddLoading, setMemberAddLoading] = useState(false);
@@ -133,6 +134,7 @@ export default function KomunitasDashboard() {
       setMemberLoading(false);
     }
   };
+  await fetchMemberRequestCount(row.id);
 
   const handleMemberRequest = async (requestId, action) => {
     try {
@@ -144,6 +146,7 @@ export default function KomunitasDashboard() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       setMemberRequestRefresh((s) => !s);
+      await fetchMemberRequestCount(activeCommunity.id);
 
       if (memberTab === "requests") {
         setRefresh((s) => !s);
@@ -170,6 +173,32 @@ export default function KomunitasDashboard() {
       console.error("Member error:", e);
     } finally {
       setMemberLoading(false);
+    }
+  };
+  await fetchMemberRequestCount(row.id);
+
+  const fetchMemberRequestCount = async (communityId) => {
+    if (!communityId) return;
+
+    try {
+      const res = await fetch(
+        api(`admin/communities/${communityId}/member-requests`),
+        {
+          headers: headersJSON(),
+        }
+      );
+
+      const json = await res.json();
+
+      const data =
+        json?.data?.data ||
+        json?.data ||
+        [];
+
+      setMemberRequestCount(Array.isArray(data) ? data.length : 0);
+    } catch (e) {
+      console.error("Request count error:", e);
+      setMemberRequestCount(0);
     }
   };
 
@@ -508,7 +537,7 @@ formControl={{
               onClick={() => setMemberTab("members")}
             />
             <ButtonComponent
-              label="Permintaan Bergabung"
+              label={`Permintaan Bergabung (${memberRequestCount})`}
               variant={memberTab === "requests" ? "solid" : "outline"}
               onClick={() => setMemberTab("requests")}
             />
