@@ -128,6 +128,7 @@ export default function KomunitasDashboard() {
         [];
 
       setMemberList(Array.isArray(data) ? data : []);
+      await fetchMemberRequestCount(row.id);
     } catch (e) {
       console.error("Member error:", e);
     } finally {
