@@ -134,7 +134,6 @@ export default function KomunitasDashboard() {
       setMemberLoading(false);
     }
   };
-  await fetchMemberRequestCount(row.id);
 
   const handleMemberRequest = async (requestId, action) => {
     try {
