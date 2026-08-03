@@ -169,7 +169,7 @@ export default function KomunitasDashboard() {
       const json = await res.json();
       const data = json?.data?.data || json?.data || json?.members || [];
       setMemberList(Array.isArray(data) ? data : []);
-      await fetchMemberRequestCount(row.id);
+      await fetchMemberRequestCount(communityId);
     } catch (e) {
       console.error("Member error:", e);
     } finally {
@@ -243,6 +243,33 @@ export default function KomunitasDashboard() {
       setMemberAddLoading(false);
     }
   };
+
+  const handleChangeRole = async (member) => {
+  const isAdmin =
+    member.role === "admin" ||
+    member.community_role === "admin" ||
+    member.is_admin === true;
+
+  try {
+    await fetch(
+      api(
+        `admin/communities/${activeCommunity.id}/members/${member.id}/role`
+      ),
+      {
+        method: "PATCH",
+        headers: headersJSON(),
+        body: JSON.stringify({
+          role: isAdmin ? "member" : "admin",
+        }),
+      }
+    );
+
+    fetchMembers(activeCommunity.id);
+  } catch (err) {
+    console.error(err);
+    alert("Gagal mengubah role");
+  }
+};
 
   /* =============================
      CREATE / UPDATE
@@ -368,6 +395,28 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
       selector: "name",
       label: "Nama",
       item: (row) => <b>{row.name || row.email || "-"}</b>,
+    },
+    {
+      selector: "role",
+      label: "Role",
+      item: (row) => {
+        const isAdmin =
+          row.role === "admin" ||
+          row.community_role === "admin" ||
+          row.is_admin === true;
+      
+        return (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-semibold ${
+              isAdmin
+                ? "bg-blue-100 text-blue-700"
+                : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            {isAdmin ? "Admin" : "Member"}
+          </span>
+        );
+      },
     },
     {
       selector: "email",
@@ -593,6 +642,21 @@ formControl={{
                   setToRefresh={memberRequestRefresh}
                   actionControl={{
                     except: ["edit", "detail", "delete"],
+                  
+                    include: (row) => {
+                      const isAdmin =
+                        row.role === "admin" ||
+                        row.community_role === "admin" ||
+                        row.is_admin === true;
+                    
+                      return (
+                        <ButtonComponent
+                          size="xs"
+                          label={isAdmin ? "Jadikan Member" : "Jadikan Admin"}
+                          onClick={() => handleChangeRole(row)}
+                        />
+                      );
+                    },
                   }}
                 />
               )}
