@@ -554,10 +554,18 @@ formControl={{
       },
     },
     {
+      type: "select",
       construction: {
         name: "corporate_id",
         label: "Mitra Komunitas",
-        placeholder: "Masukkan ID Mitra",
+        validations: {
+          required: true,
+        },
+        fetch: {
+          path: "admin/corporates",
+          label: "name",
+          value: "id",
+        },
       },
     },
     {
