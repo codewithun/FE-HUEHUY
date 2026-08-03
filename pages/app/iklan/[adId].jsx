@@ -396,6 +396,7 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoMessage, setInfoMessage] = useState('');
+  const [showChatOption, setShowChatOption] = useState(false);
 
   const handleShare = () => setShowShareModal(true);
   const handleReport = () => setShowReportModal(true);
@@ -973,20 +974,12 @@ export default function AdDetailUnified({ initialAd = null, currentUrl = '' }) {
             <div className="lg:max-w-sm lg:mx-auto">
               <button
                 onClick={() => {
-                  if (adData?.seller?.phone) {
-                    const phone = String(adData.seller.phone).replace(/\s+/g, '');
-                    // Format nomor untuk WhatsApp (hapus karakter non-digit, tambah 62 jika dimulai dengan 0)
-                    let formattedPhone = phone.replace(/\D/g, '');
-                    if (formattedPhone.startsWith('0')) {
-                      formattedPhone = '62' + formattedPhone.substring(1);
-                    } else if (!formattedPhone.startsWith('62')) {
-                      formattedPhone = '62' + formattedPhone;
-                    }
-
-                    const message = encodeURIComponent(`Halo, saya tertarik dengan iklan "${adData.title}". Bisakah Anda memberikan informasi lebih lanjut?`);
-                    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
-                    window.open(whatsappUrl, '_blank');
-                  }
+                  console.log(adData.seller);
+                  router.push(
+                    `/app/pesan/${adData.seller.id}?targetName=${encodeURIComponent(
+                      adData.seller.name
+                    )}`
+                  );
                 }}
                 className="w-full py-4 lg:py-3.5 rounded-[15px] lg:rounded-xl font-bold text-lg lg:text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white focus:ring-4 focus:ring-opacity-50 flex items-center justify-center"
                 style={{
