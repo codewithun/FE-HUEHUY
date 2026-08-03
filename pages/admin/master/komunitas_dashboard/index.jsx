@@ -479,6 +479,25 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
           : "-",
     },
   ], []);
+  const [corporates, setCorporates] = useState([]);
+
+useEffect(() => {
+  const loadCorporate = async () => {
+    try {
+      const res = await fetch(api("admin/corporates"), {
+        headers: headersJSON(),
+      });
+
+      const json = await res.json();
+
+      setCorporates(json.data || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  loadCorporate();
+}, []);
 
   /* =============================
      RENDER
@@ -558,14 +577,10 @@ formControl={{
       construction: {
         name: "corporate_id",
         label: "Mitra Komunitas",
-        validations: {
-          required: true,
-        },
-        fetch: {
-          path: "admin/corporates",
-          label: "name",
-          value: "id",
-        },
+        options: corporates.map(item => ({
+          label: item.name,
+          value: item.id,
+        })),
       },
     },
     {
