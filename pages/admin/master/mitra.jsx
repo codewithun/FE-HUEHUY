@@ -28,6 +28,17 @@ export default function ManageCorporate() {
         columnControl={{
           custom: [
             {
+              selector: 'id',
+              label: 'ID Mitra',
+              sortable: true,
+              width: '100px',
+              item: ({ id }) => (
+                <span className="font-semibold text-primary">
+                  {id}
+                </span>
+              ),
+            },
+            {
               selector: 'name',
               label: 'Nama',
               sortable: true,
@@ -55,6 +66,13 @@ export default function ManageCorporate() {
         formControl={{
           contentType: 'multipart/form-data',
           custom: [
+            {
+              construction: {
+                name: 'id',
+                label: 'ID Mitra',
+                disabled: true,
+              },
+            },
             {
               construction: {
                 name: 'name',
