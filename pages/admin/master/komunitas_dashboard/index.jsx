@@ -6,7 +6,7 @@ import {
 
 import Cookies from "js-cookie";
 import Image from "next/image";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 
 import {
   ButtonComponent,
@@ -71,6 +71,8 @@ export default function KomunitasDashboard() {
   const [memberEmail, setMemberEmail] = useState("");
   const [memberAddLoading, setMemberAddLoading] = useState(false);
   const [memberAddError, setMemberAddError] = useState("");
+
+  const [corporates, setCorporates] = useState([]);
 
   const abortRef = useRef(null);
 
@@ -479,25 +481,24 @@ const submitCommunity = async ({ payload, isUpdate, row }) => {
           : "-",
     },
   ], []);
-  const [corporates, setCorporates] = useState([]);
 
-useEffect(() => {
-  const loadCorporate = async () => {
-    try {
-      const res = await fetch(api("admin/corporates"), {
-        headers: headersJSON(),
-      });
+  useEffect(() => {
+    const loadCorporate = async () => {
+      try {
+        const res = await fetch(api("admin/corporates"), {
+          headers: headersJSON(),
+        });
 
-      const json = await res.json();
+        const json = await res.json();
 
-      setCorporates(json.data || []);
-    } catch (e) {
-      console.error(e);
-    }
-  };
+        setCorporates(json.data || []);
+      } catch (e) {
+        console.error(e);
+      }
+    };
 
-  loadCorporate();
-}, []);
+    loadCorporate();
+  }, []);
 
   /* =============================
      RENDER
